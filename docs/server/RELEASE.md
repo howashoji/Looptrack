@@ -290,9 +290,8 @@ libfuse（LGPL-2.1）の対応ソースは、**毎回のリリースには添付
 そこに 7 本（runtime のソース + 6 部品のソース・約 11MB）と `SHA256SUMS` を置き、NOTICE と AppImage の中の案内から指します（`runtime-components.json` の `runtime.corresponding_source.url`）。
 同じ runtime を使うリリースには同じ資料が当てはまるので、置き場は tag ごとに 1 つで足ります。
 
-> **公開のときにやること**: 今の `corresponding_source` は `status: planned` で、URL は仮です。
-> 公開のときに上の 7 本（URL と SHA-256 はマニフェストにあります）を取り直して照合し、リリースを作って `url` を確定してください。
-> そのあと `status` を `published` に直し、NOTICE を作り直します。
+> **公開のときにやったこと**: `corresponding_source` は `status: published` で、`url` は確定済みです
+> （上の 7 本を取り直して照合し、1 回限りのリリースを作ってあります）。NOTICE も作り直し済みです。
 
 ## 2-3. install.sh と grants.sql（導入用の資産）
 

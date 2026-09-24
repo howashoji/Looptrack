@@ -23,9 +23,9 @@
     "lgpl_option": "6(a) + 6(d)",
     "relinking": "RELINKING.md",
     "corresponding_source": {
-      "status": "planned",
+      "status": "published",
       "url": "https://github.com/howashoji/looptrack/releases/tag/appimage-runtime-source-20251108",
-      "note": "TODO: 公開のときに、この 1 回限りのリリースを作り、runtime と下の 6 部品のソースの tarball（7 本・約 11MB）と SHA256SUMS を添付して URL を確定する。毎回のリリースには添付しない（LGPL-2.1 §6(d)＝配布物と同じ場所から同等のアクセスで取れる形）。"
+      "note": "runtime と下の 6 部品のソースの tarball（7 本・約 11MB）と SHA256SUMS を添付した 1 回限りのリリース。毎回のリリースには添付しない（LGPL-2.1 §6(d)＝配布物と同じ場所から同等のアクセスで取れる形）。"
     }
   },
   "components": [

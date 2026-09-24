@@ -218,8 +218,6 @@ Looptrack 自身（usr/bin/looptrack）はこれらの部品と一切リンク�
 tarball）の置き場と、runtime を作り直して差し替える手順（RELINKING.md）を示している。
 採った選択肢: LGPL-2.1 §6(a) + 6(d)。
 対応ソース一式（SHA256SUMS つき）: https://github.com/howashoji/looptrack/releases/tag/appimage-runtime-source-20251108
-  ↑ この置き場は公開のときに作る（それまでは、下の各部品の Source (tarball) の URL と SHA-256 から
-  同じものを取得できる）。
 作り直しの手順: AppImage の usr/share/doc/looptrack/licenses/RELINKING.md（リポジトリの deploy/release/licenses/RELINKING.md）。
 fusermount3（GPL-2.0）は同梱しておらず、利用者の OS に入っているものを実行する。
 (LICENSE)
