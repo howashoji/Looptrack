@@ -1,0 +1,13 @@
+# usage-report/no-period
+$ issue usage report
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 期間を指定してください: --since-last（前回のレポート以降）か --from 2026-09-01 [--to 2026-09-30]、依頼に応えるなら --request <番号>
+
+#### requests (0)
+
+#### files (0)

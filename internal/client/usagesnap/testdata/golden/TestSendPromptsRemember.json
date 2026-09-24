@@ -1,0 +1,34 @@
+[
+ {
+  "call": "{\"fn\":\"remember\",\"env\":{\"HOME\":\"<TMP>/001\",\"LOOPTRACK_API_URL\":\"https://im.invalid/im\",\"LOOPTRACK_PROJECT\":\"req\",\"XDG_CONFIG_HOME\":\"<TMP>/001/xdg\"},\"arg\":\"{\\\"id\\\": 2, \\\"duplicate\\\": false}\"}",
+  "out": "true"
+ },
+ {
+  "call": "{\"fn\":\"remember\",\"env\":{\"HOME\":\"<TMP>/001\",\"LOOPTRACK_API_URL\":\"https://im.invalid/im\",\"LOOPTRACK_PROJECT\":\"req\",\"XDG_CONFIG_HOME\":\"<TMP>/001/xdg\"},\"arg\":\"{\\\"id\\\": 3, \\\"send_prompts\\\": false}\"}",
+  "out": "false"
+ },
+ {
+  "call": "{\"fn\":\"remember\",\"env\":{\"HOME\":\"<TMP>/001\",\"LOOPTRACK_API_URL\":\"https://im.invalid/im\",\"LOOPTRACK_PROJECT\":\"req\",\"XDG_CONFIG_HOME\":\"<TMP>/001/xdg\"},\"arg\":\"null\"}",
+  "out": "false"
+ },
+ {
+  "call": "{\"fn\":\"remember\",\"env\":{\"HOME\":\"<TMP>/001\",\"LOOPTRACK_API_URL\":\"https://im.invalid/im\",\"LOOPTRACK_PROJECT\":\"req\",\"XDG_CONFIG_HOME\":\"<TMP>/001/xdg\"},\"arg\":\"{\\\"send_prompts\\\": \\\"yes\\\"}\"}",
+  "out": "false"
+ },
+ {
+  "call": "{\"fn\":\"remember\",\"env\":{\"HOME\":\"<TMP>/001\",\"LOOPTRACK_API_URL\":\"https://im.invalid/im\",\"LOOPTRACK_PROJECT\":\"other\",\"XDG_CONFIG_HOME\":\"<TMP>/001/xdg\"},\"arg\":\"{\\\"send_prompts\\\": true}\"}",
+  "out": "true"
+ },
+ {
+  "call": "{\"fn\":\"remember\",\"env\":{\"HOME\":\"<TMP>/001\",\"LOOPTRACK_API_URL\":\"https://im.invalid/im\",\"LOOPTRACK_PROJECT\":\"req\",\"XDG_CONFIG_HOME\":\"<TMP>/001/xdg\"},\"arg\":\"{}\"}",
+  "out": "false"
+ },
+ {
+  "call": "{\"fn\":\"allowed\",\"env\":{\"HOME\":\"<TMP>/001\",\"LOOPTRACK_API_URL\":\"https://im.invalid/im/api/v1/\",\"LOOPTRACK_PROJECT\":\"req\",\"XDG_CONFIG_HOME\":\"<TMP>/001/xdg\"}}",
+  "out": "false"
+ },
+ {
+  "call": "{\"fn\":\"remember\",\"env\":{\"HOME\":\"<TMP>/001\",\"XDG_CONFIG_HOME\":\"<TMP>/001/xdg\"},\"arg\":\"{\\\"send_prompts\\\": true}\"}",
+  "out": "false"
+ }
+]

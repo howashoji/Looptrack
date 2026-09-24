@@ -1,0 +1,46 @@
+CREATE TABLE usage_snapshots (
+  id                INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  project_id        INTEGER NOT NULL,
+  user_id           INTEGER NOT NULL,
+  token_id          INTEGER NULL,
+  received_at       DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now') || '000'),
+  client            TEXT    NOT NULL,
+  client_version    TEXT    NOT NULL DEFAULT '',
+  session_id        TEXT    NOT NULL,
+  conversation_id   TEXT    NOT NULL,
+  trigger_kind      TEXT    NOT NULL,
+  issue_id          INTEGER NULL,
+  op                TEXT    NULL,
+  issue_status      TEXT    NULL,
+  via               TEXT    NULL,
+  at                DATETIME NOT NULL,
+  main_input        INTEGER NOT NULL DEFAULT 0,
+  main_cache_create INTEGER NOT NULL DEFAULT 0,
+  main_cache_read   INTEGER NOT NULL DEFAULT 0,
+  main_output       INTEGER NOT NULL DEFAULT 0,
+  sub_input         INTEGER NOT NULL DEFAULT 0,
+  sub_cache_create  INTEGER NOT NULL DEFAULT 0,
+  sub_cache_read    INTEGER NOT NULL DEFAULT 0,
+  sub_output        INTEGER NOT NULL DEFAULT 0,
+  responses         INTEGER NOT NULL DEFAULT 0,
+  sub_responses     INTEGER NOT NULL DEFAULT 0,
+  by_model          TEXT    NULL,
+  io                TEXT    NULL,
+  human             TEXT    NULL,
+  segments          TEXT    NULL,
+  branch            TEXT    NOT NULL DEFAULT '',
+  branches          TEXT    NULL,
+  cwd_name          TEXT    NOT NULL DEFAULT '',
+  excluded          INTEGER NOT NULL DEFAULT 0,
+  dedupe_key        TEXT    NOT NULL,
+  CONSTRAINT uk_usage_snapshots_dedupe UNIQUE (dedupe_key),
+  CONSTRAINT fk_usage_snapshots_project FOREIGN KEY (project_id) REFERENCES projects (id),
+  CONSTRAINT fk_usage_snapshots_user FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT fk_usage_snapshots_issue FOREIGN KEY (issue_id) REFERENCES issues (id),
+  CONSTRAINT chk_usage_snapshots_trigger CHECK (trigger_kind IN ('issue_op', 'stop', 'session_end', 'manual', 'import'))
+);
+CREATE INDEX k_usage_snapshots_conversation ON usage_snapshots (project_id, conversation_id);
+CREATE INDEX k_usage_snapshots_issue ON usage_snapshots (issue_id);
+CREATE INDEX k_usage_snapshots_received ON usage_snapshots (project_id, received_at);
+CREATE TRIGGER trg_usage_snapshots_no_update BEFORE UPDATE ON usage_snapshots WHEN NOT EXISTS (SELECT 1 FROM append_only_unlock) BEGIN SELECT RAISE(ABORT, 'append-only: usage_snapshots は書き換えられません'); END;
+CREATE TRIGGER trg_usage_snapshots_no_delete BEFORE DELETE ON usage_snapshots WHEN NOT EXISTS (SELECT 1 FROM append_only_unlock) BEGIN SELECT RAISE(ABORT, 'append-only: usage_snapshots は削除できません'); END;

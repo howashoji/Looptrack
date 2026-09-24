@@ -1,0 +1,36 @@
+# summary/hook-json
+$ issue summary --hook-json --agent copilot
+
+#### exit 0
+
+#### stdout
+{"additionalContext": "── 進行中（In Progress） ──\n該当なし\n\n── レビュー待ち（In Review） ──\nID        TYPE        STATUS      PRI BLOCKED  ASSIGNEE     TITLE\nDEMO-0003 requirement In Review   P2  -        bob(!)       認証の要件\n(!) は担当がこのプロジェクトで変更できなくなった（権限の解除・無効化）もの。引き継ぐなら assign（MCP は assign_issue）\n\n── 着手可能（ready・上位 5 / 全 5 件） ──\nID        TYPE        STATUS      PRI BLOCKED   TITLE\nDEMO-0002 bug         Todo        P0  DEMO-0001 保存でエラーになる\n\n未クローズ 2 件（bug 0 件）", "hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "── 進行中（In Progress） ──\n該当なし\n\n── レビュー待ち（In Review） ──\nID        TYPE        STATUS      PRI BLOCKED  ASSIGNEE     TITLE\nDEMO-0003 requirement In Review   P2  -        bob(!)       認証の要件\n(!) は担当がこのプロジェクトで変更できなくなった（権限の解除・無効化）もの。引き継ぐなら assign（MCP は assign_issue）\n\n── 着手可能（ready・上位 5 / 全 5 件） ──\nID        TYPE        STATUS      PRI BLOCKED   TITLE\nDEMO-0002 bug         Todo        P0  DEMO-0001 保存でエラーになる\n\n未クローズ 2 件（bug 0 件）"}}
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/projects/demo/summary?limit=10
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+POST /im/api/v1/projects/demo/install
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "agent": "copilot",
+      "client": {
+        "arch": "$GOARCH",
+        "os": "$GOOS",
+        "version": "$VERSION"
+      },
+      "files": {},
+      "host": "$HOST",
+      "source": "",
+      "trigger": "hook",
+      "workspace": "ws"
+    }
+
+#### files (0)

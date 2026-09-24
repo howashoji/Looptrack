@@ -1,0 +1,43 @@
+{
+  "note": "LOOPTRACK_LOOP_NO_BLOCK=1（今の init の配線）は --no-block と同じ。TrustUnconfirmed より優先",
+  "args": [
+    "--agent",
+    "codex"
+  ],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "LOOPTRACK_LOOP_NO_BLOCK": "1"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "trust_unconfirmed": true,
+  "input": {
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "Stop",
+    "stop_hook_active": false
+  },
+  "event": {
+    "agent": "codex",
+    "name": "Stop",
+    "raw_name": "Stop",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app"
+  },
+  "result": {
+    "block": "引き継ぎが古いままです",
+    "system_message": "注意"
+  },
+  "output": {
+    "stdout": {
+      "systemMessage": "注意\n\n引き継ぎが古いままです"
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "system_message": "注意\n\n引き継ぎが古いままです"
+  }
+}

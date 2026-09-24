@@ -1,0 +1,41 @@
+{
+  "note": "Claude Code の SessionStart（source: startup）。kit の session-start-rules の注入",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "SessionStart",
+    "source": "startup"
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "SessionStart",
+    "raw_name": "SessionStart",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "source": "startup"
+  },
+  "result": {
+    "context": "毎セッション守る規律（kit/loop の rules から注入）"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": "毎セッション守る規律（kit/loop の rules から注入）"
+      }
+    },
+    "exit_code": 0
+  }
+}

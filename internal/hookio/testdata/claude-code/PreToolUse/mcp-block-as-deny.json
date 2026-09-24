@@ -1,0 +1,58 @@
+{
+  "note": "MCP のツール名 mcp__<サーバ>__<ツール>。PreToolUse の Block は Deny に寄せる",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__im-oauth__set_status",
+    "tool_input": {
+      "id": "IM-0001",
+      "status": "Done"
+    }
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "PreToolUse",
+    "raw_name": "PreToolUse",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "MCP",
+      "raw_name": "mcp__im-oauth__set_status",
+      "server": "im-oauth",
+      "name": "set_status",
+      "input": {
+        "id": "IM-0001",
+        "status": "Done"
+      }
+    }
+  },
+  "result": {
+    "block": "受け入れ条件を検証してから"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "受け入れ条件を検証してから"
+      }
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "deny": "受け入れ条件を検証してから"
+  }
+}

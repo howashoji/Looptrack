@@ -1,0 +1,41 @@
+# verify/timeout
+$ issue verify DEMO-0001 --timeout 0.5
+
+#### exit 1
+
+#### stdout
+DEMO-0001 の検証コマンド 1 件を実行します（場所: $TMP/ws・本文 01234567）
+[1/1] $ sleep 5
+[1/1] timeout sleep 5（時間切れ・$SEC 秒）
+結果: 0/1 成功・1 失敗（$SEC 秒）
+verify を記録: DEMO-0001（0/1 成功・1 失敗）
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+POST /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "body_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "host": "$HOST",
+      "results": [
+        {
+          "command": "sleep 5",
+          "duration_ms": 0,
+          "exit_code": null,
+          "output_tail": "",
+          "status": "timeout"
+        }
+      ],
+      "workspace": "ws"
+    }
+
+#### files (0)

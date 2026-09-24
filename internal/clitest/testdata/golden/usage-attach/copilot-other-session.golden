@@ -1,0 +1,19 @@
+# usage-attach/copilot-other-session
+$ issue usage attach DEMO-0001
+env COPILOT_AGENT_SESSION_ID=0f0f0f0f-0000-4000-8000-000000000001
+env COPILOT_CLI=1
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: Copilot CLI の会話のトークンが見つかりません（1 個の OpenTelemetry のファイル出力に gen_ai.conversation.id = 0f0f0f0f-0000-4000-8000-000000000001 のスパンがありません。Copilot CLI は OTel の出力先（COPILOT_OTEL_FILE_EXPORTER_PATH）を hook にもシェルにも渡さないので、出力先は $COPILOT_HOME/otel/ の下（COPILOT_HOME が無ければ ~/.copilot/otel/。例: COPILOT_OTEL_FILE_EXPORTER_PATH=$TMP/home/.copilot/otel/copilot-otel.jsonl）にしてください。VS Code の outfile も同じ置き場にします）
+
+#### requests (0)
+
+#### files (1)
+home/.copilot/otel/copilot-otel.jsonl (0644)
+    {"type":"span","traceId":"t1","spanId":"c1","parentSpanId":"a1","name":"chat x","kind":0,"startTime":[1714611601,0],"endTime":[1714611603,500000000],"attributes":{"gen_ai.operation.name":"chat","gen_ai.conversation.id":"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f","gen_ai.response.model":"gpt-5.6-luna","gen_ai.usage.input_tokens":120000,"gen_ai.usage.cache_read.input_tokens":100000,"gen_ai.usage.cache_write.input_tokens":19990,"gen_ai.usage.output_tokens":500,"gen_ai.usage.reasoning.output_tokens":7},"resource":{"attributes":{"service.name":"github-copilot","service.version":"1.0.86"}}}
+    {"type":"span","traceId":"t1","spanId":"c2","parentSpanId":"a1","name":"chat x","kind":0,"startTime":[1714611605,0],"endTime":[1714611607,500000000],"attributes":{"gen_ai.operation.name":"chat","gen_ai.conversation.id":"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f","gen_ai.response.model":"gpt-5.6-luna","gen_ai.usage.input_tokens":123000,"gen_ai.usage.cache_read.input_tokens":115000,"gen_ai.usage.cache_write.input_tokens":7985,"gen_ai.usage.output_tokens":450},"resource":{"attributes":{"service.name":"github-copilot","service.version":"1.0.86"}}}
+    {"type":"span","traceId":"t1","spanId":"a1","parentSpanId":null,"name":"invoke_agent x","kind":0,"startTime":[1714611600,0],"endTime":[1714611602,500000000],"attributes":{"gen_ai.operation.name":"invoke_agent","gen_ai.conversation.id":"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f","gen_ai.usage.input_tokens":243000,"gen_ai.usage.output_tokens":950,"github.copilot.turn_count":2},"resource":{"attributes":{"service.name":"github-copilot","service.version":"1.0.86"}}}

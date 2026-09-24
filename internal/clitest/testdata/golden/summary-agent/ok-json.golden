@@ -1,0 +1,162 @@
+# summary-agent/ok-json
+$ issue summary --agent claude-code --limit 3 --json
+
+#### exit 0
+
+#### stdout
+{
+  "in_progress": [
+    {
+      "id": "DEMO-0001",
+      "project": "demo",
+      "title": "ログイン画面を作る",
+      "type": "task",
+      "status": "In Progress",
+      "priority": "P1",
+      "parent": "",
+      "labels": [],
+      "blocked_by": [],
+      "traces": [],
+      "refs": [],
+      "created": "2024-05-01 10:00",
+      "updated": "2024-05-02 11:30",
+      "closed": false,
+      "version": 3,
+      "file_name": "DEMO-0001-x.md",
+      "assignee": "alice"
+    }
+  ],
+  "in_review": [
+    {
+      "id": "DEMO-0003",
+      "project": "demo",
+      "title": "認証の要件",
+      "type": "requirement",
+      "status": "In Review",
+      "priority": "P2",
+      "parent": "",
+      "labels": [],
+      "blocked_by": [],
+      "traces": [],
+      "refs": [],
+      "created": "2024-05-01 10:00",
+      "updated": "2024-05-02 11:30",
+      "closed": false,
+      "version": 3,
+      "file_name": "DEMO-0003-x.md",
+      "assignee": "bob",
+      "assignee_inactive": true,
+      "feedback_pending": 2,
+      "review_age": "3 日",
+      "review_stale": true,
+      "verify_self_reported": true
+    }
+  ],
+  "ready": [
+    {
+      "id": "DEMO-0002",
+      "project": "demo",
+      "title": "保存でエラーになる",
+      "type": "bug",
+      "status": "Todo",
+      "priority": "P0",
+      "parent": "",
+      "labels": [],
+      "blocked_by": [
+        "DEMO-0001"
+      ],
+      "traces": [],
+      "refs": [],
+      "created": "2024-05-01 10:00",
+      "updated": "2024-05-02 11:30",
+      "closed": false,
+      "version": 3,
+      "file_name": "DEMO-0002-x.md"
+    }
+  ],
+  "ready_total": 1,
+  "counts": {
+    "open": 3,
+    "open_bugs": 1,
+    "ready": 1,
+    "in_progress": 1,
+    "in_review": 1
+  },
+  "usage_requests": [
+    {
+      "id": 7,
+      "created_at": "2024-05-03T00:00:00Z",
+      "requested_by": "carol",
+      "period": "2024-04-01〜2024-04-30",
+      "target": "demo",
+      "note": "月次\n報告",
+      "command": "looptrack issue usage report --request 7 --json"
+    }
+  ],
+  "feedback": {
+    "count": 2,
+    "issue_count": 1,
+    "issues": [
+      {
+        "id": "DEMO-0003",
+        "first_at": "2024-05-02T01:00:00Z",
+        "pending": 2,
+        "excerpt": "ボタンが小さい"
+      }
+    ]
+  },
+  "requirements_ready": [
+    {
+      "requirement": {
+        "id": "DEMO-0003",
+        "title": "認証の要件"
+      },
+      "done": 2,
+      "canceled": 1,
+      "command": "looptrack issue close DEMO-0003"
+    }
+  ],
+  "requirements_ready_total": 1,
+  "usage_missing": {
+    "count": 1,
+    "issues": [
+      "DEMO-0001"
+    ],
+    "days": 7,
+    "command": "looptrack issue usage attach DEMO-0001",
+    "message": "トークン情報の未付与 1 件（DEMO-0001）。looptrack issue usage attach DEMO-0001 で付けてください"
+  },
+  "install": {
+    "state": "outdated",
+    "message": "【配布スクリプトの更新】looptrack が古い版です。looptrack issue init で更新してください"
+  }
+}
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/projects/demo/summary?limit=3
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+POST /im/api/v1/projects/demo/install
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "agent": "claude-code",
+      "client": {
+        "arch": "$GOARCH",
+        "os": "$GOOS",
+        "version": "$VERSION"
+      },
+      "files": {},
+      "host": "$HOST",
+      "source": "",
+      "trigger": "hook",
+      "workspace": "ws"
+    }
+
+#### files (0)

@@ -1,0 +1,51 @@
+# verify-last/ok-json
+$ issue verify DEMO-0001 --last --json
+
+#### exit 0
+
+#### stdout
+{
+  "id": "DEMO-0001",
+  "body_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "commands": [
+    "echo ok",
+    "make test"
+  ],
+  "text": "DEMO-0001 の検証コマンド（2 件）\n1. echo ok\n2. printf 'a\\nb\\n'\n直近の verify: 記録なし",
+  "current": true,
+  "last": {
+    "at": "2024-05-02T02:40:00Z",
+    "passed": 1,
+    "failed": 1,
+    "via": "cli",
+    "host": "build-01",
+    "workspace": "demo-app",
+    "self_reported": false,
+    "results": [
+      {
+        "command": "echo ok",
+        "status": "ok",
+        "exit_code": 0,
+        "duration_ms": 0,
+        "output_tail": "ok\n"
+      },
+      {
+        "command": "make test",
+        "status": "fail",
+        "exit_code": 2,
+        "duration_ms": 0,
+        "output_tail": "FAIL: TestLogin\nmake: *** [test] Error 2\n"
+      }
+    ]
+  }
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

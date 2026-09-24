@@ -1,0 +1,13 @@
+{{define "login.html"}}{{template "head" (headData .Lang (T .Lang "server.web.login.title"))}}
+<main class="card">
+  <h1>{{T .Lang "server.web.common.brand"}}</h1>
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  <form method="post" action="{{base}}/login" autocomplete="on">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="next" value="{{.Next}}">
+    <label>{{T .Lang "server.web.login.login_name"}}<input name="login" value="{{.Login}}" autocomplete="username" required autofocus></label>
+    <label>{{T .Lang "server.web.login.password"}}<input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit">{{T .Lang "server.web.login.submit"}}</button>
+  </form>
+</main>
+{{template "foot"}}{{end}}

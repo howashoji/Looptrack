@@ -1,0 +1,33 @@
+# usage-ledger-add/404
+$ issue usage ledger add '2024-05 月次' --from 2024-05-01 --to 2024-06-01 --data-end '2024-05-31 21:00' --excluded 'c-1, c-2' --total-tokens 4567 --note reports/2024-05.pdf --created-at '2024-06-01 09:00' --request-id 7
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシューが見つかりません: DEMO-0999
+
+#### requests (1)
+POST /im/api/v1/projects/demo/usage/ledger
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "created_at": "2024-06-01 09:00",
+      "data_end": "2024-05-31 21:00",
+      "excluded_conversations": [
+        "c-1",
+        "c-2"
+      ],
+      "from": "2024-05-01",
+      "name": "2024-05 月次",
+      "note": "reports/2024-05.pdf",
+      "request_id": 7,
+      "to": "2024-06-01",
+      "total_tokens": 4567
+    }
+
+#### files (0)

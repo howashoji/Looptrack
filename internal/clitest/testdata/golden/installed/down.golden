@@ -1,0 +1,32 @@
+# installed/down
+$ issue installed --agent codex
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: サーバに接続できません（$API）: $REASON
+
+#### requests (1)
+POST /im/api/v1/projects/demo/install
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "agent": "codex",
+      "client": {
+        "arch": "$GOARCH",
+        "os": "$GOOS",
+        "version": "$VERSION"
+      },
+      "files": {},
+      "host": "$HOST",
+      "source": "",
+      "trigger": "manual",
+      "workspace": "ws"
+    }
+
+#### files (0)

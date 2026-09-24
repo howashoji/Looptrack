@@ -1,0 +1,6 @@
+[
+ {
+  "call": "{\"fn\":\"detect\",\"cwd\":\"/nowhere\",\"env\":{\"CLAUDE_CODE_SESSION_ID\":\"sess-1\",\"HOME\":\"<TMP>/001\"}}",
+  "out": "[\"claude-code\", \"<TMP>/001/.claude/projects/-Users-x-proj/sess-1.jsonl\", \"sess-1\"]"
+ }
+]

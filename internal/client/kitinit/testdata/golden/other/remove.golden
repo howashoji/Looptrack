@@ -1,0 +1,11 @@
+# init --remove-loop
+
+#### exit 0
+
+#### stdout
+init --remove-loop: $TMP/ws
+loop は入っていません（変更はありません）
+
+#### stderr
+
+#### files

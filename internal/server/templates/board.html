@@ -1,0 +1,146 @@
+{{define "board.html"}}<!doctype html>
+<html lang="{{T .Lang "server.web.common.html_lang"}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{.Name}} — {{T .Lang "server.web.board.title_suffix"}}</title>
+<link rel="stylesheet" href="{{base}}/static/board.css">
+<link rel="stylesheet" href="{{base}}/static/appbar.css">
+</head>
+<body data-base="{{.Base}}" data-slug="{{.Slug}}" data-csrf="{{.CSRF}}">
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <div class="appbar-title"><span id="projname">{{.Name}}</span><small id="proj"></small></div>
+    <div class="tools appbar-wide">
+      <div class="grow"><input id="q" type="search" placeholder="{{T .Lang "server.web.board.search"}}" autocomplete="off"></div>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-view="board" aria-selected="true">{{T .Lang "server.web.board.tab_board"}}</button>
+        <button role="tab" data-view="list" aria-selected="false">{{T .Lang "server.web.board.tab_list"}}</button>
+        <button role="tab" data-view="matrix" aria-selected="false">{{T .Lang "server.web.board.tab_matrix"}}</button>
+      </div>
+    </div>
+    {{if .CanEdit}}<button type="button" class="appbar-action" id="newIssue" title="{{T .Lang "server.web.board.new_title"}}">{{T .Lang "server.web.board.new"}}</button>{{end}}
+    <a class="appbar-action" href="{{base}}/p/{{.Slug}}/report-requests" title="{{T .Lang "server.web.board.report_title"}}">{{T .Lang "server.web.board.report"}}</a>
+{{template "appbar_row_end" .}}
+  <div class="filters appbar-below" id="filters"></div>
+{{template "appbar_close"}}
+<div class="load-error" id="loadError" role="alert" hidden></div>
+<main id="main"></main>
+<div class="scrim" id="scrim"></div>
+<aside id="drawer" aria-hidden="true"></aside>
+{{/* この画面が使う文面だけを埋め込み、board.js（と board.js が呼ぶ render.js）が読む。対訳表は API で配らない。 */}}
+<script type="application/json" id="i18n">{
+  "title_suffix": "{{T .Lang "server.web.board.title_suffix"}}",
+  "type_requirement": "{{T .Lang "server.web.board.type_requirement"}}",
+  "type_design": "{{T .Lang "server.web.board.type_design"}}",
+  "type_task": "{{T .Lang "server.web.board.type_task"}}",
+  "type_bug": "{{T .Lang "server.web.board.type_bug"}}",
+  "type_test": "{{T .Lang "server.web.board.type_test"}}",
+  "type_epic": "{{T .Lang "server.web.board.type_epic"}}",
+  "sort_priority": "{{T .Lang "server.web.board.sort_priority"}}",
+  "sort_id": "{{T .Lang "server.web.board.sort_id"}}",
+  "sort_updated": "{{T .Lang "server.web.board.sort_updated"}}",
+  "sort_created": "{{T .Lang "server.web.board.sort_created"}}",
+  "sort_status": "{{T .Lang "server.web.board.sort_status"}}",
+  "sort_type": "{{T .Lang "server.web.board.sort_type"}}",
+  "sort_title": "{{T .Lang "server.web.board.sort_title"}}",
+  "ready": "{{T .Lang "server.web.board.ready"}}",
+  "blocked": "{{T .Lang "server.web.board.blocked"}}",
+  "empty": "{{T .Lang "server.web.board.empty"}}",
+  "no_match": "{{T .Lang "server.web.board.no_match"}}",
+  "th_id": "{{T .Lang "server.web.board.th_id"}}",
+  "th_priority": "{{T .Lang "server.web.board.th_priority"}}",
+  "th_type": "{{T .Lang "server.web.board.th_type"}}",
+  "th_status": "{{T .Lang "server.web.board.th_status"}}",
+  "th_assignee": "{{T .Lang "server.web.board.th_assignee"}}",
+  "th_title": "{{T .Lang "server.web.board.th_title"}}",
+  "th_blocked": "{{T .Lang "server.web.board.th_blocked"}}",
+  "th_updated": "{{T .Lang "server.web.board.th_updated"}}",
+  "matrix_none": "{{T .Lang "server.web.board.matrix_none"}}",
+  "mx_req": "{{T .Lang "server.web.board.mx_req"}}",
+  "mx_status": "{{T .Lang "server.web.board.mx_status"}}",
+  "mx_title": "{{T .Lang "server.web.board.mx_title"}}",
+  "mx_design": "{{T .Lang "server.web.board.mx_design"}}",
+  "mx_impl": "{{T .Lang "server.web.board.mx_impl"}}",
+  "mx_test": "{{T .Lang "server.web.board.mx_test"}}",
+  "gaps": "{{T .Lang "server.web.board.gaps"}}",
+  "orphan": "{{T .Lang "server.web.board.orphan"}}",
+  "filter_ready": "{{T .Lang "server.web.board.filter_ready"}}",
+  "filter_closed": "{{T .Lang "server.web.board.filter_closed"}}",
+  "filter_feedback": "{{T .Lang "server.web.board.filter_feedback"}}",
+  "filter_feedback_title": "{{T .Lang "server.web.board.filter_feedback_title"}}",
+  "assignee_title": "{{T .Lang "server.web.board.assignee_title"}}",
+  "assignee_all": "{{T .Lang "server.web.board.assignee_all"}}",
+  "assignee_me": "{{T .Lang "server.web.board.assignee_me"}}",
+  "assignee_none": "{{T .Lang "server.web.board.assignee_none"}}",
+  "assignee_one": "{{T .Lang "server.web.board.assignee_one"}}",
+  "label_all": "{{T .Lang "server.web.board.label_all"}}",
+  "sort_by": "{{T .Lang "server.web.board.sort_by"}}",
+  "sort_option": "{{T .Lang "server.web.board.sort_option"}}",
+  "dir_title": "{{T .Lang "server.web.board.dir_title"}}",
+  "dir_desc": "{{T .Lang "server.web.board.dir_desc"}}",
+  "dir_asc": "{{T .Lang "server.web.board.dir_asc"}}",
+  "export": "{{T .Lang "server.web.board.export"}}",
+  "export_title": "{{T .Lang "server.web.board.export_title"}}",
+  "export_none": "{{T .Lang "server.web.board.export_none"}}",
+  "count": "{{T .Lang "server.web.board.count"}}",
+  "row_assignee": "{{T .Lang "server.web.board.row_assignee"}}",
+  "row_status_change": "{{T .Lang "server.web.board.row_status_change"}}",
+  "row_blocked": "{{T .Lang "server.web.board.row_blocked"}}",
+  "row_traces": "{{T .Lang "server.web.board.row_traces"}}",
+  "row_refs": "{{T .Lang "server.web.board.row_refs"}}",
+  "row_labels": "{{T .Lang "server.web.board.row_labels"}}",
+  "row_parent": "{{T .Lang "server.web.board.row_parent"}}",
+  "row_dates": "{{T .Lang "server.web.board.row_dates"}}",
+  "row_origin": "{{T .Lang "server.web.board.row_origin"}}",
+  "row_file": "{{T .Lang "server.web.board.row_file"}}",
+  "unassigned": "{{T .Lang "server.web.board.unassigned"}}",
+  "close": "{{T .Lang "server.web.board.close"}}",
+  "new_id": "{{T .Lang "server.web.board.new_id"}}",
+  "new_h2": "{{T .Lang "server.web.board.new_h2"}}",
+  "send_failed": "{{T .Lang "server.web.board.send_failed"}}",
+  "load_failed": "{{T .Lang "server.web.board.load_failed"}}",
+  "search_failed": "{{T .Lang "server.web.board.search_failed"}}",
+  "body_failed": "{{T .Lang "server.web.board.body_failed"}}",
+  "body_loading": "{{T .Lang "server.web.board.body_loading"}}",
+  "filter_search": "{{T .Lang "server.web.board.filter_search"}}",
+  "filter_closed_shown": "{{T .Lang "server.web.board.filter_closed_shown"}}",
+  "filter_types": "{{T .Lang "server.web.board.filter_types"}}",
+  "filter_priorities": "{{T .Lang "server.web.board.filter_priorities"}}",
+  "filter_label": "{{T .Lang "server.web.board.filter_label"}}",
+  "filter_assignee": "{{T .Lang "server.web.board.filter_assignee"}}",
+  "filter_me": "{{T .Lang "server.web.board.filter_me"}}",
+  "filter_unassigned": "{{T .Lang "server.web.board.filter_unassigned"}}",
+  "filter_sort": "{{T .Lang "server.web.board.filter_sort"}}",
+  "filter_desc": "{{T .Lang "server.web.board.filter_desc"}}",
+  "filter_asc": "{{T .Lang "server.web.board.filter_asc"}}",
+  "assignee_inactive": "{{T .Lang "server.web.board.assignee_inactive"}}",
+  "assign_self": "{{T .Lang "server.web.board.assign_self"}}",
+  "assign_member": "{{T .Lang "server.web.board.assign_member"}}",
+  "assign_reason_placeholder": "{{T .Lang "server.web.board.assign_reason_placeholder"}}",
+  "assign_reason": "{{T .Lang "server.web.board.assign_reason"}}",
+  "assign_submit": "{{T .Lang "server.web.board.assign_submit"}}",
+  "feedback_title": "{{T .Lang "server.web.board.feedback_title"}}",
+  "feedback_count": "{{T .Lang "server.web.board.feedback_count"}}",
+  "err_forbidden": "{{T .Lang "server.web.board.err_forbidden"}}",
+  "err_failed": "{{T .Lang "server.web.board.err_failed"}}",
+  "override": "{{T .Lang "server.web.board.override"}}",
+  "form_title": "{{T .Lang "server.web.board.form_title"}}",
+  "form_type": "{{T .Lang "server.web.board.form_type"}}",
+  "form_priority": "{{T .Lang "server.web.board.form_priority"}}",
+  "form_content": "{{T .Lang "server.web.board.form_content"}}",
+  "form_criteria": "{{T .Lang "server.web.board.form_criteria"}}",
+  "form_submit": "{{T .Lang "server.web.board.form_submit"}}",
+  "body_empty": "{{T .Lang "domain.template.empty"}}",
+  "body_acceptance": "{{T .Lang "domain.template.acceptance_heading"}}",
+  "status_label": "{{T .Lang "server.web.board.status_label"}}",
+  "status_comment_placeholder": "{{T .Lang "server.web.board.status_comment_placeholder"}}",
+  "status_comment": "{{T .Lang "server.web.board.status_comment"}}",
+  "status_submit": "{{T .Lang "server.web.board.status_submit"}}",
+  "comment_label": "{{T .Lang "server.web.board.comment_label"}}",
+  "comment_submit": "{{T .Lang "server.web.board.comment_submit"}}"
+}</script>
+<script type="module" src="{{base}}/static/board.js"></script>
+</body>
+</html>{{end}}

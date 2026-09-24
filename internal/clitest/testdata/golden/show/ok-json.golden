@@ -1,0 +1,45 @@
+# show/ok-json
+$ issue show DEMO-0001 --json
+
+#### exit 0
+
+#### stdout
+{
+  "id": "DEMO-0001",
+  "project": "demo",
+  "title": "ログイン画面を作る",
+  "type": "task",
+  "status": "In Progress",
+  "priority": "P1",
+  "parent": "",
+  "labels": [],
+  "blocked_by": [],
+  "traces": [],
+  "refs": [],
+  "created": "2024-05-01 10:00",
+  "updated": "2024-05-02 11:30",
+  "closed": false,
+  "version": 3,
+  "file_name": "DEMO-0001-x.md",
+  "assignee": "alice",
+  "body": "## 内容\n\nログイン画面を作る。\n",
+  "preamble": null,
+  "comments": [
+    {
+      "seq": 1,
+      "ts": "2024-05-02 11:30",
+      "content": "着手。"
+    }
+  ],
+  "markdown": "---\nid: DEMO-0001\ntitle: ログイン画面を作る\ntype: task\nstatus: In Progress\nassignee: alice\npriority: P1\nlabels: []\nparent: \"\"\nblocked_by: []\ntraces: []\nrefs: []\ncreated: 2024-05-01 10:00\nupdated: 2024-05-02 11:30\n---\n\n# DEMO-0001 ログイン画面を作る\n\n## 内容\n\nログイン画面を作る。\n\n## 受け入れ条件\n\n- [ ] ID とパスワードでログインできる\n\n## コメント\n\n### 2024-05-02 11:30\n\n着手。\n"
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

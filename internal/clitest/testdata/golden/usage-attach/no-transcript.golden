@@ -1,0 +1,13 @@
+# usage-attach/no-transcript
+$ issue usage attach DEMO-0001
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 会話記録が見つかりません（コーディング AI のセッションの中で実行してください。Claude Code は CLAUDE_CODE_SESSION_ID、Codex は CODEX_THREAD_ID か作業ディレクトリが一致する直近の記録を探します。Copilot CLI は COPILOT_AGENT_SESSION_ID のスパンを $COPILOT_HOME/otel/（無ければ ~/.copilot/otel/）の下の OpenTelemetry のファイル出力から探します）
+
+#### requests (0)
+
+#### files (0)

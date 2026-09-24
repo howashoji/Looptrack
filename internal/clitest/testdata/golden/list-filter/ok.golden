@@ -1,0 +1,20 @@
+# list-filter/ok
+$ issue list --status Todo --type bug --label ui --ref FR-1 --all --assignee me --sort updated --reverse
+
+#### exit 0
+
+#### stdout
+ID        TYPE        STATUS      PRI BLOCKED   UPDATED          TITLE
+DEMO-0002 bug         Todo        P0  DEMO-0001 2024-05-02 11:30 保存でエラーになる
+
+1 件
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?all=1&assignee=me&label=ui&ref=FR-1&reverse=1&sort=updated&status=Todo&type=bug
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

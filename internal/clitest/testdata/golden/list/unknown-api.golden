@@ -1,0 +1,17 @@
+# list/unknown-api
+$ issue list
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: API が見つかりません
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?sort=priority  [フィクスチャなし → 404]
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

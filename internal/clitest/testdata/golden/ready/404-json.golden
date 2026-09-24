@@ -1,0 +1,17 @@
+# ready/404-json
+$ issue ready --json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシューが見つかりません: DEMO-0999
+
+#### requests (1)
+GET /im/api/v1/projects/demo/ready?sort=priority
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

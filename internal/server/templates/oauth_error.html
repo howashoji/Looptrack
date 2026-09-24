@@ -1,0 +1,8 @@
+{{define "oauth_error.html"}}{{template "head" (headData .Lang (T .Lang "server.web.oauth_error.title"))}}
+{{template "nav" .}}
+<main class="page">
+  <h1>{{T .Lang "server.web.oauth_error.title"}}</h1>
+  <p>{{.Message}}</p>
+  <p><a href="{{base}}/">{{T .Lang "server.web.common.back_to_projects"}}</a></p>
+</main>
+{{template "foot"}}{{end}}

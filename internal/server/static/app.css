@@ -1,0 +1,65 @@
+:root {
+  --bg: #f6f7f9; --fg: #1d2330; --muted: #667085; --card: #fff; --line: #d9dde5;
+  --accent: #2f6fdf; --accent-fg: #fff; --error: #b42318; --error-bg: #fef3f2;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111418; --fg: #e6e8eb; --muted: #98a2b3; --card: #1a1f26; --line: #2b323c;
+    --accent: #6d9ef5; --accent-fg: #0b1220; --error: #f97066; --error-bg: #2a1614; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.6 -apple-system, "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.card { max-width: 380px; margin: 12vh auto 0; padding: 28px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 12px; }
+.wide { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+.page { max-width: 720px; margin: 24px auto; padding: 0 16px; }
+h1 { font-size: 20px; margin: 0 0 16px; }
+label { display: block; margin: 12px 0; font-size: 13px; color: var(--muted); }
+input { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; font: inherit; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+button { margin-top: 8px; padding: 9px 16px; font: inherit; color: var(--accent-fg); background: var(--accent);
+  border: 0; border-radius: 8px; cursor: pointer; width: 100%; }
+button.link { width: auto; margin: 0; padding: 0; background: none; color: var(--accent); }
+.error { padding: 8px 10px; color: var(--error); background: var(--error-bg); border-radius: 8px; }
+.muted { color: var(--muted); font-size: 13px; }
+.qr { display: block; margin: 12px auto; background: #fff; padding: 8px; border-radius: 8px; }
+.secret code { word-break: break-all; }
+.projects { list-style: none; padding: 0; }
+.projects li { padding: 12px 14px; margin-bottom: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+a { color: var(--accent); }
+.wide h2 { font-size: 16px; margin: 0 0 10px; }
+.panel { margin: 16px 0; padding: 18px 20px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+.notice { padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 8px 0; }
+.row label { margin: 0; }
+.row .grow { flex: 1 1 240px; }
+.row button { width: auto; margin: 0; }
+.row.tight { margin: 0; flex-wrap: nowrap; }
+.narrow { max-width: 380px; }
+select { display: block; margin-top: 4px; padding: 8px 10px; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; }
+.row.tight select { margin: 0; }
+button.danger { background: var(--error); color: #fff; }
+button.small { padding: 4px 10px; font-size: 13px; width: auto; margin: 0; }
+table.list { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.list th, table.list td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; white-space: nowrap; }
+table.list td form { margin: 0; }
+/* 用途は利用者が付ける任意長の文字列なので、長いときだけここで折り返す（他の列は折り返さない） */
+table.list td.name { white-space: normal; min-width: 10em; }
+tr.inactive td { color: var(--muted); }
+.inactive-tokens { margin-top: 12px; }
+.inactive-tokens summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.inactive-tokens table { margin-top: 8px; }
+input.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre { padding: 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+.created { border-color: var(--accent); }
+/* レポート作成の依頼。ヘッダのパンくずは appbar.css */
+fieldset { margin: 0 0 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; }
+legend { padding: 0 6px; font-size: 13px; color: var(--muted); }
+label.choice { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--fg); font-size: 14px; }
+label.choice input { display: inline; width: auto; margin: 0; }
+textarea { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; font: inherit; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+button.inline { width: auto; }

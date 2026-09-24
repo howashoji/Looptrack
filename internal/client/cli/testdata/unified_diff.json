@@ -1,0 +1,2006 @@
+{
+ "pairs": [
+  {
+   "A": "本文\r\n本文\r\n\nb\n本文\r\nxd\nx- [ ] 条件\nx## 見出し\nc\nx\n\n\nd\nd\nx## 見出し\nx- [ ] 条件\n本文\r\nc\na\n- [ ] 条件\nc\n## 見出し\n## 見出し\nb\nxa\n本文\r\nc\n\n- [ ] 条件\nc\n\n## 見出し\n\nd\nb\n## 見出し\na\nc\nd\nd\nxd\n\n\n## 見出し\n- [ ] 条件\nc\n- [ ] 条件\n- [ ] 条件\na\n- [ ] 条件\na\nc\n- [ ] 条件\na\n## 見出し\n\n\n\n## 見出し\nb\nb\n## 見出し\n- [ ] 条件\n- [ ] 条件\nb\n\n- [ ] 条件\n\n- [ ] 条件\n- [ ] 条件\nb\n本文\r\nb\n本文\r\na\n本文\r\n\nb\nd\n- [ ] 条件\n- [ ] 条件\n## 見出し\n\na\nd\n本文\r\nx本文\r\na\n- [ ] 条件\n## 見出し\n\n本文\r\na\n本文\r\n\nd\nc\nd\n\nc\nb\na\n本文\r\n本文\r\nb\nb\n\n## 見出し\nx- [ ] 条件\n## 見出し\n\nd\nb\nb\nx## 見出し\n本文\r\n## 見出し\n\nb\nc\na\n## 見出し\n本文\r\na\n本文\r\nc\nd\nb\n本文\r\nc\nc\na\nc\n- [ ] 条件\n- [ ] 条件\nd\n本文\r\n## 見出し\n本文\r\nb\nc\nxxx## 見出し\n\n本文\r\nxd\n- [ ] 条件\nd\nb\na\nd\n- [ ] 条件\n## 見出し\nc\na\na\n- [ ] 条件\nd\nc\n- [ ] 条件\n\n\n本文\r\n- [ ] 条件\nd\na\na\n## 見出し\n\nd\nx\nb\na\n## 見出し\n## 見出し\nd\nb\n\n本文\r\n本文\r\n## 見出し\n- [ ] 条件\n\nb\n\nd\nc\n本文\r\n## 見出し\n\n\n## 見出し\n\n\nxa\n## 見出し\nb\nc\na\nxd\n- [ ] 条件\n- [ ] 条件\nb\n本文\r\n\n\nd\nb\nx## 見出し\n本文\r\n本文\r\na\nc\na\nb\n本文\r\n\n- [ ] 条件\n",
+   "B": "d\n\nd\n- [ ] 条件\nd\nd\n## 見出し\nx## 見出し\nc\n## 見出し\n## 見出し\n本文\r\n## 見出し\n\n\na\n本文\r\nx本文\r\nx本文\r\n\n- [ ] 条件\nd\nd\nb\na\nb\n\n\n\nc\na\n\nd\nx\n本文\r\nc\nxc\nxa\nd\n## 見出し\n- [ ] 条件\n- [ ] 条件\nd\n## 見出し\nd\nx## 見出し\n- [ ] 条件\nc\nc\n- [ ] 条件\nb\nd\nb\nxxb\na\nd\n\nd\n\na\nxb\n## 見出し\nd\nb\n\nx\n\nc\nd\n本文\r\nb\na\nd\nb\n\n- [ ] 条件\nd\nd\n- [ ] 条件\n- [ ] 条件\n\n## 見出し\na\na\n- [ ] 条件\nd\n\nc\na\n## 見出し\nx\n## 見出し\n## 見出し\nd\nb\n\nc\nb\n- [ ] 条件\nx## 見出し\na\n## 見出し\nb\nb\nb\nb\nx## 見出し\na\na\n本文\r\n\n## 見出し\n- [ ] 条件\n\n- [ ] 条件\n本文\r\n\n"
+  },
+  {
+   "A": "c\n",
+   "B": ""
+  },
+  {
+   "A": "本文\r\nc\na\nxx## 見出し\na\nd\nc\na\n",
+   "B": "本文\r\nc\na\nd\na\nd\nc\na\n"
+  },
+  {
+   "A": "## 見出し\nb\n本文\r\nb\n\nc\n",
+   "B": "## 見出し\nb\n本文\r\nd\nxd\nc\n"
+  },
+  {
+   "A": "\nd\nd\n本文\r\nb\n## 見出し\n\nc\n本文\r\nc\n\nb\n- [ ] 条件\nc\na\na\n\n## 見出し\n",
+   "B": "a\nd\n\n## 見出し\n- [ ] 条件\n本文\r\nx- [ ] 条件\na\n## 見出し\nc\nb\nd\nc\nc\n本文\r\nxx\n## 見出し\na\nx\nxx"
+  },
+  {
+   "A": "本文\r\n## 見出し\nb\n## 見出し\n\nxa\n本文\r\n- [ ] 条件\nc\nd\nb\n## 見出し\n",
+   "B": "c\nxb\nx- [ ] 条件\nx## 見出し\nd\n本文\r\nx\nx## 見出し\n本文\r\nx## 見出し\na\n- [ ] 条件\na\n## 見出し\n"
+  },
+  {
+   "A": "a\na\n- [ ] 条件\n- [ ] 条件\n本文\r\nb\na\n- [ ] 条件\nc\n本文\r\nd\n",
+   "B": "## 見出し\n本文\r\nd\nd\na\nx## 見出し\nx"
+  },
+  {
+   "A": "本文\r\nc\nc\nb\na\nxa\nd\nx本文\r\n## 見出し\n## 見出し\n本文\r\na\n",
+   "B": "本文\r\nc\nb\na\nxa\nd\nx本文\r\n## 見出し\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "\n\n",
+   "B": "本文\r\n- [ ] 条件\n\n"
+  },
+  {
+   "A": "本文\r\n",
+   "B": "x本文\r\n"
+  },
+  {
+   "A": "",
+   "B": "c\n"
+  },
+  {
+   "A": "xa\nxb\nb\n",
+   "B": "xa\n- [ ] 条件\nc\n"
+  },
+  {
+   "A": "b\nxb\n- [ ] 条件\n- [ ] 条件\nd\n本文\r\nc\nb\n## 見出し\nb\n\nb\n本文\r\n- [ ] 条件\n- [ ] 条件\nd\nc\n",
+   "B": "## 見出し\nd\nb\n## 見出し\nx## 見出し\nxb\nc\n- [ ] 条件\na\nc\nd\n本文\r\n## 見出し\n\n\nx## 見出し\na\n\na\na\n"
+  },
+  {
+   "A": "d\n## 見出し\nxb\nd\n\na\nx## 見出し\nd\nd\n\n## 見出し\n\n\n## 見出し\n## 見出し\nd\nd\n",
+   "B": "b\nxc\na\nc\n本文\r\nc\nxb\n## 見出し\na\nd\n\na\na\nc\n## 見出し\nb\na\nb\nc\n\nb\n\n"
+  },
+  {
+   "A": "## 見出し\nxxd\n\nxd\nb\nd\nb\nb\n\n- [ ] 条件\nxb\nxx",
+   "B": "## 見出し\nxxd\n\nxd\nb\nd\nb\nb\n\na\nxb\n本文\r\nxx"
+  },
+  {
+   "A": "b\nb\n- [ ] 条件\na\n",
+   "B": "- [ ] 条件\n## 見出し\n\n- [ ] 条件\na\n"
+  },
+  {
+   "A": "xd\nx本文\r\n- [ ] 条件\nb\n",
+   "B": "## 見出し\nxd\n- [ ] 条件\nb\n"
+  },
+  {
+   "A": "本文\r\nd\nb\nxb\n",
+   "B": "## 見出し\nc\na\nc\nc\n本文\r\n## 見出し\nd\n\n本文\r\n- [ ] 条件\n"
+  },
+  {
+   "A": "本文\r\nd\nd\n\n## 見出し\n- [ ] 条件\n\n- [ ] 条件\nd\nc\n\n## 見出し\n\nd\n",
+   "B": "## 見出し\n本文\r\na\nd\nc\n- [ ] 条件\n\n\nc\n"
+  },
+  {
+   "A": "- [ ] 条件\nb\nd\n## 見出し\na\n- [ ] 条件\nxa\n本文\r\nxc\n本文\r\na\na\n- [ ] 条件\nb\n\na\n",
+   "B": "a\n## 見出し\nb\nb\n## 見出し\n## 見出し\n本文\r\nc\n本文\r\nb\nx本文\r\na\nc\nb\nc\n- [ ] 条件\nc\n本文\r\n本文\r\n"
+  },
+  {
+   "A": "c\n本文\r\nc\nb\n## 見出し\n## 見出し\n## 見出し\nc\n\nd\n\nc\nc\n## 見出し\na\n- [ ] 条件\nc\n- [ ] 条件\nxb\na\n- [ ] 条件\nxd\nd\nc\n本文\r\n\nx## 見出し\nd\na\na\n\n本文\r\na\nd\nc\nc\n## 見出し\nb\nd\n## 見出し\nd\nd\n## 見出し\nb\nc\na\n\nb\n本文\r\n本文\r\nxd\nxa\n## 見出し\nb\nd\nb\nd\n\nxa\nxx\na\n本文\r\nd\nb\n## 見出し\n本文\r\nd\nd\n## 見出し\nxb\nb\n本文\r\n## 見出し\nb\n\na\n\na\na\nx本文\r\n## 見出し\n本文\r\nb\na\na\na\n- [ ] 条件\nb\n本文\r\n\n- [ ] 条件\nb\n本文\r\nc\nb\na\n## 見出し\nd\n## 見出し\na\na\nd\n## 見出し\na\nc\n- [ ] 条件\nc\nd\n\nc\n- [ ] 条件\n- [ ] 条件\nc\nd\n## 見出し\n\nx## 見出し\n## 見出し\n- [ ] 条件\n本文\r\nc\n## 見出し\nxxb\nxa\n- [ ] 条件\nd\nc\nd\n- [ ] 条件\nc\na\nb\nxc\nb\n## 見出し\nc\n\na\na\na\nx## 見出し\n- [ ] 条件\n\n## 見出し\n## 見出し\n本文\r\n- [ ] 条件\nc\na\n\n- [ ] 条件\nd\na\n\nb\nc\n- [ ] 条件\n## 見出し\n- [ ] 条件\n\nb\n\na\nxxb\nd\nd\na\na\n本文\r\nb\nc\nc\nc\n\n## 見出し\nd\n本文\r\nx\nb\n- [ ] 条件\nxc\na\nc\n## 見出し\n\n本文\r\nb\nb\nc\n\n本文\r\n本文\r\nc\n- [ ] 条件\na\n本文\r\na\nc\nx本文\r\nc\n\nx- [ ] 条件\n## 見出し\nb\nd\n- [ ] 条件\nb\nb\n\nc\nb\nd\n## 見出し\nc\n## 見出し\na\n\nc\n本文\r\na\n\nd\n\n\n- [ ] 条件\nc\n\nc\nc\n本文\r\nc\n## 見出し\nb\nx## 見出し\nc\n本文\r\n本文\r\nb\n## 見出し\nc\n本文\r\nc\nd\n本文\r\n- [ ] 条件\nd\n本文\r\n## 見出し\nx- [ ] 条件\n",
+   "B": "c\n本文\r\nc\nb\n## 見出し\n## 見出し\n## 見出し\nc\n\nd\n\nc\nc\n## 見出し\na\n- [ ] 条件\nc\n- [ ] 条件\nxb\na\n- [ ] 条件\nxd\nd\nc\n本文\r\n\nx## 見出し\nd\na\na\n\n本文\r\na\nd\nc\nc\n## 見出し\nb\nd\n## 見出し\nd\nd\n## 見出し\nb\nc\na\n\nb\n本文\r\n本文\r\nxd\nxa\n## 見出し\nb\nd\nb\nd\n\nxa\nxx\na\n本文\r\nd\nb\n## 見出し\n本文\r\nd\nd\n## 見出し\nxb\nb\n本文\r\n## 見出し\nb\n\na\n\na\na\nx本文\r\n## 見出し\n本文\r\nb\na\na\na\n- [ ] 条件\nb\n本文\r\n\n- [ ] 条件\nb\n本文\r\nc\nb\na\n## 見出し\nd\n## 見出し\na\na\nd\n## 見出し\na\nc\n- [ ] 条件\nc\nd\n\nc\n- [ ] 条件\n- [ ] 条件\nc\nd\n## 見出し\n\nx## 見出し\n## 見出し\n- [ ] 条件\n本文\r\nc\n## 見出し\nxxb\nxa\n- [ ] 条件\nd\nc\nd\n- [ ] 条件\nc\na\nb\nb\n## 見出し\nc\n\na\na\na\nx## 見出し\n- [ ] 条件\n\n## 見出し\n## 見出し\n本文\r\n- [ ] 条件\nc\na\n\n- [ ] 条件\nd\na\n\nb\nc\n- [ ] 条件\n## 見出し\n- [ ] 条件\n\nb\n\na\nxxb\nd\nd\na\na\n本文\r\nb\nc\nc\nc\n\n## 見出し\nd\n本文\r\nx\nb\n- [ ] 条件\nxc\na\nc\n## 見出し\n\n本文\r\nb\nb\nc\n\n本文\r\n本文\r\nc\n- [ ] 条件\na\n本文\r\na\nc\nx本文\r\nc\n\nx- [ ] 条件\n## 見出し\nb\nd\n- [ ] 条件\nb\nb\n\nc\nb\nd\n## 見出し\nc\n## 見出し\na\n\nc\n本文\r\na\n\nd\n\n\n- [ ] 条件\nc\n\nc\nc\n本文\r\nc\n## 見出し\nb\nx## 見出し\nc\n本文\r\n本文\r\nb\n## 見出し\nc\n本文\r\nc\nd\n本文\r\n- [ ] 条件\nd\n本文\r\n## 見出し\nx- [ ] 条件\n"
+  },
+  {
+   "A": "a\n本文\r\nd\nd\n本文\r\n\nb\nc\nd\n## 見出し\nb\nc\nc\n- [ ] 条件\n- [ ] 条件\n## 見出し\n\n\n",
+   "B": "c\n- [ ] 条件\nb\n\na\na\n\nx- [ ] 条件\n\nc\n本文\r\n- [ ] 条件\nx本文\r\n\n## 見出し\nd\n## 見出し\nb\n本文\r\n## 見出し\n## 見出し\n\nx## 見出し\nd\n"
+  },
+  {
+   "A": "## 見出し\nb\n本文\r\nb\nd\nxd\nc\n## 見出し\nd\nc\nx## 見出し\nc\n",
+   "B": "c\nxc\n\nxb\nc\n\nd\na\nc\nb\na\nb\na\nb\n\n## 見出し\nd\nb\n- [ ] 条件\n- [ ] 条件\nb\n## 見出し\n## 見出し\nd\n"
+  },
+  {
+   "A": "b\n本文\r\nx- [ ] 条件\n- [ ] 条件\n",
+   "B": "\n本文\r\n- [ ] 条件\n"
+  },
+  {
+   "A": "- [ ] 条件\nc\nxxxx本文\r\n- [ ] 条件\n本文\r\nxd\n\n本文\r\n- [ ] 条件\na\na\n",
+   "B": "- [ ] 条件\nc\n- [ ] 条件\n本文\r\nxd\n\n\n本文\r\n- [ ] 条件\na\na\n"
+  },
+  {
+   "A": "## 見出し\n\n本文\r\nc\nd\n- [ ] 条件\n\nxa\nc\na\n\nd\n",
+   "B": "d\nd\nc\n## 見出し\n- [ ] 条件\n\n## 見出し\n\nxb\n\n本文\r\n## 見出し\n- [ ] 条件\n## 見出し\n## 見出し\nc\nc\nc\n本文\r\nb\n"
+  },
+  {
+   "A": "本文\r\n- [ ] 条件\n",
+   "B": "- [ ] 条件\na\n- [ ] 条件\n"
+  },
+  {
+   "A": "c\nc\nc\nb\na\nb\nxc\n## 見出し\nb\n## 見出し\n- [ ] 条件\nc\n",
+   "B": "c\nc\nb\na\nb\nxc\n## 見出し\nb\n## 見出し\n- [ ] 条件\nc\n"
+  },
+  {
+   "A": "## 見出し\nc\n",
+   "B": "a\nc\n"
+  },
+  {
+   "A": "## 見出し\n- [ ] 条件\nd\n\n\nb\n## 見出し\n- [ ] 条件\n",
+   "B": "## 見出し\n- [ ] 条件\n\n\nb\n本文\r\n## 見出し\n- [ ] 条件\n"
+  },
+  {
+   "A": "b\nc\n\n本文\r\nb\n- [ ] 条件\nc\n本文\r\nc\nd\nd\n\nc\n",
+   "B": "b\n\n本文\r\nb\nx本文\r\nc\nd\nd\n\nc\n"
+  },
+  {
+   "A": "## 見出し\n## 見出し\nb\nc\na\nc\n## 見出し\nd\nc\n\nd\nd\n",
+   "B": "## 見出し\n## 見出し\nc\na\nb\n## 見出し\nd\nc\n\nd\nd\n"
+  },
+  {
+   "A": "## 見出し\nxb\nc\n",
+   "B": "## 見出し\nxb\nb\nc\n"
+  },
+  {
+   "A": "\n- [ ] 条件\n## 見出し\nd\nd\nd\nb\n- [ ] 条件\nc\n## 見出し\nc\na\nd\n## 見出し\n本文\r\n",
+   "B": "\n- [ ] 条件\n## 見出し\nd\nd\nd\nb\nd\n- [ ] 条件\nc\n## 見出し\nc\n\nb\nd\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "c\n- [ ] 条件\n- [ ] 条件\nc\nd\nd\n- [ ] 条件\n\n- [ ] 条件\n\nc\n本文\r\nd\n",
+   "B": "c\n- [ ] 条件\na\n- [ ] 条件\nc\nd\nd\n- [ ] 条件\n\n- [ ] 条件\n\nd\nc\n本文\r\na\nd\n"
+  },
+  {
+   "A": "a\na\n## 見出し\n- [ ] 条件\nc\n\n\n本文\r\na\n- [ ] 条件\nd\n\nd\nb\nx本文\r\nx- [ ] 条件\nd\n",
+   "B": "\n本文\r\n本文\r\n- [ ] 条件\n\n- [ ] 条件\n- [ ] 条件\n本文\r\nb\n- [ ] 条件\nd\na\n本文\r\n## 見出し\nc\n\nc\n## 見出し\nb\nc\n"
+  },
+  {
+   "A": "b\nb\nb\nb\n\n本文\r\n- [ ] 条件\nc\n## 見出し\na\n- [ ] 条件\n## 見出し\n",
+   "B": "b\nb\nb\nb\n\n本文\r\n- [ ] 条件\nc\n## 見出し\na\n- [ ] 条件\nc\n## 見出し\n"
+  },
+  {
+   "A": "c\n\n\na\n- [ ] 条件\n- [ ] 条件\n## 見出し\nd\n- [ ] 条件\n",
+   "B": "## 見出し\n## 見出し\nx\n## 見出し\nd\nc\nb\nd\n\n- [ ] 条件\n\nxb\na\n"
+  },
+  {
+   "A": "x- [ ] 条件\n## 見出し\n本文\r\n## 見出し\na\na\n## 見出し\nc\na\nc\n\n本文\r\na\n\nd\n## 見出し\na\n\n",
+   "B": "x- [ ] 条件\n## 見出し\n本文\r\n## 見出し\na\nx## 見出し\nc\na\nc\n\n本文\r\na\n\nd\n## 見出し\na\n\n"
+  },
+  {
+   "A": "b\nxx\nxx本文\r\nxb\nc\nb\na\nx",
+   "B": "x\nxb\nc\n本文\r\nc\nc\n\nb\nd\nb\nc\n## 見出し\nb\nd\nb\nc\n## 見出し\nd\n"
+  },
+  {
+   "A": "c\n\n本文\r\na\n## 見出し\nd\nxc\n\n- [ ] 条件\n## 見出し\n\nb\nd\n## 見出し\n本文\r\nb\nb\nd\nc\n\n本文\r\nb\nx本文\r\n\n- [ ] 条件\n## 見出し\nx本文\r\na\nx\nc\n## 見出し\n## 見出し\nc\n## 見出し\na\na\n- [ ] 条件\nb\na\n## 見出し\na\nb\n## 見出し\n\nc\n## 見出し\n- [ ] 条件\n## 見出し\n- [ ] 条件\n- [ ] 条件\nc\n本文\r\n## 見出し\nc\n\nb\nc\n- [ ] 条件\n## 見出し\nc\nc\nd\n\n- [ ] 条件\n## 見出し\n- [ ] 条件\n## 見出し\nxb\nd\nb\n\n- [ ] 条件\nc\na\nc\nc\na\n- [ ] 条件\nb\nc\n\na\n- [ ] 条件\nd\nx本文\r\nd\n本文\r\n## 見出し\n- [ ] 条件\nxc\n- [ ] 条件\n\n- [ ] 条件\nxxd\na\nb\nc\na\nc\n本文\r\na\n\n\n本文\r\n本文\r\n## 見出し\na\nb\nb\n\n## 見出し\n- [ ] 条件\na\nx本文\r\n\nx- [ ] 条件\n本文\r\na\nb\nx本文\r\n本文\r\n- [ ] 条件\n## 見出し\na\nx\nb\nxc\n## 見出し\n本文\r\nb\n\n本文\r\n\nc\n## 見出し\n本文\r\nc\nb\n- [ ] 条件\nx- [ ] 条件\nb\nb\nx## 見出し\na\nc\n## 見出し\n\nb\nc\n\n本文\r\nd\n- [ ] 条件\nb\na\na\nd\nb\n## 見出し\nb\nc\nc\n\nxa\nd\n本文\r\n本文\r\n\nc\nd\na\n- [ ] 条件\n- [ ] 条件\nb\nxb\nc\n\n\n## 見出し\nb\nd\n- [ ] 条件\nxa\nd\n- [ ] 条件\n- [ ] 条件\nx\n- [ ] 条件\n\n- [ ] 条件\nc\n## 見出し\nb\n## 見出し\n## 見出し\nx## 見出し\n## 見出し\n\nd\nb\n## 見出し\n## 見出し\n\na\n\nb\nb\na\nx## 見出し\nc\nd\n- [ ] 条件\n本文\r\n- [ ] 条件\nb\nb\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n## 見出し\nd\n本文\r\n- [ ] 条件\n\nc\na\n\na\na\nx\n",
+   "B": "c\n\n本文\r\na\n## 見出し\nd\nxc\n\n- [ ] 条件\n## 見出し\n\nb\nd\n## 見出し\n本文\r\nb\nb\nd\nc\n\n本文\r\nb\nx本文\r\n\n- [ ] 条件\n## 見出し\nx本文\r\na\nx\nc\n## 見出し\n## 見出し\nc\n## 見出し\na\na\n- [ ] 条件\nb\na\n## 見出し\na\nb\n## 見出し\n\nc\n## 見出し\n- [ ] 条件\n## 見出し\n- [ ] 条件\n- [ ] 条件\nc\n本文\r\n## 見出し\nc\n\nb\nc\n- [ ] 条件\n## 見出し\nc\nc\nd\n\n- [ ] 条件\n## 見出し\n- [ ] 条件\n## 見出し\nxb\nd\nb\n\n- [ ] 条件\nc\na\nc\nc\na\nb\n- [ ] 条件\nb\nc\n\na\n- [ ] 条件\nd\nx本文\r\nd\n本文\r\n## 見出し\n- [ ] 条件\nxc\n- [ ] 条件\n\n- [ ] 条件\nxxd\na\nb\nc\na\nc\n本文\r\na\n\n\n本文\r\n本文\r\n## 見出し\na\nb\n- [ ] 条件\n\n## 見出し\n- [ ] 条件\na\nx本文\r\n\nx- [ ] 条件\n本文\r\na\nb\nx本文\r\n本文\r\n- [ ] 条件\n## 見出し\na\nx\nb\nxc\n## 見出し\n本文\r\nb\n\n本文\r\n\nc\n## 見出し\n本文\r\nc\nb\n- [ ] 条件\nx- [ ] 条件\nb\nb\nx## 見出し\na\nc\n## 見出し\n\nb\nc\n\n本文\r\nd\n- [ ] 条件\nb\na\na\nd\nb\n## 見出し\nb\nc\nc\n\nxa\nd\n本文\r\n本文\r\n\nc\nd\na\n- [ ] 条件\n- [ ] 条件\nb\nxb\nc\n\n\n## 見出し\nb\nd\n- [ ] 条件\nxa\nd\n- [ ] 条件\n- [ ] 条件\nx\n- [ ] 条件\n\n- [ ] 条件\nc\n## 見出し\nb\n## 見出し\n## 見出し\nx## 見出し\n## 見出し\n\nd\nb\n## 見出し\n## 見出し\n\na\n\nb\nb\na\nx## 見出し\nc\nd\n- [ ] 条件\n本文\r\n- [ ] 条件\nb\nb\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n## 見出し\nd\n本文\r\n- [ ] 条件\n\nc\na\n\na\na\nx\n"
+  },
+  {
+   "A": "c\nb\nc\nxb\nd\nb\n## 見出し\n- [ ] 条件\n\nxc\n本文\r\n本文\r\n",
+   "B": "d\nc\na\n- [ ] 条件\n\n- [ ] 条件\nc\n- [ ] 条件\n本文\r\n## 見出し\na\n本文\r\nd\n本文\r\nx## 見出し\nb\nb\n\na\nb\n- [ ] 条件\n"
+  },
+  {
+   "A": "本文\r\nd\na\nd\n本文\r\n",
+   "B": "d\na\n本文\r\nd\n本文\r\n"
+  },
+  {
+   "A": "d\nxb\n## 見出し\nb\n## 見出し\n- [ ] 条件\n## 見出し\nb\n本文\r\n本文\r\n- [ ] 条件\nb\nb\n## 見出し\n",
+   "B": "xxb\n## 見出し\na\n## 見出し\n- [ ] 条件\n## 見出し\nb\n本文\r\n本文\r\n本文\r\n- [ ] 条件\nb\nb\n## 見出し\n"
+  },
+  {
+   "A": "",
+   "B": "## 見出し\n"
+  },
+  {
+   "A": "a\nb\na\n- [ ] 条件\n- [ ] 条件\nb\nb\n本文\r\n- [ ] 条件\n",
+   "B": "a\nb\n本文\r\na\n\n- [ ] 条件\n- [ ] 条件\nb\n- [ ] 条件\nb\n本文\r\n- [ ] 条件\n"
+  },
+  {
+   "A": "x本文\r\nd\n## 見出し\n## 見出し\n- [ ] 条件\nc\na\nd\n",
+   "B": "x本文\r\nd\n## 見出し\n## 見出し\nd\nc\na\nd\n"
+  },
+  {
+   "A": "c\n- [ ] 条件\n\nb\n本文\r\nb\n## 見出し\n\na\nc\n",
+   "B": "- [ ] 条件\n\nb\n本文\r\nb\nd\n\nxc\n"
+  },
+  {
+   "A": "d\nb\nd\n本文\r\n",
+   "B": "d\nb\nd\n本文\r\n"
+  },
+  {
+   "A": "本文\r\nb\nc\n## 見出し\nb\n本文\r\nc\nb\n- [ ] 条件\n## 見出し\nb\nx\n",
+   "B": "x本文\r\nb\nc\n## 見出し\nb\nd\nc\n## 見出し\nb\n- [ ] 条件\n## 見出し\nb\n## 見出し\nx\n"
+  },
+  {
+   "A": "b\n- [ ] 条件\nxb\nd\na\na\na\nx",
+   "B": "b\nb\n本文\r\n本文\r\n- [ ] 条件\nd\n\nc\nx"
+  },
+  {
+   "A": "d\nd\n",
+   "B": "- [ ] 条件\nd\n"
+  },
+  {
+   "A": "a\nd\nb\n",
+   "B": "a\n- [ ] 条件\n本文\r\nd\n\nc\n"
+  },
+  {
+   "A": "x\nx## 見出し\nc\n",
+   "B": "d\n"
+  },
+  {
+   "A": "- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n## 見出し\na\na\n## 見出し\nb\n\nx本文\r\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "- [ ] 条件\n- [ ] 条件\n## 見出し\na\na\n## 見出し\nb\n\nx本文\r\nc\n- [ ] 条件\nb\n- [ ] 条件\n"
+  },
+  {
+   "A": "d\n本文\r\n\n- [ ] 条件\nd\n- [ ] 条件\n本文\r\n本文\r\nxc\nxc\n\n## 見出し\nd\nx",
+   "B": "d\n本文\r\n\n- [ ] 条件\nd\n- [ ] 条件\n本文\r\nxxc\nxc\n\n## 見出し\nd\nx"
+  },
+  {
+   "A": "",
+   "B": "x"
+  },
+  {
+   "A": "x\nxb\n## 見出し\nb\nb\n本文\r\n\nb\n",
+   "B": "d\na\nd\n本文\r\nc\nb\n- [ ] 条件\nxc\nc\n本文\r\n\na\n"
+  },
+  {
+   "A": "本文\r\n本文\r\nd\nx本文\r\nd\n- [ ] 条件\n## 見出し\nd\nx\n- [ ] 条件\n本文\r\nc\n## 見出し\n- [ ] 条件\nxc\n",
+   "B": "本文\r\nd\nd\nx本文\r\nc\n- [ ] 条件\n## 見出し\nd\nx\n- [ ] 条件\n本文\r\nc\n## 見出し\n- [ ] 条件\nxc\n"
+  },
+  {
+   "A": "- [ ] 条件\nx\nc\n\n- [ ] 条件\na\nxc\n- [ ] 条件\n- [ ] 条件\na\n## 見出し\nc\n本文\r\nxa\n",
+   "B": "- [ ] 条件\nx\nc\n\n- [ ] 条件\na\nxc\n- [ ] 条件\n- [ ] 条件\na\nb\nc\n本文\r\nxa\n"
+  },
+  {
+   "A": "d\n\nd\nb\na\n\nxd\n本文\r\n## 見出し\nd\n- [ ] 条件\nx本文\r\nx- [ ] 条件\n## 見出し\n## 見出し\nc\nc\n## 見出し\nb\nc\n本文\r\nb\na\nx- [ ] 条件\na\n\n- [ ] 条件\n## 見出し\n\nx\nc\nd\n\n\na\n本文\r\nc\nxd\n## 見出し\nd\na\na\nd\n- [ ] 条件\nc\nx\n\n\nx\nc\n- [ ] 条件\nc\nxb\nc\nc\n本文\r\n\nd\nc\n\nd\n- [ ] 条件\n- [ ] 条件\n本文\r\nxd\n本文\r\n## 見出し\nb\nxa\nd\nx本文\r\n本文\r\nc\n## 見出し\n- [ ] 条件\nb\nb\n- [ ] 条件\nd\n本文\r\nc\nc\n- [ ] 条件\n本文\r\nd\n\nb\n- [ ] 条件\nd\na\n- [ ] 条件\na\n\nx\na\nb\nd\nx\nc\nd\nx本文\r\nc\na\nb\n\nb\n\nxa\nx\n\nb\na\n本文\r\n\na\nd\n\nb\na\n\nd\n- [ ] 条件\n- [ ] 条件\nd\nc\n## 見出し\nx- [ ] 条件\n## 見出し\nd\n## 見出し\n## 見出し\nc\nc\n## 見出し\n## 見出し\n本文\r\na\n本文\r\nx## 見出し\n\n## 見出し\n\n- [ ] 条件\nxc\nc\nx- [ ] 条件\nx本文\r\nb\n本文\r\n- [ ] 条件\nd\nd\nd\n## 見出し\n本文\r\n## 見出し\nc\n## 見出し\nd\nxx本文\r\n\nc\nxa\nc\n本文\r\n## 見出し\n本文\r\nc\nd\nd\nb\n- [ ] 条件\nc\n## 見出し\n- [ ] 条件\n## 見出し\n",
+   "B": "d\n\nd\nb\na\n\nxd\n本文\r\n## 見出し\nd\n- [ ] 条件\nx本文\r\nx- [ ] 条件\n## 見出し\n## 見出し\nc\nc\n## 見出し\nb\nc\n本文\r\nb\na\nx- [ ] 条件\na\n\n- [ ] 条件\n## 見出し\n\nx\nc\nd\n\n\na\n本文\r\nc\nxd\n## 見出し\nd\na\na\nd\n- [ ] 条件\nc\nx\n\n\nx\nc\n- [ ] 条件\nc\nxb\nc\nc\n本文\r\n\nd\na\nc\n\nd\n- [ ] 条件\n- [ ] 条件\n本文\r\nxd\n本文\r\n## 見出し\nb\nxa\nd\nx本文\r\n本文\r\nc\n## 見出し\n- [ ] 条件\nb\nb\n- [ ] 条件\nd\n本文\r\nc\nc\n- [ ] 条件\n本文\r\nd\n\nb\n- [ ] 条件\nd\na\n- [ ] 条件\na\n\nx\na\nb\nd\nx\nc\nd\nx本文\r\nc\na\nb\n\nb\n\nxa\nx\n\nb\na\n本文\r\n\na\n\nd\na\n\nd\n- [ ] 条件\n- [ ] 条件\nd\nc\n## 見出し\nx- [ ] 条件\n## 見出し\nd\n## 見出し\n## 見出し\nc\nc\n## 見出し\n## 見出し\n本文\r\na\n本文\r\nx## 見出し\n\n## 見出し\n\n- [ ] 条件\nxc\nc\nx- [ ] 条件\nx本文\r\nb\n本文\r\n- [ ] 条件\nd\nd\nd\n## 見出し\n本文\r\n## 見出し\nc\n## 見出し\nd\nxx本文\r\n\nc\nxa\nc\n本文\r\n## 見出し\n本文\r\nc\nd\nd\nb\n- [ ] 条件\nc\n## 見出し\n- [ ] 条件\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\nx本文\r\n## 見出し\n本文\r\n本文\r\na\n本文\r\nd\nc\n\nc\n本文\r\nxb\n",
+   "B": "本文\r\nx本文\r\n## 見出し\n本文\r\n本文\r\nxx本文\r\nd\nc\n\nc\n本文\r\nd\n"
+  },
+  {
+   "A": "d\nb\n- [ ] 条件\nxd\nb\n",
+   "B": "- [ ] 条件\nb\n- [ ] 条件\nxd\nb\n"
+  },
+  {
+   "A": "b\nd\nxd\n本文\r\nx- [ ] 条件\na\n本文\r\n",
+   "B": "b\n- [ ] 条件\nd\nxd\n本文\r\nx- [ ] 条件\na\n- [ ] 条件\n本文\r\n"
+  },
+  {
+   "A": "c\nx本文\r\na\na\nd\n- [ ] 条件\n## 見出し\n- [ ] 条件\n- [ ] 条件\n## 見出し\n## 見出し\n- [ ] 条件\nc\n## 見出し\nc\n",
+   "B": "c\nx本文\r\na\nd\n- [ ] 条件\n## 見出し\n- [ ] 条件\nc\n- [ ] 条件\n## 見出し\n## 見出し\n- [ ] 条件\nc\n## 見出し\nc\n"
+  },
+  {
+   "A": "- [ ] 条件\na\n## 見出し\na\n本文\r\n- [ ] 条件\n",
+   "B": "- [ ] 条件\n- [ ] 条件\na\na\na\n本文\r\n- [ ] 条件\n"
+  },
+  {
+   "A": "## 見出し\n本文\r\n\n本文\r\nb\nb\n本文\r\nxb\n",
+   "B": "b\n- [ ] 条件\nxa\nd\na\n\n\n## 見出し\nx\n## 見出し\n"
+  },
+  {
+   "A": "- [ ] 条件\na\nx",
+   "B": "d\n\nd\n- [ ] 条件\nxb\n"
+  },
+  {
+   "A": "本文\r\na\nd\na\nb\nd\n",
+   "B": "- [ ] 条件\n## 見出し\n\nxa\na\nc\n本文\r\nd\n"
+  },
+  {
+   "A": "a\nd\n## 見出し\n本文\r\n## 見出し\nxx本文\r\n## 見出し\nxa\n- [ ] 条件\n- [ ] 条件\nc\n本文\r\n- [ ] 条件\nx",
+   "B": "a\nd\n## 見出し\n本文\r\n## 見出し\nxx本文\r\n## 見出し\n本文\r\nxa\nx- [ ] 条件\nc\n本文\r\n- [ ] 条件\nx"
+  },
+  {
+   "A": "- [ ] 条件\n\nb\nd\n\n## 見出し\n## 見出し\nc\n\n",
+   "B": "\n## 見出し\nd\nx## 見出し\nx"
+  },
+  {
+   "A": "## 見出し\na\n- [ ] 条件\n\n\na\nc\nc\nxb\nb\na\nc\na\nxc\n本文\r\nc\n",
+   "B": "## 見出し\na\n- [ ] 条件\n\nx\na\nc\nc\nxb\na\nc\nd\nxc\n本文\r\nc\n"
+  },
+  {
+   "A": "本文\r\na\n\n## 見出し\n- [ ] 条件\nd\n\nc\na\n\na\nb\nb\nb\n",
+   "B": "本文\r\na\n\n\n## 見出し\n- [ ] 条件\nd\n\nc\na\n\na\nb\nb\nb\n"
+  },
+  {
+   "A": "b\nd\nx- [ ] 条件\n\nb\n\n本文\r\n## 見出し\nd\n## 見出し\nb\nd\na\nxb\n- [ ] 条件\nd\n",
+   "B": "b\nd\n\nb\n\n本文\r\n## 見出し\nd\n## 見出し\nc\nb\nd\na\nxb\nd\n本文\r\nd\n"
+  },
+  {
+   "A": "- [ ] 条件\na\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nd\nx本文\r\na\nxd\nb\nc\nxx- [ ] 条件\nc\n\n",
+   "B": "c\na\n- [ ] 条件\n- [ ] 条件\nb\n- [ ] 条件\nd\nx本文\r\nxd\nb\nc\nxx- [ ] 条件\nc\n\n"
+  },
+  {
+   "A": "",
+   "B": "## 見出し\n"
+  },
+  {
+   "A": "",
+   "B": "d\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "b\n- [ ] 条件\n## 見出し\nb\nx本文\r\nx本文\r\n本文\r\nb\nd\n",
+   "B": "b\n- [ ] 条件\n- [ ] 条件\n## 見出し\nx本文\r\n本文\r\nb\nd\n"
+  },
+  {
+   "A": "- [ ] 条件\nc\n- [ ] 条件\nc\nxd\na\n- [ ] 条件\nb\nd\nb\nc\n",
+   "B": "## 見出し\n本文\r\n- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\na\nd\n- [ ] 条件\n本文\r\nxd\n本文\r\na\nd\na\n- [ ] 条件\n"
+  },
+  {
+   "A": "c\n\n- [ ] 条件\nxxa\n本文\r\nc\n## 見出し\na\n本文\r\nc\nc\nc\nd\n本文\r\nxb\nd\n\nd\nb\n\na\n本文\r\n- [ ] 条件\n- [ ] 条件\nd\n## 見出し\n本文\r\n\n本文\r\n\nxa\n本文\r\n- [ ] 条件\nd\na\na\n## 見出し\nc\nd\n\n- [ ] 条件\nx\nxa\n## 見出し\n- [ ] 条件\nc\nx\n## 見出し\nxd\nc\n## 見出し\nc\nb\nx## 見出し\nd\n## 見出し\na\n## 見出し\nc\n\n本文\r\nc\n## 見出し\nd\nd\n\nxd\nd\nc\na\nb\n## 見出し\nd\nc\nc\na\nb\n- [ ] 条件\n本文\r\n- [ ] 条件\nb\nxxd\n- [ ] 条件\nd\nxd\n## 見出し\nb\na\nxb\n- [ ] 条件\n- [ ] 条件\nd\n- [ ] 条件\na\n## 見出し\n本文\r\nd\n## 見出し\n本文\r\n本文\r\na\n- [ ] 条件\nx- [ ] 条件\n- [ ] 条件\na\n本文\r\n\nb\n- [ ] 条件\n本文\r\nxx本文\r\nxd\n\nd\n本文\r\na\n\n## 見出し\nxc\n本文\r\nc\nx- [ ] 条件\n\na\n本文\r\nd\nx## 見出し\na\n本文\r\n- [ ] 条件\n- [ ] 条件\n本文\r\nd\na\nd\n本文\r\n\nb\na\na\na\nb\n- [ ] 条件\n\na\nb\nd\n\n本文\r\na\n\nd\nxd\nd\nc\nx\n\n\n本文\r\n\n- [ ] 条件\n## 見出し\nc\na\nb\nb\n\nx## 見出し\nc\n- [ ] 条件\na\n\n\n## 見出し\n- [ ] 条件\nc\na\nc\n- [ ] 条件\nb\n本文\r\nb\n## 見出し\n- [ ] 条件\n\nb\n本文\r\nb\nxxa\na\n本文\r\nb\n本文\r\n- [ ] 条件\n- [ ] 条件\nc\n本文\r\nb\n- [ ] 条件\n- [ ] 条件\nb\n本文\r\n- [ ] 条件\nx## 見出し\nd\nd\n- [ ] 条件\nb\n\nx\n本文\r\n本文\r\nb\nd\n- [ ] 条件\nxc\n\na\n- [ ] 条件\n本文\r\nc\nd\nxb\nb\n## 見出し\nxc\n\nx## 見出し\n本文\r\n- [ ] 条件\nd\n\n## 見出し\n\na\n\nb\n- [ ] 条件\n- [ ] 条件\na\n\nc\n- [ ] 条件\n- [ ] 条件\nc\nd\nxa\na\nxd\na\nc\n本文\r\nx## 見出し\nd\n## 見出し\nxx- [ ] 条件\nx## 見出し\nxxc\nc\n- [ ] 条件\nc\n\nc\na\nb\nd\nxc\nc\n## 見出し\nx## 見出し\n本文\r\n## 見出し\nx## 見出し\n\nc\n- [ ] 条件\n## 見出し\n",
+   "B": "c\n\n- [ ] 条件\nxxa\n本文\r\nc\n## 見出し\na\n本文\r\nc\nc\nc\nd\n本文\r\nxb\nd\n\nd\nb\n\na\n本文\r\n- [ ] 条件\n- [ ] 条件\nd\n## 見出し\n本文\r\n\n本文\r\n\nxa\n本文\r\n- [ ] 条件\nd\na\na\n## 見出し\nc\nd\n\n- [ ] 条件\nx\nxa\n## 見出し\n- [ ] 条件\nc\nx\n## 見出し\nxd\nc\n## 見出し\nc\nb\nx## 見出し\nd\n## 見出し\na\n## 見出し\nc\n\n本文\r\nc\n## 見出し\nd\nd\n\nxd\nd\nc\na\nb\n## 見出し\nd\nc\nc\na\nb\n- [ ] 条件\n本文\r\n- [ ] 条件\nb\nxxd\n- [ ] 条件\nd\nxd\n## 見出し\nb\na\nxb\n- [ ] 条件\n- [ ] 条件\nd\n- [ ] 条件\na\n## 見出し\n本文\r\nd\n## 見出し\n本文\r\n本文\r\na\n- [ ] 条件\nx- [ ] 条件\n- [ ] 条件\na\n本文\r\n\nb\n- [ ] 条件\n本文\r\nxx本文\r\nxd\n\nd\n本文\r\na\n\n## 見出し\nxc\n本文\r\nc\nx- [ ] 条件\n\na\n本文\r\nx## 見出し\na\n本文\r\n- [ ] 条件\n- [ ] 条件\n本文\r\nd\na\nd\n本文\r\n\nb\na\na\na\nb\n- [ ] 条件\n\na\nb\nd\n\n本文\r\na\n\nd\nxd\nd\nc\nx\n\n\n本文\r\n\n- [ ] 条件\n## 見出し\nc\na\nb\nb\n\nx## 見出し\nc\n- [ ] 条件\na\n\n\n## 見出し\n- [ ] 条件\nc\na\nc\n- [ ] 条件\nb\n本文\r\nb\n## 見出し\n- [ ] 条件\n\nb\n本文\r\nb\nxxa\na\n本文\r\nb\n本文\r\n- [ ] 条件\n- [ ] 条件\nc\n本文\r\nb\n- [ ] 条件\n- [ ] 条件\nb\n本文\r\n- [ ] 条件\nx## 見出し\nd\nd\n- [ ] 条件\nb\n\nx\n本文\r\n本文\r\nb\nd\n- [ ] 条件\nxc\n\na\n- [ ] 条件\n本文\r\nc\nd\nxb\nb\n## 見出し\nxc\n\nx## 見出し\n本文\r\n- [ ] 条件\nd\n\n## 見出し\n## 見出し\n\na\n\nb\n- [ ] 条件\n- [ ] 条件\na\n\nc\n- [ ] 条件\n- [ ] 条件\nc\nd\nxa\na\nxd\na\nc\n本文\r\nx## 見出し\nd\n## 見出し\nxx- [ ] 条件\nx## 見出し\nxxc\nc\n- [ ] 条件\nc\n\nc\na\nb\nd\nxc\nc\n## 見出し\nx## 見出し\n本文\r\n## 見出し\nx## 見出し\n\nc\n- [ ] 条件\n## 見出し\n"
+  },
+  {
+   "A": "## 見出し\nc\n- [ ] 条件\na\n## 見出し\n\nb\n\nx\nd\n",
+   "B": "## 見出し\nc\n- [ ] 条件\nc\na\n## 見出し\n本文\r\n\nb\n\n本文\r\nd\n"
+  },
+  {
+   "A": "x\nc\nxb\n\na\nd\n\nb\n## 見出し\nb\nd\n",
+   "B": "d\na\na\n- [ ] 条件\nd\n本文\r\nc\n本文\r\n"
+  },
+  {
+   "A": "a\nd\nd\nd\nxb\nx本文\r\n",
+   "B": "a\nd\n## 見出し\nd\nxb\nx本文\r\n"
+  },
+  {
+   "A": "\nc\n## 見出し\nx",
+   "B": "\n\nc\n## 見出し\n## 見出し\nx"
+  },
+  {
+   "A": "b\nd\n本文\r\n## 見出し\na\nb\na\n## 見出し\n## 見出し\nxd\n",
+   "B": "本文\r\na\nb\n## 見出し\n- [ ] 条件\nb\n## 見出し\nb\na\nd\n\nb\n本文\r\nb\n"
+  },
+  {
+   "A": "c\nb\n\nc\n\n- [ ] 条件\n\n\n",
+   "B": "c\nb\n\nc\n\n- [ ] 条件\n## 見出し\n\n"
+  },
+  {
+   "A": "a\na\nc\n## 見出し\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "b\n本文\r\na\na\na\nd\n"
+  },
+  {
+   "A": "d\nc\n## 見出し\nc\na\na\n## 見出し\nd\n",
+   "B": "d\nc\nc\na\n## 見出し\nc\n本文\r\n- [ ] 条件\n## 見出し\n## 見出し\na\n## 見出し\n本文\r\nxa\n"
+  },
+  {
+   "A": "d\na\n## 見出し\nd\nb\n## 見出し\nd\n## 見出し\nx",
+   "B": "a\n## 見出し\n## 見出し\nb\n## 見出し\n## 見出し\n## 見出し\nx"
+  },
+  {
+   "A": "d\na\n本文\r\nc\na\na\nxb\n",
+   "B": "## 見出し\nb\nb\nd\n\n"
+  },
+  {
+   "A": "- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\nb\nx本文\r\n\na\n\n本文\r\n\n\nb\n\na\nb\n## 見出し\n",
+   "B": "- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\nb\nx本文\r\n\na\n- [ ] 条件\n\n本文\r\n\nb\n\na\nb\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\na\nx\nx- [ ] 条件\nd\nb\n",
+   "B": "a\nx\nx- [ ] 条件\nc\nd\nb\n"
+  },
+  {
+   "A": "a\nc\nxa\nc\na\n\nd\na\nc\n## 見出し\nx## 見出し\na\n- [ ] 条件\n## 見出し\n## 見出し\n",
+   "B": "a\nc\nxa\nc\na\n\nd\nd\nc\n## 見出し\nxa\n- [ ] 条件\n## 見出し\n"
+  },
+  {
+   "A": "a\nc\n## 見出し\nc\n## 見出し\n- [ ] 条件\nc\na\nb\n- [ ] 条件\n## 見出し\n",
+   "B": "a\nc\n## 見出し\nc\n## 見出し\na\n- [ ] 条件\nc\na\nd\nb\n## 見出し\n- [ ] 条件\n## 見出し\n"
+  },
+  {
+   "A": "\nb\n- [ ] 条件\nb\nc\n本文\r\n本文\r\nd\n本文\r\n## 見出し\nxb\nc\n## 見出し\nxc\n",
+   "B": "\nb\n- [ ] 条件\nb\nc\n本文\r\nd\n本文\r\n## 見出し\nxb\n## 見出し\nxc\n"
+  },
+  {
+   "A": "## 見出し\n本文\r\n## 見出し\n- [ ] 条件\n\n本文\r\nd\nc\nc\nd\nb\n## 見出し\na\n- [ ] 条件\n\na\nd\nx",
+   "B": "## 見出し\n本文\r\n## 見出し\n- [ ] 条件\n\nx本文\r\nd\nc\nc\nd\nd\nb\n## 見出し\na\n- [ ] 条件\n\na\na\nx"
+  },
+  {
+   "A": "x- [ ] 条件\n## 見出し\nb\nb\n",
+   "B": "x- [ ] 条件\n## 見出し\n## 見出し\nc\n## 見出し\nb\n"
+  },
+  {
+   "A": "c\nc\na\n本文\r\nd\nxd\n- [ ] 条件\n\nb\n本文\r\n",
+   "B": "c\nc\nc\na\n本文\r\nd\nxd\n- [ ] 条件\n\nb\n本文\r\n"
+  },
+  {
+   "A": "## 見出し\n- [ ] 条件\na\n## 見出し\nb\nx- [ ] 条件\n本文\r\na\n本文\r\na\nb\n\n- [ ] 条件\nxd\nc\n",
+   "B": "## 見出し\n- [ ] 条件\na\n- [ ] 条件\n## 見出し\nb\nx- [ ] 条件\n本文\r\na\n本文\r\na\nb\n\na\n- [ ] 条件\nxd\nc\n"
+  },
+  {
+   "A": "xc\nx## 見出し\n- [ ] 条件\nd\n## 見出し\n- [ ] 条件\nd\n- [ ] 条件\n- [ ] 条件\nb\na\nd\n本文\r\na\n本文\r\n- [ ] 条件\nxc\n- [ ] 条件\n## 見出し\nc\n本文\r\n## 見出し\n本文\r\na\n本文\r\na\nb\n## 見出し\n- [ ] 条件\n\n\na\nb\nc\n本文\r\n本文\r\n本文\r\n- [ ] 条件\n\na\nb\n## 見出し\nb\n本文\r\n本文\r\n- [ ] 条件\n\nd\na\nb\n\n本文\r\nb\na\nxxd\nx\nd\nx- [ ] 条件\nxb\nc\na\n本文\r\n本文\r\n- [ ] 条件\nb\n\nd\n- [ ] 条件\nd\nc\n## 見出し\nc\nd\n## 見出し\nb\na\n## 見出し\nd\n本文\r\n- [ ] 条件\n\nd\na\n- [ ] 条件\n\n\n## 見出し\nd\nxxb\n\nx## 見出し\nd\nd\nd\n- [ ] 条件\n本文\r\nd\n\na\nd\nb\n## 見出し\nb\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nb\na\na\n\n## 見出し\nd\n\n- [ ] 条件\n\n- [ ] 条件\n本文\r\na\nc\n- [ ] 条件\nc\nb\n\na\na\na\nx## 見出し\nd\nb\n- [ ] 条件\nb\n- [ ] 条件\nc\nd\nb\n- [ ] 条件\n\n本文\r\n## 見出し\na\na\n\n\nd\n## 見出し\n## 見出し\n- [ ] 条件\na\n## 見出し\n- [ ] 条件\nx\n\n## 見出し\n\n## 見出し\n- [ ] 条件\nxb\nxc\nc\nb\n\nb\nb\nb\nd\n\n本文\r\na\n本文\r\nc\n本文\r\n\n- [ ] 条件\n## 見出し\nxc\nb\n- [ ] 条件\n- [ ] 条件\nc\nb\n本文\r\n## 見出し\n## 見出し\n\n\na\n\n## 見出し\n\nxc\nd\nc\nx本文\r\n本文\r\n- [ ] 条件\n\n\nb\na\na\n- [ ] 条件\n## 見出し\nc\na\nxa\nb\nb\nc\na\nx本文\r\n- [ ] 条件\nx\n## 見出し\n## 見出し\nxa\na\n## 見出し\n- [ ] 条件\na\nd\nc\nx\n## 見出し\nc\na\n本文\r\n本文\r\nc\n\n- [ ] 条件\n## 見出し\nb\n- [ ] 条件\nd\n- [ ] 条件\nb\nb\nb\nc\n本文\r\n- [ ] 条件\nb\nc\nxa\n本文\r\n本文\r\nb\nc\n\na\n## 見出し\nb\n\n本文\r\nb\na\nb\n本文\r\na\n## 見出し\nxd\n本文\r\n本文\r\n## 見出し\nb\nc\n本文\r\nc\n- [ ] 条件\na\nb\n本文\r\n## 見出し\n\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n## 見出し\n本文\r\nb\n- [ ] 条件\na\nxc\n- [ ] 条件\n本文\r\na\n\n本文\r\na\nd\nb\n本文\r\na\n## 見出し\nd\nb\n本文\r\nb\n\nb\n本文\r\n## 見出し\n",
+   "B": "xc\nx## 見出し\n- [ ] 条件\nd\n## 見出し\n- [ ] 条件\nd\n- [ ] 条件\n- [ ] 条件\nb\na\nd\n本文\r\na\n本文\r\n- [ ] 条件\nxc\n- [ ] 条件\n\nc\n本文\r\n## 見出し\n本文\r\na\n本文\r\na\nb\n## 見出し\n- [ ] 条件\n\n\na\nb\nc\n本文\r\n本文\r\n本文\r\n- [ ] 条件\n\na\nb\n## 見出し\nb\n本文\r\n本文\r\n- [ ] 条件\n\nd\na\nb\n\n本文\r\nb\na\nxxd\nx\nd\nx- [ ] 条件\nxb\nc\na\n本文\r\n本文\r\n- [ ] 条件\nb\n\nd\n- [ ] 条件\nd\nc\n## 見出し\nc\nd\n## 見出し\nb\na\n## 見出し\nd\n本文\r\n- [ ] 条件\n\nd\na\n- [ ] 条件\n\n\n## 見出し\nd\nxxb\n\nx## 見出し\nd\nd\nd\n- [ ] 条件\n本文\r\nd\n\na\nd\nb\n## 見出し\nb\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nb\na\na\n\n## 見出し\nd\n\n- [ ] 条件\n\n- [ ] 条件\n本文\r\na\nc\n- [ ] 条件\nc\nb\n\na\na\na\nx## 見出し\nd\nb\n- [ ] 条件\nb\n- [ ] 条件\nc\nd\nb\n- [ ] 条件\n\n本文\r\n## 見出し\na\na\n\n\nd\n## 見出し\n## 見出し\n- [ ] 条件\na\n## 見出し\n- [ ] 条件\nx\n\n## 見出し\n\n## 見出し\n- [ ] 条件\nxb\nxc\nc\nb\n\nb\nb\nb\nd\n\n本文\r\na\n本文\r\nc\n本文\r\n\n- [ ] 条件\n## 見出し\nxc\nb\n- [ ] 条件\n- [ ] 条件\nc\nb\n本文\r\n## 見出し\n## 見出し\n\n\na\n\n## 見出し\n\nxc\nd\nc\nx本文\r\n本文\r\n- [ ] 条件\n\n\nb\na\na\n- [ ] 条件\n## 見出し\nc\na\nxa\nb\nb\nc\na\nx本文\r\n- [ ] 条件\nx\n## 見出し\n## 見出し\nxa\na\n## 見出し\n- [ ] 条件\na\nd\nc\nx\n## 見出し\nc\na\n本文\r\n本文\r\nc\n\n- [ ] 条件\n## 見出し\nb\n- [ ] 条件\nd\n- [ ] 条件\nb\nb\nb\nc\n本文\r\n- [ ] 条件\nb\nc\nxa\n本文\r\n本文\r\nb\nc\n\na\n## 見出し\nb\n\n本文\r\nb\na\nb\n本文\r\na\n## 見出し\nxd\n本文\r\n本文\r\n## 見出し\nb\nc\n本文\r\nc\n- [ ] 条件\na\nb\n本文\r\n## 見出し\n\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n## 見出し\n本文\r\nb\n- [ ] 条件\na\nxc\n- [ ] 条件\n本文\r\na\n\n本文\r\na\nd\nb\n本文\r\na\n## 見出し\nd\nb\n本文\r\nb\n\nb\n本文\r\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\nx## 見出し\n- [ ] 条件\n## 見出し\nb\nc\na\nxx- [ ] 条件\n",
+   "B": "d\n本文\r\nx## 見出し\n- [ ] 条件\n## 見出し\nb\nc\na\nxx- [ ] 条件\n"
+  },
+  {
+   "A": "- [ ] 条件\na\nd\nxd\nd\nxc\nd\n",
+   "B": "- [ ] 条件\na\nd\nxd\n本文\r\nxc\nd\n"
+  },
+  {
+   "A": "",
+   "B": "\nc\n"
+  },
+  {
+   "A": "\nx- [ ] 条件\na\nxd\n\n本文\r\n- [ ] 条件\nb\nd\n- [ ] 条件\n本文\r\n",
+   "B": "\nx- [ ] 条件\na\nxd\n\n本文\r\n- [ ] 条件\n## 見出し\nb\nd\n- [ ] 条件\n本文\r\n"
+  },
+  {
+   "A": "b\na\n## 見出し\n\n- [ ] 条件\n本文\r\n- [ ] 条件\nd\nd\nd\nc\nxb\n## 見出し\nd\n本文\r\n\n- [ ] 条件\n",
+   "B": "本文\r\na\n## 見出し\n\n## 見出し\n本文\r\n- [ ] 条件\nd\nd\nd\nc\nxb\n## 見出し\nd\n本文\r\n- [ ] 条件\n"
+  },
+  {
+   "A": "本文\r\nb\n## 見出し\n- [ ] 条件\n- [ ] 条件\n本文\r\n## 見出し\nc\nxc\nc\nc\n\n\n",
+   "B": "- [ ] 条件\nxx本文\r\n- [ ] 条件\n## 見出し\nd\nb\na\nb\nb\n- [ ] 条件\n- [ ] 条件\nd\nc\n## 見出し\na\nd\n本文\r\nxc\na\n本文\r\na\na\nc\n"
+  },
+  {
+   "A": "\n## 見出し\n本文\r\na\nb\n本文\r\n\na\n## 見出し\n本文\r\na\n",
+   "B": "## 見出し\na\nb\n本文\r\n\na\n## 見出し\nb\n"
+  },
+  {
+   "A": "\na\n- [ ] 条件\nd\nc\na\n\n## 見出し\n\nb\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nxd\na\nc\n\n",
+   "B": "\na\n- [ ] 条件\nd\nc\na\n\n\nb\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nd\na\nc\n\n"
+  },
+  {
+   "A": "",
+   "B": "\n## 見出し\n"
+  },
+  {
+   "A": "- [ ] 条件\na\nb\nb\nx",
+   "B": "- [ ] 条件\na\nb\nb\nx"
+  },
+  {
+   "A": "d\n",
+   "B": ""
+  },
+  {
+   "A": "a\nc\nc\n## 見出し\nc\n## 見出し\n## 見出し\nb\na\nx## 見出し\na\nd\n## 見出し\nc\n## 見出し\n",
+   "B": "xc\nxc\n- [ ] 条件\n\nc\n本文\r\nd\nd\nc\n\n\nd\n\nx本文\r\nb\n- [ ] 条件\n\nd\n## 見出し\n"
+  },
+  {
+   "A": "d\n本文\r\nd\n- [ ] 条件\n\nb\nd\nc\n",
+   "B": "\n本文\r\n本文\r\na\nd\n\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "a\n",
+   "B": "c\na\nxc\nb\nxb\nb\n## 見出し\n## 見出し\n\na\nx"
+  },
+  {
+   "A": "d\n## 見出し\n- [ ] 条件\nc\nd\n- [ ] 条件\na\n\nb\n",
+   "B": "\n## 見出し\n- [ ] 条件\nc\n- [ ] 条件\na\n## 見出し\nb\n"
+  },
+  {
+   "A": "d\nd\n\nc\n\n本文\r\nc\nb\na\na\nd\n\nc\nc\nd\nc\n",
+   "B": "d\nd\n\nc\n本文\r\nc\nb\na\nd\n\nc\nc\nd\nc\n"
+  },
+  {
+   "A": "c\n本文\r\nc\na\n## 見出し\nb\na\na\n## 見出し\n- [ ] 条件\n",
+   "B": "xc\n- [ ] 条件\nx- [ ] 条件\nc\nc\nxa\nd\n## 見出し\na\n## 見出し\na\na\na\n## 見出し\nd\nd\nb\nd\nb\n## 見出し\n"
+  },
+  {
+   "A": "## 見出し\n\n## 見出し\nb\n- [ ] 条件\nc\nc\n## 見出し\n- [ ] 条件\n本文\r\n## 見出し\nc\n本文\r\nc\nb\n- [ ] 条件\nb\n\n",
+   "B": "## 見出し\n\n## 見出し\nb\n- [ ] 条件\nc\nc\na\n## 見出し\n本文\r\nc\nb\n- [ ] 条件\nb\n\n"
+  },
+  {
+   "A": "## 見出し\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\n本文\r\nxa\n- [ ] 条件\n本文\r\n- [ ] 条件\n本文\r\nd\nb\nd\nc\n本文\r\n- [ ] 条件\nxa\n\n本文\r\nc\n本文\r\nd\n本文\r\nc\na\n## 見出し\nd\nxd\n\n- [ ] 条件\n\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\nxxx\nb\n\n\nb\n- [ ] 条件\nx## 見出し\nd\nd\n\na\na\n\nxxd\n## 見出し\nc\n本文\r\n- [ ] 条件\nb\nxxc\na\na\na\n- [ ] 条件\n本文\r\na\n本文\r\nd\nc\nc\n\nx\nb\n本文\r\n- [ ] 条件\nx本文\r\nc\n本文\r\nc\nc\nxb\na\na\n本文\r\n## 見出し\nc\n## 見出し\n- [ ] 条件\n\n本文\r\nx本文\r\n本文\r\n本文\r\n本文\r\n\na\n\nd\nx- [ ] 条件\nd\nb\n- [ ] 条件\nc\na\na\n本文\r\na\nc\n## 見出し\na\nxd\nb\nc\na\nb\n本文\r\na\nb\n本文\r\n\n## 見出し\n- [ ] 条件\nd\nb\nc\n## 見出し\n\n- [ ] 条件\n本文\r\nc\nx\nxc\n## 見出し\nc\nc\n本文\r\nxb\n- [ ] 条件\nd\n## 見出し\n- [ ] 条件\nd\n## 見出し\nc\n## 見出し\nb\nc\n## 見出し\n本文\r\n本文\r\n\n\n本文\r\nb\na\n## 見出し\n\n\nb\n\nb\n- [ ] 条件\n- [ ] 条件\n\nd\n本文\r\n## 見出し\n## 見出し\nc\n本文\r\na\na\n本文\r\na\n- [ ] 条件\n## 見出し\n## 見出し\nxxd\nxx\na\nd\n本文\r\n## 見出し\n\n- [ ] 条件\nb\nxb\n\n本文\r\na\n本文\r\na\na\nd\nd\nb\nx\n- [ ] 条件\na\n本文\r\nxc\na\n## 見出し\nc\n- [ ] 条件\na\nd\nb\n\na\nd\n\nc\nx## 見出し\nb\nb\nb\nb\n- [ ] 条件\nx## 見出し\na\nc\n## 見出し\n本文\r\nd\nd\n本文\r\nd\n## 見出し\n## 見出し\nd\n本文\r\n- [ ] 条件\nxd\n## 見出し\nb\n- [ ] 条件\n\nb\n- [ ] 条件\na\nd\n本文\r\n本文\r\nb\n- [ ] 条件\nb\nx本文\r\nd\nb\n本文\r\nd\nb\n## 見出し\nb\n## 見出し\nb\na\nc\na\nb\na\n本文\r\n## 見出し\nc\n\n\nd\nxx- [ ] 条件\nc\na\nc\nc\n本文\r\n本文\r\n本文\r\n本文\r\na\n- [ ] 条件\na\nb\n## 見出し\nxc\nc\n",
+   "B": "## 見出し\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\n本文\r\nxa\n- [ ] 条件\n本文\r\n- [ ] 条件\n本文\r\nd\nb\nd\nc\n本文\r\n- [ ] 条件\nxa\n\n本文\r\nc\n本文\r\nd\n本文\r\nc\na\n## 見出し\nd\nxd\n\n- [ ] 条件\n\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\nxxx\nb\n\n\nb\n- [ ] 条件\nx## 見出し\nd\nd\n\na\na\n\nxxd\n## 見出し\nc\n本文\r\n- [ ] 条件\nb\nxxc\na\na\na\n- [ ] 条件\n本文\r\na\n## 見出し\n本文\r\nd\n\nc\nc\n\nx\nb\n本文\r\n- [ ] 条件\nx本文\r\nc\n本文\r\nc\nc\nxb\na\na\n本文\r\n## 見出し\nc\n## 見出し\n- [ ] 条件\n\n本文\r\nx本文\r\n本文\r\n本文\r\n本文\r\n\na\n\nd\nx- [ ] 条件\nd\nb\n- [ ] 条件\nc\na\na\n本文\r\na\nc\n## 見出し\na\nxd\nb\nc\na\nb\n本文\r\na\nb\n本文\r\n\n## 見出し\n- [ ] 条件\nd\nb\nc\n## 見出し\n\n- [ ] 条件\n本文\r\nc\nx\nxc\n## 見出し\nc\nc\n本文\r\nxb\n- [ ] 条件\nd\n## 見出し\n- [ ] 条件\nd\n## 見出し\nc\n## 見出し\nb\nc\n## 見出し\n本文\r\n本文\r\n\n\n本文\r\nb\na\n## 見出し\n\n\nb\n\nb\n- [ ] 条件\n- [ ] 条件\n\nd\n本文\r\n## 見出し\n## 見出し\nc\n本文\r\na\na\n本文\r\na\n- [ ] 条件\n## 見出し\n## 見出し\nxxd\nxx\na\nd\n本文\r\n## 見出し\n\n- [ ] 条件\nb\nxb\n\n本文\r\na\n本文\r\na\na\nd\nd\nb\nx\n- [ ] 条件\na\n本文\r\nxc\na\n## 見出し\nc\n- [ ] 条件\na\nd\nb\n\na\nd\n\nc\nx## 見出し\nb\nb\nb\nb\n- [ ] 条件\nx## 見出し\na\nc\n## 見出し\n本文\r\nd\nd\n本文\r\nd\n## 見出し\n## 見出し\nd\n本文\r\n- [ ] 条件\nxd\n## 見出し\nb\n- [ ] 条件\n\nb\n- [ ] 条件\na\nd\n本文\r\n本文\r\nb\n- [ ] 条件\nb\nx本文\r\nd\nb\n本文\r\nd\nb\n## 見出し\nb\n## 見出し\nb\na\nc\na\nb\na\n本文\r\n## 見出し\nc\n\n\nd\nxx- [ ] 条件\nc\na\nc\nc\n本文\r\n本文\r\n本文\r\n本文\r\na\n- [ ] 条件\na\nb\nd\n## 見出し\nxc\nc\n"
+  },
+  {
+   "A": "- [ ] 条件\nx- [ ] 条件\nd\nd\nd\n\n本文\r\nxa\nb\nc\n",
+   "B": "- [ ] 条件\nd\n\nd\nd\n\n本文\r\nxa\nb\nc\n"
+  },
+  {
+   "A": "\nb\n\nb\n## 見出し\nb\nc\n本文\r\nd\n\nb\n",
+   "B": "d\nc\nc\n## 見出し\nc\n## 見出し\n- [ ] 条件\nc\nb\n## 見出し\na\nb\nc\nb\nx本文\r\n"
+  },
+  {
+   "A": "- [ ] 条件\n本文\r\nx本文\r\n",
+   "B": "- [ ] 条件\n本文\r\n## 見出し\n"
+  },
+  {
+   "A": "- [ ] 条件\na\n本文\r\nd\n## 見出し\n本文\r\nx## 見出し\n\na\nb\n本文\r\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n\n",
+   "B": "- [ ] 条件\na\n本文\r\nd\n## 見出し\n本文\r\nx## 見出し\na\nb\n本文\r\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n\n"
+  },
+  {
+   "A": "d\nc\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "\n\nc\n本文\r\n\nb\nb\n\n- [ ] 条件\n本文\r\n\nxd\nb\n- [ ] 条件\n\nb\n## 見出し\n"
+  },
+  {
+   "A": "xd\nx- [ ] 条件\n- [ ] 条件\n## 見出し\nx本文\r\n",
+   "B": "x- [ ] 条件\n- [ ] 条件\n## 見出し\nx本文\r\n"
+  },
+  {
+   "A": "d\n## 見出し\nb\n- [ ] 条件\nxxa\nc\nd\nc\nd\nc\n- [ ] 条件\n本文\r\n\na\n\nb\n",
+   "B": "d\n## 見出し\n- [ ] 条件\nb\n- [ ] 条件\nxxa\nc\nd\nc\nd\nc\n本文\r\n\na\nb\n"
+  },
+  {
+   "A": "xc\n## 見出し\n\nd\n\n本文\r\n## 見出し\n",
+   "B": "c\n\n本文\r\n\n本文\r\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\nd\nc\n## 見出し\n\n\na\n本文\r\n- [ ] 条件\n## 見出し\n- [ ] 条件\na\na\na\n## 見出し\n本文\r\n- [ ] 条件\n",
+   "B": "本文\r\nd\nc\n## 見出し\n\nd\na\n本文\r\n- [ ] 条件\n## 見出し\n- [ ] 条件\na\na\n## 見出し\n本文\r\n- [ ] 条件\n"
+  },
+  {
+   "A": "## 見出し\n\n\n- [ ] 条件\n本文\r\n本文\r\n",
+   "B": "## 見出し\n\n- [ ] 条件\n本文\r\n本文\r\n"
+  },
+  {
+   "A": "x",
+   "B": ""
+  },
+  {
+   "A": "c\n\nb\nb\n本文\r\nc\n",
+   "B": "c\n\nb\nb\n本文\r\nc\nc\n"
+  },
+  {
+   "A": "x## 見出し\nd\nc\nx本文\r\na\n",
+   "B": "d\n\nx本文\r\na\n"
+  },
+  {
+   "A": "a\nxc\n## 見出し\nb\n",
+   "B": "a\n## 見出し\nxc\n## 見出し\nd\nb\n"
+  },
+  {
+   "A": "本文\r\n## 見出し\nd\n\n\n- [ ] 条件\n\n本文\r\nc\nb\nc\n## 見出し\n- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\nxa\n",
+   "B": "本文\r\n- [ ] 条件\nd\n\n\n- [ ] 条件\n\n本文\r\n## 見出し\nc\nb\nc\n## 見出し\n- [ ] 条件\n\n- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\nxa\n"
+  },
+  {
+   "A": "- [ ] 条件\nb\n\n",
+   "B": "d\nb\n\n"
+  },
+  {
+   "A": "- [ ] 条件\nb\n本文\r\nb\n本文\r\na\nx## 見出し\nx- [ ] 条件\n",
+   "B": "a\n## 見出し\na\n- [ ] 条件\nx## 見出し\nd\nd\na\nx\nc\na\nb\n- [ ] 条件\nx"
+  },
+  {
+   "A": "d\n\nx- [ ] 条件\n本文\r\nxa\n## 見出し\nxx",
+   "B": "d\n## 見出し\n\nx- [ ] 条件\n本文\r\nxa\n本文\r\nxx"
+  },
+  {
+   "A": "d\n## 見出し\n## 見出し\n\n",
+   "B": "- [ ] 条件\nb\n## 見出し\n## 見出し\n\n"
+  },
+  {
+   "A": "c\nx本文\r\nc\n本文\r\n本文\r\n本文\r\n## 見出し\n本文\r\n- [ ] 条件\nd\nb\nx- [ ] 条件\n- [ ] 条件\na\nb\n## 見出し\nb\nd\na\nx## 見出し\nd\nd\n\n## 見出し\nd\na\na\nb\nxc\na\nb\n- [ ] 条件\nx## 見出し\n- [ ] 条件\n本文\r\nb\n## 見出し\na\nb\nb\na\n\n\nxxa\na\na\n\n- [ ] 条件\nx本文\r\na\nx## 見出し\n\nc\n本文\r\nx\nxb\nd\nd\n- [ ] 条件\nd\nc\na\na\nc\nb\nc\nc\na\nb\nc\nd\nx\nx## 見出し\n## 見出し\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n本文\r\nb\n- [ ] 条件\nd\na\n本文\r\na\n## 見出し\n## 見出し\nd\nx- [ ] 条件\nx## 見出し\n## 見出し\n\nc\nb\n本文\r\nd\nxa\n\na\nc\na\na\n- [ ] 条件\n- [ ] 条件\nxb\n\na\n## 見出し\n## 見出し\n\n- [ ] 条件\n## 見出し\n## 見出し\nc\n本文\r\nc\na\nxb\n本文\r\nb\n- [ ] 条件\na\n- [ ] 条件\nd\n- [ ] 条件\n- [ ] 条件\nc\nc\na\nb\n\nc\nx本文\r\nb\na\n本文\r\n本文\r\n## 見出し\nd\na\nb\n- [ ] 条件\n本文\r\nb\nb\nd\n本文\r\n\nx本文\r\n- [ ] 条件\nb\nb\nd\nb\n- [ ] 条件\na\n\nxc\na\nd\na\nxc\n- [ ] 条件\nb\n本文\r\nxc\nd\n## 見出し\nd\n## 見出し\n\nb\nxb\nc\n## 見出し\n\nc\na\nxa\nb\nb\nc\n## 見出し\nb\nd\nc\n本文\r\n\n- [ ] 条件\nxc\na\na\nb\nc\n本文\r\nc\nxc\n本文\r\n本文\r\nxxc\n## 見出し\nxx本文\r\n\nb\nb\na\n\n\n本文\r\nx\n- [ ] 条件\n本文\r\n- [ ] 条件\n\nb\nc\n## 見出し\nc\nc\n## 見出し\nc\na\nd\nd\nc\nc\nxb\nd\n本文\r\nb\n## 見出し\na\na\nx本文\r\nc\nxx\n本文\r\n## 見出し\n## 見出し\nc\nx\nb\nd\nxd\nc\nxx## 見出し\nxb\n- [ ] 条件\na\n本文\r\n\n\n\nc\n本文\r\nxb\n本文\r\nb\n- [ ] 条件\n\n- [ ] 条件\nb\n",
+   "B": "c\nx本文\r\nc\n本文\r\n本文\r\n本文\r\n## 見出し\n本文\r\n- [ ] 条件\nd\nb\nx- [ ] 条件\n- [ ] 条件\na\nb\n## 見出し\nb\nd\na\nx## 見出し\nd\nd\n\n## 見出し\nd\na\na\nb\nxc\na\nb\n- [ ] 条件\nx## 見出し\n- [ ] 条件\n本文\r\nb\n## 見出し\na\nb\nb\na\n\n\nxxa\na\na\n\n- [ ] 条件\nx本文\r\na\nx## 見出し\n\nc\n本文\r\nx\nxb\nd\nd\n- [ ] 条件\nd\nc\na\na\nc\nb\nc\nc\na\nb\nc\nd\nx## 見出し\n## 見出し\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n本文\r\nb\n- [ ] 条件\nd\na\n本文\r\na\n## 見出し\n## 見出し\nd\nx- [ ] 条件\nx## 見出し\n## 見出し\n\nc\nb\n本文\r\nd\nxa\n\na\nc\na\na\n- [ ] 条件\n- [ ] 条件\nxb\n\na\n## 見出し\n## 見出し\n\n- [ ] 条件\n## 見出し\n## 見出し\nc\n本文\r\nc\na\nxb\n本文\r\nb\n- [ ] 条件\na\n- [ ] 条件\nd\n- [ ] 条件\n- [ ] 条件\nc\nc\na\nb\n\nc\nx本文\r\nb\na\n本文\r\n本文\r\n## 見出し\nd\na\nb\n- [ ] 条件\n本文\r\nb\nb\nd\n本文\r\n\nx本文\r\n- [ ] 条件\nb\nb\nd\nb\n- [ ] 条件\na\n\nxc\na\nd\na\nxc\n- [ ] 条件\nb\n本文\r\nxc\nd\n## 見出し\nd\n## 見出し\n\nb\nxb\nc\n## 見出し\n\nc\na\nxa\n\nb\nc\n## 見出し\nb\nd\nc\n本文\r\n\n- [ ] 条件\nxc\na\na\nb\nc\n本文\r\nc\nxc\n本文\r\n本文\r\nxxc\n## 見出し\nxx本文\r\n\nb\nb\na\n\n\n本文\r\nx\n- [ ] 条件\n本文\r\n- [ ] 条件\n\nb\nc\n## 見出し\nc\nc\n## 見出し\nc\na\nd\nd\nc\nc\nxb\nd\n本文\r\nb\n## 見出し\na\na\nx本文\r\nc\nxx\n本文\r\n## 見出し\n## 見出し\nc\nx\nb\nd\nxd\nc\nxx## 見出し\nxb\n- [ ] 条件\na\n本文\r\n\n\n\nc\n本文\r\nxb\n本文\r\nb\n- [ ] 条件\n\n- [ ] 条件\nb\n"
+  },
+  {
+   "A": "a\nc\n",
+   "B": "a\nc\n- [ ] 条件\n本文\r\nd\n\na\n"
+  },
+  {
+   "A": "## 見出し\nc\n本文\r\nc\nb\nb\n\n本文\r\nd\nxb\nxc\n",
+   "B": "## 見出し\n- [ ] 条件\nc\n本文\r\nc\nb\nb\n\nc\n## 見出し\nd\nxb\nxc\n"
+  },
+  {
+   "A": "- [ ] 条件\n## 見出し\n- [ ] 条件\na\n本文\r\n## 見出し\n本文\r\nb\n- [ ] 条件\n## 見出し\n本文\r\n## 見出し\n",
+   "B": "- [ ] 条件\n## 見出し\n- [ ] 条件\na\n本文\r\n## 見出し\n本文\r\nb\na\n本文\r\n本文\r\n## 見出し\n"
+  },
+  {
+   "A": "a\n## 見出し\n本文\r\n## 見出し\n- [ ] 条件\nxd\n## 見出し\n## 見出し\n本文\r\n- [ ] 条件\n",
+   "B": "b\na\na\nb\n- [ ] 条件\n本文\r\n\nxc\na\n- [ ] 条件\nb\nc\na\nxx"
+  },
+  {
+   "A": "x## 見出し\nd\nc\nb\n- [ ] 条件\na\n",
+   "B": "- [ ] 条件\nb\nxd\n- [ ] 条件\nc\n本文\r\nb\na\nc\nb\n\nc\nb\nxd\n## 見出し\na\nc\nxc\n"
+  },
+  {
+   "A": "本文\r\nd\n",
+   "B": "a\n本文\r\nc\n\na\nx- [ ] 条件\n\nc\nxx## 見出し\nb\n本文\r\na\nb\n\n- [ ] 条件\na\nx"
+  },
+  {
+   "A": "c\na\n## 見出し\n## 見出し\n- [ ] 条件\nd\nc\n- [ ] 条件\nd\nd\nb\nd\n- [ ] 条件\n",
+   "B": "c\na\n## 見出し\n## 見出し\n- [ ] 条件\nd\nc\nx- [ ] 条件\nd\nd\nb\n- [ ] 条件\n"
+  },
+  {
+   "A": "",
+   "B": "## 見出し\n"
+  },
+  {
+   "A": "- [ ] 条件\nb\n",
+   "B": "d\nxb\n## 見出し\na\nb\n## 見出し\na\n"
+  },
+  {
+   "A": "a\nb\n## 見出し\na\nxb\nb\nc\nc\n",
+   "B": "c\na\nb\n## 見出し\na\n本文\r\nc\nc\n"
+  },
+  {
+   "A": "\nd\nd\n- [ ] 条件\nc\n## 見出し\n本文\r\n",
+   "B": "\nd\n- [ ] 条件\nd\n- [ ] 条件\nc\nc\n本文\r\n"
+  },
+  {
+   "A": "c\n- [ ] 条件\nc\nb\n本文\r\nxa\na\nc\n## 見出し\n",
+   "B": "c\n- [ ] 条件\nc\nb\n本文\r\na\nc\nxb\n"
+  },
+  {
+   "A": "本文\r\nc\n",
+   "B": "x本文\r\nc\n"
+  },
+  {
+   "A": "c\nc\nd\nxb\nxx\n本文\r\n## 見出し\n- [ ] 条件\nc\nd\n",
+   "B": "c\nc\nb\nd\nxb\nxx\n本文\r\n## 見出し\nx- [ ] 条件\nc\nd\n"
+  },
+  {
+   "A": "本文\r\nb\n",
+   "B": "本文\r\n\n\nd\n## 見出し\n## 見出し\n\nx\nxa\na\n本文\r\n本文\r\n本文\r\nc\nd\n"
+  },
+  {
+   "A": "- [ ] 条件\nxc\na\n- [ ] 条件\n## 見出し\nx\n本文\r\n本文\r\nd\n\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "- [ ] 条件\nxc\na\n- [ ] 条件\n## 見出し\nd\nx\n本文\r\n本文\r\nd\nx- [ ] 条件\n- [ ] 条件\n"
+  },
+  {
+   "A": "本文\r\nd\n## 見出し\n本文\r\n",
+   "B": "本文\r\nd\nd\n本文\r\n"
+  },
+  {
+   "A": "## 見出し\n- [ ] 条件\nd\n## 見出し\nxd\n- [ ] 条件\n## 見出し\nd\nb\n本文\r\n本文\r\n",
+   "B": "## 見出し\n- [ ] 条件\nd\nxd\n- [ ] 条件\n## 見出し\nd\nb\n本文\r\n本文\r\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "- [ ] 条件\nx本文\r\na\na\nd\nc\n\nd\nx- [ ] 条件\nd\n- [ ] 条件\n本文\r\n## 見出し\nb\nc\na\nc\nb\nc\nb\nd\nd\na\n- [ ] 条件\n- [ ] 条件\na\nx\na\n本文\r\nd\nc\nc\nxd\nc\nb\nd\nxa\nc\n- [ ] 条件\n## 見出し\n- [ ] 条件\nc\n\nx- [ ] 条件\nc\nc\n\n- [ ] 条件\nxa\nc\nb\nc\nc\nxx## 見出し\nb\n## 見出し\n本文\r\n本文\r\na\n\nc\nxa\nd\n- [ ] 条件\n\n本文\r\n## 見出し\n## 見出し\nb\n## 見出し\n本文\r\n## 見出し\nd\nd\nd\nx\n\n本文\r\nb\nd\na\nb\nd\n- [ ] 条件\n- [ ] 条件\n\n\n\na\n\n本文\r\n\nc\n本文\r\nc\n## 見出し\n- [ ] 条件\nc\n## 見出し\n## 見出し\n\nx本文\r\n## 見出し\nc\n\nx\na\nc\nc\n本文\r\nd\nxc\nd\n本文\r\na\nc\n- [ ] 条件\n本文\r\nb\nc\nx本文\r\n本文\r\nb\nc\nb\n- [ ] 条件\n本文\r\nx- [ ] 条件\na\n本文\r\n- [ ] 条件\n本文\r\nd\nc\n## 見出し\nx\nb\nd\n## 見出し\nd\nxd\nc\nd\na\nxc\na\n## 見出し\nb\nb\nd\nd\nd\n\nc\n## 見出し\n## 見出し\n- [ ] 条件\nd\nd\n## 見出し\na\nd\nc\nx- [ ] 条件\n## 見出し\nd\nd\nxd\nx本文\r\nd\nb\nc\nc\nc\n- [ ] 条件\n## 見出し\n\nb\na\n- [ ] 条件\nxxxc\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nc\n\nxb\nxb\n\nd\na\n## 見出し\nb\n本文\r\na\n\n- [ ] 条件\nd\nc\nxd\n\nd\nb\nb\nxx\na\nb\n- [ ] 条件\n## 見出し\nd\na\na\nx\n本文\r\nd\n本文\r\n## 見出し\na\n## 見出し\nd\n本文\r\nc\nx## 見出し\n## 見出し\n\nd\nd\na\nc\na\n",
+   "B": "- [ ] 条件\nx本文\r\na\na\nd\nc\n\nd\nx- [ ] 条件\nd\n- [ ] 条件\n本文\r\n## 見出し\nb\nc\na\nc\nb\nc\nb\nd\nd\na\n- [ ] 条件\n- [ ] 条件\na\nx\na\n本文\r\nd\nc\nc\nxd\nc\nb\nd\nxa\nc\n- [ ] 条件\n## 見出し\n- [ ] 条件\nc\n\nx- [ ] 条件\nc\nc\n\n- [ ] 条件\nxa\nc\nb\nc\nc\nxx## 見出し\nb\n## 見出し\n本文\r\n本文\r\na\n\nc\nxa\nd\n- [ ] 条件\n\n本文\r\n## 見出し\n## 見出し\nb\n## 見出し\n本文\r\n## 見出し\nd\nd\nd\nx\n\n本文\r\nb\nd\na\nb\nd\n- [ ] 条件\n- [ ] 条件\n\n\n\na\n\n本文\r\n\nc\n本文\r\nc\n## 見出し\n- [ ] 条件\nc\n## 見出し\n## 見出し\n\nx本文\r\n## 見出し\nc\n\nx\na\nc\nc\nd\nd\nxc\nd\n本文\r\na\nc\n- [ ] 条件\n本文\r\nb\nc\nx本文\r\n本文\r\nb\nc\nb\n- [ ] 条件\n本文\r\nx- [ ] 条件\na\n本文\r\n- [ ] 条件\n本文\r\nd\nc\n## 見出し\nx\nb\nd\n## 見出し\nd\nxd\nc\nd\na\nxc\na\n## 見出し\nb\nb\nd\nd\nd\n\nc\n## 見出し\n## 見出し\n- [ ] 条件\nd\nd\n## 見出し\na\nd\nc\nx- [ ] 条件\n## 見出し\nd\nd\nxd\nx本文\r\nd\nb\nc\nc\nc\n- [ ] 条件\n## 見出し\n\nb\na\n- [ ] 条件\nxxxc\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nc\n\nxb\nxb\n\nd\na\n## 見出し\nb\n本文\r\na\n\n- [ ] 条件\nd\nc\nxd\n\nd\nb\nb\nxx\na\nb\n- [ ] 条件\n## 見出し\nd\na\na\nx\n本文\r\nd\n本文\r\n## 見出し\na\n## 見出し\nd\n本文\r\nc\nx## 見出し\n## 見出し\n\nd\nd\na\nc\na\n"
+  },
+  {
+   "A": "c\n",
+   "B": "a\n本文\r\n"
+  },
+  {
+   "A": "a\n\na\n",
+   "B": "## 見出し\n"
+  },
+  {
+   "A": "c\nb\nd\nc\n",
+   "B": "## 見出し\nc\nc\nxd\nxa\nx## 見出し\n- [ ] 条件\nb\n本文\r\na\nx"
+  },
+  {
+   "A": "x\n- [ ] 条件\nb\n",
+   "B": "d\nb\n"
+  },
+  {
+   "A": "\na\n本文\r\nb\na\nd\na\na\nb\nc\n",
+   "B": "b\nb\nd\n- [ ] 条件\n- [ ] 条件\nc\nb\na\n"
+  },
+  {
+   "A": "\nxx本文\r\nx本文\r\n## 見出し\nc\n## 見出し\n本文\r\n",
+   "B": "xx本文\r\nx本文\r\n## 見出し\nc\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "xb\n- [ ] 条件\nc\n- [ ] 条件\nb\nd\nd\nb\nc\n",
+   "B": "本文\r\nxb\n- [ ] 条件\nc\n- [ ] 条件\nb\nd\nd\nb\nc\n"
+  },
+  {
+   "A": "- [ ] 条件\na\nc\nx本文\r\n",
+   "B": "- [ ] 条件\n- [ ] 条件\nc\n\n"
+  },
+  {
+   "A": "c\nd\n\nxb\n本文\r\n- [ ] 条件\n本文\r\na\n",
+   "B": "本文\r\n- [ ] 条件\nd\nxb\n## 見出し\n本文\r\n本文\r\n"
+  },
+  {
+   "A": "xb\nd\n",
+   "B": "xb\n## 見出し\nd\n"
+  },
+  {
+   "A": "- [ ] 条件\n",
+   "B": "d\nc\n- [ ] 条件\n"
+  },
+  {
+   "A": "a\nc\na\na\nx- [ ] 条件\n- [ ] 条件\nxb\nb\nb\n## 見出し\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "a\nc\na\n## 見出し\na\nx- [ ] 条件\n- [ ] 条件\nb\nb\n## 見出し\n- [ ] 条件\n- [ ] 条件\n"
+  },
+  {
+   "A": "d\n本文\r\nxxa\n",
+   "B": ""
+  },
+  {
+   "A": "c\n本文\r\na\na\n\n",
+   "B": "- [ ] 条件\n- [ ] 条件\nxa\n- [ ] 条件\nb\na\nd\n"
+  },
+  {
+   "A": "\nb\nc\n\na\n本文\r\nc\n本文\r\nc\n## 見出し\nc\n## 見出し\na\n",
+   "B": "\nxb\n- [ ] 条件\na\n本文\r\nx本文\r\n本文\r\n## 見出し\nxb\nd\nc\nd\nc\na\n## 見出し\n本文\r\nxb\n- [ ] 条件\nd\n"
+  },
+  {
+   "A": "a\n- [ ] 条件\n本文\r\n\n本文\r\na\nc\na\n- [ ] 条件\na\n\n\na\n\nd\n\na\n",
+   "B": "a\n本文\r\n\n本文\r\na\n本文\r\nc\n本文\r\n- [ ] 条件\na\n\n\na\n\nd\n\na\n"
+  },
+  {
+   "A": "d\n",
+   "B": "a\n\n- [ ] 条件\nd\n"
+  },
+  {
+   "A": "b\nd\n\nxc\nc\na\n- [ ] 条件\n## 見出し\n## 見出し\n\n\nc\na\n本文\r\nc\nb\nc\n## 見出し\n",
+   "B": "b\nd\n\nxc\nc\na\n- [ ] 条件\n## 見出し\n## 見出し\n\nd\nc\na\n本文\r\nc\nb\nc\n## 見出し\n"
+  },
+  {
+   "A": "",
+   "B": "\n\n"
+  },
+  {
+   "A": "x\nx\n本文\r\na\n## 見出し\n本文\r\n## 見出し\nb\n本文\r\n- [ ] 条件\nb\nxd\na\n## 見出し\nb\na\nd\nx- [ ] 条件\na\nb\nx- [ ] 条件\n## 見出し\nd\n## 見出し\nb\nc\n- [ ] 条件\nc\nd\nb\nb\n- [ ] 条件\nb\n## 見出し\nx本文\r\nd\nxb\n本文\r\n\nxc\n## 見出し\nd\nd\nc\n- [ ] 条件\n\nd\n- [ ] 条件\n\nc\nc\nx## 見出し\n\n- [ ] 条件\nc\n- [ ] 条件\n本文\r\n## 見出し\nc\na\na\nxd\n## 見出し\na\n- [ ] 条件\n- [ ] 条件\n\na\nc\nc\na\n- [ ] 条件\n本文\r\nxd\nb\nc\n本文\r\nxb\n本文\r\nd\n- [ ] 条件\n\nb\nd\n## 見出し\nb\na\n- [ ] 条件\nb\nd\nb\n\nx## 見出し\nc\nb\n- [ ] 条件\n本文\r\na\nc\nc\n\n## 見出し\nd\nxb\nxd\nc\n## 見出し\n\nx- [ ] 条件\nb\nxd\n\nd\na\nb\n本文\r\n\nd\n## 見出し\n\nd\n本文\r\nb\nx- [ ] 条件\nx\n\n- [ ] 条件\nd\nx本文\r\n## 見出し\nxb\n- [ ] 条件\nd\nd\n\nb\nb\nd\nx本文\r\nc\nxxx本文\r\nd\nb\na\n- [ ] 条件\nxa\n\na\n本文\r\nb\nd\nb\n## 見出し\nb\nc\nd\n\n## 見出し\n- [ ] 条件\nd\nd\nb\nd\nxd\nc\nx\nc\n本文\r\nx- [ ] 条件\nx\nb\nb\n## 見出し\n本文\r\n本文\r\n- [ ] 条件\nb\nc\nx\na\n\nc\na\n\n## 見出し\n## 見出し\n## 見出し\n本文\r\nd\na\nx## 見出し\nc\nxc\n- [ ] 条件\na\na\nb\n本文\r\n## 見出し\na\nb\nx\n\nb\nb\nx\n\n\n- [ ] 条件\nc\nc\n## 見出し\nx\nc\na\n- [ ] 条件\n本文\r\n## 見出し\na\nb\na\nb\nb\nd\n本文\r\na\n- [ ] 条件\na\nc\n- [ ] 条件\n- [ ] 条件\n## 見出し\nd\n\n## 見出し\n- [ ] 条件\nc\nb\n- [ ] 条件\n本文\r\n## 見出し\n## 見出し\n## 見出し\nxd\nxa\n\nc\na\n本文\r\nb\n本文\r\n## 見出し\n本文\r\nb\nx\n\nb\n- [ ] 条件\nd\nd\n## 見出し\na\n## 見出し\n- [ ] 条件\n本文\r\nd\na\nc\n## 見出し\n## 見出し\n本文\r\nx## 見出し\nd\n本文\r\na\n本文\r\n\n",
+   "B": "b\nc\n本文\r\nx## 見出し\nx- [ ] 条件\n- [ ] 条件\na\n## 見出し\nxa\nx\na\nd\na\n\na\nc\nc\nd\nd\nc\n## 見出し\nxc\nc\nc\nx本文\r\na\na\nd\nb\nxb\n- [ ] 条件\n本文\r\n## 見出し\nd\nb\n\n## 見出し\n本文\r\na\n\nb\n- [ ] 条件\nxd\nb\n## 見出し\nd\n本文\r\n\n- [ ] 条件\nc\n\nxc\n\n\n- [ ] 条件\n- [ ] 条件\n本文\r\nx## 見出し\nd\n本文\r\n\n本文\r\nxx\nd\nd\n\nxa\nd\nd\nc\n- [ ] 条件\n本文\r\n本文\r\nc\nb\n- [ ] 条件\na\nb\na\n\n- [ ] 条件\nxb\nb\n- [ ] 条件\n- [ ] 条件\n本文\r\n本文\r\nd\n本文\r\n\n- [ ] 条件\nxb\n## 見出し\n## 見出し\n## 見出し\nc\n\nc\nb\n\na\nc\nc\na\nc\n- [ ] 条件\nx- [ ] 条件\na\n## 見出し\na\nd\n- [ ] 条件\n## 見出し\na\nd\nc\nc\n\nc\nd\n## 見出し\nb\nd\n## 見出し\nb\n\nc\n- [ ] 条件\nd\na\nc\na\n本文\r\nb\n## 見出し\nc\n本文\r\nd\nb\nc\nc\nb\n"
+  },
+  {
+   "A": "## 見出し\nc\n本文\r\n本文\r\nb\na\nd\n- [ ] 条件\nc\n\n本文\r\nc\n本文\r\nd\nc\nd\n本文\r\na\nb\n",
+   "B": "c\n本文\r\n本文\r\nb\na\n- [ ] 条件\nd\n- [ ] 条件\nc\n\n本文\r\nc\n本文\r\nc\nd\nc\nd\n本文\r\na\nb\n"
+  },
+  {
+   "A": "本文\r\na\nd\n\nx本文\r\nd\n本文\r\n- [ ] 条件\n- [ ] 条件\nb\n## 見出し\nxd\n本文\r\nx",
+   "B": "本文\r\nd\n\nx本文\r\nd\n本文\r\n- [ ] 条件\n- [ ] 条件\nb\nxd\n本文\r\nx"
+  },
+  {
+   "A": "b\na\n## 見出し\n\n\n",
+   "B": "b\na\n## 見出し\n\n"
+  },
+  {
+   "A": "b\nx\nxb\nd\nx- [ ] 条件\nd\n## 見出し\nc\nb\n- [ ] 条件\nd\na\nb\n## 見出し\n",
+   "B": "b\n本文\r\nxb\nd\nx- [ ] 条件\nd\n## 見出し\nc\nb\n- [ ] 条件\nd\nd\na\nb\n## 見出し\n"
+  },
+  {
+   "A": "b\n## 見出し\n本文\r\n- [ ] 条件\n## 見出し\n- [ ] 条件\n\n本文\r\n本文\r\nb\nc\nxxd\nc\nd\n",
+   "B": "\na\na\na\n## 見出し\na\nc\nxd\n## 見出し\nxc\nb\nc\n"
+  },
+  {
+   "A": "b\nb\n\n本文\r\n## 見出し\nc\n本文\r\n## 見出し\nb\nxxc\na\nxb\n- [ ] 条件\n本文\r\n",
+   "B": "\n- [ ] 条件\n## 見出し\n\na\nx\n本文\r\nc\nc\na\nx- [ ] 条件\n本文\r\n## 見出し\n"
+  },
+  {
+   "A": "b\n- [ ] 条件\nd\n## 見出し\n## 見出し\n\nc\n## 見出し\na\nc\n本文\r\na\na\n",
+   "B": "b\nd\n## 見出し\n## 見出し\n\nc\n## 見出し\na\nc\n- [ ] 条件\nd\na\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "",
+   "B": "d\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "b\n\nb\n- [ ] 条件\nc\n",
+   "B": "b\na\n\nb\n- [ ] 条件\n"
+  },
+  {
+   "A": "d\nb\n## 見出し\nb\na\nd\n## 見出し\n## 見出し\nd\nd\n",
+   "B": "d\nb\n## 見出し\nb\na\n## 見出し\n## 見出し\nd\nc\n"
+  },
+  {
+   "A": "a\n- [ ] 条件\n- [ ] 条件\nxc\na\na\n本文\r\nxd\nc\n本文\r\nxb\nd\n- [ ] 条件\n\n## 見出し\n",
+   "B": "a\n- [ ] 条件\n- [ ] 条件\nxc\na\na\na\n本文\r\nxd\nc\n本文\r\nxb\nd\n- [ ] 条件\n- [ ] 条件\n## 見出し\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\n本文\r\nd\na\na\n## 見出し\nc\nb\na\nc\n## 見出し\nx## 見出し\n本文\r\n## 見出し\nc\na\n",
+   "B": "本文\r\nd\na\na\n## 見出し\nc\nb\na\nc\n## 見出し\nx## 見出し\n本文\r\n## 見出し\nc\nb\nd\n"
+  },
+  {
+   "A": "本文\r\nx",
+   "B": "d\n本文\r\nd\n"
+  },
+  {
+   "A": "\n\n本文\r\n- [ ] 条件\n",
+   "B": "\nc\n本文\r\n## 見出し\n- [ ] 条件\n"
+  },
+  {
+   "A": "本文\r\n\nd\n\nd\nd\nc\nd\n## 見出し\n本文\r\n\na\n- [ ] 条件\nc\n本文\r\nx\nd\n",
+   "B": "本文\r\n\nd\n\n- [ ] 条件\nd\nc\nd\n## 見出し\n本文\r\n\na\n- [ ] 条件\na\nc\n本文\r\nx\nd\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "## 見出し\n- [ ] 条件\n本文\r\nxc\n本文\r\nc\n本文\r\nc\nc\n## 見出し\n## 見出し\nx",
+   "B": "## 見出し\n- [ ] 条件\n本文\r\nxc\n本文\r\nx本文\r\nc\nc\n## 見出し\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "d\n\n\nc\n本文\r\n本文\r\nc\n- [ ] 条件\nd\n\n## 見出し\n",
+   "B": "x本文\r\nd\n\n- [ ] 条件\nc\n## 見出し\nd\nb\n- [ ] 条件\n"
+  },
+  {
+   "A": "- [ ] 条件\nc\nc\nc\nb\nc\n## 見出し\nx## 見出し\nx\n- [ ] 条件\n本文\r\n## 見出し\na\n\n- [ ] 条件\n本文\r\nxa\n本文\r\n## 見出し\na\n- [ ] 条件\nc\n- [ ] 条件\na\n本文\r\n\nc\nc\n- [ ] 条件\nc\n本文\r\n## 見出し\n\nd\nb\nxxx本文\r\n本文\r\nd\n\na\na\nxd\nb\nc\nc\nxc\nb\nd\n\n\nb\n本文\r\nb\n\na\na\nx## 見出し\nc\n- [ ] 条件\n本文\r\n本文\r\n\n- [ ] 条件\n## 見出し\n## 見出し\n- [ ] 条件\nb\nxd\n- [ ] 条件\nc\n本文\r\n## 見出し\n\n## 見出し\n\nc\nxxx## 見出し\nxc\n本文\r\n## 見出し\n\nd\nd\nd\nc\n- [ ] 条件\nd\nxa\n## 見出し\nx- [ ] 条件\n\n- [ ] 条件\n本文\r\nxd\nd\n本文\r\nc\n\na\nc\n\n本文\r\nd\nb\nxxc\na\nc\n\nc\n## 見出し\n- [ ] 条件\na\na\nc\nc\nb\na\n\na\nb\n\na\nd\nc\nc\n本文\r\n\nd\n## 見出し\nc\n本文\r\n## 見出し\n\n\nc\nx- [ ] 条件\n本文\r\nc\n\nx本文\r\n- [ ] 条件\n\n本文\r\nb\na\na\n\n本文\r\nd\na\n本文\r\n本文\r\n- [ ] 条件\n\n- [ ] 条件\nd\nc\n- [ ] 条件\na\nd\n本文\r\nb\n本文\r\n## 見出し\nc\nb\nc\n- [ ] 条件\n\n## 見出し\nc\na\n- [ ] 条件\n- [ ] 条件\nxa\n## 見出し\nd\n- [ ] 条件\n\nd\nc\nb\na\n## 見出し\na\n\nd\nd\n本文\r\nd\n## 見出し\n## 見出し\nc\n- [ ] 条件\nb\nb\na\n## 見出し\n本文\r\n本文\r\nxc\n## 見出し\na\n本文\r\nc\nd\nd\nb\n\n## 見出し\nb\n本文\r\nxb\nb\n\n\n- [ ] 条件\n## 見出し\nxd\nd\nd\na\n- [ ] 条件\nx本文\r\na\n## 見出し\n- [ ] 条件\n\nd\n\nc\n\n\nb\nx- [ ] 条件\n本文\r\n\n- [ ] 条件\nd\n本文\r\n本文\r\n本文\r\n\nb\na\n本文\r\na\n## 見出し\n## 見出し\n本文\r\nd\nd\nx\n- [ ] 条件\nc\nd\n- [ ] 条件\nd\na\nxa\n- [ ] 条件\n本文\r\nb\n\nd\n## 見出し\nd\n本文\r\n本文\r\n- [ ] 条件\na\n\n\n本文\r\nxd\n## 見出し\nx\nc\nb\n- [ ] 条件\n\nc\nb\nc\na\nd\nc\n本文\r\nb\n本文\r\n- [ ] 条件\na\nd\n本文\r\na\nb\n\n## 見出し\n- [ ] 条件\n本文\r\na\n\nc\nb\nb\n\nx\nxa\na\nb\nc\n",
+   "B": "- [ ] 条件\nc\nc\nc\nb\nc\n## 見出し\nx\n- [ ] 条件\n本文\r\n## 見出し\na\n\n- [ ] 条件\n本文\r\nxa\n本文\r\n## 見出し\na\n- [ ] 条件\nc\n- [ ] 条件\na\n本文\r\n\nc\nc\n- [ ] 条件\nc\n本文\r\n## 見出し\n\nd\nb\nxxx本文\r\n本文\r\nd\n\na\na\nxd\nb\nc\nc\nxc\nb\nd\n\n\nb\n本文\r\nb\n\na\na\nx## 見出し\nc\n- [ ] 条件\n本文\r\n本文\r\n\n- [ ] 条件\n## 見出し\n## 見出し\n- [ ] 条件\nb\nxd\n- [ ] 条件\nc\n本文\r\n## 見出し\n\n## 見出し\n\nc\nxxx## 見出し\nxc\n本文\r\n## 見出し\n\nd\nd\nd\nc\n- [ ] 条件\nd\nxa\n## 見出し\nx- [ ] 条件\n\n- [ ] 条件\n本文\r\nxd\nd\nb\nc\n\na\nc\n\n本文\r\nd\nb\nxxc\na\nc\n\nc\n## 見出し\n- [ ] 条件\na\na\nc\nc\nb\na\n\na\nb\n\na\nd\nc\nc\n本文\r\n\nd\n## 見出し\nc\n本文\r\n## 見出し\n\n\nc\nx- [ ] 条件\n本文\r\nc\n\nx本文\r\n- [ ] 条件\n\n本文\r\nb\na\na\n\n本文\r\nd\na\n本文\r\n本文\r\n- [ ] 条件\n\n- [ ] 条件\nd\nc\n- [ ] 条件\na\nd\n本文\r\nb\n本文\r\n## 見出し\nc\nb\nc\n- [ ] 条件\n\n## 見出し\nc\na\n- [ ] 条件\n- [ ] 条件\nxa\n## 見出し\nd\n- [ ] 条件\n\nd\nc\nb\na\n## 見出し\na\n\nd\nd\n本文\r\nd\n## 見出し\n## 見出し\nc\n- [ ] 条件\nb\nb\na\n## 見出し\n本文\r\n本文\r\nxc\n## 見出し\na\n本文\r\nc\nd\nd\nb\n\n## 見出し\nb\n本文\r\nxb\nb\n\n\n- [ ] 条件\n## 見出し\nxd\nd\nd\na\n- [ ] 条件\nx本文\r\na\n## 見出し\n- [ ] 条件\n\nd\n\nc\n\n\nb\nx- [ ] 条件\n本文\r\n\n- [ ] 条件\nd\n本文\r\n本文\r\n本文\r\n\nb\na\n本文\r\na\n## 見出し\n- [ ] 条件\n本文\r\nd\nd\nx\n- [ ] 条件\nc\nd\n- [ ] 条件\nd\na\nxa\n- [ ] 条件\n本文\r\nb\n\nd\n## 見出し\nd\n本文\r\n本文\r\n- [ ] 条件\na\n\n\n本文\r\nxd\n## 見出し\nx\nc\nb\n- [ ] 条件\n\nc\nb\nc\na\nd\nc\n本文\r\nb\n本文\r\n- [ ] 条件\na\nd\n本文\r\na\nb\n\n## 見出し\n- [ ] 条件\n本文\r\na\n\nc\nb\nb\n\nx\nxa\na\nb\nc\n"
+  },
+  {
+   "A": "xx本文\r\n",
+   "B": ""
+  },
+  {
+   "A": "- [ ] 条件\nb\n本文\r\n- [ ] 条件\nb\n",
+   "B": "\nx## 見出し\na\n本文\r\nc\n- [ ] 条件\n本文\r\n- [ ] 条件\n\n本文\r\nxb\n## 見出し\n"
+  },
+  {
+   "A": "x## 見出し\n- [ ] 条件\nb\nb\na\n",
+   "B": "c\n- [ ] 条件\nb\nb\na\n"
+  },
+  {
+   "A": "a\n本文\r\nd\na\nd\nb\na\nx本文\r\n- [ ] 条件\nd\n- [ ] 条件\nb\nd\nx本文\r\n本文\r\nxc\n",
+   "B": "本文\r\nd\na\nd\nb\na\na\nx本文\r\n- [ ] 条件\nd\n- [ ] 条件\nb\nd\nx本文\r\n本文\r\nxc\n"
+  },
+  {
+   "A": "b\nxa\n## 見出し\n本文\r\n本文\r\na\nc\na\nxc\n## 見出し\nc\na\n本文\r\na\nd\n",
+   "B": "a\n- [ ] 条件\nxxc\nd\n本文\r\na\n本文\r\n- [ ] 条件\nd\n## 見出し\n本文\r\n\nb\n- [ ] 条件\nx本文\r\nb\n- [ ] 条件\na\nc\nd\nb\n"
+  },
+  {
+   "A": "c\n本文\r\n\nb\n## 見出し\n## 見出し\n\nc\n- [ ] 条件\n- [ ] 条件\nb\n- [ ] 条件\n本文\r\na\n## 見出し\na\n- [ ] 条件\n本文\r\n本文\r\n",
+   "B": "c\n本文\r\n\nb\n## 見出し\n## 見出し\n\nc\n- [ ] 条件\nb\n- [ ] 条件\n本文\r\n## 見出し\n## 見出し\na\n- [ ] 条件\n本文\r\n"
+  },
+  {
+   "A": "a\nxx本文\r\nb\nx\na\n",
+   "B": "a\nxx本文\r\nb\nx\na\n"
+  },
+  {
+   "A": "本文\r\n",
+   "B": ""
+  },
+  {
+   "A": "## 見出し\nc\n\nxa\na\n本文\r\n- [ ] 条件\n## 見出し\n本文\r\n\na\n",
+   "B": "## 見出し\nc\n\nxa\na\n本文\r\n- [ ] 条件\n## 見出し\n本文\r\n\nc\na\n"
+  },
+  {
+   "A": "d\n- [ ] 条件\nb\n## 見出し\nd\nc\n- [ ] 条件\nb\nd\n\n",
+   "B": "## 見出し\nd\n- [ ] 条件\nb\n## 見出し\nd\nc\n- [ ] 条件\nb\nd\n\n"
+  },
+  {
+   "A": "b\n## 見出し\n\nd\nx本文\r\n本文\r\n- [ ] 条件\nd\nd\nc\nc\nd\na\n本文\r\n",
+   "B": "## 見出し\n\nx本文\r\n本文\r\n本文\r\nd\nd\nc\nc\nd\na\n本文\r\n"
+  },
+  {
+   "A": "c\n- [ ] 条件\n## 見出し\n## 見出し\nx## 見出し\nd\n- [ ] 条件\n",
+   "B": "b\nc\nx## 見出し\n\n## 見出し\na\n"
+  },
+  {
+   "A": "b\n\nc\nb\n- [ ] 条件\n## 見出し\n## 見出し\nb\n\n",
+   "B": "b\n\nc\nx- [ ] 条件\n本文\r\n## 見出し\nb\n\n"
+  },
+  {
+   "A": "- [ ] 条件\na\nx\n- [ ] 条件\n- [ ] 条件\n本文\r\n本文\r\n",
+   "B": "本文\r\nb\nc\nc\nd\nb\n本文\r\na\n本文\r\nb\n本文\r\nd\na\n- [ ] 条件\nc\n\nxd\n- [ ] 条件\n本文\r\nb\na\n"
+  },
+  {
+   "A": "\nc\nc\na\n## 見出し\n- [ ] 条件\na\n",
+   "B": "c\n\na\n## 見出し\n- [ ] 条件\na\n"
+  },
+  {
+   "A": "本文\r\nc\n- [ ] 条件\nd\nx- [ ] 条件\nc\nd\n本文\r\nd\n本文\r\n本文\r\n",
+   "B": "本文\r\nc\n- [ ] 条件\nd\nx- [ ] 条件\nc\nd\n本文\r\nd\n本文\r\nb\n本文\r\n"
+  },
+  {
+   "A": "xc\n\nc\n\n本文\r\nb\nd\n\nb\nc\nb\n",
+   "B": "d\n本文\r\nb\n## 見出し\n本文\r\nb\nb\n\n"
+  },
+  {
+   "A": "a\nc\n本文\r\n## 見出し\n",
+   "B": "a\n本文\r\n## 見出し\n"
+  },
+  {
+   "A": "x\na\n",
+   "B": "x\n本文\r\na\n"
+  },
+  {
+   "A": "## 見出し\nb\nd\n\n本文\r\nc\n## 見出し\n\na\n本文\r\n本文\r\nd\nb\n- [ ] 条件\n- [ ] 条件\nc\n本文\r\na\n- [ ] 条件\n本文\r\n\nc\nb\nb\nb\n## 見出し\nd\nc\n本文\r\n- [ ] 条件\nx## 見出し\n- [ ] 条件\n## 見出し\nd\n\n\nb\nd\n## 見出し\nxxx\nc\nx## 見出し\n\n## 見出し\n本文\r\nb\n\nx## 見出し\n\nxc\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\na\nd\n- [ ] 条件\nb\n\nc\n## 見出し\n## 見出し\nx本文\r\nc\n## 見出し\nd\nxc\nxb\n## 見出し\nxb\nc\nc\n\nc\n## 見出し\nx\n\nc\n- [ ] 条件\nd\n\nb\n\nb\n## 見出し\nb\nx本文\r\nc\na\nc\nb\na\n- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\nd\nd\n## 見出し\nb\n- [ ] 条件\nb\nc\nxc\nc\nc\nc\nc\nb\nxc\n- [ ] 条件\nc\n\na\nd\n\nd\n- [ ] 条件\na\n- [ ] 条件\n本文\r\nd\n## 見出し\n- [ ] 条件\na\n本文\r\na\nb\n本文\r\nd\nb\nxa\n- [ ] 条件\nc\n- [ ] 条件\nc\nx\n- [ ] 条件\n\nd\nc\n## 見出し\n- [ ] 条件\na\nc\nc\n本文\r\n\nx本文\r\n## 見出し\nd\nxb\n本文\r\nx## 見出し\n\na\n- [ ] 条件\n- [ ] 条件\n## 見出し\nd\nc\nb\nb\n## 見出し\nd\n本文\r\na\n## 見出し\n- [ ] 条件\nd\na\nb\nb\nxb\nd\n\nc\n## 見出し\n本文\r\nd\nb\n- [ ] 条件\n- [ ] 条件\na\n本文\r\na\nb\n本文\r\n## 見出し\nx\nb\nc\n本文\r\n## 見出し\n\n\nc\n- [ ] 条件\nxx- [ ] 条件\nd\nb\nx本文\r\nx- [ ] 条件\nb\n\nb\nc\n- [ ] 条件\na\nb\n本文\r\nb\nc\nd\nc\nxxb\nc\n本文\r\n本文\r\n- [ ] 条件\nxb\nb\n本文\r\nxxxc\n- [ ] 条件\n- [ ] 条件\n\n- [ ] 条件\nx\n## 見出し\n- [ ] 条件\n- [ ] 条件\n本文\r\n\n- [ ] 条件\n",
+   "B": "## 見出し\nb\nd\n\n本文\r\nc\n## 見出し\n\na\n本文\r\n本文\r\nd\nb\n- [ ] 条件\n- [ ] 条件\nc\n本文\r\na\n- [ ] 条件\n本文\r\n\nc\nb\nb\nb\n## 見出し\nd\nc\n本文\r\n- [ ] 条件\nx## 見出し\n- [ ] 条件\n## 見出し\nd\n\n\nb\nd\n## 見出し\nxxx\nc\nx## 見出し\n\n## 見出し\n本文\r\nb\n\nx## 見出し\n\nxc\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\na\nd\n- [ ] 条件\nb\n\nc\n## 見出し\n## 見出し\nx本文\r\nc\n## 見出し\nd\nxc\nxb\n## 見出し\nxb\nc\nc\n\nc\n## 見出し\nx\n\nc\n- [ ] 条件\nd\n\nb\n\nb\n## 見出し\nb\nx本文\r\nc\na\nc\nb\na\n- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\nd\nd\n## 見出し\n- [ ] 条件\nb\nc\nxc\nc\nc\nc\nc\nb\nxc\n- [ ] 条件\nc\n\na\nd\n\nd\n- [ ] 条件\na\n- [ ] 条件\n本文\r\nd\n## 見出し\n- [ ] 条件\na\n本文\r\na\nb\n本文\r\nd\nb\nxa\n- [ ] 条件\nc\n- [ ] 条件\nc\nx\n- [ ] 条件\n\nd\nc\n## 見出し\n- [ ] 条件\na\nc\nc\n本文\r\n\nx本文\r\n## 見出し\nd\nxb\n本文\r\nx## 見出し\n\na\n- [ ] 条件\n- [ ] 条件\n## 見出し\nd\nc\nb\nb\n## 見出し\nd\n本文\r\na\n## 見出し\n- [ ] 条件\nd\na\nb\nb\nxb\nd\n\nc\n## 見出し\n本文\r\nd\nb\n- [ ] 条件\n- [ ] 条件\na\n本文\r\na\nb\n本文\r\n## 見出し\nx\nb\nc\n## 見出し\n本文\r\n## 見出し\n\n\nc\n- [ ] 条件\nxx- [ ] 条件\nd\nb\nx本文\r\nx- [ ] 条件\nb\n\nb\nc\n- [ ] 条件\na\nb\n本文\r\nb\nc\nd\nc\nxxb\nc\n本文\r\n本文\r\n- [ ] 条件\nxb\nb\n本文\r\nxxxc\n- [ ] 条件\n- [ ] 条件\n\n- [ ] 条件\nx\n## 見出し\n- [ ] 条件\n- [ ] 条件\n本文\r\n\n- [ ] 条件\n"
+  },
+  {
+   "A": "\na\nx- [ ] 条件\n本文\r\na\na\na\n- [ ] 条件\nx",
+   "B": "x- [ ] 条件\n- [ ] 条件\nb\nb\nb\n本文\r\nxa\nb\nb\n"
+  },
+  {
+   "A": "本文\r\nc\n",
+   "B": "## 見出し\na\nc\n"
+  },
+  {
+   "A": "- [ ] 条件\n## 見出し\nb\nxa\n- [ ] 条件\nd\nb\n",
+   "B": "## 見出し\n## 見出し\nb\nxa\n- [ ] 条件\nd\nb\n"
+  },
+  {
+   "A": "xa\nb\n\nc\na\nc\n- [ ] 条件\nb\n## 見出し\nc\nb\nc\na\n## 見出し\n- [ ] 条件\nxx",
+   "B": "d\nb\nx- [ ] 条件\nc\nb\nc\na\nc\nxb\n## 見出し\nc\n本文\r\n"
+  },
+  {
+   "A": "d\nc\n本文\r\n- [ ] 条件\nc\n- [ ] 条件\n## 見出し\n## 見出し\nd\n\n\nc\n- [ ] 条件\n- [ ] 条件\na\n",
+   "B": "d\nc\n本文\r\n- [ ] 条件\nc\n- [ ] 条件\n## 見出し\n## 見出し\nd\n\n\nc\nb\n- [ ] 条件\na\n"
+  },
+  {
+   "A": "- [ ] 条件\na\nd\nxb\n- [ ] 条件\n## 見出し\n本文\r\n\n## 見出し\n",
+   "B": "本文\r\n\na\nc\n## 見出し\nd\nd\n\nc\nb\n## 見出し\n"
+  },
+  {
+   "A": "d\n\n- [ ] 条件\n\n\n\nxd\n- [ ] 条件\n## 見出し\nc\nd\nd\n- [ ] 条件\n## 見出し\nb\nc\n- [ ] 条件\n\n",
+   "B": "c\nc\n- [ ] 条件\n## 見出し\nc\n本文\r\n## 見出し\nb\na\na\n\n\nb\n本文\r\na\nb\n## 見出し\n## 見出し\nx"
+  },
+  {
+   "A": "a\nd\n## 見出し\n",
+   "B": "b\na\nd\n## 見出し\n"
+  },
+  {
+   "A": "a\n## 見出し\n本文\r\n## 見出し\nd\n- [ ] 条件\n",
+   "B": "a\n\n## 見出し\n## 見出し\nd\n- [ ] 条件\n"
+  },
+  {
+   "A": "本文\r\n- [ ] 条件\n本文\r\nd\n- [ ] 条件\nd\n- [ ] 条件\nx\nd\nb\nxb\n",
+   "B": "d\n本文\r\n本文\r\n\n- [ ] 条件\n本文\r\n- [ ] 条件\n- [ ] 条件\n"
+  },
+  {
+   "A": "\nd\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n## 見出し\nx本文\r\nd\nb\n本文\r\nd\n\n## 見出し\n本文\r\nb\n",
+   "B": "\nd\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n## 見出し\nd\nb\n本文\r\nd\n\n## 見出し\n本文\r\nb\n"
+  },
+  {
+   "A": "xx- [ ] 条件\nxc\nb\n\nd\nx",
+   "B": "xx- [ ] 条件\nxc\n\nd\nd\na\n"
+  },
+  {
+   "A": "b\n",
+   "B": "xb\n"
+  },
+  {
+   "A": "a\n本文\r\nxx本文\r\n本文\r\nc\n\n- [ ] 条件\nx\n## 見出し\nc\nd\n",
+   "B": "a\n本文\r\nxx本文\r\n本文\r\nc\n\n- [ ] 条件\nx\n## 見出し\nxc\nd\n"
+  },
+  {
+   "A": "- [ ] 条件\n",
+   "B": "a\nx- [ ] 条件\n"
+  },
+  {
+   "A": "## 見出し\nb\na\n本文\r\nc\n- [ ] 条件\n- [ ] 条件\nd\n\n\n- [ ] 条件\na\na\n",
+   "B": "x本文\r\n\nb\n本文\r\nc\n- [ ] 条件\nd\n"
+  },
+  {
+   "A": "\n\n\nc\n## 見出し\nc\n- [ ] 条件\nb\n\n",
+   "B": "\n\nxc\n## 見出し\nc\n- [ ] 条件\nb\n\n"
+  },
+  {
+   "A": "## 見出し\n\nd\nb\n",
+   "B": "\nb\n"
+  },
+  {
+   "A": "xb\n\nb\n",
+   "B": "本文\r\n\nb\n"
+  },
+  {
+   "A": "a\nb\n\n## 見出し\n\n本文\r\nd\n## 見出し\n- [ ] 条件\nxb\n## 見出し\nc\n本文\r\nd\na\nx本文\r\nd\n- [ ] 条件\n## 見出し\n- [ ] 条件\n- [ ] 条件\n\nc\nd\nb\nc\n## 見出し\n\nd\na\nc\n\nb\nx\nc\nd\nd\n本文\r\nd\n- [ ] 条件\n- [ ] 条件\nx- [ ] 条件\n## 見出し\n\n本文\r\nxb\nd\nc\nc\n本文\r\n本文\r\n## 見出し\n- [ ] 条件\n本文\r\nb\na\n## 見出し\nc\nd\n- [ ] 条件\n## 見出し\nxd\na\nd\n\nd\n## 見出し\n\n## 見出し\nd\nb\n- [ ] 条件\n- [ ] 条件\nxxc\nx\nd\n## 見出し\nx## 見出し\n- [ ] 条件\nc\n本文\r\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n- [ ] 条件\nc\n## 見出し\nb\n- [ ] 条件\n- [ ] 条件\nxxxa\nd\n- [ ] 条件\na\nd\n- [ ] 条件\na\nx\n\nd\nd\n\n## 見出し\nb\n\nd\na\nb\nc\nx本文\r\n- [ ] 条件\nb\nd\na\n\n- [ ] 条件\nc\nx- [ ] 条件\nxx\n## 見出し\n- [ ] 条件\n\n本文\r\n\n本文\r\n- [ ] 条件\nd\nxb\n## 見出し\nx本文\r\nxxd\n- [ ] 条件\na\n本文\r\nd\n\nb\n本文\r\n本文\r\nd\nb\nxd\n- [ ] 条件\n## 見出し\n- [ ] 条件\nb\nb\n- [ ] 条件\n## 見出し\nb\nd\n## 見出し\n\n\n\n\n本文\r\n## 見出し\n## 見出し\n\nb\nxb\na\n## 見出し\nd\nxx\n- [ ] 条件\n- [ ] 条件\n## 見出し\nc\n本文\r\na\nd\n## 見出し\n本文\r\nb\n## 見出し\nx- [ ] 条件\n本文\r\nb\nxb\nx- [ ] 条件\nc\nb\n本文\r\n## 見出し\n- [ ] 条件\nc\nd\nd\n- [ ] 条件\nb\n本文\r\n## 見出し\na\n本文\r\n本文\r\n- [ ] 条件\na\nd\nb\nd\na\n本文\r\n本文\r\nc\n\n本文\r\na\n\nb\nd\nb\nd\n- [ ] 条件\nc\n- [ ] 条件\nd\nd\nb\nb\na\n- [ ] 条件\nc\na\n## 見出し\n本文\r\nc\n本文\r\n## 見出し\n- [ ] 条件\nc\nd\n- [ ] 条件\nb\n\nc\n\n本文\r\nx\n\nb\nc\n- [ ] 条件\n## 見出し\n\n- [ ] 条件\nc\na\nd\n- [ ] 条件\nx\n## 見出し\n- [ ] 条件\nc\n- [ ] 条件\n本文\r\n本文\r\n",
+   "B": "a\nb\n\n## 見出し\n\n本文\r\nd\n## 見出し\n- [ ] 条件\nxb\n## 見出し\nc\n本文\r\nd\na\nx本文\r\nd\n- [ ] 条件\n## 見出し\n- [ ] 条件\n- [ ] 条件\n\nc\nd\nb\nc\n## 見出し\n\nd\na\nc\n\nb\nx\nc\nd\nd\n本文\r\nd\n- [ ] 条件\n- [ ] 条件\nx- [ ] 条件\n## 見出し\n\n本文\r\nxb\nd\nc\nc\n本文\r\n本文\r\n## 見出し\n- [ ] 条件\n本文\r\nb\na\n## 見出し\nc\nd\n- [ ] 条件\n## 見出し\nxd\na\nd\n\nd\n## 見出し\n\n## 見出し\nd\nb\n- [ ] 条件\n- [ ] 条件\nxxc\nx\nd\n## 見出し\nx## 見出し\n- [ ] 条件\nc\n本文\r\n- [ ] 条件\n- [ ] 条件\n\n本文\r\n- [ ] 条件\nc\n## 見出し\nb\n- [ ] 条件\n- [ ] 条件\nxxxa\nd\n- [ ] 条件\na\nd\n- [ ] 条件\na\nx\n\nd\nd\n\n## 見出し\nb\n\nd\na\nb\nc\nx本文\r\n- [ ] 条件\nb\nd\na\n\n- [ ] 条件\nc\nx- [ ] 条件\nxx\n## 見出し\n- [ ] 条件\n\n本文\r\n\n本文\r\n- [ ] 条件\nd\nxb\n## 見出し\nx本文\r\nxxd\n- [ ] 条件\na\n本文\r\nd\n\nb\n本文\r\n本文\r\nd\nb\nxd\n- [ ] 条件\n## 見出し\n- [ ] 条件\nb\nb\n- [ ] 条件\n## 見出し\nb\nd\n## 見出し\n\n\n\n\n本文\r\n## 見出し\n## 見出し\n\nb\nxb\na\n## 見出し\nd\nb\nxx\n- [ ] 条件\n- [ ] 条件\n## 見出し\nc\n本文\r\na\nd\n## 見出し\n本文\r\nb\n## 見出し\nx- [ ] 条件\n本文\r\nb\nxb\nx- [ ] 条件\nc\nb\n本文\r\n## 見出し\n- [ ] 条件\nc\nd\nd\n- [ ] 条件\nb\n本文\r\n## 見出し\na\n本文\r\n本文\r\n- [ ] 条件\na\nd\nb\nd\na\n本文\r\n本文\r\nc\n\n本文\r\na\n\nb\nd\nb\nd\n- [ ] 条件\nc\n- [ ] 条件\nd\nd\nb\nb\na\n- [ ] 条件\nc\na\n## 見出し\n本文\r\nc\n本文\r\n## 見出し\n- [ ] 条件\nc\nd\n- [ ] 条件\nb\n\nc\n\n本文\r\nx\n\nb\nc\n- [ ] 条件\n## 見出し\n\n- [ ] 条件\nc\na\nd\n- [ ] 条件\nx\n## 見出し\n- [ ] 条件\nc\n- [ ] 条件\n本文\r\n本文\r\n"
+  },
+  {
+   "A": "- [ ] 条件\na\nc\nb\n## 見出し\n本文\r\nd\n本文\r\nd\n",
+   "B": "## 見出し\n本文\r\n- [ ] 条件\n\nb\na\n本文\r\nx本文\r\nb\nd\na\nb\na\nc\nx"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "a\nxc\na\nb\n\n\nb\na\n",
+   "B": "\n\n本文\r\nd\n\na\n\n## 見出し\nc\n- [ ] 条件\nb\n- [ ] 条件\nc\nc\n- [ ] 条件\nxa\n- [ ] 条件\n"
+  },
+  {
+   "A": "c\nd\n本文\r\n本文\r\n- [ ] 条件\nd\n本文\r\nb\n\n本文\r\nx\n",
+   "B": "c\nd\n本文\r\nb\n本文\r\n- [ ] 条件\nd\n本文\r\nb\n\n本文\r\n"
+  },
+  {
+   "A": "d\n本文\r\na\n- [ ] 条件\n本文\r\nd\nxa\nx\n## 見出し\n- [ ] 条件\n",
+   "B": "d\n本文\r\na\n- [ ] 条件\n本文\r\nd\nxa\nx\n## 見出し\n- [ ] 条件\n"
+  },
+  {
+   "A": "xc\n\nc\na\na\na\nd\nx## 見出し\nd\n",
+   "B": "xc\n\nc\nxa\na\na\nd\n## 見出し\n"
+  },
+  {
+   "A": "a\nd\n",
+   "B": "a\n本文\r\nd\n"
+  },
+  {
+   "A": "b\nc\nd\nxx本文\r\nb\nx## 見出し\n本文\r\nxx",
+   "B": "d\n- [ ] 条件\nb\nc\nxx本文\r\nb\nx## 見出し\n本文\r\nxx"
+  },
+  {
+   "A": "x- [ ] 条件\nc\nd\nx\nd\n本文\r\n",
+   "B": "x- [ ] 条件\nc\n本文\r\nd\nx\nd\nc\n本文\r\n"
+  },
+  {
+   "A": "a\nx## 見出し\n本文\r\nd\n本文\r\nc\nc\n",
+   "B": "## 見出し\nc\n\nx\n本文\r\nd\nc\na\n- [ ] 条件\n本文\r\n- [ ] 条件\nd\nd\n\nc\nx\n## 見出し\n\n\n"
+  },
+  {
+   "A": "\nc\na\n- [ ] 条件\n- [ ] 条件\nc\nx本文\r\n- [ ] 条件\nb\n\n本文\r\nd\nb\nc\n本文\r\n",
+   "B": "\nc\na\n- [ ] 条件\n- [ ] 条件\nc\nx本文\r\n- [ ] 条件\nb\n\n本文\r\nb\nb\nc\n本文\r\n"
+  },
+  {
+   "A": "本文\r\nb\nb\n## 見出し\nd\n本文\r\nxb\nd\nc\nc\n- [ ] 条件\nd\nc\nd\nxa\n",
+   "B": "本文\r\nb\nb\nd\n## 見出し\nxb\nd\nc\nc\n- [ ] 条件\nd\n## 見出し\nc\nd\nxa\n"
+  },
+  {
+   "A": "\n## 見出し\n\n本文\r\na\nc\nc\n本文\r\nb\n本文\r\n本文\r\nd\na\n",
+   "B": "x本文\r\nxx本文\r\nb\n## 見出し\nd\nx本文\r\nb\na\nx- [ ] 条件\nxa\n"
+  },
+  {
+   "A": "- [ ] 条件\nc\nxc\n- [ ] 条件\n\na\n\nd\n\n\nd\n\n- [ ] 条件\n",
+   "B": "d\nx本文\r\nc\n本文\r\nc\n## 見出し\nxb\nxxc\nd\nd\nb\n- [ ] 条件\n- [ ] 条件\na\n"
+  },
+  {
+   "A": "b\n",
+   "B": "本文\r\nb\n"
+  },
+  {
+   "A": "b\n\nc\nx- [ ] 条件\na\na\n## 見出し\n## 見出し\nb\nd\nd\nx\n",
+   "B": "b\n\nc\n- [ ] 条件\na\na\n## 見出し\n## 見出し\nb\nd\nd\nx\n"
+  },
+  {
+   "A": "本文\r\nx本文\r\n## 見出し\na\nb\n本文\r\n## 見出し\n\n\nd\nc\na\na\nx## 見出し\n\n",
+   "B": "本文\r\nx本文\r\n## 見出し\na\nb\n## 見出し\n\n\nd\nc\na\na\nx## 見出し\n\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "b\nb\nb\n本文\r\nx## 見出し\n\n本文\r\nxa\n本文\r\n- [ ] 条件\n## 見出し\nd\n## 見出し\n",
+   "B": "b\nb\nb\n本文\r\nx\n本文\r\nc\nxa\n## 見出し\n- [ ] 条件\n本文\r\n- [ ] 条件\n## 見出し\nd\n## 見出し\n"
+  },
+  {
+   "A": "\nc\n本文\r\n\nxxd\n## 見出し\nxd\nb\n## 見出し\n- [ ] 条件\na\nb\nc\n\nd\nb\n## 見出し\nc\n本文\r\n本文\r\n本文\r\nc\n- [ ] 条件\nc\nb\nd\nb\nxd\nb\n- [ ] 条件\n## 見出し\n- [ ] 条件\n\nd\nb\nc\n- [ ] 条件\n本文\r\n## 見出し\nd\nd\n本文\r\n- [ ] 条件\n本文\r\nc\n\n\n\n## 見出し\nd\nc\nc\nc\n## 見出し\n\n## 見出し\nd\nd\nxb\nb\nc\n## 見出し\nxd\n\n本文\r\nd\n- [ ] 条件\n## 見出し\n## 見出し\nd\nx- [ ] 条件\na\nc\n本文\r\n- [ ] 条件\n本文\r\nd\nd\n- [ ] 条件\n本文\r\n\nxc\nxd\na\nxb\na\na\nxd\n本文\r\n## 見出し\n- [ ] 条件\n## 見出し\n## 見出し\n本文\r\na\nxx本文\r\n\na\nb\n## 見出し\n## 見出し\n- [ ] 条件\n本文\r\n- [ ] 条件\nb\n- [ ] 条件\nd\nb\n\na\na\nxa\n\nxa\nc\nc\nx## 見出し\nb\n## 見出し\nd\n\na\n本文\r\nd\na\nb\n\na\n本文\r\n## 見出し\n\nx本文\r\nc\nd\nb\n## 見出し\nd\n本文\r\nd\n本文\r\nb\na\n- [ ] 条件\nc\na\nc\nc\n## 見出し\nd\n本文\r\nd\n\na\na\n- [ ] 条件\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\n## 見出し\n## 見出し\n\n## 見出し\nd\nc\n\nd\na\nx- [ ] 条件\nc\n- [ ] 条件\n\na\n## 見出し\nd\nxb\n\nx本文\r\n## 見出し\nxc\nx\n## 見出し\nc\nx本文\r\nb\nd\nb\nd\nc\n## 見出し\n- [ ] 条件\n本文\r\n\n- [ ] 条件\n\n本文\r\n\nd\na\nc\n本文\r\n\n- [ ] 条件\n## 見出し\nd\na\n本文\r\n本文\r\nb\nd\n## 見出し\nd\n\nc\n本文\r\n## 見出し\nc\nxc\n- [ ] 条件\nb\n## 見出し\nd\nd\n\n本文\r\nb\n\n- [ ] 条件\nd\na\nx- [ ] 条件\n本文\r\n本文\r\nd\n- [ ] 条件\n- [ ] 条件\n\n\nxa\n- [ ] 条件\nc\nx- [ ] 条件\nb\n## 見出し\n## 見出し\n- [ ] 条件\n## 見出し\nb\nc\nx本文\r\na\nx本文\r\na\nxa\n- [ ] 条件\nc\n\nd\n- [ ] 条件\n- [ ] 条件\nc\n- [ ] 条件\nc\nc\nx- [ ] 条件\nd\n本文\r\nb\nxc\nd\nc\n## 見出し\n本文\r\nd\n\n## 見出し\nb\n本文\r\n本文\r\n本文\r\nd\n- [ ] 条件\nxd\n\nd\nxd\nxd\nc\n本文\r\nd\n本文\r\nd\nd\na\n## 見出し\n- [ ] 条件\na\na\na\nx\n- [ ] 条件\nxx## 見出し\n## 見出し\nc\n",
+   "B": "\nc\n本文\r\n\nxxd\n## 見出し\nxd\nb\n## 見出し\n- [ ] 条件\na\nb\n\nd\nb\n## 見出し\nc\n本文\r\n本文\r\n本文\r\nc\nc\nb\nd\nb\nxd\nb\n- [ ] 条件\n## 見出し\n- [ ] 条件\n\nd\nb\nc\n- [ ] 条件\n本文\r\n## 見出し\nd\nd\n本文\r\n- [ ] 条件\n本文\r\nc\n\n\n\n## 見出し\nd\nc\nc\nc\n## 見出し\n\n## 見出し\nd\nd\nxb\nb\nc\n## 見出し\nxd\n\n本文\r\nd\n- [ ] 条件\n## 見出し\n\nd\nx- [ ] 条件\na\nc\n本文\r\n- [ ] 条件\n本文\r\nd\nd\n- [ ] 条件\n本文\r\n\nxc\nxd\na\nxb\na\na\nxd\n本文\r\n## 見出し\n- [ ] 条件\n## 見出し\n## 見出し\n本文\r\na\nxx本文\r\n\na\nb\n## 見出し\n## 見出し\n- [ ] 条件\n本文\r\n- [ ] 条件\nb\n- [ ] 条件\nd\nb\n\na\na\nxa\n\nxa\nc\nc\nx## 見出し\nb\n## 見出し\nd\n\na\n本文\r\nd\na\nb\n\na\n本文\r\n## 見出し\n\nx本文\r\nc\nd\nb\n## 見出し\nd\n本文\r\nd\n本文\r\nb\na\n- [ ] 条件\nc\na\nc\nc\n## 見出し\nd\n本文\r\nd\n\na\na\n- [ ] 条件\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\n## 見出し\n## 見出し\n\n## 見出し\nd\nc\n\nd\na\nx- [ ] 条件\nc\n- [ ] 条件\n\na\n## 見出し\nd\nxb\n\nx本文\r\n## 見出し\nxc\nx\n## 見出し\nc\nx本文\r\nb\nd\nb\nd\nc\n## 見出し\n- [ ] 条件\n本文\r\n\n- [ ] 条件\n\n本文\r\n\nd\na\nc\n本文\r\n\nb\n## 見出し\nd\na\n本文\r\n本文\r\nb\nd\n## 見出し\nd\n\nc\n本文\r\n## 見出し\nc\nxc\n- [ ] 条件\nb\n## 見出し\nd\nd\n\n本文\r\nb\n\n- [ ] 条件\nd\na\nx- [ ] 条件\n本文\r\n本文\r\nd\n- [ ] 条件\n- [ ] 条件\n\n\nxa\n- [ ] 条件\nc\nx- [ ] 条件\nb\n## 見出し\n## 見出し\n- [ ] 条件\n## 見出し\nb\nc\nx本文\r\na\nx本文\r\na\nxa\n- [ ] 条件\nc\n\nd\n- [ ] 条件\n- [ ] 条件\nc\n- [ ] 条件\nc\nc\nx- [ ] 条件\nd\n本文\r\nb\nxc\nd\nc\n## 見出し\n本文\r\nd\n\n## 見出し\nb\n本文\r\n本文\r\n本文\r\nd\n- [ ] 条件\nxd\n\nd\nxd\nxd\nc\n本文\r\nd\n本文\r\nd\nd\na\n## 見出し\n- [ ] 条件\na\na\na\nx\n- [ ] 条件\nxx## 見出し\n## 見出し\nc\n"
+  },
+  {
+   "A": "c\n",
+   "B": "\n## 見出し\na\nxx"
+  },
+  {
+   "A": "a\n",
+   "B": ""
+  },
+  {
+   "A": "",
+   "B": "x"
+  },
+  {
+   "A": "- [ ] 条件\nb\nd\n\n## 見出し\n\na\na\nx本文\r\n- [ ] 条件\na\n",
+   "B": "## 見出し\nb\nd\n\n## 見出し\na\nx本文\r\n- [ ] 条件\na\n"
+  },
+  {
+   "A": "## 見出し\nd\nc\nx\n\nb\nd\nx",
+   "B": "## 見出し\nd\nc\nx\n\nb\nd\nb\nx"
+  },
+  {
+   "A": "## 見出し\n## 見出し\n\nc\n- [ ] 条件\n",
+   "B": "## 見出し\n## 見出し\nc\n- [ ] 条件\n"
+  },
+  {
+   "A": "本文\r\nd\nb\n本文\r\nc\n- [ ] 条件\n本文\r\n本文\r\nx\n## 見出し\na\na\nb\n\n- [ ] 条件\n本文\r\n",
+   "B": "本文\r\nd\nb\n本文\r\nc\n- [ ] 条件\n本文\r\nb\n本文\r\nx\n## 見出し\na\nb\n\n- [ ] 条件\n本文\r\n"
+  },
+  {
+   "A": "d\nd\n本文\r\nd\n本文\r\n## 見出し\nd\n\n## 見出し\n本文\r\n本文\r\nd\n本文\r\n本文\r\nxb\n",
+   "B": "d\nc\nd\n本文\r\nd\n本文\r\n## 見出し\nd\nd\n\n本文\r\n本文\r\nd\n本文\r\n本文\r\n"
+  },
+  {
+   "A": "c\n## 見出し\nd\na\nxc\n本文\r\nx- [ ] 条件\n",
+   "B": "c\n## 見出し\nd\na\nx- [ ] 条件\n"
+  },
+  {
+   "A": "\n",
+   "B": "x## 見出し\n本文\r\nd\nd\n\na\n## 見出し\nb\n## 見出し\n- [ ] 条件\n本文\r\nxd\n\n## 見出し\n"
+  },
+  {
+   "A": "b\n\n- [ ] 条件\n- [ ] 条件\nc\nb\n本文\r\na\n",
+   "B": "b\n\n- [ ] 条件\n- [ ] 条件\n本文\r\nb\n## 見出し\n本文\r\na\n"
+  },
+  {
+   "A": "c\nb\n",
+   "B": "\nx## 見出し\na\na\n## 見出し\n\n## 見出し\nc\nb\n"
+  },
+  {
+   "A": "a\n- [ ] 条件\nd\n## 見出し\nb\n本文\r\na\nd\nb\nd\nc\nb\nb\na\nc\n本文\r\nxd\nx",
+   "B": "a\n- [ ] 条件\nd\n## 見出し\n## 見出し\nb\n本文\r\na\nd\nb\nd\nc\nb\nc\na\nc\n本文\r\nxd\nx"
+  },
+  {
+   "A": "b\na\nxb\n- [ ] 条件\nb\n- [ ] 条件\na\n- [ ] 条件\n\nb\n- [ ] 条件\na\n\n- [ ] 条件\nx\n",
+   "B": "b\na\n本文\r\n本文\r\nb\n- [ ] 条件\na\n- [ ] 条件\n\nb\n- [ ] 条件\na\n\n- [ ] 条件\nx\n"
+  },
+  {
+   "A": "d\n本文\r\nxa\n- [ ] 条件\na\n\n",
+   "B": "- [ ] 条件\n本文\r\nd\nx\na\n"
+  },
+  {
+   "A": "## 見出し\n\nc\nc\n## 見出し\n- [ ] 条件\nxc\n本文\r\n- [ ] 条件\na\nx本文\r\n\n## 見出し\n\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "## 見出し\n\n本文\r\nc\nc\n## 見出し\n- [ ] 条件\nxc\n本文\r\n- [ ] 条件\na\nx本文\r\n\nc\n\n- [ ] 条件\n- [ ] 条件\n"
+  },
+  {
+   "A": "xa\nb\nd\n## 見出し\nb\nc\n本文\r\nxx",
+   "B": "b\nb\n\n- [ ] 条件\n本文\r\n- [ ] 条件\n- [ ] 条件\nx"
+  },
+  {
+   "A": "xb\nd\nxb\nx\n\na\n- [ ] 条件\n\n\n",
+   "B": "xb\nd\nxb\nx\n\na\n- [ ] 条件\nc\nc\n"
+  },
+  {
+   "A": "## 見出し\n本文\r\nc\n- [ ] 条件\nx本文\r\n- [ ] 条件\na\na\n\nxb\n本文\r\na\nc\nd\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "d\n本文\r\n- [ ] 条件\nx本文\r\n- [ ] 条件\na\na\n\nxb\n本文\r\na\nc\nd\n- [ ] 条件\n- [ ] 条件\n"
+  },
+  {
+   "A": "\n## 見出し\n\nb\nc\nd\na\nx## 見出し\na\n本文\r\n\nxb\n## 見出し\nxd\nd\n本文\r\nd\na\n## 見出し\n## 見出し\n## 見出し\n- [ ] 条件\n本文\r\na\nb\n## 見出し\n\nb\n\nc\nc\nx- [ ] 条件\na\n## 見出し\nb\nx## 見出し\n\nx本文\r\nd\nx- [ ] 条件\nb\n## 見出し\nc\nc\nd\n## 見出し\nx## 見出し\nc\n\nb\n本文\r\n## 見出し\n## 見出し\n本文\r\n本文\r\nc\nd\n\n- [ ] 条件\nd\nb\nxc\nxb\n## 見出し\nx## 見出し\n\nd\nxb\n\nd\nb\nx\nb\nb\n## 見出し\nb\n- [ ] 条件\n\n## 見出し\nxa\n\na\nc\n- [ ] 条件\n本文\r\nx- [ ] 条件\nb\n- [ ] 条件\n- [ ] 条件\nb\n\nd\nc\n- [ ] 条件\nb\nxd\n\n\n- [ ] 条件\nd\nc\nb\n- [ ] 条件\nc\na\nb\nd\n- [ ] 条件\n\n- [ ] 条件\nb\nb\nd\n## 見出し\nd\nc\n## 見出し\n## 見出し\nxb\nb\na\na\nd\nd\n## 見出し\nb\na\na\n\nd\n- [ ] 条件\n本文\r\nb\nd\n本文\r\n- [ ] 条件\n\nxxxx- [ ] 条件\nb\n本文\r\nb\nb\n本文\r\nc\nxa\n\nd\nb\na\nd\na\n## 見出し\nb\nc\n- [ ] 条件\nc\n- [ ] 条件\n## 見出し\nd\nd\nc\nx\n- [ ] 条件\nc\na\n本文\r\n本文\r\nb\nx- [ ] 条件\nb\na\nxc\na\n## 見出し\nc\nd\nd\nd\n\nd\n\n\n本文\r\nxd\nd\n\nc\n本文\r\n- [ ] 条件\n本文\r\nxc\n## 見出し\na\n\nc\nc\n- [ ] 条件\nc\n- [ ] 条件\nxxx本文\r\nb\n本文\r\n- [ ] 条件\nx## 見出し\na\nb\nxb\na\n## 見出し\nd\nxb\n## 見出し\n- [ ] 条件\n\n本文\r\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n## 見出し\nb\n本文\r\nc\n- [ ] 条件\na\nxd\n\nc\nd\nb\n- [ ] 条件\n\n- [ ] 条件\nd\n本文\r\n- [ ] 条件\n本文\r\n\n\n## 見出し\nb\n## 見出し\nxx- [ ] 条件\n\n## 見出し\nb\na\nd\nb\nb\nb\nb\nc\na\n## 見出し\na\nxd\n\na\n\nb\n",
+   "B": "\n## 見出し\n\nb\nc\nd\na\nx## 見出し\na\n本文\r\n\nxb\n## 見出し\nxd\nd\n本文\r\nd\na\n## 見出し\n## 見出し\n## 見出し\n- [ ] 条件\n本文\r\na\nb\n## 見出し\n\nb\n\nc\nc\nx- [ ] 条件\na\n## 見出し\nb\nx## 見出し\n\nx本文\r\nd\nx- [ ] 条件\nb\n## 見出し\nc\nc\nd\n## 見出し\nx## 見出し\nc\n\nb\n本文\r\n## 見出し\n## 見出し\n本文\r\n本文\r\nc\nd\n\n- [ ] 条件\nd\nb\nxc\nxb\n## 見出し\nx## 見出し\n\nd\nxb\n\nd\nb\nx\nb\nb\n## 見出し\nb\n- [ ] 条件\n\n## 見出し\nxa\n\na\nc\n- [ ] 条件\n本文\r\nx- [ ] 条件\nb\n- [ ] 条件\n- [ ] 条件\nb\n\nc\n- [ ] 条件\nb\nxd\n\n\n- [ ] 条件\nd\nc\nb\n- [ ] 条件\nc\na\nb\nd\n- [ ] 条件\n\n- [ ] 条件\nb\nb\nd\n## 見出し\nd\nc\n## 見出し\n## 見出し\nxb\nb\na\na\nd\nd\n## 見出し\nb\na\na\n\nd\n- [ ] 条件\n本文\r\nb\nd\n本文\r\n- [ ] 条件\n\nxxxx- [ ] 条件\nb\n本文\r\nb\nb\n本文\r\nc\nxa\n\nd\nb\na\nd\na\n## 見出し\nb\nc\n- [ ] 条件\nc\n- [ ] 条件\n## 見出し\nd\nd\nc\nx\n- [ ] 条件\nc\na\n本文\r\n本文\r\nb\nx- [ ] 条件\nb\na\nxc\na\n## 見出し\nc\nd\nd\nd\n\nd\n\n\n本文\r\nxd\nd\n\nc\n本文\r\n- [ ] 条件\n本文\r\nxc\n## 見出し\na\n\nc\nc\n- [ ] 条件\nc\n- [ ] 条件\nxxx本文\r\nb\n本文\r\n- [ ] 条件\nx## 見出し\na\nb\nxb\na\n## 見出し\nd\nxb\n## 見出し\n- [ ] 条件\n\n本文\r\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n## 見出し\nb\n本文\r\nc\n- [ ] 条件\na\nxd\n\nc\nd\nb\n- [ ] 条件\n\n- [ ] 条件\nd\n本文\r\n- [ ] 条件\n本文\r\n\n\n## 見出し\nb\n## 見出し\nxx- [ ] 条件\n\n## 見出し\nb\na\nd\nb\nb\nb\nb\nc\na\n## 見出し\na\nxd\n\na\n\nb\n"
+  },
+  {
+   "A": "xc\n## 見出し\n- [ ] 条件\nx",
+   "B": "## 見出し\nc\n- [ ] 条件\nx"
+  },
+  {
+   "A": "## 見出し\nd\nd\na\n本文\r\nb\n## 見出し\nb\n\na\nb\na\n本文\r\n",
+   "B": "## 見出し\nd\nd\na\n本文\r\nb\n## 見出し\n## 見出し\nb\n\na\nb\na\n本文\r\n"
+  },
+  {
+   "A": "## 見出し\na\nc\na\n- [ ] 条件\nb\n- [ ] 条件\nc\n- [ ] 条件\nb\nxxxd\na\nb\n",
+   "B": "## 見出し\na\nb\na\n- [ ] 条件\nb\n- [ ] 条件\nc\n- [ ] 条件\nb\n- [ ] 条件\nxxxd\na\nb\n"
+  },
+  {
+   "A": "## 見出し\nc\na\n\n",
+   "B": "- [ ] 条件\nc\na\n\n"
+  },
+  {
+   "A": "本文\r\nxd\na\nb\nd\na\nd\na\nxd\n本文\r\n## 見出し\nc\nd\nd\n",
+   "B": "本文\r\nxd\na\nb\nc\nd\n\na\nd\na\n\n本文\r\n## 見出し\nc\nd\nd\n"
+  },
+  {
+   "A": "## 見出し\n\nx",
+   "B": "## 見出し\n\n## 見出し\n"
+  },
+  {
+   "A": "d\n- [ ] 条件\na\nc\nx## 見出し\n本文\r\nb\nd\nb\n",
+   "B": "d\na\nx## 見出し\n本文\r\nb\nd\nb\n"
+  },
+  {
+   "A": "## 見出し\na\n- [ ] 条件\nd\na\nb\n\n本文\r\nx\nx本文\r\nb\n本文\r\nd\nxb\n\nd\n",
+   "B": "d\na\n- [ ] 条件\nd\na\nb\n\n本文\r\n本文\r\nx\nx本文\r\nb\nd\nxb\n\nd\n"
+  },
+  {
+   "A": "## 見出し\n\n- [ ] 条件\n本文\r\nd\nb\nd\nc\nc\nd\nc\n",
+   "B": "## 見出し\n\n- [ ] 条件\n本文\r\nb\nd\na\nc\nc\nd\nc\n"
+  },
+  {
+   "A": "d\na\n\na\n\n- [ ] 条件\nd\na\nxb\n本文\r\nd\nxd\n",
+   "B": "d\na\n\na\n\n- [ ] 条件\nd\na\nxb\n本文\r\nd\n\nxd\n"
+  },
+  {
+   "A": "c\n本文\r\n- [ ] 条件\nx- [ ] 条件\n\n- [ ] 条件\n- [ ] 条件\nb\nc\n\n## 見出し\n本文\r\n",
+   "B": "## 見出し\nc\n本文\r\n- [ ] 条件\nx- [ ] 条件\n\n- [ ] 条件\n- [ ] 条件\nb\nc\n\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "a\nx- [ ] 条件\na\n",
+   "B": "\nx- [ ] 条件\na\n"
+  },
+  {
+   "A": "a\n- [ ] 条件\nb\nd\n\nd\n- [ ] 条件\n- [ ] 条件\n## 見出し\n- [ ] 条件\nc\na\n## 見出し\n- [ ] 条件\na\na\n- [ ] 条件\n",
+   "B": "a\n- [ ] 条件\nb\nd\n\n- [ ] 条件\nd\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nc\na\n## 見出し\n- [ ] 条件\na\na\n- [ ] 条件\n"
+  },
+  {
+   "A": "本文\r\n## 見出し\nc\n本文\r\nd\nx\nx\nb\n",
+   "B": "本文\r\n## 見出し\nb\nc\n本文\r\nd\nx\nx\nb\n"
+  },
+  {
+   "A": "\n\n\n",
+   "B": "b\n\n本文\r\n\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "本文\r\nb\n## 見出し\nxc\n",
+   "B": "本文\r\n\nb\nb\n## 見出し\nxc\n"
+  },
+  {
+   "A": "a\nd\n## 見出し\n",
+   "B": "\na\nb\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\na\nd\n",
+   "B": "本文\r\nxa\nc\n本文\r\na\nc\nc\n- [ ] 条件\nd\n- [ ] 条件\n## 見出し\na\nxb\nd\nx\n## 見出し\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\n\nc\na\n\na\nb\n- [ ] 条件\nc\n- [ ] 条件\na\nx\nc\n- [ ] 条件\nd\na\nc\n\nxd\nc\n\n- [ ] 条件\nc\n## 見出し\n- [ ] 条件\na\nb\nd\nd\nd\n\n本文\r\n本文\r\nd\n本文\r\nxa\na\n- [ ] 条件\nb\nd\na\nx本文\r\nxa\n## 見出し\n本文\r\n本文\r\nd\n- [ ] 条件\nd\n- [ ] 条件\nxa\nd\na\n本文\r\n本文\r\nx- [ ] 条件\na\n本文\r\nc\n\nc\na\nx## 見出し\n\nxc\n本文\r\n- [ ] 条件\nd\n本文\r\n- [ ] 条件\nd\n- [ ] 条件\n本文\r\n\nxb\n本文\r\n## 見出し\nd\nx- [ ] 条件\n\nb\nd\n## 見出し\n\na\n\nd\nc\n\n\n本文\r\n本文\r\nb\nb\n\n本文\r\n## 見出し\nx- [ ] 条件\n## 見出し\n- [ ] 条件\n\n## 見出し\nxb\n本文\r\nxxxa\nc\nb\nx- [ ] 条件\nd\na\na\n\n## 見出し\nb\nb\n- [ ] 条件\na\n\n\nd\nd\nc\n## 見出し\nd\n## 見出し\na\n本文\r\n- [ ] 条件\nxb\nb\nc\nd\n## 見出し\nd\nb\nb\nb\nc\nxx## 見出し\n\nc\n\n本文\r\n本文\r\nd\n- [ ] 条件\nd\nx- [ ] 条件\n## 見出し\n本文\r\nc\n\n- [ ] 条件\n本文\r\nb\n- [ ] 条件\n## 見出し\na\nc\nx\nxd\nd\nd\nd\nxx## 見出し\nx\n本文\r\nd\n本文\r\nb\nc\n\nd\n- [ ] 条件\n本文\r\nd\n本文\r\nd\na\n## 見出し\n本文\r\nb\n本文\r\nb\n## 見出し\nc\nc\n\nd\nb\nd\n## 見出し\na\nc\na\nx## 見出し\n本文\r\nb\nb\n本文\r\n\n",
+   "B": "本文\r\n本文\r\na\nb\nb\n## 見出し\na\n\nd\n- [ ] 条件\nc\nb\n## 見出し\n\nb\nc\n本文\r\n本文\r\n## 見出し\nc\n本文\r\na\n\nc\nb\n- [ ] 条件\n- [ ] 条件\nx\n本文\r\na\nd\n\n- [ ] 条件\nxxb\n- [ ] 条件\nd\n\n\na\n本文\r\nx\nb\nxxd\n## 見出し\nd\n## 見出し\na\nd\nb\n\n\n本文\r\nxx- [ ] 条件\n\na\nc\n- [ ] 条件\n\nb\nd\n- [ ] 条件\na\nd\na\n本文\r\nx本文\r\n\nx\n本文\r\n- [ ] 条件\n本文\r\n本文\r\nxa\n\nd\na\n## 見出し\n- [ ] 条件\nc\nc\nc\n\n\n本文\r\nc\n\n## 見出し\nxa\nc\n## 見出し\nc\nc\na\n- [ ] 条件\nd\nd\n本文\r\na\n\n## 見出し\n## 見出し\n- [ ] 条件\n本文\r\na\n"
+  },
+  {
+   "A": "\nc\nd\n",
+   "B": "c\nd\n"
+  },
+  {
+   "A": "\nc\n- [ ] 条件\n",
+   "B": "c\n- [ ] 条件\nx本文\r\nxa\nb\nb\nd\nd\nd\na\n## 見出し\nxd\nxx"
+  },
+  {
+   "A": "- [ ] 条件\nc\nxc\nc\nc\n## 見出し\n本文\r\n本文\r\nd\n- [ ] 条件\n\n",
+   "B": "b\n本文\r\na\n本文\r\nxa\n- [ ] 条件\nxa\n本文\r\n\n## 見出し\na\n本文\r\n## 見出し\n\nc\nc\nd\n本文\r\nd\nd\n本文\r\n## 見出し\n- [ ] 条件\n"
+  },
+  {
+   "A": "x\n- [ ] 条件\n",
+   "B": "## 見出し\nb\n"
+  },
+  {
+   "A": "\na\n本文\r\na\nd\nb\n## 見出し\nxc\n\n## 見出し\nxd\n## 見出し\n",
+   "B": "本文\r\nb\n- [ ] 条件\n本文\r\nxa\nd\nc\nxx## 見出し\n## 見出し\n## 見出し\n## 見出し\nx## 見出し\n本文\r\na\na\n\nb\nd\nc\na\n## 見出し\n"
+  },
+  {
+   "A": "c\n## 見出し\n## 見出し\nc\nd\nd\n- [ ] 条件\nc\nb\n本文\r\n本文\r\n## 見出し\nb\nx## 見出し\n",
+   "B": "c\n## 見出し\n## 見出し\nc\na\nd\nd\n- [ ] 条件\nc\n本文\r\n本文\r\n## 見出し\nb\nx## 見出し\n"
+  },
+  {
+   "A": "c\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n本文\r\n\n",
+   "B": "c\n\n- [ ] 条件\n本文\r\n\n"
+  },
+  {
+   "A": "- [ ] 条件\n## 見出し\nx\nxx\na\n- [ ] 条件\na\nc\n\n## 見出し\n\nc\n## 見出し\n本文\r\n",
+   "B": "- [ ] 条件\n本文\r\n## 見出し\nx\nxx\na\nc\n\n## 見出し\n\nc\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "x本文\r\nx## 見出し\na\na\nc\nb\n## 見出し\n本文\r\nb\n",
+   "B": "x本文\r\nx## 見出し\na\na\nxc\nb\n## 見出し\nb\n"
+  },
+  {
+   "A": "d\nb\n## 見出し\n本文\r\nd\nxc\nd\nd\n## 見出し\nd\n## 見出し\n",
+   "B": "xd\n- [ ] 条件\nb\n## 見出し\n本文\r\nd\nxc\nd\n## 見出し\n## 見出し\nd\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\nd\nc\nx",
+   "B": "本文\r\nx本文\r\nc\nx"
+  },
+  {
+   "A": "",
+   "B": "d\n"
+  },
+  {
+   "A": "b\nb\n本文\r\nx## 見出し\n- [ ] 条件\n\n- [ ] 条件\n- [ ] 条件\n本文\r\n",
+   "B": "b\nb\n本文\r\nx## 見出し\n- [ ] 条件\n- [ ] 条件\nxc\n本文\r\n"
+  },
+  {
+   "A": "## 見出し\n## 見出し\nc\n本文\r\n\nx\n本文\r\nb\nd\n本文\r\n- [ ] 条件\na\nc\nx",
+   "B": "## 見出し\n## 見出し\nc\n本文\r\n\n本文\r\n本文\r\nb\nd\n本文\r\n- [ ] 条件\na\nc\n## 見出し\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "x\n\nd\nxa\n- [ ] 条件\nxa\n",
+   "B": "\nx\n\nd\n本文\r\nb\n"
+  },
+  {
+   "A": "本文\r\nc\nb\nd\n- [ ] 条件\n\n## 見出し\n## 見出し\nc\nxa\nc\na\na\n\n## 見出し\n",
+   "B": "本文\r\nc\n\nd\n- [ ] 条件\n\n## 見出し\nc\nxa\nc\na\n本文\r\na\n\n## 見出し\n"
+  },
+  {
+   "A": "c\n",
+   "B": "\n"
+  },
+  {
+   "A": "本文\r\n本文\r\n本文\r\nc\nc\n## 見出し\n",
+   "B": "x- [ ] 条件\nx"
+  },
+  {
+   "A": "c\na\n- [ ] 条件\nxx- [ ] 条件\nc\nb\n本文\r\n## 見出し\n本文\r\nxb\n- [ ] 条件\nb\nc\n\na\nb\n\na\n- [ ] 条件\n- [ ] 条件\nb\n## 見出し\na\nb\na\na\nb\n\na\nb\n\nb\nb\na\n## 見出し\nd\nb\na\nb\n本文\r\nc\nb\nxx## 見出し\nxc\n本文\r\nb\n- [ ] 条件\nc\nc\nxx- [ ] 条件\na\na\n- [ ] 条件\na\nb\nx- [ ] 条件\n本文\r\nc\n\n\nb\nc\n本文\r\na\n- [ ] 条件\n\nxc\n\n- [ ] 条件\nb\n## 見出し\n\nxa\n\nd\n## 見出し\nx本文\r\nc\n\n- [ ] 条件\nx\nc\nc\nd\nb\nc\n\nb\nc\n\nx## 見出し\n本文\r\n本文\r\na\nc\n\n本文\r\n- [ ] 条件\na\nx\n本文\r\n- [ ] 条件\n\n\nc\nc\n- [ ] 条件\nb\na\n- [ ] 条件\n## 見出し\nd\nx## 見出し\nc\nc\nc\n- [ ] 条件\n## 見出し\na\n## 見出し\nxb\n- [ ] 条件\nb\nc\n## 見出し\n- [ ] 条件\n本文\r\nx本文\r\nb\nd\nxb\n\nd\nc\n- [ ] 条件\na\na\nc\nd\nxa\n## 見出し\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n\na\nd\n## 見出し\nc\n- [ ] 条件\n## 見出し\na\n\nxc\n本文\r\nd\nb\nd\nd\nb\nd\nx- [ ] 条件\nc\na\n\n本文\r\nb\n## 見出し\na\nb\n## 見出し\nxc\n## 見出し\n- [ ] 条件\nxc\nb\nd\n- [ ] 条件\nb\nc\nd\nxd\nc\nb\nxd\n## 見出し\nxb\nx",
+   "B": "c\na\n- [ ] 条件\nxx- [ ] 条件\nc\nb\n本文\r\n## 見出し\n本文\r\nxb\n- [ ] 条件\nb\nc\n\na\nb\n\na\n- [ ] 条件\n- [ ] 条件\nb\n## 見出し\na\nb\na\na\nb\n\na\nb\n\nb\na\n## 見出し\nd\nb\na\nb\n本文\r\nc\nb\nxx## 見出し\nxc\n本文\r\nb\n- [ ] 条件\nc\nc\nxx- [ ] 条件\na\na\n- [ ] 条件\na\nb\nx- [ ] 条件\n本文\r\nc\n\n\nb\nc\n本文\r\na\n- [ ] 条件\n\nxc\n\n- [ ] 条件\nb\n## 見出し\n\nxa\n\nd\n## 見出し\nx本文\r\nc\n\n- [ ] 条件\nx\nc\nc\nd\nb\nc\n\nb\nc\n\nx## 見出し\n本文\r\n本文\r\na\nc\n\n本文\r\n- [ ] 条件\na\nx\n本文\r\n- [ ] 条件\n\n\nc\nc\n- [ ] 条件\nb\na\n- [ ] 条件\n## 見出し\nd\nx## 見出し\nc\nc\n- [ ] 条件\n## 見出し\na\n## 見出し\nxb\n- [ ] 条件\nb\nc\n## 見出し\n- [ ] 条件\n本文\r\nx本文\r\nb\nd\nxb\n\nd\nc\n- [ ] 条件\na\na\nc\nd\nxa\n## 見出し\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n\na\nd\n## 見出し\nc\n- [ ] 条件\n## 見出し\na\n\nxc\n本文\r\nd\nb\nd\nd\nb\nd\nx- [ ] 条件\nc\na\n\n本文\r\nb\n## 見出し\na\n## 見出し\nxc\n## 見出し\n- [ ] 条件\nxc\nb\nd\n- [ ] 条件\nb\nc\nd\nxd\nc\nb\nxd\n## 見出し\nxb\nx"
+  },
+  {
+   "A": "d\na\n",
+   "B": "a\nd\n\nb\na\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "\nx\nxc\n## 見出し\n## 見出し\na\nxa\n## 見出し\n本文\r\n本文\r\nb\n## 見出し\nxxxx",
+   "B": "## 見出し\nd\nd\n- [ ] 条件\n- [ ] 条件\nx\n本文\r\n- [ ] 条件\n- [ ] 条件\nxd\nd\n\n"
+  },
+  {
+   "A": "b\n- [ ] 条件\n本文\r\nb\n## 見出し\na\nc\n- [ ] 条件\n",
+   "B": "\n- [ ] 条件\nb\nb\n## 見出し\na\nc\n- [ ] 条件\n"
+  },
+  {
+   "A": "b\na\nd\n",
+   "B": "d\n\nx## 見出し\nc\nc\n本文\r\n- [ ] 条件\n## 見出し\n- [ ] 条件\na\n- [ ] 条件\n\nd\na\nx"
+  },
+  {
+   "A": "本文\r\n\na\n- [ ] 条件\n## 見出し\n- [ ] 条件\na\nb\n",
+   "B": "x本文\r\nb\nb\nc\n## 見出し\n本文\r\n- [ ] 条件\n本文\r\nb\nxc\n本文\r\n- [ ] 条件\nb\n## 見出し\n"
+  },
+  {
+   "A": "xa\nb\n本文\r\nc\nx本文\r\nb\n- [ ] 条件\nd\n## 見出し\nb\na\n",
+   "B": "xa\n本文\r\nb\n本文\r\nc\nx本文\r\nb\n- [ ] 条件\nd\n## 見出し\nb\na\n"
+  },
+  {
+   "A": "",
+   "B": "- [ ] 条件\n"
+  },
+  {
+   "A": "\n## 見出し\n- [ ] 条件\n- [ ] 条件\nb\n## 見出し\n- [ ] 条件\nd\nc\nd\n本文\r\n",
+   "B": "\n- [ ] 条件\n- [ ] 条件\nb\n## 見出し\n- [ ] 条件\nd\nc\nd\n本文\r\n"
+  },
+  {
+   "A": "本文\r\n本文\r\n## 見出し\n## 見出し\n本文\r\n\n本文\r\nxa\n## 見出し\nb\nd\n本文\r\na\nb\n",
+   "B": "本文\r\n本文\r\n## 見出し\n本文\r\n本文\r\n本文\r\n## 見出し\nb\nd\n本文\r\na\nb\n"
+  },
+  {
+   "A": "a\n本文\r\na\nd\nc\n",
+   "B": "\n- [ ] 条件\n\nb\nb\n\n本文\r\n"
+  },
+  {
+   "A": "d\nxxb\nb\n本文\r\n## 見出し\nxb\n本文\r\nc\nxxd\nx",
+   "B": "d\n- [ ] 条件\nb\n本文\r\n## 見出し\nxb\n- [ ] 条件\nc\nxxd\n"
+  },
+  {
+   "A": "d\nb\nc\nc\n- [ ] 条件\na\nc\n本文\r\na\nd\nxa\na\nb\nx## 見出し\n本文\r\n## 見出し\n",
+   "B": "d\nb\nx- [ ] 条件\nc\n本文\r\na\na\nxa\na\nb\nx## 見出し\n本文\r\n## 見出し\n"
+  },
+  {
+   "A": "## 見出し\n- [ ] 条件\nd\nc\n本文\r\n本文\r\nd\nx本文\r\n## 見出し\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nc\nd\n本文\r\n",
+   "B": "## 見出し\n- [ ] 条件\n## 見出し\nd\nc\n本文\r\n本文\r\n- [ ] 条件\nx本文\r\n## 見出し\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nc\nd\n本文\r\n"
+  },
+  {
+   "A": "xxa\nxb\nxc\n\n本文\r\nb\nd\nxc\n\n",
+   "B": "- [ ] 条件\nxxa\n本文\r\nxb\nc\n"
+  },
+  {
+   "A": "## 見出し\na\n## 見出し\nxb\nc\n## 見出し\nb\n",
+   "B": "## 見出し\n## 見出し\na\n## 見出し\nc\n## 見出し\nb\n"
+  },
+  {
+   "A": "b\n\n",
+   "B": "本文\r\na\nd\n\n本文\r\na\na\nb\n\nb\n\n- [ ] 条件\nb\n"
+  },
+  {
+   "A": "- [ ] 条件\nb\n- [ ] 条件\n\nc\n\n\n",
+   "B": "a\n本文\r\n## 見出し\na\nc\na\n## 見出し\n\n本文\r\na\n\nd\n本文\r\n"
+  },
+  {
+   "A": "\n\nd\n\n- [ ] 条件\n本文\r\nc\n\n- [ ] 条件\nxc\n## 見出し\nd\nc\n本文\r\n\n- [ ] 条件\n",
+   "B": "c\n\n\nd\n\n- [ ] 条件\n本文\r\nc\n\n- [ ] 条件\nxc\n## 見出し\nd\nc\n本文\r\n\n- [ ] 条件\n"
+  },
+  {
+   "A": "## 見出し\nd\nc\n本文\r\n## 見出し\na\na\n## 見出し\nb\n## 見出し\na\nd\n本文\r\nb\na\n本文\r\nc\n",
+   "B": "## 見出し\nd\nc\n本文\r\n## 見出し\na\n## 見出し\nb\n## 見出し\na\nd\n## 見出し\nb\na\n\n本文\r\nc\n"
+  },
+  {
+   "A": "c\nx- [ ] 条件\n本文\r\n\n\nxb\n- [ ] 条件\nxa\nd\na\nd\nd\nxb\na\n## 見出し\n\n\nb\n本文\r\n本文\r\n- [ ] 条件\nx- [ ] 条件\nc\n本文\r\n## 見出し\n## 見出し\nb\n\nxa\n\nc\n## 見出し\nc\nb\nxa\n\nd\n## 見出し\n## 見出し\nc\nb\na\nb\n本文\r\nb\na\na\na\nb\n## 見出し\n- [ ] 条件\nd\n本文\r\nd\n本文\r\n## 見出し\n## 見出し\nb\na\n## 見出し\nd\n- [ ] 条件\n- [ ] 条件\nb\nd\nc\n## 見出し\n\n- [ ] 条件\n本文\r\nb\n- [ ] 条件\nb\n- [ ] 条件\n- [ ] 条件\nd\n## 見出し\na\nd\n\na\n\nc\n本文\r\nb\n\nc\n- [ ] 条件\n本文\r\nd\n- [ ] 条件\n本文\r\n- [ ] 条件\nd\n## 見出し\nc\na\n\nb\n## 見出し\n- [ ] 条件\n- [ ] 条件\nc\n\n- [ ] 条件\nd\n本文\r\na\nc\n\nxxxa\nd\nc\nd\n\nd\n本文\r\nb\n\na\nx\nc\n本文\r\na\nd\n\nd\nd\n\na\n\n- [ ] 条件\n- [ ] 条件\na\nb\nd\nb\nx\nx\nc\na\n- [ ] 条件\nb\nb\nb\nc\nb\nb\n\na\nb\nxb\n- [ ] 条件\nx\n本文\r\n## 見出し\n- [ ] 条件\n## 見出し\n\n本文\r\na\n## 見出し\n## 見出し\nd\nb\nb\n## 見出し\n本文\r\n\nb\n本文\r\n- [ ] 条件\nxb\nx本文\r\na\na\nxa\n## 見出し\nb\n本文\r\na\nd\n本文\r\nc\n\nd\nb\n本文\r\nc\n本文\r\n## 見出し\n## 見出し\nx- [ ] 条件\nc\na\nb\nb\n本文\r\nb\nc\na\n\na\na\na\nx## 見出し\na\n本文\r\n\nxa\nb\n\n- [ ] 条件\n本文\r\n本文\r\n\nc\n\nc\n## 見出し\nx## 見出し\n\n\n本文\r\nd\na\nb\nc\nc\nc\nx\n- [ ] 条件\n## 見出し\n## 見出し\nb\n本文\r\n\n\nb\nxc\nc\nd\nc\nx- [ ] 条件\n\n- [ ] 条件\na\n本文\r\nx本文\r\nd\n本文\r\na\n## 見出し\na\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n## 見出し\nb\n\n本文\r\n## 見出し\nd\nc\n- [ ] 条件\n- [ ] 条件\nd\n本文\r\n- [ ] 条件\nd\n- [ ] 条件\n\n- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\n## 見出し\nc\nc\nb\n## 見出し\n## 見出し\nb\n## 見出し\n本文\r\nd\n本文\r\na\n## 見出し\nxd\n## 見出し\n## 見出し\n本文\r\nxa\n\n\nb\nx## 見出し\n## 見出し\n- [ ] 条件\na\nc\n\nc\n- [ ] 条件\n## 見出し\n本文\r\n## 見出し\nb\n本文\r\n- [ ] 条件\nb\n## 見出し\nd\n",
+   "B": "c\nx- [ ] 条件\n本文\r\n\n\nxb\n- [ ] 条件\nxa\nd\na\nd\nd\nxb\na\n## 見出し\n\n\nb\n本文\r\n本文\r\n- [ ] 条件\nx- [ ] 条件\nc\n本文\r\n## 見出し\n## 見出し\nb\n\nxa\n\nc\n## 見出し\nc\n\nb\nxa\n\nd\n## 見出し\n## 見出し\nc\nb\na\nb\n本文\r\nb\na\na\na\nb\n## 見出し\n- [ ] 条件\nd\n本文\r\nd\n本文\r\n## 見出し\n## 見出し\nb\na\n## 見出し\nd\n- [ ] 条件\n- [ ] 条件\nb\n- [ ] 条件\nd\nc\n## 見出し\n\n- [ ] 条件\n本文\r\nb\n- [ ] 条件\nb\n- [ ] 条件\n- [ ] 条件\nd\n## 見出し\na\nd\n\na\n\nc\n本文\r\nb\n\nc\n- [ ] 条件\n本文\r\nd\n- [ ] 条件\n本文\r\n- [ ] 条件\nd\n## 見出し\nc\na\n\nb\n## 見出し\n- [ ] 条件\n- [ ] 条件\nc\n\n- [ ] 条件\nd\n本文\r\na\nc\n\nxxxa\nd\nc\nd\n\nd\n本文\r\nb\n\na\nx\nc\n本文\r\na\nd\n\nd\nd\n\na\n\n- [ ] 条件\n- [ ] 条件\na\nb\nd\nb\nx\nx\nc\na\n- [ ] 条件\nb\nb\nb\nc\nb\nb\n\na\nb\nxb\n- [ ] 条件\nx\n本文\r\n## 見出し\n- [ ] 条件\n## 見出し\n\n本文\r\na\n## 見出し\n## 見出し\nd\nb\nb\n## 見出し\n本文\r\n\nb\n本文\r\n- [ ] 条件\nxb\nx本文\r\na\na\nxa\n## 見出し\nb\n本文\r\na\nd\n本文\r\nc\n\nd\nb\n本文\r\nc\n本文\r\n## 見出し\n## 見出し\nx- [ ] 条件\nc\na\nb\nb\n本文\r\nb\nc\na\n\na\na\na\nx## 見出し\na\n本文\r\n\nxa\nb\n\n- [ ] 条件\n本文\r\n本文\r\n\nc\n\nc\n## 見出し\nx## 見出し\n\n\n本文\r\nd\na\nb\nc\nc\nc\nx\n- [ ] 条件\n## 見出し\n## 見出し\nb\n本文\r\n\n\nb\nxc\nc\nd\nc\nx- [ ] 条件\n\n- [ ] 条件\na\n本文\r\nx本文\r\nb\n本文\r\na\n## 見出し\na\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\n## 見出し\nb\n\n本文\r\n## 見出し\nd\nc\n- [ ] 条件\n- [ ] 条件\nd\n本文\r\n- [ ] 条件\nd\nb\n\n- [ ] 条件\n- [ ] 条件\n本文\r\n- [ ] 条件\n## 見出し\nc\nc\nb\n## 見出し\n## 見出し\nb\n## 見出し\n本文\r\nd\n本文\r\na\n## 見出し\nxd\n## 見出し\n## 見出し\n本文\r\nxa\n\n\nb\nx## 見出し\n## 見出し\n- [ ] 条件\na\nc\n\nc\n- [ ] 条件\n## 見出し\n本文\r\n## 見出し\nb\n本文\r\n- [ ] 条件\nb\n## 見出し\nd\n"
+  },
+  {
+   "A": "本文\r\nxc\n\n\nc\nb\nxc\nc\nxa\nd\n- [ ] 条件\n本文\r\nc\n- [ ] 条件\n",
+   "B": "本文\r\nxc\n\n\nc\nb\nxc\nc\nxa\nd\n- [ ] 条件\na\n- [ ] 条件\n"
+  },
+  {
+   "A": "d\nd\n",
+   "B": "本文\r\n## 見出し\nd\n"
+  },
+  {
+   "A": "c\nd\nb\na\n## 見出し\na\nd\n\n",
+   "B": "c\nd\nb\na\n## 見出し\na\nd\n"
+  },
+  {
+   "A": "",
+   "B": "d\nx"
+  },
+  {
+   "A": "- [ ] 条件\nd\nd\nc\n\n本文\r\nc\n## 見出し\nb\nc\nxa\nb\n- [ ] 条件\n- [ ] 条件\n## 見出し\n- [ ] 条件\nd\n- [ ] 条件\n",
+   "B": "b\n- [ ] 条件\n## 見出し\n\n\nc\na\n本文\r\n\n## 見出し\n## 見出し\nc\n- [ ] 条件\nxc\nc\n\na\n- [ ] 条件\nx本文\r\nd\nb\nx- [ ] 条件\n"
+  },
+  {
+   "A": "a\n- [ ] 条件\n## 見出し\nb\n\nd\n",
+   "B": "a\n- [ ] 条件\n## 見出し\nx\n\nd\n"
+  },
+  {
+   "A": "d\nxc\nd\na\nc\n本文\r\nc\nb\nxc\n本文\r\n## 見出し\n\n",
+   "B": "d\n本文\r\nd\na\n\n本文\r\nc\nb\nxc\n本文\r\n## 見出し\n\n"
+  },
+  {
+   "A": "## 見出し\nc\n## 見出し\nb\n本文\r\n本文\r\nd\n- [ ] 条件\n",
+   "B": "## 見出し\nc\n## 見出し\n本文\r\n本文\r\nd\nd\n"
+  },
+  {
+   "A": "",
+   "B": "a\n"
+  },
+  {
+   "A": "xa\na\na\n本文\r\n",
+   "B": "c\na\n本文\r\n"
+  },
+  {
+   "A": "c\n\nxd\n- [ ] 条件\nd\nx## 見出し\na\nd\nd\n",
+   "B": "xd\nd\n本文\r\nc\n## 見出し\n## 見出し\nb\n- [ ] 条件\nxa\n\nd\nxc\n"
+  },
+  {
+   "A": "",
+   "B": ""
+  },
+  {
+   "A": "d\nx本文\r\n\nc\nb\n本文\r\nxd\na\nx本文\r\n- [ ] 条件\nb\n",
+   "B": "d\nx本文\r\n\nc\nb\nxd\na\nx本文\r\n- [ ] 条件\nb\n"
+  },
+  {
+   "A": "- [ ] 条件\n本文\r\nxd\nb\nc\n## 見出し\n## 見出し\nxd\na\na\nc\n- [ ] 条件\na\nc\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "- [ ] 条件\n本文\r\nxd\nb\nc\n## 見出し\nxd\na\na\nc\n- [ ] 条件\na\nc\n- [ ] 条件\n- [ ] 条件\n"
+  },
+  {
+   "A": "a\nc\n\nxc\n本文\r\nd\na\nb\na\n- [ ] 条件\n- [ ] 条件\n\nb\n\n本文\r\n",
+   "B": "a\nc\n\na\nxc\n本文\r\nd\na\nb\nd\na\n- [ ] 条件\n- [ ] 条件\n\n\n本文\r\n"
+  },
+  {
+   "A": "本文\r\n\n",
+   "B": "本文\r\n## 見出し\n\n"
+  },
+  {
+   "A": "\na\n- [ ] 条件\n## 見出し\n- [ ] 条件\na\n- [ ] 条件\n\nd\nxc\n",
+   "B": "\na\n- [ ] 条件\n## 見出し\n- [ ] 条件\na\n- [ ] 条件\n\nxc\n"
+  },
+  {
+   "A": "a\nc\na\nx本文\r\nb\n## 見出し\n本文\r\n- [ ] 条件\nc\nc\nx",
+   "B": "a\nc\na\nx本文\r\nb\n## 見出し\n- [ ] 条件\nc\nx"
+  },
+  {
+   "A": "c\n本文\r\n- [ ] 条件\n本文\r\n- [ ] 条件\na\n## 見出し\nx\nb\na\n- [ ] 条件\nd\nc\nd\n## 見出し\n\n",
+   "B": "\n\na\nxc\n\nc\nc\na\n\nb\nxc\nb\n- [ ] 条件\n## 見出し\n本文\r\nxxx- [ ] 条件\n"
+  },
+  {
+   "A": "\n本文\r\n- [ ] 条件\nc\nd\nc\n- [ ] 条件\nxx本文\r\nb\nc\n- [ ] 条件\n## 見出し\nd\nx本文\r\n\n## 見出し\n## 見出し\nb\n本文\r\na\nb\nc\nc\n\nb\nd\n本文\r\n本文\r\n## 見出し\n## 見出し\nx- [ ] 条件\nc\n\n\nc\nd\n- [ ] 条件\nd\n\nd\nxd\nd\nxb\n\nxc\n\nb\nb\nb\nc\n\n## 見出し\na\n本文\r\nb\na\na\n- [ ] 条件\nc\nxd\na\n- [ ] 条件\n本文\r\na\n## 見出し\nx- [ ] 条件\nb\na\nb\n- [ ] 条件\nc\na\na\nd\nb\n- [ ] 条件\n\nb\n- [ ] 条件\na\nx- [ ] 条件\nc\n## 見出し\n本文\r\nx- [ ] 条件\n- [ ] 条件\nb\n- [ ] 条件\nc\n\n## 見出し\nd\nc\nd\nb\n- [ ] 条件\na\na\n\n本文\r\na\nx本文\r\n本文\r\nxc\n本文\r\na\n- [ ] 条件\na\n## 見出し\nxx本文\r\n- [ ] 条件\nc\nd\nxb\nxc\n## 見出し\n- [ ] 条件\nx- [ ] 条件\nxxa\n## 見出し\n## 見出し\na\nx\n本文\r\n本文\r\n## 見出し\nx本文\r\nd\n## 見出し\n\na\nc\nx\n本文\r\nxd\nc\n## 見出し\n本文\r\nc\nb\nd\nx本文\r\n- [ ] 条件\nb\nb\nd\nc\n\nc\nc\na\nx## 見出し\n本文\r\nd\nb\n- [ ] 条件\n本文\r\n\nxb\nd\n本文\r\n## 見出し\na\nc\nd\nd\n- [ ] 条件\n本文\r\na\nc\n本文\r\n\nd\n## 見出し\nd\n## 見出し\n## 見出し\nb\nd\n本文\r\nb\nd\nd\n\nd\n- [ ] 条件\na\nxxc\n## 見出し\nc\nc\nb\na\na\nb\n- [ ] 条件\nxc\n本文\r\n## 見出し\nb\n本文\r\nx\nxd\nd\n本文\r\nd\nd\nd\n本文\r\n",
+   "B": "\n本文\r\n- [ ] 条件\nc\nd\nc\n- [ ] 条件\nxx本文\r\nb\nc\n- [ ] 条件\n## 見出し\nd\nx本文\r\n\n## 見出し\n## 見出し\nb\n本文\r\na\nb\nc\nc\n\nb\nd\n本文\r\n本文\r\n## 見出し\n## 見出し\nx- [ ] 条件\nc\n\n\nc\nd\n- [ ] 条件\nd\n\nd\nxd\nd\nxb\n\nxc\n\nb\nb\nb\nc\n\n## 見出し\na\n本文\r\nb\na\na\n- [ ] 条件\nc\nxd\na\n- [ ] 条件\n本文\r\na\n## 見出し\nx- [ ] 条件\nb\na\nb\n- [ ] 条件\nc\na\na\nd\nb\n- [ ] 条件\n\nb\n- [ ] 条件\na\na\nx- [ ] 条件\nc\n## 見出し\n本文\r\nx- [ ] 条件\n- [ ] 条件\nb\n- [ ] 条件\nc\n\n## 見出し\nd\nc\nd\nb\n- [ ] 条件\na\na\n\n本文\r\na\nx本文\r\n本文\r\nxc\n本文\r\na\n- [ ] 条件\na\n## 見出し\nxx本文\r\n- [ ] 条件\nc\nd\nxb\nxc\n## 見出し\n- [ ] 条件\nx- [ ] 条件\nxxa\n## 見出し\n## 見出し\na\nx\n本文\r\n本文\r\n## 見出し\nx本文\r\nd\n## 見出し\n\na\nc\nx\n本文\r\nxd\nc\n## 見出し\n本文\r\nc\nb\nd\nx本文\r\n- [ ] 条件\nb\nb\nd\nc\n\nc\nc\na\nx## 見出し\n本文\r\nd\nb\n- [ ] 条件\n本文\r\n\nxb\nd\n本文\r\n## 見出し\na\nc\nd\nd\n- [ ] 条件\n本文\r\na\nc\n本文\r\n\nd\n## 見出し\nd\n## 見出し\n## 見出し\nb\nd\n本文\r\nb\nd\nd\n\nd\n- [ ] 条件\na\nxxc\n## 見出し\nc\nc\nb\na\na\nb\n- [ ] 条件\nxc\n本文\r\n## 見出し\nb\n本文\r\nx\nxd\nd\n本文\r\nd\nd\nd\n本文\r\n"
+  },
+  {
+   "A": "## 見出し\n本文\r\n- [ ] 条件\nxd\nc\n- [ ] 条件\na\n- [ ] 条件\na\n",
+   "B": "## 見出し\n本文\r\n- [ ] 条件\n## 見出し\nc\n- [ ] 条件\na\n- [ ] 条件\na\n"
+  },
+  {
+   "A": "- [ ] 条件\nb\n- [ ] 条件\n- [ ] 条件\na\nd\nx- [ ] 条件\nxx本文\r\n",
+   "B": "- [ ] 条件\nb\n- [ ] 条件\n- [ ] 条件\na\nd\n"
+  },
+  {
+   "A": "c\nx",
+   "B": ""
+  },
+  {
+   "A": "xa\n",
+   "B": ""
+  },
+  {
+   "A": "b\n本文\r\nc\nxb\na\nd\n本文\r\nb\nxxd\nc\n本文\r\n- [ ] 条件\n## 見出し\nxa\nb\n",
+   "B": "b\n本文\r\nc\nxb\na\nd\nc\nd\n- [ ] 条件\nb\nxxd\nc\n本文\r\n- [ ] 条件\n## 見出し\nxa\nb\n"
+  },
+  {
+   "A": "a\n",
+   "B": "a\n"
+  },
+  {
+   "A": "a\nd\n\n",
+   "B": "a\nd\n"
+  },
+  {
+   "A": "## 見出し\nb\nd\n\n\na\nxa\nc\n\nb\nc\n\nc\nd\n本文\r\n\n",
+   "B": "本文\r\na\n## 見出し\n本文\r\nc\nd\n本文\r\n- [ ] 条件\nb\n## 見出し\n\n"
+  },
+  {
+   "A": "本文\r\na\nb\nb\nx\na\n本文\r\nb\nxd\nb\n## 見出し\nb\n",
+   "B": "xa\n本文\r\na\nd\n\na\nx本文\r\n## 見出し\n## 見出し\nx\n## 見出し\nb\nc\n"
+  },
+  {
+   "A": "b\nxa\n## 見出し\nc\nd\n- [ ] 条件\nx本文\r\nc\n\n## 見出し\na\n- [ ] 条件\nb\nc\na\n\n",
+   "B": "- [ ] 条件\nxa\n## 見出し\na\nc\nd\n- [ ] 条件\nx本文\r\nc\n\n## 見出し\na\n- [ ] 条件\nb\nc\na\n\n"
+  },
+  {
+   "A": "\nc\na\nd\n- [ ] 条件\n\n- [ ] 条件\nc\n\nc\n\n",
+   "B": "d\nx\nc\na\nd\n- [ ] 条件\n\n- [ ] 条件\nc\n\nc\n\n"
+  },
+  {
+   "A": "## 見出し\nx## 見出し\nx- [ ] 条件\n\n\nx## 見出し\nd\nd\n## 見出し\nd\na\n",
+   "B": "## 見出し\nx## 見出し\nx- [ ] 条件\n\n\n- [ ] 条件\n- [ ] 条件\nd\n## 見出し\nd\na\n"
+  },
+  {
+   "A": "xc\n- [ ] 条件\n- [ ] 条件\n## 見出し\n本文\r\n- [ ] 条件\n\nc\n本文\r\n",
+   "B": "xc\n- [ ] 条件\nd\n- [ ] 条件\n## 見出し\n- [ ] 条件\n\n## 見出し\n本文\r\n"
+  },
+  {
+   "A": "- [ ] 条件\n\nb\nc\nc\nx\nd\nxd\n本文\r\n\nb\na\nb\nx\n## 見出し\n",
+   "B": "\n## 見出し\nc\nc\nx\nd\nxd\n本文\r\n\nb\na\nb\nx\n## 見出し\n"
+  },
+  {
+   "A": "b\nx- [ ] 条件\nxa\na\n- [ ] 条件\nd\n- [ ] 条件\na\nd\nx",
+   "B": "a\n- [ ] 条件\n- [ ] 条件\nb\nd\nc\na\n\n## 見出し\nb\nx## 見出し\nc\na\n本文\r\n- [ ] 条件\n本文\r\n\na\nc\n"
+  },
+  {
+   "A": "",
+   "B": "\nxa\n本文\r\nb\na\n"
+  },
+  {
+   "A": "d\nc\nd\nc\n本文\r\n\nb\nd\n\n本文\r\na\n- [ ] 条件\nc\nd\n本文\r\nc\n",
+   "B": "d\nc\nd\nc\n本文\r\n\nb\nd\n## 見出し\n本文\r\na\n- [ ] 条件\nb\nc\nd\n本文\r\n本文\r\nc\n"
+  },
+  {
+   "A": "d\na\n\n## 見出し\n## 見出し\n## 見出し\nb\n本文\r\n",
+   "B": "c\nb\na\na\n本文\r\n## 見出し\n## 見出し\n- [ ] 条件\n## 見出し\nd\nc\n- [ ] 条件\nx\nd\n"
+  },
+  {
+   "A": "d\nd\nc\nc\na\n## 見出し\n- [ ] 条件\nc\na\n- [ ] 条件\n\n本文\r\n",
+   "B": "\nx- [ ] 条件\n本文\r\nd\nx## 見出し\nxx- [ ] 条件\nxd\nd\n## 見出し\nd\na\n## 見出し\nb\nc\n本文\r\n"
+  },
+  {
+   "A": "xb\nxa\n- [ ] 条件\nx本文\r\nc\n- [ ] 条件\nx- [ ] 条件\nc\n本文\r\nc\na\n本文\r\nd\nc\n- [ ] 条件\nd\n本文\r\n本文\r\nc\nd\n## 見出し\n- [ ] 条件\nc\nd\n本文\r\n\n本文\r\n本文\r\nc\n本文\r\n## 見出し\n本文\r\nc\n本文\r\n## 見出し\nxxxxc\n- [ ] 条件\n- [ ] 条件\n## 見出し\nc\n- [ ] 条件\nx## 見出し\n## 見出し\na\nb\n\n## 見出し\nc\nd\nc\n## 見出し\n本文\r\nx\n本文\r\n## 見出し\na\nc\n- [ ] 条件\nb\n## 見出し\na\n\n- [ ] 条件\na\n## 見出し\nc\nc\nb\nx\nxxd\na\na\n\n本文\r\nb\nd\n本文\r\n\na\n## 見出し\nc\nc\nd\nb\n本文\r\n- [ ] 条件\nc\n\na\n- [ ] 条件\nxc\n本文\r\nc\nb\na\nxc\na\nxx\nd\na\nxa\nc\nd\nd\n\nc\n\n本文\r\n## 見出し\nx本文\r\nd\nb\n## 見出し\na\nb\n\nd\n- [ ] 条件\n## 見出し\nx## 見出し\na\n本文\r\n\n- [ ] 条件\n\n本文\r\n- [ ] 条件\n## 見出し\n\n- [ ] 条件\nc\n\n\n\nb\nd\n本文\r\nc\nc\nc\nc\n\n本文\r\nxc\n## 見出し\nb\nx\nc\nb\nc\n\na\nc\na\n## 見出し\n本文\r\n本文\r\nx- [ ] 条件\nxxd\nd\n\n\nx- [ ] 条件\n## 見出し\n本文\r\na\na\nx本文\r\nc\nxa\n- [ ] 条件\na\nb\na\n## 見出し\nxxc\n- [ ] 条件\na\n## 見出し\n- [ ] 条件\n- [ ] 条件\nx## 見出し\n## 見出し\n\nx## 見出し\nx本文\r\n\n\nxa\nb\n本文\r\nb\n## 見出し\nb\n\nc\na\n本文\r\nc\n\nd\nd\nc\nd\nx本文\r\na\n\nd\nb\nd\n\n- [ ] 条件\n## 見出し\nd\na\n- [ ] 条件\nb\nx## 見出し\na\nd\n\n\n本文\r\n\n- [ ] 条件\nc\n\n本文\r\n\nb\nb\nc\nb\nc\n本文\r\n本文\r\n## 見出し\na\nxc\n\n## 見出し\n## 見出し\n本文\r\n## 見出し\n本文\r\n本文\r\n本文\r\n- [ ] 条件\n本文\r\na\n本文\r\nb\nc\na\nb\nxc\n\n\nxb\nc\nb\nc\nx\nc\n本文\r\nc\nd\n\nd\nc\nc\n- [ ] 条件\n## 見出し\n",
+   "B": "xb\nxa\n- [ ] 条件\nx本文\r\nc\n- [ ] 条件\nx- [ ] 条件\nc\n本文\r\nc\na\n本文\r\nd\nc\n- [ ] 条件\nd\n本文\r\nc\nd\n## 見出し\n- [ ] 条件\nc\nd\n本文\r\n\n本文\r\n本文\r\nc\n本文\r\n## 見出し\nd\nc\n本文\r\n## 見出し\nxxxxc\n- [ ] 条件\n- [ ] 条件\n## 見出し\nc\n- [ ] 条件\nx## 見出し\n## 見出し\na\nb\n\n## 見出し\nc\nd\nc\n## 見出し\n本文\r\nx\n本文\r\n## 見出し\na\nc\n- [ ] 条件\nb\n## 見出し\na\n\n- [ ] 条件\na\n## 見出し\nc\nc\nb\nx\nxxd\na\na\n\n本文\r\nb\nd\n本文\r\n\na\n## 見出し\nc\nc\nd\nb\n本文\r\n- [ ] 条件\nc\n\na\n- [ ] 条件\nxc\n本文\r\nc\nb\na\nxc\na\nxx\nd\na\nxa\nc\nd\nd\n\nc\n\n本文\r\n## 見出し\nx本文\r\nd\nb\n## 見出し\na\nb\n\nd\n- [ ] 条件\n## 見出し\nx## 見出し\na\n本文\r\n\n- [ ] 条件\n本文\r\n本文\r\n- [ ] 条件\n## 見出し\n\n- [ ] 条件\nc\n\n\n\nb\nd\n本文\r\nc\nc\nc\nc\n\n本文\r\nxc\n## 見出し\nb\nx\nc\nb\nc\n\na\nc\na\n## 見出し\n本文\r\n本文\r\nx- [ ] 条件\nxxd\nd\n\n\nx- [ ] 条件\n## 見出し\n本文\r\na\na\nx本文\r\nb\nc\nxa\n- [ ] 条件\na\nb\na\n## 見出し\nxxc\n- [ ] 条件\na\n## 見出し\n- [ ] 条件\n- [ ] 条件\nx## 見出し\n## 見出し\n\nx## 見出し\nx本文\r\n\n\nxa\nb\n本文\r\nb\n## 見出し\nb\n\nc\na\n本文\r\nc\n\nd\nd\nc\nd\nx本文\r\na\n\nd\nb\nd\n\n- [ ] 条件\n## 見出し\nd\na\n- [ ] 条件\nb\nx## 見出し\na\nd\n\n\n本文\r\n\n- [ ] 条件\nc\n\n本文\r\n\nb\nb\nc\nb\nc\n本文\r\n本文\r\n## 見出し\na\nxc\n\n## 見出し\n## 見出し\n本文\r\n## 見出し\n本文\r\n本文\r\n本文\r\n- [ ] 条件\n本文\r\na\n本文\r\nb\nc\na\nb\nxc\n\n\nxb\nc\nb\nc\nx\nc\n本文\r\nc\nd\n\nd\nc\nc\n- [ ] 条件\n## 見出し\n"
+  },
+  {
+   "A": "本文\r\n本文\r\nxxd\nd\na\nx本文\r\n- [ ] 条件\nb\nd\n- [ ] 条件\nd\n",
+   "B": "d\nc\n本文\r\nc\na\nb\nc\n本文\r\nd\nb\n"
+  },
+  {
+   "A": "本文\r\n## 見出し\n\nc\n## 見出し\nb\nb\nd\n- [ ] 条件\nb\n- [ ] 条件\nxa\nc\n## 見出し\n- [ ] 条件\n\n本文\r\nx",
+   "B": "- [ ] 条件\nb\nb\n\nxd\n- [ ] 条件\n## 見出し\n- [ ] 条件\n- [ ] 条件\n## 見出し\n- [ ] 条件\n本文\r\n## 見出し\n\n- [ ] 条件\n- [ ] 条件\nd\nc\na\nc\n本文\r\n- [ ] 条件\nb\nc\nx- [ ] 条件\na\n"
+  },
+  {
+   "A": "c\n本文\r\nxxb\nb\n\nc\n- [ ] 条件\nd\nb\na\nd\na\nx- [ ] 条件\nd\nc\nd\n",
+   "B": "c\nb\n本文\r\nxxb\nb\nc\n- [ ] 条件\nd\nb\nd\na\nx- [ ] 条件\nd\nc\nd\n"
+  },
+  {
+   "A": "本文\r\n- [ ] 条件\n- [ ] 条件\n## 見出し\n## 見出し\n## 見出し\nc\n",
+   "B": "本文\r\n- [ ] 条件\n## 見出し\n本文\r\n## 見出し\n## 見出し\nc\n"
+  },
+  {
+   "A": "x- [ ] 条件\nb\nb\n本文\r\nd\n\n\na\nx\n## 見出し\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nd\nc\nx",
+   "B": "x- [ ] 条件\nb\nc\n本文\r\nd\n\n\na\nx\n## 見出し\n- [ ] 条件\n- [ ] 条件\n- [ ] 条件\nd\nc\nx"
+  },
+  {
+   "A": "d\na\n本文\r\nc\n## 見出し\n\n\n本文\r\nd\nb\nd\n- [ ] 条件\nb\na\n",
+   "B": "d\na\n本文\r\nc\n## 見出し\n\n- [ ] 条件\n\n本文\r\nd\nb\n- [ ] 条件\nd\n- [ ] 条件\nb\na\n"
+  },
+  {
+   "A": "a\nd\nd\na\na\n\n- [ ] 条件\n## 見出し\nc\nb\nc\n本文\r\na\n## 見出し\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "a\nd\n- [ ] 条件\na\na\n\n- [ ] 条件\n## 見出し\nb\nc\n本文\r\n## 見出し\n- [ ] 条件\n- [ ] 条件\n"
+  },
+  {
+   "A": "b\n本文\r\nd\n本文\r\n- [ ] 条件\n## 見出し\nc\n",
+   "B": "d\nb\n本文\r\n本文\r\nd\n本文\r\n- [ ] 条件\nd\nc\n"
+  },
+  {
+   "A": "## 見出し\nc\nd\nb\n## 見出し\nb\n\n## 見出し\nb\n- [ ] 条件\nd\nd\na\n",
+   "B": "d\nc\nd\nb\n## 見出し\nb\n## 見出し\nb\nd\nd\na\n"
+  },
+  {
+   "A": "## 見出し\nb\n\n- [ ] 条件\n本文\r\nd\nc\n- [ ] 条件\nd\nc\n## 見出し\nx本文\r\nb\n## 見出し\na\n## 見出し\n",
+   "B": "## 見出し\nb\n\n- [ ] 条件\nb\n本文\r\nd\nc\n- [ ] 条件\nc\nc\n## 見出し\n## 見出し\nx本文\r\nb\n## 見出し\na\n"
+  },
+  {
+   "A": "d\nc\nb\n## 見出し\n",
+   "B": "## 見出し\nx## 見出し\nxd\nb\nc\nc\nx本文\r\n\na\n- [ ] 条件\n## 見出し\nd\nx"
+  },
+  {
+   "A": "\n## 見出し\nd\n## 見出し\n\nd\n- [ ] 条件\nxd\nd\n- [ ] 条件\n- [ ] 条件\n",
+   "B": "\n## 見出し\nd\n## 見出し\n\nd\n- [ ] 条件\n\nd\n- [ ] 条件\nd\n"
+  },
+  {
+   "A": "- [ ] 条件\n本文\r\nx\nx本文\r\nd\nd\nd\nd\nc\nc\n",
+   "B": "- [ ] 条件\n本文\r\nx本文\r\n本文\r\nd\nd\nd\nd\nc\nc\n"
+  },
+  {
+   "A": "c\n## 見出し\nb\n本文\r\n## 見出し\n\n## 見出し\nxa\n\n\n本文\r\na\n- [ ] 条件\nc\n",
+   "B": "本文\r\nb\nx- [ ] 条件\nd\n本文\r\n- [ ] 条件\n\n\nb\n\nc\nd\n\n\n本文\r\nd\n\n\n## 見出し\nx- [ ] 条件\n## 見出し\n\n\n"
+  },
+  {
+   "A": "c\n\n## 見出し\n本文\r\n",
+   "B": "c\nx## 見出し\n本文\r\n"
+  },
+  {
+   "A": "b\nb\nd\nc\na\n本文\r\n## 見出し\n\n\n\nd\n## 見出し\n- [ ] 条件\n本文\r\nd\n\nd\n",
+   "B": "b\nb\n\nc\na\n本文\r\n## 見出し\n\n\n\nd\n## 見出し\n- [ ] 条件\n本文\r\nd\na\nd\n"
+  },
+  {
+   "A": "b\n\nc\nx本文\r\nx- [ ] 条件\n",
+   "B": "b\n\n\nc\na\n"
+  },
+  {
+   "A": "xd\n## 見出し\n\n本文\r\nb\nb\nb\n## 見出し\n本文\r\nc\nc\n- [ ] 条件\n## 見出し\nx",
+   "B": "x- [ ] 条件\n## 見出し\n\n本文\r\nb\nb\nb\n## 見出し\n本文\r\nc\n- [ ] 条件\n## 見出し\nx"
+  },
+  {
+   "A": "- [ ] 条件\n- [ ] 条件\na\n## 見出し\nd\nxa\nb\n本文\r\n## 見出し\n\nx",
+   "B": "\n- [ ] 条件\na\n## 見出し\nd\nxa\nb\n本文\r\n## 見出し\n\n本文\r\n"
+  }
+ ],
+ "want": [
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,217 +1,117 @@\n-本文\r\n-本文\r\n-\n-b\n-本文\r\n-xd\n-x- [ ] 条件\n-x## 見出し\n-c\n-x\n-\n+d\n \n d\n+- [ ] 条件\n d\n+d\n+## 見出し\n x## 見出し\n-x- [ ] 条件\n-本文\r\n-c\n-a\n-- [ ] 条件\n c\n ## 見出し\n ## 見出し\n-b\n-xa\n 本文\r\n-c\n-\n-- [ ] 条件\n-c\n-\n-## 見出し\n-\n-d\n-b\n-## 見出し\n-a\n-c\n-d\n-d\n-xd\n-\n-\n-## 見出し\n-- [ ] 条件\n-c\n-- [ ] 条件\n-- [ ] 条件\n-a\n-- [ ] 条件\n-a\n-c\n-- [ ] 条件\n-a\n ## 見出し\n \n \n+a\n+本文\r\n+x本文\r\n+x本文\r\n \n-## 見出し\n+- [ ] 条件\n+d\n+d\n b\n+a\n b\n+\n+\n+\n+c\n+a\n+\n+d\n+x\n+本文\r\n+c\n+xc\n+xa\n+d\n ## 見出し\n - [ ] 条件\n - [ ] 条件\n+d\n+## 見出し\n+d\n+x## 見出し\n+- [ ] 条件\n+c\n+c\n+- [ ] 条件\n+b\n+d\n+b\n+xxb\n+a\n+d\n+\n+d\n+\n+a\n+xb\n+## 見出し\n+d\n+b\n+\n+x\n+\n+c\n+d\n+本文\r\n+b\n+a\n+d\n b\n \n - [ ] 条件\n-\n-- [ ] 条件\n-- [ ] 条件\n-b\n-本文\r\n-b\n-本文\r\n-a\n-本文\r\n-\n-b\n+d\n d\n - [ ] 条件\n - [ ] 条件\n-## 見出し\n-\n-a\n-d\n-本文\r\n-x本文\r\n-a\n-- [ ] 条件\n-## 見出し\n-\n-本文\r\n-a\n-本文\r\n-\n-d\n-c\n-d\n-\n-c\n-b\n-a\n-本文\r\n-本文\r\n-b\n-b\n \n ## 見出し\n-x- [ ] 条件\n-## 見出し\n-\n-d\n-b\n-b\n-x## 見出し\n-本文\r\n-## 見出し\n-\n-b\n-c\n-a\n-## 見出し\n-本文\r\n-a\n-本文\r\n-c\n-d\n-b\n-本文\r\n-c\n-c\n-a\n-c\n-- [ ] 条件\n-- [ ] 条件\n-d\n-本文\r\n-## 見出し\n-本文\r\n-b\n-c\n-xxx## 見出し\n-\n-本文\r\n-xd\n-- [ ] 条件\n-d\n-b\n-a\n-d\n-- [ ] 条件\n-## 見出し\n-c\n a\n a\n - [ ] 条件\n d\n+\n c\n-- [ ] 条件\n-\n-\n-本文\r\n-- [ ] 条件\n-d\n-a\n a\n ## 見出し\n-\n-d\n x\n-b\n-a\n ## 見出し\n ## 見出し\n d\n b\n \n+c\n+b\n+- [ ] 条件\n+x## 見出し\n+a\n+## 見出し\n+b\n+b\n+b\n+b\n+x## 見出し\n+a\n+a\n 本文\r\n-本文\r\n+\n ## 見出し\n - [ ] 条件\n \n-b\n-\n-d\n-c\n-本文\r\n-## 見出し\n-\n-\n-## 見出し\n-\n-\n-xa\n-## 見出し\n-b\n-c\n-a\n-xd\n - [ ] 条件\n-- [ ] 条件\n-b\n 本文\r\n \n-\n-d\n-b\n-x## 見出し\n-本文\r\n-本文\r\n-a\n-c\n-a\n-b\n-本文\r\n-\n-- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +0,0 @@\n-c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,7 @@\n 本文\r\n c\n a\n-xx## 見出し\n+d\n a\n d\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n ## 見出し\n b\n 本文\r\n-b\n-\n+d\n+xd\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,18 +1,20 @@\n+a\n+d\n \n+## 見出し\n+- [ ] 条件\n+本文\r\n+x- [ ] 条件\n+a\n+## 見出し\n+c\n+b\n d\n-d\n-本文\r\n-b\n-## 見出し\n-\n+c\n c\n 本文\r\n-c\n-\n-b\n-- [ ] 条件\n-c\n+xx\n+## 見出し\n a\n-a\n-\n-## 見出し\n+x\n+xx",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,14 @@\n+c\n+xb\n+x- [ ] 条件\n+x## 見出し\n+d\n 本文\r\n+x\n+x## 見出し\n+本文\r\n+x## 見出し\n+a\n+- [ ] 条件\n+a\n ## 見出し\n-b\n-## 見出し\n-\n-xa\n-本文\r\n-- [ ] 条件\n-c\n-d\n-b\n-## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,7 @@\n-a\n-a\n-- [ ] 条件\n-- [ ] 条件\n-本文\r\n-b\n-a\n-- [ ] 条件\n-c\n+## 見出し\n 本文\r\n d\n+d\n+a\n+x## 見出し\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,4 @@\n 本文\r\n-c\n c\n b\n a\n@@ -9,4 +8,3 @@\n ## 見出し\n ## 見出し\n 本文\r\n-a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n+本文\r\n+- [ ] 条件\n \n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1 @@\n-本文\r\n+x本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,3 @@\n xa\n-xb\n-b\n+- [ ] 条件\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,17 +1,20 @@\n+## 見出し\n+d\n b\n+## 見出し\n+x## 見出し\n xb\n+c\n - [ ] 条件\n-- [ ] 条件\n+a\n+c\n d\n 本文\r\n-c\n-b\n ## 見出し\n-b\n \n-b\n-本文\r\n-- [ ] 条件\n-- [ ] 条件\n-d\n-c\n+\n+x## 見出し\n+a\n+\n+a\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,17 +1,22 @@\n-d\n+b\n+xc\n+a\n+c\n+本文\r\n+c\n+xb\n ## 見出し\n-xb\n+a\n d\n \n a\n-x## 見出し\n-d\n-d\n+a\n+c\n+## 見出し\n+b\n+a\n+b\n+c\n \n-## 見出し\n+b\n \n-\n-## 見出し\n-## 見出し\n-d\n-d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -7,6 +7,7 @@\n b\n b\n \n-- [ ] 条件\n+a\n xb\n+本文\r\n xx",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,5 @@\n-b\n-b\n+- [ ] 条件\n+## 見出し\n+\n - [ ] 条件\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n+## 見出し\n xd\n-x本文\r\n - [ ] 条件\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,11 @@\n+## 見出し\n+c\n+a\n+c\n+c\n 本文\r\n+## 見出し\n d\n-b\n-xb\n+\n+本文\r\n+- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,14 +1,9 @@\n+## 見出し\n 本文\r\n+a\n d\n-d\n-\n-## 見出し\n+c\n - [ ] 条件\n \n-- [ ] 条件\n-d\n+\n c\n-\n-## 見出し\n-\n-d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,16 +1,19 @@\n+a\n+## 見出し\n+b\n+b\n+## 見出し\n+## 見出し\n+本文\r\n+c\n+本文\r\n+b\n+x本文\r\n+a\n+c\n+b\n+c\n - [ ] 条件\n-b\n-d\n-## 見出し\n-a\n-- [ ] 条件\n-xa\n+c\n 本文\r\n-xc\n 本文\r\n-a\n-a\n-- [ ] 条件\n-b\n-\n-a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -130,55 +130,54 @@\n c\n a\n b\n+b\n+## 見出し\n+c\n+\n+a\n+a\n+a\n+x## 見出し\n+- [ ] 条件\n+\n+## 見出し\n+## 見出し\n+本文\r\n+- [ ] 条件\n+c\n+a\n+\n+- [ ] 条件\n+d\n+a\n+\n+b\n+c\n+- [ ] 条件\n+## 見出し\n+- [ ] 条件\n+\n+b\n+\n+a\n+xxb\n+d\n+d\n+a\n+a\n+本文\r\n+b\n+c\n+c\n+c\n+\n+## 見出し\n+d\n+本文\r\n+x\n+b\n+- [ ] 条件\n xc\n-b\n-## 見出し\n-c\n-\n-a\n-a\n-a\n-x## 見出し\n-- [ ] 条件\n-\n-## 見出し\n-## 見出し\n-本文\r\n-- [ ] 条件\n-c\n-a\n-\n-- [ ] 条件\n-d\n-a\n-\n-b\n-c\n-- [ ] 条件\n-## 見出し\n-- [ ] 条件\n-\n-b\n-\n-a\n-xxb\n-d\n-d\n-a\n-a\n-本文\r\n-b\n-c\n-c\n-c\n-\n-## 見出し\n-d\n-本文\r\n-x\n-b\n-- [ ] 条件\n-xc\n a\n c\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,18 +1,24 @@\n+c\n+- [ ] 条件\n+b\n+\n a\n+a\n+\n+x- [ ] 条件\n+\n+c\n 本文\r\n-d\n-d\n-本文\r\n+- [ ] 条件\n+x本文\r\n \n-b\n-c\n+## 見出し\n d\n ## 見出し\n b\n-c\n-c\n-- [ ] 条件\n-- [ ] 条件\n+本文\r\n+## 見出し\n ## 見出し\n \n-\n+x## 見出し\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,24 @@\n-## 見出し\n+c\n+xc\n+\n+xb\n+c\n+\n+d\n+a\n+c\n b\n-本文\r\n+a\n b\n-d\n-xd\n-c\n+a\n+b\n+\n ## 見出し\n d\n-c\n-x## 見出し\n-c\n+b\n+- [ ] 条件\n+- [ ] 条件\n+b\n+## 見出し\n+## 見出し\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n-b\n+\n 本文\r\n-x- [ ] 条件\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,9 @@\n - [ ] 条件\n c\n-xxxx本文\r\n - [ ] 条件\n 本文\r\n xd\n+\n \n 本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,20 @@\n+d\n+d\n+c\n+## 見出し\n+- [ ] 条件\n+\n ## 見出し\n \n+xb\n+\n 本文\r\n+## 見出し\n+- [ ] 条件\n+## 見出し\n+## 見出し\n c\n-d\n-- [ ] 条件\n-\n-xa\n c\n-a\n-\n-d\n+c\n+本文\r\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n-本文\r\n - [ ] 条件\n+a\n+- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n-c\n c\n c\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,2 @@\n-## 見出し\n+a\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,8 @@\n ## 見出し\n - [ ] 条件\n-d\n \n \n b\n+本文\r\n ## 見出し\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,8 @@\n b\n-c\n \n 本文\r\n b\n-- [ ] 条件\n-c\n-本文\r\n+x本文\r\n c\n d\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,8 @@\n ## 見出し\n ## 見出し\n-b\n c\n a\n-c\n+b\n ## 見出し\n d\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n ## 見出し\n xb\n+b\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,11 +5,13 @@\n d\n d\n b\n+d\n - [ ] 条件\n c\n ## 見出し\n c\n-a\n+\n+b\n d\n ## 見出し\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,6 @@\n c\n - [ ] 条件\n+a\n - [ ] 条件\n c\n d\n@@ -8,6 +9,8 @@\n \n - [ ] 条件\n \n+d\n c\n 本文\r\n+a\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,17 +1,20 @@\n+\n+本文\r\n+本文\r\n+- [ ] 条件\n+\n+- [ ] 条件\n+- [ ] 条件\n+本文\r\n+b\n+- [ ] 条件\n+d\n a\n-a\n+本文\r\n ## 見出し\n-- [ ] 条件\n c\n \n-\n-本文\r\n-a\n-- [ ] 条件\n-d\n-\n-d\n+c\n+## 見出し\n b\n-x本文\r\n-x- [ ] 条件\n-d\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -9,4 +9,5 @@\n ## 見出し\n a\n - [ ] 条件\n+c\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,13 @@\n-c\n-\n-\n-a\n-- [ ] 条件\n-- [ ] 条件\n+## 見出し\n+## 見出し\n+x\n ## 見出し\n d\n+c\n+b\n+d\n+\n - [ ] 条件\n+\n+xb\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,8 +3,7 @@\n 本文\r\n ## 見出し\n a\n-a\n-## 見出し\n+x## 見出し\n c\n a\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,18 @@\n-b\n-xx\n-xx本文\r\n+x\n xb\n c\n+本文\r\n+c\n+c\n+\n b\n-a\n-x+d\n+b\n+c\n+## 見出し\n+b\n+d\n+b\n+c\n+## 見出し\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -75,6 +75,7 @@\n c\n c\n a\n+b\n - [ ] 条件\n b\n c\n@@ -106,7 +107,7 @@\n ## 見出し\n a\n b\n-b\n+- [ ] 条件\n \n ## 見出し\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,21 @@\n+d\n c\n-b\n-c\n-xb\n-d\n-b\n-## 見出し\n+a\n - [ ] 条件\n \n-xc\n+- [ ] 条件\n+c\n+- [ ] 条件\n 本文\r\n+## 見出し\n+a\n 本文\r\n+d\n+本文\r\n+x## 見出し\n+b\n+b\n+\n+a\n+b\n+- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,5 @@\n+d\n+a\n 本文\r\n d\n-a\n-d\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,13 @@\n-d\n-xb\n+xxb\n ## 見出し\n-b\n+a\n ## 見出し\n - [ ] 条件\n ## 見出し\n b\n 本文\r\n 本文\r\n+本文\r\n - [ ] 条件\n b\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,12 @@\n a\n b\n+本文\r\n a\n+\n - [ ] 条件\n - [ ] 条件\n b\n+- [ ] 条件\n b\n 本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,7 +2,7 @@\n d\n ## 見出し\n ## 見出し\n-- [ ] 条件\n+d\n c\n a\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,8 @@\n-c\n - [ ] 条件\n \n b\n 本文\r\n b\n-## 見出し\n+d\n \n-a\n-c\n+xc\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,14 @@\n-本文\r\n+x本文\r\n b\n c\n ## 見出し\n b\n-本文\r\n+d\n c\n+## 見出し\n b\n - [ ] 条件\n ## 見出し\n b\n+## 見出し\n x\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,9 @@\n b\n+b\n+本文\r\n+本文\r\n - [ ] 条件\n-xb\n d\n-a\n-a\n-a\n+\n+c\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,2 @@\n+- [ ] 条件\n d\n-d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,6 @@\n a\n+- [ ] 条件\n+本文\r\n d\n-b\n+\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1 @@\n-x\n-x## 見出し\n-c\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n-- [ ] 条件\n - [ ] 条件\n - [ ] 条件\n ## 見出し\n@@ -8,6 +7,7 @@\n b\n \n x本文\r\n+c\n - [ ] 条件\n+b\n - [ ] 条件\n-- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,8 +5,7 @@\n d\n - [ ] 条件\n 本文\r\n-本文\r\n-xc\n+xxc\n xc\n \n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,12 @@\n-x\n-xb\n-## 見出し\n+d\n+a\n+d\n+本文\r\n+c\n b\n-b\n+- [ ] 条件\n+xc\n+c\n 本文\r\n \n-b\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,8 @@\n-本文\r\n 本文\r\n d\n+d\n x本文\r\n-d\n+c\n - [ ] 条件\n ## 見出し\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -8,7 +8,7 @@\n - [ ] 条件\n - [ ] 条件\n a\n-## 見出し\n+b\n c\n 本文\r\n xa\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -56,6 +56,7 @@\n 本文\r\n \n d\n+a\n c\n \n d\n@@ -113,9 +114,8 @@\n 本文\r\n \n a\n+\n d\n-\n-b\n a\n \n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,11 +3,10 @@\n ## 見出し\n 本文\r\n 本文\r\n-a\n-本文\r\n+xx本文\r\n d\n c\n \n c\n 本文\r\n-xb\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n-d\n+- [ ] 条件\n b\n - [ ] 条件\n xd\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,9 @@\n b\n+- [ ] 条件\n d\n xd\n 本文\r\n x- [ ] 条件\n a\n+- [ ] 条件\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,11 @@\n c\n x本文\r\n-a\n a\n d\n - [ ] 条件\n ## 見出し\n - [ ] 条件\n+c\n - [ ] 条件\n ## 見出し\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,7 @@\n+- [ ] 条件\n - [ ] 条件\n a\n-## 見出し\n+a\n a\n 本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,10 @@\n+b\n+- [ ] 条件\n+xa\n+d\n+a\n+\n+\n ## 見出し\n-本文\r\n-\n-本文\r\n-b\n-b\n-本文\r\n-xb\n+x\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,5 @@\n+d\n+\n+d\n - [ ] 条件\n-a\n-x+xb\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,8 @@\n+- [ ] 条件\n+## 見出し\n+\n+xa\n+a\n+c\n 本文\r\n-a\n d\n-a\n-b\n-d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,9 +5,9 @@\n ## 見出し\n xx本文\r\n ## 見出し\n+本文\r\n xa\n-- [ ] 条件\n-- [ ] 条件\n+x- [ ] 条件\n c\n 本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,5 @@\n-- [ ] 条件\n-\n-b\n-d\n \n ## 見出し\n-## 見出し\n-c\n-\n+d\n+x## 見出し\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,15 +2,14 @@\n a\n - [ ] 条件\n \n-\n+x\n a\n c\n c\n xb\n-b\n a\n c\n-a\n+d\n xc\n 本文\r\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,6 @@\n 本文\r\n a\n+\n \n ## 見出し\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,5 @@\n b\n d\n-x- [ ] 条件\n \n b\n \n@@ -8,9 +7,11 @@\n ## 見出し\n d\n ## 見出し\n+c\n b\n d\n a\n xb\n-- [ ] 条件\n d\n+本文\r\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,11 @@\n-- [ ] 条件\n+c\n a\n - [ ] 条件\n - [ ] 条件\n+b\n - [ ] 条件\n d\n x本文\r\n-a\n xd\n b\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+d\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,7 @@\n b\n - [ ] 条件\n+- [ ] 条件\n ## 見出し\n-b\n-x本文\r\n x本文\r\n 本文\r\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,16 @@\n+## 見出し\n+本文\r\n - [ ] 条件\n-c\n - [ ] 条件\n-c\n+本文\r\n+- [ ] 条件\n+a\n+d\n+- [ ] 条件\n+本文\r\n xd\n+本文\r\n+a\n+d\n a\n - [ ] 条件\n-b\n-d\n-b\n-c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -123,7 +123,6 @@\n \n a\n 本文\r\n-d\n x## 見出し\n a\n 本文\r\n@@ -231,6 +230,7 @@\n d\n \n ## 見出し\n+## 見出し\n \n a\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,12 @@\n ## 見出し\n c\n - [ ] 条件\n+c\n a\n ## 見出し\n+本文\r\n \n b\n \n-x\n+本文\r\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,8 @@\n-x\n+d\n+a\n+a\n+- [ ] 条件\n+d\n+本文\r\n c\n-xb\n-\n-a\n-d\n-\n-b\n-## 見出し\n-b\n-d\n+本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n a\n d\n-d\n+## 見出し\n d\n xb\n x本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,6 @@\n+\n \n c\n ## 見出し\n+## 見出し\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,14 @@\n-b\n-d\n 本文\r\n-## 見出し\n a\n b\n+## 見出し\n+- [ ] 条件\n+b\n+## 見出し\n+b\n a\n-## 見出し\n-## 見出し\n-xd\n+d\n+\n+b\n+本文\r\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -4,5 +4,5 @@\n c\n \n - [ ] 条件\n+## 見出し\n \n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n+b\n+本文\r\n a\n a\n-c\n-## 見出し\n-- [ ] 条件\n-- [ ] 条件\n+a\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,14 @@\n d\n c\n+c\n+a\n ## 見出し\n c\n-a\n+本文\r\n+- [ ] 条件\n+## 見出し\n+## 見出し\n a\n ## 見出し\n-d\n+本文\r\n+xa\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,8 @@\n-d\n a\n ## 見出し\n-d\n+## 見出し\n b\n ## 見出し\n-d\n+## 見出し\n ## 見出し\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,5 @@\n+## 見出し\n+b\n+b\n d\n-a\n-本文\r\n-c\n-a\n-a\n-xb\n+\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -6,9 +6,9 @@\n x本文\r\n \n a\n+- [ ] 条件\n \n 本文\r\n-\n \n b\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n-本文\r\n a\n x\n x- [ ] 条件\n+c\n d\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,11 +5,9 @@\n a\n \n d\n-a\n+d\n c\n ## 見出し\n-x## 見出し\n-a\n+xa\n - [ ] 条件\n ## 見出し\n-## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,9 +3,12 @@\n ## 見出し\n c\n ## 見出し\n+a\n - [ ] 条件\n c\n a\n+d\n b\n+## 見出し\n - [ ] 条件\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -4,11 +4,9 @@\n b\n c\n 本文\r\n-本文\r\n d\n 本文\r\n ## 見出し\n xb\n-c\n ## 見出し\n xc\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,10 +3,11 @@\n ## 見出し\n - [ ] 条件\n \n-本文\r\n+x本文\r\n d\n c\n c\n+d\n d\n b\n ## 見出し\n@@ -14,5 +15,5 @@\n - [ ] 条件\n \n a\n-d\n+a\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,6 @@\n x- [ ] 条件\n ## 見出し\n+## 見出し\n+c\n+## 見出し\n b\n-b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+c\n c\n c\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,7 @@\n ## 見出し\n - [ ] 条件\n a\n+- [ ] 条件\n ## 見出し\n b\n x- [ ] 条件\n@@ -10,6 +11,7 @@\n a\n b\n \n+a\n - [ ] 条件\n xd\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -16,7 +16,7 @@\n - [ ] 条件\n xc\n - [ ] 条件\n-## 見出し\n+\n c\n 本文\r\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+d\n 本文\r\n x## 見出し\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,6 +2,6 @@\n a\n d\n xd\n-d\n+本文\r\n xc\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1,2 @@\n+\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,6 +5,7 @@\n \n 本文\r\n - [ ] 条件\n+## 見出し\n b\n d\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,8 @@\n-b\n+本文\r\n a\n ## 見出し\n \n-- [ ] 条件\n+## 見出し\n 本文\r\n - [ ] 条件\n d\n@@ -13,5 +13,4 @@\n ## 見出し\n d\n 本文\r\n-\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,23 @@\n-本文\r\n+- [ ] 条件\n+xx本文\r\n+- [ ] 条件\n+## 見出し\n+d\n b\n-## 見出し\n+a\n+b\n+b\n - [ ] 条件\n - [ ] 条件\n+d\n+c\n+## 見出し\n+a\n+d\n 本文\r\n-## 見出し\n+xc\n+a\n+本文\r\n+a\n+a\n c\n-xc\n-c\n-c\n-\n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,8 @@\n-\n ## 見出し\n-本文\r\n a\n b\n 本文\r\n \n a\n ## 見出し\n-本文\r\n-a\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,13 +5,12 @@\n c\n a\n \n-## 見出し\n \n b\n - [ ] 条件\n - [ ] 条件\n - [ ] 条件\n-xd\n+d\n a\n c\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1,2 @@\n+\n+## 見出し\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +0,0 @@\n-d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,15 +1,19 @@\n-a\n+xc\n+xc\n+- [ ] 条件\n+\n c\n+本文\r\n+d\n+d\n c\n-## 見出し\n-c\n-## 見出し\n-## 見出し\n+\n+\n+d\n+\n+x本文\r\n b\n-a\n-x## 見出し\n-a\n+- [ ] 条件\n+\n d\n ## 見出し\n-c\n-## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,6 @@\n+\n+本文\r\n+本文\r\n+a\n d\n-本文\r\n-d\n-- [ ] 条件\n \n-b\n-d\n-c\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1,11 @@\n+c\n a\n+xc\n+b\n+xb\n+b\n+## 見出し\n+## 見出し\n+\n+a\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,8 @@\n-d\n+\n ## 見出し\n - [ ] 条件\n c\n-d\n - [ ] 条件\n a\n-\n+## 見出し\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,11 +2,9 @@\n d\n \n c\n-\n 本文\r\n c\n b\n-a\n a\n d\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,20 @@\n+xc\n+- [ ] 条件\n+x- [ ] 条件\n c\n-本文\r\n c\n+xa\n+d\n+## 見出し\n a\n ## 見出し\n-b\n+a\n a\n a\n ## 見出し\n-- [ ] 条件\n+d\n+d\n+b\n+d\n+b\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,11 +5,8 @@\n - [ ] 条件\n c\n c\n+a\n ## 見出し\n-- [ ] 条件\n-本文\r\n-## 見出し\n-c\n 本文\r\n c\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -60,8 +60,10 @@\n - [ ] 条件\n 本文\r\n a\n-本文\r\n-d\n+## 見出し\n+本文\r\n+d\n+\n c\n c\n \n@@ -275,6 +277,7 @@\n - [ ] 条件\n a\n b\n+d\n ## 見出し\n xc\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n - [ ] 条件\n-x- [ ] 条件\n d\n+\n d\n d\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,15 @@\n-\n-b\n-\n+d\n+c\n+c\n+## 見出し\n+c\n+## 見出し\n+- [ ] 条件\n+c\n b\n ## 見出し\n+a\n b\n c\n-本文\r\n-d\n-\n b\n+x本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,3 @@\n - [ ] 条件\n 本文\r\n-x本文\r\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,7 +5,6 @@\n ## 見出し\n 本文\r\n x## 見出し\n-\n a\n b\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,17 @@\n-d\n+\n+\n c\n+本文\r\n+\n+b\n+b\n+\n - [ ] 条件\n+本文\r\n+\n+xd\n+b\n - [ ] 条件\n+\n+b\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n-xd\n x- [ ] 条件\n - [ ] 条件\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,6 @@\n d\n ## 見出し\n+- [ ] 条件\n b\n - [ ] 条件\n xxa\n@@ -8,9 +9,7 @@\n c\n d\n c\n-- [ ] 条件\n 本文\r\n \n a\n-\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,6 @@\n-xc\n-## 見出し\n+c\n \n-d\n+本文\r\n \n 本文\r\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,7 +3,7 @@\n c\n ## 見出し\n \n-\n+d\n a\n 本文\r\n - [ ] 条件\n@@ -11,7 +11,6 @@\n - [ ] 条件\n a\n a\n-a\n ## 見出し\n 本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,4 @@\n ## 見出し\n-\n \n - [ ] 条件\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +0,0 @@\n-x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -4,3 +4,4 @@\n b\n 本文\r\n c\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,4 @@\n-x## 見出し\n d\n-c\n+\n x本文\r\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,6 @@\n a\n+## 見出し\n xc\n ## 見出し\n+d\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,16 +1,19 @@\n 本文\r\n-## 見出し\n+- [ ] 条件\n d\n \n \n - [ ] 条件\n \n 本文\r\n+## 見出し\n c\n b\n c\n ## 見出し\n - [ ] 条件\n+\n+- [ ] 条件\n - [ ] 条件\n 本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,3 @@\n-- [ ] 条件\n+d\n b\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,14 @@\n+a\n+## 見出し\n+a\n - [ ] 条件\n+x## 見出し\n+d\n+d\n+a\n+x\n+c\n+a\n b\n-本文\r\n-b\n-本文\r\n-a\n-x## 見出し\n-x- [ ] 条件\n+- [ ] 条件\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,8 @@\n d\n+## 見出し\n \n x- [ ] 条件\n 本文\r\n xa\n-## 見出し\n+本文\r\n xx",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,5 @@\n-d\n+- [ ] 条件\n+b\n ## 見出し\n ## 見出し\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -69,176 +69,175 @@\n b\n c\n d\n+x## 見出し\n+## 見出し\n+- [ ] 条件\n+- [ ] 条件\n+\n+本文\r\n+本文\r\n+b\n+- [ ] 条件\n+d\n+a\n+本文\r\n+a\n+## 見出し\n+## 見出し\n+d\n+x- [ ] 条件\n+x## 見出し\n+## 見出し\n+\n+c\n+b\n+本文\r\n+d\n+xa\n+\n+a\n+c\n+a\n+a\n+- [ ] 条件\n+- [ ] 条件\n+xb\n+\n+a\n+## 見出し\n+## 見出し\n+\n+- [ ] 条件\n+## 見出し\n+## 見出し\n+c\n+本文\r\n+c\n+a\n+xb\n+本文\r\n+b\n+- [ ] 条件\n+a\n+- [ ] 条件\n+d\n+- [ ] 条件\n+- [ ] 条件\n+c\n+c\n+a\n+b\n+\n+c\n+x本文\r\n+b\n+a\n+本文\r\n+本文\r\n+## 見出し\n+d\n+a\n+b\n+- [ ] 条件\n+本文\r\n+b\n+b\n+d\n+本文\r\n+\n+x本文\r\n+- [ ] 条件\n+b\n+b\n+d\n+b\n+- [ ] 条件\n+a\n+\n+xc\n+a\n+d\n+a\n+xc\n+- [ ] 条件\n+b\n+本文\r\n+xc\n+d\n+## 見出し\n+d\n+## 見出し\n+\n+b\n+xb\n+c\n+## 見出し\n+\n+c\n+a\n+xa\n+\n+b\n+c\n+## 見出し\n+b\n+d\n+c\n+本文\r\n+\n+- [ ] 条件\n+xc\n+a\n+a\n+b\n+c\n+本文\r\n+c\n+xc\n+本文\r\n+本文\r\n+xxc\n+## 見出し\n+xx本文\r\n+\n+b\n+b\n+a\n+\n+\n+本文\r\n x\n-x## 見出し\n-## 見出し\n-- [ ] 条件\n-- [ ] 条件\n-\n-本文\r\n-本文\r\n-b\n-- [ ] 条件\n-d\n-a\n-本文\r\n-a\n-## 見出し\n-## 見出し\n-d\n-x- [ ] 条件\n-x## 見出し\n-## 見出し\n-\n-c\n-b\n-本文\r\n-d\n-xa\n-\n-a\n-c\n-a\n-a\n-- [ ] 条件\n-- [ ] 条件\n-xb\n-\n-a\n-## 見出し\n-## 見出し\n-\n-- [ ] 条件\n-## 見出し\n-## 見出し\n-c\n-本文\r\n-c\n-a\n-xb\n-本文\r\n-b\n-- [ ] 条件\n-a\n-- [ ] 条件\n-d\n-- [ ] 条件\n-- [ ] 条件\n-c\n-c\n-a\n-b\n-\n-c\n-x本文\r\n-b\n-a\n-本文\r\n-本文\r\n-## 見出し\n-d\n-a\n-b\n-- [ ] 条件\n-本文\r\n-b\n-b\n-d\n-本文\r\n-\n-x本文\r\n-- [ ] 条件\n-b\n-b\n-d\n-b\n-- [ ] 条件\n-a\n-\n-xc\n-a\n-d\n-a\n-xc\n-- [ ] 条件\n-b\n-本文\r\n-xc\n-d\n-## 見出し\n-d\n-## 見出し\n-\n-b\n-xb\n-c\n-## 見出し\n-\n-c\n-a\n-xa\n-b\n-b\n-c\n-## 見出し\n-b\n-d\n-c\n-本文\r\n-\n-- [ ] 条件\n-xc\n-a\n-a\n-b\n-c\n-本文\r\n-c\n-xc\n-本文\r\n-本文\r\n-xxc\n-## 見出し\n-xx本文\r\n-\n-b\n-b\n-a\n-\n-\n-本文\r\n+- [ ] 条件\n+本文\r\n+- [ ] 条件\n+\n+b\n+c\n+## 見出し\n+c\n+c\n+## 見出し\n+c\n+a\n+d\n+d\n+c\n+c\n+xb\n+d\n+本文\r\n+b\n+## 見出し\n+a\n+a\n+x本文\r\n+c\n+xx\n+本文\r\n+## 見出し\n+## 見出し\n+c\n x\n-- [ ] 条件\n-本文\r\n-- [ ] 条件\n-\n-b\n-c\n-## 見出し\n-c\n-c\n-## 見出し\n-c\n-a\n-d\n-d\n-c\n-c\n-xb\n-d\n-本文\r\n-b\n-## 見出し\n-a\n-a\n-x本文\r\n-c\n-xx\n-本文\r\n-## 見出し\n-## 見出し\n-c\n-x\n b\n d\n xd\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,7 @@\n a\n c\n+- [ ] 条件\n+本文\r\n+d\n+\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,13 @@\n ## 見出し\n+- [ ] 条件\n c\n 本文\r\n c\n b\n b\n \n-本文\r\n+c\n+## 見出し\n d\n xb\n xc\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -6,7 +6,7 @@\n ## 見出し\n 本文\r\n b\n-- [ ] 条件\n-## 見出し\n+a\n+本文\r\n 本文\r\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,14 @@\n+b\n a\n-## 見出し\n+a\n+b\n+- [ ] 条件\n 本文\r\n-## 見出し\n+\n+xc\n+a\n - [ ] 条件\n-xd\n-## 見出し\n-## 見出し\n-本文\r\n-- [ ] 条件\n+b\n+c\n+a\n+xx",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,18 @@\n-x## 見出し\n-d\n+- [ ] 条件\n+b\n+xd\n+- [ ] 条件\n+c\n+本文\r\n+b\n+a\n c\n b\n-- [ ] 条件\n+\n+c\n+b\n+xd\n+## 見出し\n a\n+c\n+xc\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,17 @@\n+a\n 本文\r\n-d\n+c\n+\n+a\n+x- [ ] 条件\n+\n+c\n+xx## 見出し\n+b\n+本文\r\n+a\n+b\n+\n+- [ ] 条件\n+a\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,9 +5,8 @@\n - [ ] 条件\n d\n c\n-- [ ] 条件\n+x- [ ] 条件\n d\n d\n b\n-d\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,7 @@\n-- [ ] 条件\n+d\n+xb\n+## 見出し\n+a\n b\n+## 見出し\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,8 @@\n+c\n a\n b\n ## 見出し\n a\n-xb\n-b\n+本文\r\n c\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,8 @@\n \n d\n+- [ ] 条件\n d\n - [ ] 条件\n c\n-## 見出し\n+c\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,7 +3,6 @@\n c\n b\n 本文\r\n-xa\n a\n c\n-## 見出し\n+xb\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,2 @@\n-本文\r\n+x本文\r\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,11 @@\n c\n c\n+b\n d\n xb\n xx\n 本文\r\n ## 見出し\n-- [ ] 条件\n+x- [ ] 条件\n c\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,15 @@\n 本文\r\n-b\n+\n+\n+d\n+## 見出し\n+## 見出し\n+\n+x\n+xa\n+a\n+本文\r\n+本文\r\n+本文\r\n+c\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,10 +3,10 @@\n a\n - [ ] 条件\n ## 見出し\n+d\n x\n 本文\r\n 本文\r\n d\n-\n+x- [ ] 条件\n - [ ] 条件\n-- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n 本文\r\n d\n-## 見出し\n+d\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,6 @@\n ## 見出し\n - [ ] 条件\n d\n-## 見出し\n xd\n - [ ] 条件\n ## 見出し\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -107,7 +107,7 @@\n a\n c\n c\n-本文\r\n+d\n d\n xc\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1,2 @@\n-c\n+a\n+本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1 @@\n-a\n-\n-a\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,11 @@\n+## 見出し\n c\n+c\n+xd\n+xa\n+x## 見出し\n+- [ ] 条件\n b\n-d\n-c\n+本文\r\n+a\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,2 @@\n-x\n-- [ ] 条件\n+d\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,8 @@\n-\n-a\n-本文\r\n+b\n+b\n+d\n+- [ ] 条件\n+- [ ] 条件\n+c\n b\n a\n-d\n-a\n-a\n-b\n-c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n-\n xx本文\r\n x本文\r\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+本文\r\n xb\n - [ ] 条件\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n - [ ] 条件\n-a\n+- [ ] 条件\n c\n-x本文\r\n+\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,7 @@\n-c\n-d\n-\n-xb\n 本文\r\n - [ ] 条件\n+d\n+xb\n+## 見出し\n 本文\r\n-a\n+本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n xb\n+## 見出し\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1,3 @@\n+d\n+c\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,10 @@\n a\n c\n a\n+## 見出し\n a\n x- [ ] 条件\n - [ ] 条件\n-xb\n b\n b\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +0,0 @@\n-d\n-本文\r\n-xxa\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,7 @@\n-c\n-本文\r\n+- [ ] 条件\n+- [ ] 条件\n+xa\n+- [ ] 条件\n+b\n a\n-a\n-\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,19 @@\n \n-b\n-c\n-\n+xb\n+- [ ] 条件\n a\n 本文\r\n+x本文\r\n+本文\r\n+## 見出し\n+xb\n+d\n c\n+d\n+c\n+a\n+## 見出し\n 本文\r\n-c\n-## 見出し\n-c\n-## 見出し\n-a\n+xb\n+- [ ] 条件\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,11 @@\n a\n-- [ ] 条件\n 本文\r\n \n 本文\r\n a\n+本文\r\n c\n-a\n+本文\r\n - [ ] 条件\n a\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1,4 @@\n+a\n+\n+- [ ] 条件\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -8,7 +8,7 @@\n ## 見出し\n ## 見出し\n \n-\n+d\n c\n a\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1,2 @@\n+\n+\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,277 +1,142 @@\n+b\n+c\n+本文\r\n+x## 見出し\n+x- [ ] 条件\n+- [ ] 条件\n+a\n+## 見出し\n+xa\n x\n-x\n+a\n+d\n+a\n+\n+a\n+c\n+c\n+d\n+d\n+c\n+## 見出し\n+xc\n+c\n+c\n+x本文\r\n+a\n+a\n+d\n+b\n+xb\n+- [ ] 条件\n+本文\r\n+## 見出し\n+d\n+b\n+\n+## 見出し\n 本文\r\n a\n-## 見出し\n-本文\r\n-## 見出し\n+\n b\n-本文\r\n - [ ] 条件\n+xd\n b\n-xd\n-a\n-## 見出し\n-b\n-a\n-d\n-x- [ ] 条件\n-a\n-b\n-x- [ ] 条件\n ## 見出し\n d\n-## 見出し\n-b\n-c\n+本文\r\n+\n - [ ] 条件\n c\n+\n+xc\n+\n+\n+- [ ] 条件\n+- [ ] 条件\n+本文\r\n+x## 見出し\n d\n-b\n-b\n-- [ ] 条件\n-b\n-## 見出し\n-x本文\r\n-d\n-xb\n 本文\r\n \n-xc\n-## 見出し\n+本文\r\n+xx\n+d\n+d\n+\n+xa\n d\n d\n c\n - [ ] 条件\n+本文\r\n+本文\r\n+c\n+b\n+- [ ] 条件\n+a\n+b\n+a\n \n+- [ ] 条件\n+xb\n+b\n+- [ ] 条件\n+- [ ] 条件\n+本文\r\n+本文\r\n d\n+本文\r\n+\n - [ ] 条件\n+xb\n+## 見出し\n+## 見出し\n+## 見出し\n+c\n \n c\n-c\n-x## 見出し\n-\n-- [ ] 条件\n-c\n-- [ ] 条件\n-本文\r\n-## 見出し\n-c\n-a\n-a\n-xd\n-## 見出し\n-a\n-- [ ] 条件\n-- [ ] 条件\n+b\n \n a\n c\n c\n a\n+c\n - [ ] 条件\n-本文\r\n-xd\n-b\n-c\n-本文\r\n-xb\n-本文\r\n+x- [ ] 条件\n+a\n+## 見出し\n+a\n d\n - [ ] 条件\n+## 見出し\n+a\n+d\n+c\n+c\n \n+c\n+d\n+## 見出し\n b\n d\n ## 見出し\n b\n-a\n+\n+c\n - [ ] 条件\n-b\n-d\n-b\n-\n-x## 見出し\n-c\n-b\n-- [ ] 条件\n-本文\r\n-a\n-c\n-c\n-\n-## 見出し\n-d\n-xb\n-xd\n-c\n-## 見出し\n-\n-x- [ ] 条件\n-b\n-xd\n-\n d\n a\n-b\n-本文\r\n-\n-d\n-## 見出し\n-\n-d\n-本文\r\n-b\n-x- [ ] 条件\n-x\n-\n-- [ ] 条件\n-d\n-x本文\r\n-## 見出し\n-xb\n-- [ ] 条件\n-d\n-d\n-\n-b\n-b\n-d\n-x本文\r\n-c\n-xxx本文\r\n-d\n-b\n-a\n-- [ ] 条件\n-xa\n-\n-a\n-本文\r\n-b\n-d\n-b\n-## 見出し\n-b\n-c\n-d\n-\n-## 見出し\n-- [ ] 条件\n-d\n-d\n-b\n-d\n-xd\n-c\n-x\n-c\n-本文\r\n-x- [ ] 条件\n-x\n-b\n-b\n-## 見出し\n-本文\r\n-本文\r\n-- [ ] 条件\n-b\n-c\n-x\n-a\n-\n-c\n-a\n-\n-## 見出し\n-## 見出し\n-## 見出し\n-本文\r\n-d\n-a\n-x## 見出し\n-c\n-xc\n-- [ ] 条件\n-a\n-a\n-b\n-本文\r\n-## 見出し\n-a\n-b\n-x\n-\n-b\n-b\n-x\n-\n-\n-- [ ] 条件\n-c\n-c\n-## 見出し\n-x\n-c\n-a\n-- [ ] 条件\n-本文\r\n-## 見出し\n-a\n-b\n-a\n-b\n-b\n-d\n-本文\r\n-a\n-- [ ] 条件\n-a\n-c\n-- [ ] 条件\n-- [ ] 条件\n-## 見出し\n-d\n-\n-## 見出し\n-- [ ] 条件\n-c\n-b\n-- [ ] 条件\n-本文\r\n-## 見出し\n-## 見出し\n-## 見出し\n-xd\n-xa\n-\n c\n a\n 本文\r\n b\n-本文\r\n ## 見出し\n-本文\r\n-b\n-x\n-\n-b\n-- [ ] 条件\n-d\n-d\n-## 見出し\n-a\n-## 見出し\n-- [ ] 条件\n+c\n 本文\r\n d\n-a\n+b\n c\n-## 見出し\n-## 見出し\n-本文\r\n-x## 見出し\n-d\n-本文\r\n-a\n-本文\r\n-\n+c\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,9 @@\n-## 見出し\n c\n 本文\r\n 本文\r\n b\n a\n+- [ ] 条件\n d\n - [ ] 条件\n c\n@@ -11,6 +11,7 @@\n 本文\r\n c\n 本文\r\n+c\n d\n c\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,4 @@\n 本文\r\n-a\n d\n \n x本文\r\n@@ -8,7 +7,6 @@\n - [ ] 条件\n - [ ] 条件\n b\n-## 見出し\n xd\n 本文\r\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,4 +2,3 @@\n a\n ## 見出し\n \n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,5 @@\n b\n-x\n+本文\r\n xb\n d\n x- [ ] 条件\n@@ -9,6 +9,7 @@\n b\n - [ ] 条件\n d\n+d\n a\n b\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,14 +1,12 @@\n-b\n+\n+a\n+a\n+a\n ## 見出し\n-本文\r\n-- [ ] 条件\n+a\n+c\n+xd\n ## 見出し\n-- [ ] 条件\n-\n-本文\r\n-本文\r\n+xc\n b\n c\n-xxd\n-c\n-d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,14 +1,13 @@\n-b\n-b\n \n+- [ ] 条件\n+## 見出し\n+\n+a\n+x\n+本文\r\n+c\n+c\n+a\n+x- [ ] 条件\n 本文\r\n ## 見出し\n-c\n-本文\r\n-## 見出し\n-b\n-xxc\n-a\n-xb\n-- [ ] 条件\n-本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,4 @@\n b\n-- [ ] 条件\n d\n ## 見出し\n ## 見出し\n@@ -8,6 +7,6 @@\n ## 見出し\n a\n c\n-本文\r\n+- [ ] 条件\n+d\n a\n-a\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1,3 @@\n+d\n+## 見出し\n+本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,5 @@\n b\n+a\n \n b\n - [ ] 条件\n-c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,8 +3,7 @@\n ## 見出し\n b\n a\n-d\n ## 見出し\n ## 見出し\n d\n-d\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,6 +2,7 @@\n - [ ] 条件\n - [ ] 条件\n xc\n+a\n a\n a\n 本文\r\n@@ -11,5 +12,6 @@\n xb\n d\n - [ ] 条件\n-\n+- [ ] 条件\n ## 見出し\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n-本文\r\n 本文\r\n d\n a\n@@ -13,4 +12,5 @@\n 本文\r\n ## 見出し\n c\n-a\n+b\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n+d\n 本文\r\n-x+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,5 @@\n \n-\n+c\n 本文\r\n+## 見出し\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,7 +2,7 @@\n \n d\n \n-d\n+- [ ] 条件\n d\n c\n d\n@@ -11,6 +11,7 @@\n \n a\n - [ ] 条件\n+a\n c\n 本文\r\n x\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,10 +3,9 @@\n 本文\r\n xc\n 本文\r\n-c\n-本文\r\n+x本文\r\n c\n c\n ## 見出し\n ## 見出し\n-x+本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,9 @@\n+x本文\r\n d\n \n-\n+- [ ] 条件\n c\n-本文\r\n-本文\r\n-c\n+## 見出し\n+d\n+b\n - [ ] 条件\n-d\n-\n-## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,7 +5,6 @@\n b\n c\n ## 見出し\n-x## 見出し\n x\n - [ ] 条件\n 本文\r\n@@ -93,7 +92,7 @@\n 本文\r\n xd\n d\n-本文\r\n+b\n c\n \n a\n@@ -246,7 +245,7 @@\n 本文\r\n a\n ## 見出し\n-## 見出し\n+- [ ] 条件\n 本文\r\n d\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +0,0 @@\n-xx本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,12 @@\n+\n+x## 見出し\n+a\n+本文\r\n+c\n - [ ] 条件\n-b\n 本文\r\n - [ ] 条件\n-b\n+\n+本文\r\n+xb\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n-x## 見出し\n+c\n - [ ] 条件\n b\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,9 @@\n-a\n 本文\r\n d\n a\n d\n b\n+a\n a\n x本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,15 +1,21 @@\n-b\n-xa\n+a\n+- [ ] 条件\n+xxc\n+d\n+本文\r\n+a\n+本文\r\n+- [ ] 条件\n+d\n ## 見出し\n 本文\r\n-本文\r\n+\n+b\n+- [ ] 条件\n+x本文\r\n+b\n+- [ ] 条件\n a\n c\n-a\n-xc\n-## 見出し\n-c\n-a\n-本文\r\n-a\n d\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -7,13 +7,11 @@\n \n c\n - [ ] 条件\n-- [ ] 条件\n b\n - [ ] 条件\n 本文\r\n-a\n+## 見出し\n ## 見出し\n a\n - [ ] 条件\n 本文\r\n-本文\r\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +0,0 @@\n-本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -8,4 +8,5 @@\n ## 見出し\n 本文\r\n \n+c\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+## 見出し\n d\n - [ ] 条件\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,8 @@\n-b\n ## 見出し\n \n-d\n x本文\r\n 本文\r\n-- [ ] 条件\n+本文\r\n d\n d\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,6 @@\n+b\n c\n-- [ ] 条件\n+x## 見出し\n+\n ## 見出し\n-## 見出し\n-x## 見出し\n-d\n-- [ ] 条件\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,8 @@\n b\n \n c\n-b\n-- [ ] 条件\n-## 見出し\n+x- [ ] 条件\n+本文\r\n ## 見出し\n b\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,21 @@\n+本文\r\n+b\n+c\n+c\n+d\n+b\n+本文\r\n+a\n+本文\r\n+b\n+本文\r\n+d\n+a\n - [ ] 条件\n-a\n-x\n-- [ ] 条件\n+c\n+\n+xd\n - [ ] 条件\n 本文\r\n-本文\r\n+b\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,5 @@\n+c\n \n-c\n-c\n a\n ## 見出し\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -8,4 +8,5 @@\n 本文\r\n d\n 本文\r\n+b\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,8 @@\n-xc\n-\n-c\n-\n+d\n 本文\r\n b\n-d\n+## 見出し\n+本文\r\n+b\n+b\n \n-b\n-c\n-b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n a\n-c\n 本文\r\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n x\n+本文\r\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -97,7 +97,6 @@\n d\n d\n ## 見出し\n-b\n - [ ] 条件\n b\n c\n@@ -190,6 +189,7 @@\n x\n b\n c\n+## 見出し\n 本文\r\n ## 見出し\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,9 @@\n-\n-a\n x- [ ] 条件\n+- [ ] 条件\n+b\n+b\n+b\n 本文\r\n-a\n-a\n-a\n-- [ ] 条件\n-x+xa\n+b\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n-本文\r\n+## 見出し\n+a\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n-- [ ] 条件\n+## 見出し\n ## 見出し\n b\n xa\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,16 +1,12 @@\n-xa\n+d\n b\n-\n-c\n-a\n-c\n-- [ ] 条件\n-b\n-## 見出し\n+x- [ ] 条件\n c\n b\n c\n a\n+c\n+xb\n ## 見出し\n-- [ ] 条件\n-xx+c\n+本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -10,6 +10,6 @@\n \n \n c\n-- [ ] 条件\n+b\n - [ ] 条件\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,11 @@\n-- [ ] 条件\n-a\n-d\n-xb\n-- [ ] 条件\n-## 見出し\n 本文\r\n \n+a\n+c\n ## 見出し\n+d\n+d\n+\n+c\n+b\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,18 +1,19 @@\n-d\n-\n-- [ ] 条件\n-\n-\n-\n-xd\n+c\n+c\n - [ ] 条件\n ## 見出し\n c\n-d\n-d\n-- [ ] 条件\n+本文\r\n ## 見出し\n b\n-c\n-- [ ] 条件\n+a\n+a\n \n+\n+b\n+本文\r\n+a\n+b\n+## 見出し\n+## 見出し\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+b\n a\n d\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n a\n+\n ## 見出し\n-本文\r\n ## 見出し\n d\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,8 @@\n+d\n+本文\r\n+本文\r\n+\n+- [ ] 条件\n 本文\r\n - [ ] 条件\n-本文\r\n-d\n - [ ] 条件\n-d\n-- [ ] 条件\n-x\n-d\n-b\n-xb\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,7 +5,6 @@\n \n 本文\r\n ## 見出し\n-x本文\r\n d\n b\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n xx- [ ] 条件\n xc\n-b\n \n d\n-x+d\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1 @@\n-b\n+xb\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -7,5 +7,5 @@\n - [ ] 条件\n x\n ## 見出し\n-c\n+xc\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1,2 @@\n-- [ ] 条件\n+a\n+x- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,7 @@\n-## 見出し\n+x本文\r\n+\n b\n-a\n 本文\r\n c\n - [ ] 条件\n-- [ ] 条件\n d\n-\n-\n-- [ ] 条件\n-a\n-a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,6 @@\n \n \n-\n-c\n+xc\n ## 見出し\n c\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,2 @@\n-## 見出し\n \n-d\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,3 @@\n-xb\n+本文\r\n \n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -164,6 +164,7 @@\n a\n ## 見出し\n d\n+b\n xx\n - [ ] 条件\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,15 @@\n+## 見出し\n+本文\r\n - [ ] 条件\n+\n+b\n+a\n+本文\r\n+x本文\r\n+b\n+d\n+a\n+b\n a\n c\n-b\n-## 見出し\n-本文\r\n-d\n-本文\r\n-d\n+x",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,17 @@\n-a\n-xc\n-a\n-b\n \n \n+本文\r\n+d\n+\n+a\n+\n+## 見出し\n+c\n+- [ ] 条件\n b\n-a\n+- [ ] 条件\n+c\n+c\n+- [ ] 条件\n+xa\n+- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,7 @@\n c\n d\n 本文\r\n+b\n 本文\r\n - [ ] 条件\n d\n@@ -8,4 +9,3 @@\n b\n \n 本文\r\n-x\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,8 @@\n xc\n \n c\n-a\n+xa\n a\n a\n d\n-x## 見出し\n-d\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n a\n+本文\r\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,7 @@\n+d\n+- [ ] 条件\n b\n c\n-d\n xx本文\r\n b\n x## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,8 @@\n x- [ ] 条件\n c\n+本文\r\n d\n x\n d\n+c\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,19 @@\n-a\n-x## 見出し\n+## 見出し\n+c\n+\n+x\n 本文\r\n d\n+c\n+a\n+- [ ] 条件\n 本文\r\n+- [ ] 条件\n+d\n+d\n+\n c\n-c\n+x\n+## 見出し\n+\n+\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -9,7 +9,7 @@\n b\n \n 本文\r\n-d\n+b\n b\n c\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,15 +1,15 @@\n 本文\r\n b\n b\n+d\n ## 見出し\n-d\n-本文\r\n xb\n d\n c\n c\n - [ ] 条件\n d\n+## 見出し\n c\n d\n xa\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,10 @@\n-\n+x本文\r\n+xx本文\r\n+b\n ## 見出し\n-\n-本文\r\n+d\n+x本文\r\n+b\n a\n-c\n-c\n-本文\r\n-b\n-本文\r\n-本文\r\n-d\n-a\n+x- [ ] 条件\n+xa\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,14 @@\n+d\n+x本文\r\n+c\n+本文\r\n+c\n+## 見出し\n+xb\n+xxc\n+d\n+d\n+b\n - [ ] 条件\n-c\n-xc\n - [ ] 条件\n-\n a\n-\n-d\n-\n-\n-d\n-\n-- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1,2 @@\n+本文\r\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,7 @@\n b\n \n c\n-x- [ ] 条件\n+- [ ] 条件\n a\n a\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,7 +3,6 @@\n ## 見出し\n a\n b\n-本文\r\n ## 見出し\n \n \n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,10 +2,12 @@\n b\n b\n 本文\r\n-x## 見出し\n-\n+x\n 本文\r\n+c\n xa\n+## 見出し\n+- [ ] 条件\n 本文\r\n - [ ] 条件\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -10,17 +10,15 @@\n - [ ] 条件\n a\n b\n-c\n-\n-d\n-b\n-## 見出し\n-c\n-本文\r\n-本文\r\n-本文\r\n-c\n-- [ ] 条件\n+\n+d\n+b\n+## 見出し\n+c\n+本文\r\n+本文\r\n+本文\r\n+c\n c\n b\n d\n@@ -66,7 +64,7 @@\n d\n - [ ] 条件\n ## 見出し\n-## 見出し\n+\n d\n x- [ ] 条件\n a\n@@ -200,7 +198,7 @@\n c\n 本文\r\n \n-- [ ] 条件\n+b\n ## 見出し\n d\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1,4 @@\n-c\n+\n+## 見出し\n+a\n+xx",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +0,0 @@\n-a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,8 @@\n-- [ ] 条件\n+## 見出し\n b\n d\n \n ## 見出し\n-\n-a\n a\n x本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,4 +5,5 @@\n \n b\n d\n+b\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,4 @@\n ## 見出し\n ## 見出し\n-\n c\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,10 +5,10 @@\n c\n - [ ] 条件\n 本文\r\n+b\n 本文\r\n x\n ## 見出し\n-a\n a\n b\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,15 +1,15 @@\n d\n+c\n d\n 本文\r\n d\n 本文\r\n ## 見出し\n d\n+d\n \n-## 見出し\n 本文\r\n 本文\r\n d\n 本文\r\n 本文\r\n-xb\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,6 +2,4 @@\n ## 見出し\n d\n a\n-xc\n-本文\r\n x- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1,14 @@\n+x## 見出し\n+本文\r\n+d\n+d\n \n+a\n+## 見出し\n+b\n+## 見出し\n+- [ ] 条件\n+本文\r\n+xd\n+\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,7 +2,8 @@\n \n - [ ] 条件\n - [ ] 条件\n-c\n+本文\r\n b\n+## 見出し\n 本文\r\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,9 @@\n+\n+x## 見出し\n+a\n+a\n+## 見出し\n+\n+## 見出し\n c\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,7 @@\n a\n - [ ] 条件\n d\n+## 見出し\n ## 見出し\n b\n 本文\r\n@@ -10,7 +11,7 @@\n d\n c\n b\n-b\n+c\n a\n c\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,7 @@\n b\n a\n-xb\n-- [ ] 条件\n+本文\r\n+本文\r\n b\n - [ ] 条件\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,5 @@\n+- [ ] 条件\n+本文\r\n d\n-本文\r\n-xa\n-- [ ] 条件\n+x\n a\n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,6 @@\n ## 見出し\n \n+本文\r\n c\n c\n ## 見出し\n@@ -10,7 +11,7 @@\n a\n x本文\r\n \n-## 見出し\n+c\n \n - [ ] 条件\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,8 @@\n-xa\n b\n-d\n-## 見出し\n b\n-c\n+\n+- [ ] 条件\n 本文\r\n-xx+- [ ] 条件\n+- [ ] 条件\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,5 +5,5 @@\n \n a\n - [ ] 条件\n-\n-\n+c\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,5 @@\n-## 見出し\n+d\n 本文\r\n-c\n - [ ] 条件\n x本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -89,7 +89,6 @@\n - [ ] 条件\n b\n \n-d\n c\n - [ ] 条件\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n-xc\n ## 見出し\n+c\n - [ ] 条件\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,6 +5,7 @@\n 本文\r\n b\n ## 見出し\n+## 見出し\n b\n \n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n ## 見出し\n a\n-c\n+b\n a\n - [ ] 条件\n b\n@@ -8,6 +8,7 @@\n c\n - [ ] 条件\n b\n+- [ ] 条件\n xxxd\n a\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n-## 見出し\n+- [ ] 条件\n c\n a\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,11 +2,13 @@\n xd\n a\n b\n+c\n d\n+\n a\n d\n a\n-xd\n+\n 本文\r\n ## 見出し\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,3 @@\n ## 見出し\n \n-x+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,5 @@\n d\n-- [ ] 条件\n a\n-c\n x## 見出し\n 本文\r\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n-## 見出し\n+d\n a\n - [ ] 条件\n d\n@@ -6,10 +6,10 @@\n b\n \n 本文\r\n+本文\r\n x\n x本文\r\n b\n-本文\r\n d\n xb\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,9 +2,9 @@\n \n - [ ] 条件\n 本文\r\n-d\n b\n d\n+a\n c\n c\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -9,4 +9,5 @@\n xb\n 本文\r\n d\n+\n xd\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+## 見出し\n c\n 本文\r\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,3 @@\n-a\n+\n x- [ ] 条件\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,10 +3,11 @@\n b\n d\n \n+- [ ] 条件\n d\n - [ ] 条件\n - [ ] 条件\n-## 見出し\n+- [ ] 条件\n - [ ] 条件\n c\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,6 @@\n 本文\r\n ## 見出し\n+b\n c\n 本文\r\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+b\n \n+本文\r\n \n-\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,6 @@\n 本文\r\n+\n+b\n b\n ## 見出し\n xc\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+\n a\n-d\n+b\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,17 @@\n+本文\r\n+xa\n+c\n 本文\r\n a\n+c\n+c\n+- [ ] 条件\n d\n+- [ ] 条件\n+## 見出し\n+a\n+xb\n+d\n+x\n+## 見出し\n+## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,201 +1,104 @@\n 本文\r\n+本文\r\n+a\n+b\n+b\n+## 見出し\n+a\n+\n+d\n+- [ ] 条件\n+c\n+b\n+## 見出し\n+\n+b\n+c\n+本文\r\n+本文\r\n+## 見出し\n+c\n+本文\r\n+a\n \n c\n+b\n+- [ ] 条件\n+- [ ] 条件\n+x\n+本文\r\n a\n+d\n+\n+- [ ] 条件\n+xxb\n+- [ ] 条件\n+d\n+\n \n a\n+本文\r\n+x\n b\n-- [ ] 条件\n+xxd\n+## 見出し\n+d\n+## 見出し\n+a\n+d\n+b\n+\n+\n+本文\r\n+xx- [ ] 条件\n+\n+a\n c\n - [ ] 条件\n-a\n-x\n-c\n-- [ ] 条件\n+\n+b\n d\n-a\n-c\n-\n-xd\n-c\n-\n-- [ ] 条件\n-c\n-## 見出し\n - [ ] 条件\n a\n-b\n-d\n-d\n-d\n-\n-本文\r\n-本文\r\n-d\n-本文\r\n-xa\n-a\n-- [ ] 条件\n-b\n-d\n-a\n-x本文\r\n-xa\n-## 見出し\n-本文\r\n-本文\r\n-d\n-- [ ] 条件\n-d\n-- [ ] 条件\n-xa\n d\n a\n 本文\r\n-本文\r\n-x- [ ] 条件\n-a\n-本文\r\n-c\n+x本文\r\n \n-c\n-a\n-x## 見出し\n-\n-xc\n+x\n 本文\r\n - [ ] 条件\n-d\n 本文\r\n-- [ ] 条件\n-d\n-- [ ] 条件\n 本文\r\n-\n-xb\n-本文\r\n-## 見出し\n-d\n-x- [ ] 条件\n-\n-b\n-d\n-## 見出し\n-\n-a\n+xa\n \n d\n+a\n+## 見出し\n+- [ ] 条件\n+c\n+c\n c\n \n \n 本文\r\n-本文\r\n-b\n-b\n-\n-本文\r\n-## 見出し\n-x- [ ] 条件\n-## 見出し\n-- [ ] 条件\n+c\n \n ## 見出し\n-xb\n+xa\n+c\n+## 見出し\n+c\n+c\n+a\n+- [ ] 条件\n+d\n+d\n 本文\r\n-xxxa\n-c\n-b\n-x- [ ] 条件\n-d\n-a\n a\n \n ## 見出し\n-b\n-b\n-- [ ] 条件\n-a\n-\n-\n-d\n-d\n-c\n ## 見出し\n-d\n-## 見出し\n-a\n-本文\r\n-- [ ] 条件\n-xb\n-b\n-c\n-d\n-## 見出し\n-d\n-b\n-b\n-b\n-c\n-xx## 見出し\n-\n-c\n-\n-本文\r\n-本文\r\n-d\n-- [ ] 条件\n-d\n-x- [ ] 条件\n-## 見出し\n-本文\r\n-c\n-\n - [ ] 条件\n 本文\r\n-b\n-- [ ] 条件\n-## 見出し\n a\n-c\n-x\n-xd\n-d\n-d\n-d\n-xx## 見出し\n-x\n-本文\r\n-d\n-本文\r\n-b\n-c\n-\n-d\n-- [ ] 条件\n-本文\r\n-d\n-本文\r\n-d\n-a\n-## 見出し\n-本文\r\n-b\n-本文\r\n-b\n-## 見出し\n-c\n-c\n-\n-d\n-b\n-d\n-## 見出し\n-a\n-c\n-a\n-x## 見出し\n-本文\r\n-b\n-b\n-本文\r\n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,2 @@\n-\n c\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,13 @@\n-\n c\n - [ ] 条件\n+x本文\r\n+xa\n+b\n+b\n+d\n+d\n+d\n+a\n+## 見出し\n+xd\n+xx",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,23 @@\n+b\n+本文\r\n+a\n+本文\r\n+xa\n - [ ] 条件\n-c\n-xc\n+xa\n+本文\r\n+\n+## 見出し\n+a\n+本文\r\n+## 見出し\n+\n c\n c\n-## 見出し\n-本文\r\n+d\n 本文\r\n d\n+d\n+本文\r\n+## 見出し\n - [ ] 条件\n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,2 @@\n-x\n-- [ ] 条件\n+## 見出し\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,21 @@\n-\n-a\n+本文\r\n+b\n+- [ ] 条件\n+本文\r\n+xa\n+d\n+c\n+xx## 見出し\n+## 見出し\n+## 見出し\n+## 見出し\n+x## 見出し\n 本文\r\n a\n+a\n+\n+b\n d\n-b\n+c\n+a\n ## 見出し\n-xc\n-\n-## 見出し\n-xd\n-## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,11 +2,11 @@\n ## 見出し\n ## 見出し\n c\n+a\n d\n d\n - [ ] 条件\n c\n-b\n 本文\r\n 本文\r\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,5 @@\n c\n-- [ ] 条件\n-- [ ] 条件\n+\n - [ ] 条件\n 本文\r\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,8 @@\n - [ ] 条件\n+本文\r\n ## 見出し\n x\n xx\n-a\n-- [ ] 条件\n a\n c\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,8 +2,7 @@\n x## 見出し\n a\n a\n-c\n+xc\n b\n ## 見出し\n-本文\r\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,12 @@\n-d\n+xd\n+- [ ] 条件\n b\n ## 見出し\n 本文\r\n d\n xc\n d\n-d\n+## 見出し\n ## 見出し\n d\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n 本文\r\n-d\n+x本文\r\n c\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,7 +3,6 @@\n 本文\r\n x## 見出し\n - [ ] 条件\n-\n - [ ] 条件\n-- [ ] 条件\n+xc\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,7 +3,7 @@\n c\n 本文\r\n \n-x\n+本文\r\n 本文\r\n b\n d\n@@ -11,4 +11,4 @@\n - [ ] 条件\n a\n c\n-x+## 見出し\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n+\n x\n \n d\n-xa\n-- [ ] 条件\n-xa\n+本文\r\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,15 +1,15 @@\n 本文\r\n c\n-b\n+\n d\n - [ ] 条件\n \n-## 見出し\n ## 見出し\n c\n xa\n c\n a\n+本文\r\n a\n \n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +1 @@\n-c\n+\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,2 @@\n-本文\r\n-本文\r\n-本文\r\n-c\n-c\n-## 見出し\n+x- [ ] 条件\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -29,7 +29,6 @@\n a\n b\n \n-b\n b\n a\n ## 見出し\n@@ -113,7 +112,6 @@\n x## 見出し\n c\n c\n-c\n - [ ] 条件\n ## 見出し\n a\n@@ -167,7 +165,6 @@\n b\n ## 見出し\n a\n-b\n ## 見出し\n xc\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,7 @@\n+a\n d\n+\n+b\n a\n+## 見出し\n+本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,12 @@\n+## 見出し\n+d\n+d\n+- [ ] 条件\n+- [ ] 条件\n+x\n+本文\r\n+- [ ] 条件\n+- [ ] 条件\n+xd\n+d\n \n-x\n-xc\n-## 見出し\n-## 見出し\n-a\n-xa\n-## 見出し\n-本文\r\n-本文\r\n-b\n-## 見出し\n-xxxx",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n+\n+- [ ] 条件\n b\n-- [ ] 条件\n-本文\r\n b\n ## 見出し\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,15 @@\n-b\n+d\n+\n+x## 見出し\n+c\n+c\n+本文\r\n+- [ ] 条件\n+## 見出し\n+- [ ] 条件\n a\n+- [ ] 条件\n+\n d\n+a\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,14 @@\n+x本文\r\n+b\n+b\n+c\n+## 見出し\n 本文\r\n-\n-a\n - [ ] 条件\n+本文\r\n+b\n+xc\n+本文\r\n+- [ ] 条件\n+b\n ## 見出し\n-- [ ] 条件\n-a\n-b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,5 @@\n xa\n+本文\r\n b\n 本文\r\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,4 @@\n \n-## 見出し\n - [ ] 条件\n - [ ] 条件\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,9 @@\n 本文\r\n 本文\r\n ## 見出し\n-## 見出し\n 本文\r\n-\n 本文\r\n-xa\n+本文\r\n ## 見出し\n b\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,7 @@\n-a\n+\n+- [ ] 条件\n+\n+b\n+b\n+\n 本文\r\n-a\n-d\n-c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,9 @@\n d\n-xxb\n+- [ ] 条件\n b\n 本文\r\n ## 見出し\n xb\n-本文\r\n+- [ ] 条件\n c\n xxd\n-x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,10 @@\n d\n b\n-c\n-c\n-- [ ] 条件\n-a\n+x- [ ] 条件\n c\n 本文\r\n a\n-d\n+a\n xa\n a\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,14 @@\n ## 見出し\n - [ ] 条件\n+## 見出し\n d\n c\n 本文\r\n 本文\r\n-d\n+- [ ] 条件\n x本文\r\n ## 見出し\n+- [ ] 条件\n - [ ] 条件\n - [ ] 条件\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,5 @@\n+- [ ] 条件\n xxa\n+本文\r\n xb\n-xc\n-\n-本文\r\n-b\n-d\n-xc\n-\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,7 @@\n+## 見出し\n ## 見出し\n a\n ## 見出し\n-xb\n c\n ## 見出し\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,13 @@\n+本文\r\n+a\n+d\n+\n+本文\r\n+a\n+a\n b\n \n+b\n+\n+- [ ] 条件\n+b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,13 @@\n-- [ ] 条件\n-b\n-- [ ] 条件\n+a\n+本文\r\n+## 見出し\n+a\n+c\n+a\n+## 見出し\n \n-c\n+本文\r\n+a\n \n-\n+d\n+本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,4 @@\n+c\n \n \n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -4,14 +4,14 @@\n 本文\r\n ## 見出し\n a\n-a\n ## 見出し\n b\n ## 見出し\n a\n d\n-本文\r\n+## 見出し\n b\n a\n+\n 本文\r\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -31,37 +31,39 @@\n c\n ## 見出し\n c\n-b\n-xa\n-\n-d\n-## 見出し\n-## 見出し\n-c\n-b\n-a\n-b\n-本文\r\n-b\n-a\n-a\n-a\n-b\n-## 見出し\n-- [ ] 条件\n-d\n-本文\r\n-d\n-本文\r\n-## 見出し\n-## 見出し\n-b\n-a\n-## 見出し\n-d\n-- [ ] 条件\n-- [ ] 条件\n-b\n+\n+b\n+xa\n+\n+d\n+## 見出し\n+## 見出し\n+c\n+b\n+a\n+b\n+本文\r\n+b\n+a\n+a\n+a\n+b\n+## 見出し\n+- [ ] 条件\n+d\n+本文\r\n+d\n+本文\r\n+## 見出し\n+## 見出し\n+b\n+a\n+## 見出し\n+d\n+- [ ] 条件\n+- [ ] 条件\n+b\n+- [ ] 条件\n d\n c\n ## 見出し\n@@ -247,28 +249,28 @@\n a\n 本文\r\n x本文\r\n-d\n-本文\r\n-a\n-## 見出し\n-a\n-- [ ] 条件\n-- [ ] 条件\n-- [ ] 条件\n-## 見出し\n-b\n-\n-本文\r\n-## 見出し\n-d\n-c\n-- [ ] 条件\n-- [ ] 条件\n-d\n-本文\r\n-- [ ] 条件\n-d\n-- [ ] 条件\n+b\n+本文\r\n+a\n+## 見出し\n+a\n+- [ ] 条件\n+- [ ] 条件\n+- [ ] 条件\n+## 見出し\n+b\n+\n+本文\r\n+## 見出し\n+d\n+c\n+- [ ] 条件\n+- [ ] 条件\n+d\n+本文\r\n+- [ ] 条件\n+d\n+b\n \n - [ ] 条件\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -9,6 +9,5 @@\n xa\n d\n - [ ] 条件\n-本文\r\n-c\n+a\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n+本文\r\n+## 見出し\n d\n-d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,4 +5,3 @@\n ## 見出し\n a\n d\n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1,2 @@\n+d\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,18 +1,22 @@\n+b\n - [ ] 条件\n-d\n-d\n+## 見出し\n+\n+\n+c\n+a\n+本文\r\n+\n+## 見出し\n+## 見出し\n+c\n+- [ ] 条件\n+xc\n c\n \n-本文\r\n-c\n-## 見出し\n+a\n+- [ ] 条件\n+x本文\r\n+d\n b\n-c\n-xa\n-b\n-- [ ] 条件\n-- [ ] 条件\n-## 見出し\n-- [ ] 条件\n-d\n-- [ ] 条件\n+x- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n a\n - [ ] 条件\n ## 見出し\n-b\n+x\n \n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,8 @@\n d\n-xc\n+本文\r\n d\n a\n-c\n+\n 本文\r\n c\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,7 @@\n ## 見出し\n c\n ## 見出し\n-b\n 本文\r\n 本文\r\n d\n-- [ ] 条件\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1 @@\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n-xa\n-a\n+c\n a\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,12 @@\n+xd\n+d\n+本文\r\n c\n+## 見出し\n+## 見出し\n+b\n+- [ ] 条件\n+xa\n \n-xd\n-- [ ] 条件\n d\n-x## 見出し\n-a\n-d\n-d\n+xc\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,7 +3,6 @@\n \n c\n b\n-本文\r\n xd\n a\n x本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,7 +3,6 @@\n xd\n b\n c\n-## 見出し\n ## 見出し\n xd\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,15 +1,16 @@\n a\n c\n \n+a\n xc\n 本文\r\n d\n a\n b\n+d\n a\n - [ ] 条件\n - [ ] 条件\n \n-b\n \n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +1,3 @@\n 本文\r\n+## 見出し\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -6,5 +6,4 @@\n a\n - [ ] 条件\n \n-d\n xc\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -4,8 +4,6 @@\n x本文\r\n b\n ## 見出し\n-本文\r\n - [ ] 条件\n c\n-c\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,16 +1,16 @@\n+\n+\n+a\n+xc\n+\n c\n+c\n+a\n+\n+b\n+xc\n+b\n+- [ ] 条件\n+## 見出し\n 本文\r\n-- [ ] 条件\n-本文\r\n-- [ ] 条件\n-a\n-## 見出し\n-x\n-b\n-a\n-- [ ] 条件\n-d\n-c\n-d\n-## 見出し\n-\n+xxx- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -78,6 +78,7 @@\n b\n - [ ] 条件\n a\n+a\n x- [ ] 条件\n c\n ## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,7 @@\n ## 見出し\n 本文\r\n - [ ] 条件\n-xd\n+## 見出し\n c\n - [ ] 条件\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -4,5 +4,3 @@\n - [ ] 条件\n a\n d\n-x- [ ] 条件\n-xx本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,2 +0,0 @@\n-c\n-x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1 +0,0 @@\n-xa\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -4,7 +4,9 @@\n xb\n a\n d\n-本文\r\n+c\n+d\n+- [ ] 条件\n b\n xxd\n c\n",
+  "",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,3 +1,2 @@\n a\n d\n-\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,16 +1,11 @@\n+本文\r\n+a\n ## 見出し\n-b\n-d\n-\n-\n-a\n-xa\n-c\n-\n-b\n-c\n-\n+本文\r\n c\n d\n 本文\r\n+- [ ] 条件\n+b\n+## 見出し\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,13 @@\n+xa\n 本文\r\n a\n-b\n-b\n+d\n+\n+a\n+x本文\r\n+## 見出し\n+## 見出し\n x\n-a\n-本文\r\n-b\n-xd\n-b\n ## 見出し\n b\n+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,7 @@\n-b\n+- [ ] 条件\n xa\n ## 見出し\n+a\n c\n d\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,5 @@\n-\n+d\n+x\n c\n a\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -3,8 +3,8 @@\n x- [ ] 条件\n \n \n-x## 見出し\n-d\n+- [ ] 条件\n+- [ ] 条件\n d\n ## 見出し\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,9 +1,9 @@\n xc\n - [ ] 条件\n+d\n - [ ] 条件\n ## 見出し\n-本文\r\n - [ ] 条件\n \n-c\n+## 見出し\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,5 @@\n-- [ ] 条件\n \n-b\n+## 見出し\n c\n c\n x\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,10 +1,19 @@\n-b\n-x- [ ] 条件\n-xa\n a\n - [ ] 条件\n+- [ ] 条件\n+b\n d\n+c\n+a\n+\n+## 見出し\n+b\n+x## 見出し\n+c\n+a\n+本文\r\n - [ ] 条件\n+本文\r\n+\n a\n-d\n-x+c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -0,0 +1,5 @@\n+\n+xa\n+本文\r\n+b\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -6,11 +6,13 @@\n \n b\n d\n-\n+## 見出し\n 本文\r\n a\n - [ ] 条件\n+b\n c\n d\n 本文\r\n+本文\r\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,8 +1,14 @@\n-d\n+c\n+b\n a\n-\n+a\n+本文\r\n ## 見出し\n ## 見出し\n+- [ ] 条件\n ## 見出し\n-b\n-本文\r\n+d\n+c\n+- [ ] 条件\n+x\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,12 +1,15 @@\n+\n+x- [ ] 条件\n+本文\r\n d\n+x## 見出し\n+xx- [ ] 条件\n+xd\n d\n-c\n-c\n+## 見出し\n+d\n a\n ## 見出し\n-- [ ] 条件\n+b\n c\n-a\n-- [ ] 条件\n-\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -15,21 +15,20 @@\n - [ ] 条件\n d\n 本文\r\n-本文\r\n-c\n-d\n-## 見出し\n-- [ ] 条件\n-c\n-d\n-本文\r\n-\n-本文\r\n-本文\r\n-c\n-本文\r\n-## 見出し\n-本文\r\n+c\n+d\n+## 見出し\n+- [ ] 条件\n+c\n+d\n+本文\r\n+\n+本文\r\n+本文\r\n+c\n+本文\r\n+## 見出し\n+d\n c\n 本文\r\n ## 見出し\n@@ -122,7 +121,7 @@\n 本文\r\n \n - [ ] 条件\n-\n+本文\r\n 本文\r\n - [ ] 条件\n ## 見出し\n@@ -166,6 +165,7 @@\n a\n a\n x本文\r\n+b\n c\n xa\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,11 +1,10 @@\n+d\n+c\n 本文\r\n+c\n+a\n+b\n+c\n 本文\r\n-xxd\n d\n-a\n-x本文\r\n-- [ ] 条件\n b\n-d\n-- [ ] 条件\n-d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,18 +1,26 @@\n+- [ ] 条件\n+b\n+b\n+\n+xd\n+- [ ] 条件\n+## 見出し\n+- [ ] 条件\n+- [ ] 条件\n+## 見出し\n+- [ ] 条件\n 本文\r\n ## 見出し\n \n+- [ ] 条件\n+- [ ] 条件\n+d\n c\n-## 見出し\n-b\n-b\n-d\n+a\n+c\n+本文\r\n - [ ] 条件\n b\n-- [ ] 条件\n-xa\n c\n-## 見出し\n-- [ ] 条件\n-\n-本文\r\n-x+x- [ ] 条件\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,12 @@\n c\n+b\n 本文\r\n xxb\n b\n-\n c\n - [ ] 条件\n d\n b\n-a\n d\n a\n x- [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,7 @@\n 本文\r\n - [ ] 条件\n-- [ ] 条件\n ## 見出し\n+本文\r\n ## 見出し\n ## 見出し\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n x- [ ] 条件\n b\n-b\n+c\n 本文\r\n d\n \n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -4,10 +4,12 @@\n c\n ## 見出し\n \n+- [ ] 条件\n \n 本文\r\n d\n b\n+- [ ] 条件\n d\n - [ ] 条件\n b\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,16 +1,14 @@\n a\n d\n-d\n+- [ ] 条件\n a\n a\n \n - [ ] 条件\n ## 見出し\n-c\n b\n c\n 本文\r\n-a\n ## 見出し\n - [ ] 条件\n - [ ] 条件\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,9 @@\n+d\n b\n+本文\r\n 本文\r\n d\n 本文\r\n - [ ] 条件\n-## 見出し\n+d\n c\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,13 +1,11 @@\n-## 見出し\n+d\n c\n d\n b\n ## 見出し\n b\n-\n ## 見出し\n b\n-- [ ] 条件\n d\n d\n a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -2,15 +2,16 @@\n b\n \n - [ ] 条件\n+b\n 本文\r\n d\n c\n - [ ] 条件\n-d\n c\n+c\n+## 見出し\n ## 見出し\n x本文\r\n b\n ## 見出し\n a\n-## 見出し\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,13 @@\n+## 見出し\n+x## 見出し\n+xd\n+b\n+c\n+c\n+x本文\r\n+\n+a\n+- [ ] 条件\n+## 見出し\n d\n-c\n-b\n-## 見出し\n+x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -5,7 +5,7 @@\n \n d\n - [ ] 条件\n-xd\n+\n d\n - [ ] 条件\n-- [ ] 条件\n+d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,7 +1,7 @@\n - [ ] 条件\n 本文\r\n-x\n x本文\r\n+本文\r\n d\n d\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,14 +1,23 @@\n+本文\r\n+b\n+x- [ ] 条件\n+d\n+本文\r\n+- [ ] 条件\n+\n+\n+b\n+\n c\n-## 見出し\n-b\n-本文\r\n-## 見出し\n-\n-## 見出し\n-xa\n+d\n \n \n 本文\r\n-a\n-- [ ] 条件\n-c\n+d\n+\n+\n+## 見出し\n+x- [ ] 条件\n+## 見出し\n+\n+\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,3 @@\n c\n-\n-## 見出し\n+x## 見出し\n 本文\r\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,6 +1,6 @@\n b\n b\n-d\n+\n c\n a\n 本文\r\n@@ -13,5 +13,5 @@\n - [ ] 条件\n 本文\r\n d\n-\n+a\n d\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,5 +1,5 @@\n b\n \n+\n c\n-x本文\r\n-x- [ ] 条件\n+a\n",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n-xd\n+x- [ ] 条件\n ## 見出し\n \n 本文\r\n@@ -8,7 +8,6 @@\n ## 見出し\n 本文\r\n c\n-c\n - [ ] 条件\n ## 見出し\n x",
+  "--- 版 1（edit 時）\n+++ 版 2（サーバの最新）\n@@ -1,4 +1,4 @@\n-- [ ] 条件\n+\n - [ ] 条件\n a\n ## 見出し\n@@ -8,4 +8,4 @@\n 本文\r\n ## 見出し\n \n-x+本文\r\n"
+ ]
+}

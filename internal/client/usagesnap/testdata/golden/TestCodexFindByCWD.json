@@ -1,0 +1,14 @@
+[
+ {
+  "call": "{\"fn\":\"codex_find\",\"cwd\":\"<TMP>/001/proj\",\"env\":{\"HOME\":\"<TMP>/001\"}}",
+  "out": "\"<TMP>/001/.codex/sessions/2026/09/18/rollout-2026-09-18T01-00-00-0199aaaa-bbbb-cccc-dddd-eeeeffff0001.jsonl\""
+ },
+ {
+  "call": "{\"fn\":\"codex_find\",\"cwd\":\"<TMP>/001\",\"env\":{\"HOME\":\"<TMP>/001\"}}",
+  "out": "null"
+ },
+ {
+  "call": "{\"fn\":\"codex_find\",\"cwd\":\"<TMP>/001/proj\",\"env\":{\"HOME\":\"<TMP>/001\"}}",
+  "out": "null"
+ }
+]

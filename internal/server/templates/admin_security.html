@@ -1,0 +1,50 @@
+{{define "admin_security.html"}}{{template "head" (headData .Lang (T .Lang "server.web.admin_security.title"))}}
+{{template "nav" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.admin_security.title"}}</h1>
+  <p class="muted">{{T .Lang "server.web.common.back_prefix"}}<a href="{{base}}/admin/users">{{T .Lang "server.web.common.admin_users"}}</a>{{T .Lang "server.web.common.back_suffix"}}</p>
+  {{template "messages" .}}
+  <section class="panel">
+    <h2>{{T .Lang "server.web.admin_security.current"}}<span data-two-factor="{{.Policy}}">{{.PolicyLabel}}</span>{{if not .PolicySet}}{{T .Lang "server.web.admin_security.unset"}}{{end}}</h2>
+    <p class="muted">{{T .Lang "server.web.admin_security.counts" "registered" .Registered "unregistered" .Unregistered}}</p>
+    <ul>
+      <li><strong>{{T .Lang "server.web.admin_security.required_label"}}</strong>{{T .Lang "server.web.admin_security.required_desc"}}</li>
+      <li><strong>{{T .Lang "server.web.admin_security.optional_label"}}</strong>{{T .Lang "server.web.admin_security.optional_desc"}}</li>
+    </ul>
+    <p class="muted">{{T .Lang "server.web.admin_security.switch_note"}}</p>
+    {{if .Required}}
+    <form method="post" action="{{base}}/admin/security" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="two_factor" value="optional">
+      <p>{{T .Lang "server.web.admin_security.to_optional_before"}}{{if .NeedCode}}{{T .Lang "server.web.admin_security.password_and_code"}}{{else}}{{T .Lang "server.web.admin_security.password_only"}}{{end}}{{T .Lang "server.web.admin_security.to_optional_after"}}</p>
+      <label>{{T .Lang "server.web.login.password"}}<input type="password" name="password" autocomplete="current-password" required></label>
+      {{if .NeedCode}}<label>{{T .Lang "server.web.totp.code"}}<input name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" autocomplete="one-time-code" required></label>{{end}}
+      <button type="submit" class="danger">{{T .Lang "server.web.admin_security.to_optional_submit"}}</button>
+    </form>
+    {{else}}
+    <form method="post" action="{{base}}/admin/security" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="two_factor" value="required">
+      <p>{{T .Lang "server.web.admin_security.to_required_note"}}</p>
+      <button type="submit">{{T .Lang "server.web.admin_security.to_required_submit"}}</button>
+    </form>
+    {{end}}
+  </section>
+  <section class="panel">
+    <h2>{{T .Lang "server.web.admin_security.changes_h2"}}</h2>
+    {{with .Changes}}
+    <table class="list">
+      <thead><tr><th>{{T $.Lang "server.web.admin_security.th_at"}}</th><th>{{T $.Lang "server.web.admin_security.th_actor"}}</th><th>{{T $.Lang "server.web.admin_security.th_via"}}</th><th>{{T $.Lang "server.web.admin_security.th_change"}}</th><th>{{T $.Lang "server.web.admin_security.th_ip"}}</th><th>{{T $.Lang "server.web.admin_security.th_note"}}</th></tr></thead>
+      <tbody>
+      {{range .}}
+      <tr data-setting-change><td>{{.At}}</td><td>{{.Actor}}</td><td>{{.Via}}</td><td>{{.From}} → {{.To}}</td><td>{{.IP}}</td><td>{{.Note}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">{{T .Lang "server.web.admin_security.changes_none"}}</p>
+    {{end}}
+    <p class="muted">{{T .Lang "server.web.admin_security.cli_note"}}<code>looptrack settings two-factor required|optional</code></p>
+  </section>
+</main>
+{{template "foot"}}{{end}}

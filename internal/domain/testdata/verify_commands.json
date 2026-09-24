@@ -1,0 +1,110 @@
+{
+  "_comment": "検証コマンド節の抽出（DESIGN.md §5-8-1）と出力のマスク（§5-8-2）の例。Go（internal/domain/verify_test.go）と Python（scripts/issue_verify_test.py）の両方のテストで読む。",
+  "extract": [
+    {
+      "name": "1. fenced のみ",
+      "body": "## 内容\n\n説明\n\n## 検証コマンド\n\n```bash\ngo test ./internal/domain/...\n# 遅いものは最後\n\npython3 scripts/issue_verify_test.py\n```\n\n## 受け入れ条件\n\n- [ ] 通る\n",
+      "commands": [
+        "go test ./internal/domain/...",
+        "python3 scripts/issue_verify_test.py"
+      ]
+    },
+    {
+      "name": "2. 箇条書き",
+      "body": "## 検証コマンド\n\n次の 2 つを通す。\n\n- `make lint`\n- `make test`（全体）\n- make build\n",
+      "commands": [
+        "make lint"
+      ]
+    },
+    {
+      "name": "3. 節なし",
+      "body": "## 内容\n\n説明\n\n## 受け入れ条件\n\n- [ ] `go test ./...` が通る\n",
+      "commands": []
+    },
+    {
+      "name": "4. コードブロック内の見出し",
+      "body": "## 内容\n\n```md\n## 検証コマンド\necho x\n```\n",
+      "commands": []
+    },
+    {
+      "name": "5. 次の節で終わる",
+      "body": "## 検証コマンド\n\n```\ntrue\n```\n\n## 関連\n\n- `false`\n",
+      "commands": [
+        "true"
+      ]
+    },
+    {
+      "name": "6. 番号付き・* の箇条書きと ~~~ のブロック",
+      "body": "## 検証コマンド\n\n1. `make a`\n* `make b`\n~~~\nmake c | tee /dev/null\n~~~\n",
+      "commands": [
+        "make a",
+        "make b",
+        "make c | tee /dev/null"
+      ]
+    },
+    {
+      "name": "7. 節の中のコードブロックに ## の行があっても節は続く",
+      "body": "## 検証コマンド\n\n```\n## コメントではない行\necho 1\n```\n- `echo 2`\n",
+      "commands": [
+        "echo 1",
+        "echo 2"
+      ]
+    },
+    {
+      "name": "8. 節が 2 つあれば最初のものだけ",
+      "body": "## 検証コマンド\n\n- `echo first`\n\n## 検証コマンド\n\n- `echo second`\n",
+      "commands": [
+        "echo first"
+      ]
+    },
+    {
+      "name": "9. 見出しの後ろの空白と CRLF",
+      "body": "## 検証コマンド  \r\n\r\n- `echo crlf`\r\n",
+      "commands": [
+        "echo crlf"
+      ]
+    }
+  ],
+  "mask": [
+    {
+      "name": "PAT",
+      "in": "token imp_AbC123_-xyz used",
+      "out": "token imp_*** used"
+    },
+    {
+      "name": "Bearer",
+      "in": "Authorization: Bearer eyJhbGciOi.abc",
+      "out": "Authorization: Bearer ***"
+    },
+    {
+      "name": "key=value",
+      "in": "DB password=hunter2 ok\nAPI_KEY: abcd1234\napi-key=zz",
+      "out": "DB password=*** ok\nAPI_KEY: ***\napi-key=***"
+    },
+    {
+      "name": "OpenAI 形式",
+      "in": "key sk-abcdefghijklmnopqrstuvwxyz0123",
+      "out": "key sk-***"
+    },
+    {
+      "name": "AWS",
+      "in": "AKIAABCDEFGHIJKLMNOP is the id",
+      "out": "AKIA*** is the id"
+    },
+    {
+      "name": "秘密鍵",
+      "in": "x\n-----BEGIN RSA PRIVATE KEY-----\nMIIE\nabc\n-----END RSA PRIVATE KEY-----\ny",
+      "out": "x\n-----BEGIN RSA PRIVATE KEY-----***-----END RSA PRIVATE KEY-----\ny"
+    },
+    {
+      "name": "秘密鍵（END が無い）",
+      "in": "-----BEGIN PRIVATE KEY-----\nMIIE\nabc",
+      "out": "-----BEGIN PRIVATE KEY-----***"
+    },
+    {
+      "name": "該当なし",
+      "in": "ok  \tgithub.com/x/y 0.1s",
+      "out": "ok  \tgithub.com/x/y 0.1s"
+    }
+  ]
+}

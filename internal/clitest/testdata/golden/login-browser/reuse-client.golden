@@ -1,0 +1,38 @@
+# login-browser/reuse-client
+$ issue login --browser
+env LOOPTRACK_TOKEN=
+
+#### exit 0
+
+#### stdout
+ブラウザでログインと承認をしてください（5 分待ちます）。ブラウザが開かないときは次の URL を開いてください:
+  $API/oauth/authorize?response_type=code&client_id=cid_saved&redirect_uri=http%3A%2F%2F127.0.0.1%3A$PORT%2Fcallback&code_challenge=$PKCE_CHALLENGE&code_challenge_method=S256&state=$STATE&scope=im&resource=$API%2Fapi%2Fv1
+ログイン: alice（$API）。トークンを $TMP/home/.config/looptrack/credentials.json に保存しました（期限が近づくと自動で更新します）
+
+#### stderr
+
+#### requests (4)
+GET /im/.well-known/oauth-authorization-server
+  X-Looptrack-Lang: ja
+GET /im/oauth/authorize?client_id=cid_saved&code_challenge=$PKCE_CHALLENGE&code_challenge_method=S256&redirect_uri=http%3A%2F%2F127.0.0.1%3A$PORT%2Fcallback&resource=$API%2Fapi%2Fv1&response_type=code&scope=im&state=$STATE
+POST /im/oauth/token
+  Content-Type: application/x-www-form-urlencoded
+  X-Looptrack-Lang: ja
+  body:
+    client_id=cid_saved&code=code_golden&code_verifier=$PKCE_VERIFIER&grant_type=authorization_code&redirect_uri=http%3A%2F%2F127.0.0.1%3A$PORT%2Fcallback&resource=$API%2Fapi%2Fv1
+GET /im/api/v1/me
+  Authorization: Bearer imp_from_browser
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (1)
+home/.config/looptrack/credentials.json (0600)
+    {
+      "$API": {
+        "client_id": "cid_saved",
+        "expires_at": "$NOW+3600s",
+        "login": "alice",
+        "refresh_token": "imr_refresh_1",
+        "token": "imp_from_browser"
+      }
+    }

@@ -1,0 +1,20 @@
+# usage-requests/ok
+$ issue usage requests --all
+
+#### exit 0
+
+#### stdout
+#6    2024-04-01 09:00 完了（台帳 #2 2024-04 月次） carol  期間: 2024-03
+#7    2024-05-03 09:00 未完了      carol  期間: 2024-04-01〜2024-04-30  対象: demo  メモ: 月次 報告
+
+次のコマンド: looptrack issue usage report --request 7 --json
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/requests?all=1
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

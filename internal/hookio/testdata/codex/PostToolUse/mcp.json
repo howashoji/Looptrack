@@ -1,0 +1,77 @@
+{
+  "note": "Codex の PostToolUse の MCP（mcp__<サーバ>__<ツール>・tool_use_id あり）",
+  "args": [
+    "--agent",
+    "codex"
+  ],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__im__set_status",
+    "tool_input": {
+      "id": "IM-0001",
+      "status": "Done"
+    },
+    "tool_use_id": "call_BBBBBBBBBBBBBBBBBBBBBBBB",
+    "tool_response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "IM-0001: In Progress → Done"
+        }
+      ],
+      "isError": false
+    }
+  },
+  "event": {
+    "agent": "codex",
+    "name": "PostToolUse",
+    "raw_name": "PostToolUse",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "MCP",
+      "raw_name": "mcp__im__set_status",
+      "server": "im",
+      "name": "set_status",
+      "use_id": "call_BBBBBBBBBBBBBBBBBBBBBBBB",
+      "input": {
+        "id": "IM-0001",
+        "status": "Done"
+      },
+      "response": {
+        "raw": {
+          "content": [
+            {
+              "text": "IM-0001: In Progress → Done",
+              "type": "text"
+            }
+          ],
+          "isError": false
+        },
+        "text": "IM-0001: In Progress → Done"
+      }
+    }
+  },
+  "result": {
+    "context": "作業の完了を検知しました（イシュー Done: IM-0001）"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "作業の完了を検知しました（イシュー Done: IM-0001）"
+      }
+    },
+    "exit_code": 0
+  }
+}

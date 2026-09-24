@@ -1,0 +1,23 @@
+# push/ok
+$ issue push DEMO-0001
+
+#### exit 0
+
+#### stdout
+更新: DEMO-0001（版 4）
+
+#### stderr
+
+#### requests (1)
+PATCH /im/api/v1/issues/DEMO-0001?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  If-Match: "3"
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "markdown": "---\nid: DEMO-0001\ntitle: ログイン画面を作る\ntype: task\nstatus: In Progress\nassignee: alice\npriority: P1\nlabels: []\nparent: \"\"\nblocked_by: []\ntraces: []\nrefs: []\ncreated: 2024-05-01 10:00\nupdated: 2024-05-02 11:30\n---\n\n# DEMO-0001 ログイン画面を作る\n\n## 内容\n\nログイン画面を作る。\n\n## 受け入れ条件\n\n- [ ] ID とパスワードでログインできる\n\n## コメント\n\n### 2024-05-02 11:30\n\n着手。\n\n追記した行。\n"
+    }
+
+#### files (0)

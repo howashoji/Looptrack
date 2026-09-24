@@ -1,0 +1,22 @@
+# usage-attach/disabled
+$ issue usage attach DEMO-0001
+env CLAUDE_CODE_SESSION_ID=sess-golden-1
+env LOOPTRACK_USAGE=0
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 会話記録が見つかりません（コーディング AI のセッションの中で実行してください。Claude Code は CLAUDE_CODE_SESSION_ID、Codex は CODEX_THREAD_ID か作業ディレクトリが一致する直近の記録を探します。Copilot CLI は COPILOT_AGENT_SESSION_ID のスパンを $COPILOT_HOME/otel/（無ければ ~/.copilot/otel/）の下の OpenTelemetry のファイル出力から探します）
+
+#### requests (0)
+
+#### files (1)
+home/.claude/projects/-work-demo/sess-golden-1.jsonl (0644)
+    {"type":"user","timestamp":"2024-05-02T01:00:00.000Z","gitBranch":"main","version":"2.1.271","cwd":"/work/demo","origin":{"kind":"human"},"message":{"role":"user","content":"ログイン画面の不具合を直して"}}
+    {"type":"assistant","timestamp":"2024-05-02T01:00:10.000Z","gitBranch":"main","version":"2.1.271","message":{"id":"m1","model":"claude-opus-5","usage":{"input_tokens":10,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":20}}}
+    {"type":"assistant","timestamp":"2024-05-02T01:00:12.000Z","gitBranch":"main","version":"2.1.271","message":{"id":"m1","model":"claude-opus-5","usage":{"input_tokens":10,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":50}}}
+    {"type":"user","timestamp":"2024-05-02T01:05:00.000Z","gitBranch":"fix/login","version":"2.1.271","origin":{"kind":"human"},"message":{"role":"user","content":"テストも足して"}}
+    {"type":"assistant","timestamp":"2024-05-02T01:05:30.000Z","gitBranch":"fix/login","version":"2.1.271","message":{"id":"m2","model":"claude-opus-5","usage":{"input_tokens":5,"cache_creation_input_tokens":40,"cache_read_input_tokens":1200,"output_tokens":80}}}
+    {"type":"assistant","timestamp":"2024-05-02T01:06:00.000Z","gitBranch":"fix/login","version":"2.1.271","message":{"id":"m3","model":"claude-sonnet-5","usage":{"input_tokens":3,"cache_creation_input_tokens":0,"cache_read_input_tokens":900,"output_tokens":12}}}

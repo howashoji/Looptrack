@@ -1,0 +1,58 @@
+{
+  "note": "VS Code の MCP（mcp_<サーバ>_<ツール>・推論）。失敗（result_type: failure）",
+  "args": [
+    "--agent",
+    "copilot"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "timestamp": "2026-09-18T12:00:00.000Z",
+    "cwd": "/home/dev/work/sample-app",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp_im_add_comment",
+    "tool_input": {
+      "id": "IM-0001",
+      "text": "x"
+    },
+    "tool_result": {
+      "result_type": "failure",
+      "text_result_for_llm": "422"
+    }
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "PostToolUse",
+    "raw_name": "PostToolUse",
+    "shape": "snake_case",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "MCP",
+      "raw_name": "mcp_im_add_comment",
+      "server": "im",
+      "name": "add_comment",
+      "input": {
+        "id": "IM-0001",
+        "text": "x"
+      },
+      "response": {
+        "raw": {
+          "result_type": "failure",
+          "text_result_for_llm": "422"
+        },
+        "text": "422",
+        "failed": true
+      }
+    }
+  },
+  "result": {},
+  "output": {
+    "stdout": null,
+    "exit_code": 0
+  }
+}

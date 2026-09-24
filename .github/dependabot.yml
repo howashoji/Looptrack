@@ -1,0 +1,20 @@
+# 依存の更新の PR。Go のモジュールと GitHub Actions の版を週 1 回まとめて見る。
+# Go の版（ci.yml / release.yml の GO_VERSION）は対象外なので、手で上げる（docs/server/RELEASE.md）。
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      gomod:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]

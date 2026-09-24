@@ -1,0 +1,20 @@
+# init --project demo --agent other
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI other）
+その他のコーディング AI への導入（init は CLI の配置のほかはファイルを書かない。次を AI の指示ファイルと設定に入れる）:
+
+  1. CLI: looptrack を PATH に置く（MCP の looptrack の setup ツールの手順。~/.local/bin など）
+  2. 環境変数: LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo（AI がシェルを実行するときに渡るように設定する）
+  3. 指示ファイル（その AI が毎回読むもの）に書く:
+     - 作業の最初に `looptrack issue guide` を読む（MCP なら guide ツール）
+     - ループ: next → 作業 → comment → 受け入れ条件を検証 → close --comment → next
+  4. MCP: http://127.0.0.1:9/im/mcp（ヘッダ X-Looptrack-Project: demo、認証は OAuth）
+  5. フックがあれば、ツール実行後・ターン終了・セッション終了で looptrack hook usage を呼ぶ（トークン計測。docs/server/DESIGN.md §5-4）
+  6. 導入が済んだら `looptrack issue installed --agent other` でサーバへ知らせる（MCP のツール結果の導入の指示が消える）
+
+#### stderr
+
+#### files

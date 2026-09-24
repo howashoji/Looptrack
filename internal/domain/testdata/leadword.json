@@ -1,0 +1,70 @@
+{
+  "_": "コメントの先頭語（DESIGN.md §5-8-6）。Go の internal/domain/leadword_test.go・internal/server/feedback_test.go と Python の scripts/issue_feedback_test.py が同じ例を通す",
+  "lead": [
+    {"name": "半角コロン", "content": "フィードバック: テスター A（9/18）: 保存ボタンが見つからない", "kind": "feedback"},
+    {"name": "全角コロン", "content": "フィードバック：B", "kind": "feedback"},
+    {"name": "コロンの後に空白なし", "content": "フィードバック:x", "kind": "feedback"},
+    {"name": "コロンだけ", "content": "フィードバック:", "kind": "feedback"},
+    {"name": "先頭が空白", "content": " フィードバック: …", "kind": ""},
+    {"name": "先頭が改行", "content": "\nフィードバック: …", "kind": ""},
+    {"name": "先頭が全角空白", "content": "　フィードバック: …", "kind": ""},
+    {"name": "先頭でない", "content": "テスターのフィードバック: …", "kind": ""},
+    {"name": "コロンなし", "content": "フィードバック テスターから", "kind": ""},
+    {"name": "コロンの前に空白", "content": "フィードバック : x", "kind": ""},
+    {"name": "判断", "content": "判断: 了承。Done にする", "kind": "decision"},
+    {"name": "判断（全角）", "content": "判断：了承", "kind": "decision"},
+    {"name": "差し戻し", "content": "差し戻し: 見出しを直す", "kind": "sendback"},
+    {"name": "判断の途中", "content": "判断材料: …", "kind": ""},
+    {"name": "空", "content": "", "kind": ""}
+  ],
+  "_en": "英語の別名（DESIGN.md §5-13）。Go だけが読む（Python の issue.py は機能凍結で別名を足さない）。lead_en・excerpt_en は leadword_test.go、sequences_en は internal/server/loops_test.go（MySQL と SQLite の両方）",
+  "lead_en": [
+    {"name": "Feedback", "content": "Feedback: tester A (9/18): cannot find the save button", "kind": "feedback"},
+    {"name": "feedback（小文字）", "content": "feedback: x", "kind": "feedback"},
+    {"name": "FEEDBACK（大文字）", "content": "FEEDBACK:x", "kind": "feedback"},
+    {"name": "コロンだけ", "content": "Feedback:", "kind": "feedback"},
+    {"name": "全角コロンは認めない", "content": "Feedback：x", "kind": ""},
+    {"name": "先頭が空白", "content": " Feedback: x", "kind": ""},
+    {"name": "先頭が改行", "content": "\nFeedback: x", "kind": ""},
+    {"name": "先頭でない", "content": "Tester feedback: x", "kind": ""},
+    {"name": "コロンの前に空白", "content": "Feedback : x", "kind": ""},
+    {"name": "コロンなし", "content": "Feedback from tester", "kind": ""},
+    {"name": "語の続き", "content": "Feedbacks: x", "kind": ""},
+    {"name": "ケルビン記号を k と読まない", "content": "feedbac\u212a: x", "kind": ""},
+    {"name": "Decision", "content": "Decision: approved. Move to Done", "kind": "decision"},
+    {"name": "decision（小文字）", "content": "decision:ok", "kind": "decision"},
+    {"name": "Decision の途中", "content": "Decisions: …", "kind": ""},
+    {"name": "Changes requested", "content": "Changes requested: fix the heading", "kind": "sendback"},
+    {"name": "CHANGES REQUESTED（大文字）", "content": "CHANGES REQUESTED: x", "kind": "sendback"},
+    {"name": "Changes requested の空白が 2 つ", "content": "Changes  requested: x", "kind": ""},
+    {"name": "Changes だけ", "content": "Changes: x", "kind": ""}
+  ],
+  "excerpt_en": [
+    {"name": "英語の先頭語を除く", "content": "Feedback:  tester A\nsave button\n\nnot found", "n": 80, "out": "tester A save button not found"},
+    {"name": "小文字", "content": "feedback:abc", "n": 80, "out": "abc"}
+  ],
+  "excerpt": [
+    {"name": "先頭語と空白を除く", "content": "フィードバック:  テスター A\n保存ボタンが\n\n見つからない", "n": 80, "out": "テスター A 保存ボタンが 見つからない"},
+    {"name": "全角コロン", "content": "フィードバック：B", "n": 80, "out": "B"},
+    {"name": "切り詰め", "content": "フィードバック: あいうえおかきくけこ", "n": 5, "out": "あいうえお…"},
+    {"name": "ちょうど", "content": "フィードバック: あいうえお", "n": 5, "out": "あいうえお"}
+  ],
+  "_sequences": "判定の例（§5-8-6 の表の 6 つ）。steps は古い順。comment は本文、status は状態変更（コメントなし）。pending は未応答のコメントの番号（1 始まり・comment だけを数える）",
+  "sequences": [
+    {"name": "1. 未応答", "steps": [{"comment": "作業メモ"}, {"comment": "フィードバック: テスター A（9/18）: 保存ボタンが見つからない"}], "pending": [2]},
+    {"name": "2. コメントで応答", "steps": [{"comment": "フィードバック: テスター B: 一覧が遅い"}, {"comment": "REQ-0090 で起票。ボタンを右上に移す"}], "pending": []},
+    {"name": "3. 状態変更で応答", "steps": [{"comment": "フィードバック: テスター C: 文言が分かりにくい"}, {"status": "Done"}, {"status": "Todo"}], "pending": []},
+    {"name": "4. 重ねても外れない", "steps": [{"comment": "フィードバック: A"}, {"comment": "フィードバック：B"}], "pending": [1, 2]},
+    {"name": "5. 先頭でない", "steps": [{"comment": " フィードバック: 先頭が空白"}, {"comment": "テスターのフィードバック: 先頭でない"}], "pending": []},
+    {"name": "6. 応答の後の新しい反応", "steps": [{"comment": "フィードバック: A"}, {"comment": "対応方針: 次の周で直す"}, {"comment": "フィードバック: B"}], "pending": [3]}
+  ],
+  "sequences_en": [
+    {"name": "en1. 未応答", "steps": [{"comment": "work note"}, {"comment": "Feedback: tester A: cannot find the save button"}], "pending": [2]},
+    {"name": "en2. コメントで応答", "steps": [{"comment": "Feedback: tester B: list is slow"}, {"comment": "Filed REQ-0090. Move the button"}], "pending": []},
+    {"name": "en3. 状態変更で応答", "steps": [{"comment": "feedback: tester C: wording is unclear"}, {"status": "Done"}], "pending": []},
+    {"name": "en4. 重ねても外れない（大小・日本語との混在）", "steps": [{"comment": "FEEDBACK: A"}, {"comment": "フィードバック: B"}, {"comment": "fEeDbAcK:C"}], "pending": [1, 2, 3]},
+    {"name": "en5. 先頭語でない", "steps": [{"comment": " Feedback: leading space"}, {"comment": "Tester feedback: not at the start"}, {"comment": "Feedback：full-width colon"}, {"comment": "feedbac\u212a: kelvin sign"}], "pending": []},
+    {"name": "en6. 英語の反応に日本語で応答", "steps": [{"comment": "Feedback: A"}, {"comment": "対応方針: 次の周で直す"}, {"comment": "Feedback: B"}], "pending": [3]},
+    {"name": "en7. 判断・差し戻しは応答になる", "steps": [{"comment": "Feedback: A"}, {"comment": "Decision: keep as is"}, {"comment": "Feedback: B"}, {"comment": "Changes requested: fix it"}], "pending": []}
+  ]
+}

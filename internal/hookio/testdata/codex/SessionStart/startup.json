@@ -1,0 +1,42 @@
+{
+  "note": "Codex の SessionStart。ProjectDir は cwd の git のルート（CLAUDE_PROJECT_DIR が無い）",
+  "args": [
+    "--agent",
+    "codex"
+  ],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app/web",
+    "hook_event_name": "SessionStart",
+    "model": "gpt-5-codex",
+    "source": "startup"
+  },
+  "event": {
+    "agent": "codex",
+    "name": "SessionStart",
+    "raw_name": "SessionStart",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app/web",
+    "project_dir": "/home/dev/work/sample-app",
+    "source": "startup"
+  },
+  "result": {
+    "context": "毎セッション守る規律（kit/loop の rules から注入）"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": "毎セッション守る規律（kit/loop の rules から注入）"
+      }
+    },
+    "exit_code": 0
+  }
+}

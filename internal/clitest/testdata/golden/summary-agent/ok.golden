@@ -1,0 +1,61 @@
+# summary-agent/ok
+$ issue summary --agent claude-code --limit 3
+
+#### exit 0
+
+#### stdout
+══ ① いまの周（AI の作業） ══
+── 進行中（In Progress） ──
+ID        TYPE        STATUS      PRI BLOCKED  ASSIGNEE     TITLE
+DEMO-0001 task        In Progress P1  -        alice        ログイン画面を作る
+
+── 着手可能（ready・上位 1 / 全 1 件） ──
+ID        TYPE        STATUS      PRI BLOCKED   TITLE
+DEMO-0002 bug         Todo        P0  DEMO-0001 保存でエラーになる
+
+── 下位がすべて完了した要件（検証して close・1 件） ──
+DEMO-0003 認証の要件（Done 2 件・Canceled 1 件）→ looptrack issue close DEMO-0003
+
+══ ② 人の判断待ち（In Review 1 件・48 時間超 1 件） ══
+DEMO-0003 requirement In Review   P2  3 日        [48h超]  認証の要件  （直近の verify は MCP の自己申告）
+
+══ ③ 外からの反応（未応答のフィードバック 2 件・1 イシュー） ══
+DEMO-0003 2024-05-02 10:00 から 2 件  ボタンが小さい
+
+未クローズ 3 件（bug 1 件）
+トークン情報の未付与 1 件（DEMO-0001）。looptrack issue usage attach DEMO-0001 で付けてください
+
+── トークンレポートの作成依頼（未完了 1 件） ──
+#7 2024-05-03 09:00 登録（carol）期間: 2024-04-01〜2024-04-30 対象: demo メモ: 月次 報告
+次のコマンド: looptrack issue usage report --request 7 --json
+
+【配布スクリプトの更新】looptrack が古い版です。looptrack issue init で更新してください
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/projects/demo/summary?limit=3
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+POST /im/api/v1/projects/demo/install
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "agent": "claude-code",
+      "client": {
+        "arch": "$GOARCH",
+        "os": "$GOOS",
+        "version": "$VERSION"
+      },
+      "files": {},
+      "host": "$HOST",
+      "source": "",
+      "trigger": "hook",
+      "workspace": "ws"
+    }
+
+#### files (0)

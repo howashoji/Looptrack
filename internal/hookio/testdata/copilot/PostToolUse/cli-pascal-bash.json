@@ -1,0 +1,62 @@
+{
+  "note": "CLI の PascalCase の配線（VS Code 互換の形式）。結果は tool_result（result_type・text_result_for_llm）",
+  "args": [
+    "--agent",
+    "copilot"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "hook_event_name": "PostToolUse",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "timestamp": "2026-09-18T12:00:00.000Z",
+    "cwd": "/home/dev/work/sample-app",
+    "tool_name": "bash",
+    "tool_input": {
+      "command": "git commit -m x"
+    },
+    "tool_result": {
+      "result_type": "success",
+      "text_result_for_llm": "[main abc1234] x"
+    }
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "PostToolUse",
+    "raw_name": "PostToolUse",
+    "shape": "snake_case",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Bash",
+      "raw_name": "bash",
+      "name": "bash",
+      "input": {
+        "command": "git commit -m x"
+      },
+      "response": {
+        "raw": {
+          "result_type": "success",
+          "text_result_for_llm": "[main abc1234] x"
+        },
+        "text": "[main abc1234] x"
+      }
+    }
+  },
+  "result": {
+    "context": "作業の完了を検知しました（コミット）"
+  },
+  "output": {
+    "stdout": {
+      "additionalContext": "作業の完了を検知しました（コミット）",
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "作業の完了を検知しました（コミット）"
+      }
+    },
+    "exit_code": 0
+  }
+}

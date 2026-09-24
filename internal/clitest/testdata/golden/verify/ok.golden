@@ -1,0 +1,50 @@
+# verify/ok
+$ issue verify DEMO-0001
+
+#### exit 0
+
+#### stdout
+DEMO-0001 の検証コマンド 2 件を実行します（場所: $TMP/ws・本文 01234567）
+[1/2] $ echo ok
+[1/2] ok      echo ok（$SEC 秒）
+[2/2] $ printf '出力\n2 行目\n'
+[2/2] ok      printf '出力\n2 行目\n'（$SEC 秒）
+結果: 2/2 成功（$SEC 秒）
+verify を記録: DEMO-0001（2/2 成功）
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+POST /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "body_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "host": "$HOST",
+      "results": [
+        {
+          "command": "echo ok",
+          "duration_ms": 0,
+          "exit_code": 0,
+          "output_tail": "ok\n",
+          "status": "ok"
+        },
+        {
+          "command": "printf '出力\\n2 行目\\n'",
+          "duration_ms": 0,
+          "exit_code": 0,
+          "output_tail": "出力\n2 行目\n",
+          "status": "ok"
+        }
+      ],
+      "workspace": "ws"
+    }
+
+#### files (0)

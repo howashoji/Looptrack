@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "layer": "loop",
+  "entries": [
+    {"name": "hooks/session-start-rules", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 5, "order": 10,
+     "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
+    {"name": "hooks/session-start-memories", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 5, "order": 20,
+     "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
+    {"name": "hooks/session-start-iteration", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 10, "order": 30,
+     "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
+    {"name": "hooks/session-start-worktrees", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 10, "order": 40,
+     "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
+
+    {"name": "hooks/user-prompt-rules", "kind": "hook", "runner": "looptrack", "event": "UserPromptSubmit", "matcher": null, "timeout": 5, "order": 10,
+     "codex": {"event": "UserPromptSubmit", "matcher": null}, "copilot": {"event": "UserPromptSubmit", "matcher": null}},
+    {"name": "hooks/user-prompt-task-mode", "kind": "hook", "runner": "looptrack", "event": "UserPromptSubmit", "matcher": null, "timeout": 5, "order": 20,
+     "codex": {"event": "UserPromptSubmit", "matcher": null}, "copilot": {"event": "UserPromptSubmit", "matcher": null}},
+    {"name": "hooks/session-scope-guard", "kind": "hook", "runner": "looptrack", "event": "UserPromptSubmit", "matcher": null, "timeout": 10, "order": 30,
+     "codex": {"event": "UserPromptSubmit", "matcher": null}, "copilot": {"event": "UserPromptSubmit", "matcher": null}},
+    {"name": "hooks/user-prompt-stale-base", "kind": "hook", "runner": "looptrack", "event": "UserPromptSubmit", "matcher": null, "timeout": 5, "order": 40,
+     "codex": {"event": "UserPromptSubmit", "matcher": null}, "copilot": {"event": "UserPromptSubmit", "matcher": null}},
+
+    {"name": "hooks/pre-edit-task-mode-guard", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Edit|Write|NotebookEdit", "timeout": 5, "order": 10,
+     "codex": null, "copilot": {"event": "PreToolUse", "matcher": null}},
+    {"name": "hooks/pre-tool-scope-guard", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Edit|Write|NotebookEdit|Bash|mcp__.*", "timeout": 5, "order": 20,
+     "codex": null, "copilot": null},
+    {"name": "hooks/pre-tool-secrets-guard", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Edit|Write|NotebookEdit|Read|Bash", "timeout": 5, "order": 30,
+     "codex": null, "copilot": {"event": "PreToolUse", "matcher": null}},
+    {"name": "hooks/pre-tool-git-guard", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Bash", "timeout": 5, "order": 40,
+     "codex": null, "copilot": {"event": "PreToolUse", "matcher": null}},
+    {"name": "hooks/pre-tool-subagent-bound", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Task|Agent", "timeout": 5, "order": 50,
+     "codex": null, "copilot": null},
+    {"name": "hooks/pre-tool-wait-loop-guard", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Bash", "timeout": 5, "order": 60,
+     "codex": null, "copilot": {"event": "PreToolUse", "matcher": null}},
+
+    {"name": "hooks/post-work-complete-handoff-mark", "kind": "hook", "runner": "looptrack", "event": "PostToolUse", "matcher": "Bash|mcp__.*", "timeout": 5, "order": 10,
+     "codex": {"event": "PostToolUse", "matcher": null}, "copilot": {"event": "PostToolUse", "matcher": null}},
+
+    {"name": "hooks/stop-tool-markup-guard", "kind": "hook", "runner": "looptrack", "event": "Stop", "matcher": null, "timeout": 5, "order": 10,
+     "codex": null, "copilot": null},
+    {"name": "hooks/stop-handoff-freshness", "kind": "hook", "runner": "looptrack", "event": "Stop", "matcher": null, "timeout": 10, "order": 20,
+     "codex": {"event": "Stop", "matcher": null, "block": false}, "copilot": {"event": "Stop", "matcher": null}},
+    {"name": "hooks/stop-runaway-background-process", "kind": "hook", "runner": "looptrack", "event": "Stop", "matcher": null, "timeout": 5, "order": 30,
+     "codex": {"event": "Stop", "matcher": null, "block": false}, "copilot": null},
+
+    {"name": "hooks/subagent-stop-runaway-background-process", "kind": "hook", "runner": "looptrack", "event": "SubagentStop", "matcher": null, "timeout": 5, "order": 10,
+     "codex": null, "copilot": null},
+
+    {"name": "rules/output-discipline.md", "kind": "rules", "codex": null, "copilot": null},
+    {"name": "rules/working-discipline.md", "kind": "rules", "codex": {"agents_md": "sections"}, "copilot": {"agents_md": "sections"}},
+    {"name": "rules/iteration-discipline.md", "kind": "rules", "codex": {"agents_md": "sections"}, "copilot": {"agents_md": "sections"}},
+    {"name": "rules/background-process.md", "kind": "rules", "codex": {"agents_md": "sections"}, "copilot": {"agents_md": "sections"}},
+    {"name": "rules/secrets-discipline.md", "kind": "rules", "codex": {"agents_md": "sections"}, "copilot": {"agents_md": "sections"}},
+
+    {"name": "skills/iterate/SKILL.md", "kind": "skill", "codex": {"agents_md": "description"}, "copilot": {"agents_md": "description"}},
+    {"name": "skills/session-handoff/SKILL.md", "kind": "skill", "codex": {"agents_md": "description"}, "copilot": {"agents_md": "description"}}
+  ]
+}

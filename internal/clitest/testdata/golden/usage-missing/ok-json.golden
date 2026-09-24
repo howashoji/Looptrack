@@ -1,0 +1,38 @@
+# usage-missing/ok-json
+$ issue usage missing --json
+
+#### exit 0
+
+#### stdout
+{
+  "rate": 0.75,
+  "days": 30,
+  "mine": true,
+  "target": 4,
+  "attached": 3,
+  "missing_count": 1,
+  "humans": 2,
+  "missing": [
+    {
+      "at": "2024-05-02T03:00:00Z",
+      "issue": "DEMO-0002",
+      "kind": "status",
+      "via": "mcp",
+      "user": "alice",
+      "title": "保存でエラーになる"
+    }
+  ],
+  "issues": [
+    "DEMO-0002"
+  ]
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/coverage?days=30&mine=1
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

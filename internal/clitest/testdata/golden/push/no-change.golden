@@ -1,0 +1,13 @@
+# push/no-change
+$ issue push DEMO-0001
+
+#### exit 0
+
+#### stdout
+変更なし: DEMO-0001
+
+#### stderr
+
+#### requests (0)
+
+#### files (0)

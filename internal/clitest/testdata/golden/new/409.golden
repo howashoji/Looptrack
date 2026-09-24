@@ -1,0 +1,45 @@
+# new/409
+$ issue new 新しい不具合 --type bug --priority P1 --labels ui,api --parent DEMO-0003 --blocked-by 'DEMO-0001 DEMO-0002' --traces DEMO-0003 --refs FR-1,UC-2 --body '再現手順:
+1. 保存する' --assignee me
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: DEMO-0001 は他の操作で Done になっています
+
+#### requests (1)
+POST /im/api/v1/projects/demo/issues
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "assignee": "me",
+      "blocked_by": [
+        "DEMO-0001",
+        "DEMO-0002"
+      ],
+      "body": "再現手順:\n1. 保存する",
+      "labels": [
+        "ui",
+        "api"
+      ],
+      "override_reason": "",
+      "parent": "DEMO-0003",
+      "priority": "P1",
+      "refs": [
+        "FR-1",
+        "UC-2"
+      ],
+      "status": "Todo",
+      "title": "新しい不具合",
+      "traces": [
+        "DEMO-0003"
+      ],
+      "type": "bug"
+    }
+
+#### files (0)

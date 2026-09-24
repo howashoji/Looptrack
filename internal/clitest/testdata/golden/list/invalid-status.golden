@@ -1,0 +1,13 @@
+# list/invalid-status
+$ issue list --status Doing
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --status は Backlog / Todo / In Progress / In Review / Done / Canceled のいずれかです（指定値: Doing）
+
+#### requests (0)
+
+#### files (0)

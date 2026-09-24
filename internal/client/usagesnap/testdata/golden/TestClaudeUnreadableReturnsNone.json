@@ -1,0 +1,10 @@
+[
+ {
+  "call": "{\"fn\":\"collect\",\"client\":\"claude-code\",\"path\":\"/no/such/file\",\"sid\":\"x\",\"env\":{\"HOME\":\"<TMP>/001\"}}",
+  "out": "null"
+ },
+ {
+  "call": "{\"fn\":\"claude\",\"path\":\"<TMP>/001/.claude/projects/-Users-x-proj/sess-5.jsonl\",\"sid\":\"sess-5\",\"env\":{\"HOME\":\"<TMP>/001\"}}",
+  "out": "null"
+ }
+]

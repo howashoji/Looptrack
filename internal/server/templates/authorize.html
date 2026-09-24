@@ -1,0 +1,19 @@
+{{define "authorize.html"}}{{template "head" (headData .Lang (T .Lang "server.web.authorize.title"))}}
+{{template "nav" .}}
+<main class="page">
+  <h1>{{T .Lang "server.web.authorize.h1"}}</h1>
+  <p><strong>{{.Client}}</strong>{{T .Lang "server.web.authorize.asking_middle"}}<code>{{.Host}}</code>{{T .Lang "server.web.authorize.asking_after"}}</p>
+  <ul>
+    <li>{{T .Lang "server.web.authorize.scope"}}</li>
+    <li>{{T .Lang "server.web.authorize.expiry"}}</li>
+    <li>{{T .Lang "server.web.authorize.revoke_before"}}<a href="{{base}}/account">{{T .Lang "server.web.common.account_settings"}}</a>{{T .Lang "server.web.authorize.revoke_after"}}</li>
+  </ul>
+  <p class="muted">{{T .Lang "server.web.authorize.warn"}}</p>
+  <form method="post" action="{{base}}/oauth/authorize">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="query" value="{{.Query}}">
+    <button type="submit" name="approve" value="1">{{T .Lang "server.web.authorize.approve"}}</button>
+    <button type="submit" name="approve" value="0" class="link">{{T .Lang "server.web.authorize.deny"}}</button>
+  </form>
+</main>
+{{template "foot"}}{{end}}

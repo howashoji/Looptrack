@@ -1,0 +1,6 @@
+[
+ {
+  "call": "{\"fn\":\"detect\",\"cwd\":\"/nowhere\",\"env\":{\"COPILOT_HOME\":\"<TMP>/001/.copilot\",\"HOME\":\"<TMP>/001\"}}",
+  "out": "[null, null, null]"
+ }
+]

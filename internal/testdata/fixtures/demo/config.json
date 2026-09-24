@@ -1,0 +1,7 @@
+{
+  "prefix": "DEMO",
+  "width": 4,
+  "name": "デモ図書館",
+  "description": "合成フィクスチャ（架空の貸出管理アプリ）",
+  "order": 1
+}

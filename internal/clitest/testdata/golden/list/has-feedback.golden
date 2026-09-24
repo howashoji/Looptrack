@@ -1,0 +1,22 @@
+# list/has-feedback
+$ issue list --has-feedback
+
+#### exit 0
+
+#### stdout
+ID        TYPE        STATUS      PRI BLOCKED  ASSIGNEE     TITLE
+DEMO-0003 requirement In Review   P2  -        bob(!)       認証の要件
+(!) は担当がこのプロジェクトで変更できなくなった（権限の解除・無効化）もの。引き継ぐなら assign（MCP は assign_issue）
+
+1 件
+未応答のフィードバック: DEMO-0003 2 件
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?has_feedback=1&sort=priority
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

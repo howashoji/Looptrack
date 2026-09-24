@@ -1,0 +1,25 @@
+# status/404
+$ issue status DEMO-0002 'In Progress' --comment 着手 --override 急ぎ --assignee me
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシューが見つかりません: DEMO-0999
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0002/status?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "assignee": "me",
+      "comment": "着手",
+      "override_reason": "急ぎ",
+      "status": "In Progress"
+    }
+
+#### files (0)

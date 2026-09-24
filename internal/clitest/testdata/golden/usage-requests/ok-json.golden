@@ -1,0 +1,45 @@
+# usage-requests/ok-json
+$ issue usage requests --all --json
+
+#### exit 0
+
+#### stdout
+{
+  "items": [
+    {
+      "id": 6,
+      "created_at": "2024-04-01T00:00:00Z",
+      "done": true,
+      "report": {
+        "id": 2,
+        "name": "2024-04 月次"
+      },
+      "requested_by": "carol",
+      "period": "2024-03",
+      "target": "",
+      "note": "",
+      "command": ""
+    },
+    {
+      "id": 7,
+      "created_at": "2024-05-03T00:00:00Z",
+      "done": false,
+      "report": null,
+      "requested_by": "carol",
+      "period": "2024-04-01〜2024-04-30",
+      "target": "demo",
+      "note": "月次\n報告",
+      "command": "looptrack issue usage report --request 7 --json"
+    }
+  ]
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/requests?all=1
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

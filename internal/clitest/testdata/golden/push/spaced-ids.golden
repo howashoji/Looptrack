@@ -1,0 +1,83 @@
+# push/spaced-ids
+$ issue push DEMO-0001
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: blocked_by の値 'DEMO-0002 DEMO-0003' は使えません（ID に空白は含められません。複数の ID はカンマで区切ってください: blocked_by: [DEMO-0002, DEMO-0003]）。.claude/.looptrack-work/DEMO-0001.md を直してから push し直してください
+
+#### requests (0)
+
+#### files (3)
+ws/.claude/.looptrack-work/DEMO-0001.base.md (0644)
+    ---
+    id: DEMO-0001
+    title: ログイン画面を作る
+    type: task
+    status: In Progress
+    assignee: alice
+    priority: P1
+    labels: []
+    parent: ""
+    blocked_by: []
+    traces: []
+    refs: []
+    created: 2024-05-01 10:00
+    updated: 2024-05-02 11:30
+    ---
+
+    # DEMO-0001 ログイン画面を作る
+
+    ## 内容
+
+    ログイン画面を作る。
+
+    ## 受け入れ条件
+
+    - [ ] ID とパスワードでログインできる
+
+    ## コメント
+
+    ### 2024-05-02 11:30
+
+    着手。
+ws/.claude/.looptrack-work/DEMO-0001.json (0644)
+    {
+      "id": "DEMO-0001",
+      "project": "demo",
+      "version": 3
+    }
+ws/.claude/.looptrack-work/DEMO-0001.md (0644)
+    ---
+    id: DEMO-0001
+    title: ログイン画面を作る
+    type: task
+    status: In Progress
+    assignee: alice
+    priority: P1
+    labels: []
+    parent: ""
+    blocked_by: [DEMO-0002 DEMO-0003]
+    traces: []
+    refs: []
+    created: 2024-05-01 10:00
+    updated: 2024-05-02 11:30
+    ---
+
+    # DEMO-0001 ログイン画面を作る
+
+    ## 内容
+
+    ログイン画面を作る。
+
+    ## 受け入れ条件
+
+    - [ ] ID とパスワードでログインできる
+
+    ## コメント
+
+    ### 2024-05-02 11:30
+
+    着手。

@@ -1,0 +1,46 @@
+{
+  "forbid_status": {
+    "statuses": [
+      "Backlog"
+    ],
+    "message": "「{status}」はこのプロジェクトでは使わない状態です（docs/projects/example.md 運用ルール 2）。\n\n{id} の行き先は次のどちらかです。\n\n  ・まだ着手しない → \"Todo\"（優先度は priority で表す）\n  ・着手した → \"In Progress\"\n\n未着手の置き場を Todo に一本化し、next・ready の対象から漏れるイシューを作らないための規則です。"
+  },
+  "done_requires_keyword": {
+    "keyword": "動作確認",
+    "statuses": [
+      "Done"
+    ],
+    "message": "{id} を「{status}」にするには、コメントに「動作確認」の記録が必要です（docs/projects/example.md 運用ルール 3）。\n\n次のどちらかを行ってください。\n\n  1. 開発環境で動作確認を行い、結果をコメントに残す\n  2. 動かして確かめるものが無い課題（調査・文書のみ 等）であれば、「動作確認: 対象外（理由）」と明記する\n\n例:\n  looptrack issue close {id} --comment \"… 動作確認: PASS（操作と確認した内容）\"",
+    "create_message": "「{status}」で起票することはできません（コメントに「動作確認」の記録が必要です。docs/projects/example.md 運用ルール 3）。\n\nTodo で起票し、作業と確認の結果をコメントに残してから\n  looptrack issue close <ID> --comment \"… 動作確認: PASS（操作と確認した内容）\"\nで完了にしてください。"
+  },
+  "require_comment_before": {
+    "statuses": [
+      "In Progress",
+      "Done"
+    ],
+    "message": "{id} のコメントが 0 件のまま「{status}」にしようとしています（docs/projects/example.md 運用ルール 4）。\n\n状態を進める前に、着手の方針や調査・修正・確認の結果をコメントに残してください。\n\n例: looptrack issue comment {id} \"…\"\nstatus / close の --comment で同時に残すこともできます。",
+    "create_message": "コメントが無いまま「{status}」で起票することはできません（docs/projects/example.md 運用ルール 4）。\n\nTodo で起票してから、コメントを付けて進めてください。\n例: looptrack issue status <ID> \"{status}\" --comment \"…\""
+  },
+  "forbid_checkbox_pattern": {
+    "env": "(?i)(test|staging|master|本番|テスト環境|ステージング|各環境|全環境|他環境)",
+    "action": "(マージ|反映|デプロイ|リリース)",
+    "ask": "(依頼|お願い|ください|下さい|してもら|していただ)",
+    "exempt": "(誤り|訂正|対象外|~~|しない|できない)",
+    "message": "イシューの受け入れ条件に「環境への反映・マージの依頼」を書こうとしています（docs/projects/example.md 運用ルール 5）。\n\n検出した行: {hit}\n\n受け入れ条件は、このイシューの作業で確かめられることだけにします。\n他の環境への反映は別の手順（リリース作業）で行うもので、依頼を書いてもイシューの完了は判定できません。\n\n書き直し方:\n  ✗ - [ ] staging / 本番への反映を依頼した\n  ◯ 本文の注記に「staging / 本番は未反映」と事実だけを書く"
+  },
+  "usage": {
+    "require_on_close": true,
+    "case_pattern": "CASE-\\d+",
+    "message": "クローズ前にこの会話のトークン情報を付けてください（{command}。CLI は拒否されると自動で 1 回やり直す）。付けられない理由があるときは --override \"理由\"。"
+  },
+  "verify": {
+    "require_on_close": true
+  },
+  "acceptance": {
+    "require_on_close": true,
+    "statuses": [
+      "Done"
+    ],
+    "message": "{id} の「## 受け入れ条件」が起票の雛形のままです（中身のある項目が 1 つもありません。docs/projects/example.md 運用ルール 10）。\n\n「{status}」にする前に、何をもって完了とするかを本文に書いてください。\n\n  {command}\n\n受け入れ条件を書けない種類のイシュー（記録・調査のみ 等）は、理由を付けて上書きできます。\n例: looptrack issue close {id} --override \"記録のみのイシューのため受け入れ条件なし\""
+  }
+}

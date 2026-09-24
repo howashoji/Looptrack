@@ -1,0 +1,144 @@
+# init --project demo --agent codex --dry-run
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI codex・dry-run）
+kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
+配線: looptrack hook <名前> --agent <AI>
+導入セット: core のみ。loop は入れていません（--loop で入る）
+  作成         .codex/hooks.json
+      --- /dev/null
+      +++ b/.codex/hooks.json
+      @@ -0,0 +1,49 @@
+      +{
+      +  "hooks": {
+      +    "SessionStart": [
+      +      {
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent codex",
+      +            "timeout": 10
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "PostToolUse": [
+      +      {
+      +        "matcher": "mcp__.*",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+      +            "timeout": 10
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "Stop": [
+      +      {
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+      +            "timeout": 10
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "SessionEnd": [
+      +      {
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+      +            "timeout": 10
+      +          }
+      +        ]
+      +      }
+      +    ]
+      +  }
+      +}
+  作成         .codex/config.toml
+      --- /dev/null
+      +++ b/.codex/config.toml
+      @@ -0,0 +1,3 @@
+      +# looptrack issue init が足した: AI が打つ looptrack issue にイシュー管理サーバの場所を渡す（サンドボックスのネットワークの許可ではない）
+      +[shell_environment_policy]
+      +set = { LOOPTRACK_API_URL = "http://127.0.0.1:9/im", LOOPTRACK_PROJECT = "demo" }
+  作成         AGENTS.md
+      --- /dev/null
+      +++ b/AGENTS.md
+      @@ -0,0 +1,23 @@
+      +<!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
+      +## 課題管理（イシュー管理サーバ）
+      +
+      +**作業はイシュー登録から始める。会話だけで進めない。不具合は発覚と同時に起票する。**
+      +
+      +- **操作は MCP のツール（サーバ名 looptrack）で行う。** Codex のサンドボックスはシェルのコマンドの外部通信を止めるので、
+      +  CLI（`looptrack issue`）は実行のたびに権限の昇格（利用者の承認）が要る。MCP のツールの通信はサンドボックスに止められない
+      +- **使い方とルールは最初に `guide` ツールで読む**（共通規則 + このプロジェクトのルール + 運用文書を 1 回で返す）
+      +- ループ運用の 1 周: `next`（着手）→ 作業 → `add_comment`（分かった時点で記録）→ 受け入れ条件を検証 → `set_status` で Done（`comment` に検証結果）→ 次の `next`。
+      +  起票は `create_issue`、本文の編集は `get_issue` で version と全文を取り `update_issue` に直した全文を渡す。拒否されたらメッセージの指示に従う
+      +- 検証コマンド（本文の「## 検証コマンド」節）: `verify_issue` で一覧を取り、手元のシェルで順に全部実行して、結果を `report_verify` で送る
+      +- トークン情報: MCP で起票・コメント・状態変更をすると、フック（`.codex/hooks.json` の `looptrack hook usage`）が数秒後にイシューへ付ける。
+      +  Done の前に `add_comment` で経過を残しておけば、規則 usage（AI の Done にトークン情報を求める）に拒否されない
+      +- CLI は MCP に無い操作だけに使う。権限を上げて実行し、利用者の承認を得る（環境変数 `LOOPTRACK_API_URL=http://127.0.0.1:9/im` / `LOOPTRACK_PROJECT=demo` は init が `.codex/config.toml` に書いた。
+      +  `looptrack issue config` がサーバの URL が無いというエラーで止まるなら、コマンドの前に `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` を付ける）:
+      +  - `looptrack issue usage attach <ID>`: ツールの結果にこのコマンドが示されたとき（目印は文面ではなくコマンド。サーバの文面は利用者の言語で変わる）。`set_status` が規則 usage で拒否されたときは、
+      +    数秒おいて 1 回やり直し（フックの送信が間に合っていないことがある）、それでも拒否されたら付けてからやり直す
+      +  - `looptrack issue login --browser --url http://127.0.0.1:9/im`: 初回だけ（フックが使うトークン。開いたブラウザで利用者がログインと承認をする。トークンは会話に出ない）
+      +  - 導入・更新（`init`・`installed`）: `setup` ツールが返す手順どおり
+      +- MCP の looptrack が接続されていないときは、CLI の `next` / `comment` / `verify` / `close --comment` で同じ 1 周を回す（毎回承認が要る。
+      +  利用者に `~/.codex/config.toml` への `[mcp_servers.looptrack]` の追加を勧める）。本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡す
+      +- 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
+      +<!-- looptrack:end -->
+  作成         .claude/.looptrack-kit.json
+      --- /dev/null
+      +++ b/.claude/.looptrack-kit.json
+      @@ -0,0 +1,21 @@
+      +{
+      +  "version": 1,
+      +  "url": "http://127.0.0.1:9/im",
+      +  "project": "demo",
+      +  "agent": [
+      +    "codex"
+      +  ],
+      +  "source": "copy",
+      +  "core": {
+      +    "bundle_sha256": "$SHA256",
+      +    "files": {
+      +      "kit/core/skills/issue/SKILL.md": "$SHA256",
+      +      "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+      +      "kit/core/skills/token-report/SKILL.md": "$SHA256",
+      +      "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+      +    }
+      +  },
+      +  "loop": {
+      +    "installed": false
+      +  }
+      +}
+dry-run のため何も書いていません。反映は --dry-run を外して再実行
+次に:
+  1. トークンが未登録: looptrack issue login --browser --url http://127.0.0.1:9/im を実行し、開いたブラウザで利用者がログインと承認をする（AI が実行してよい。待ち受けは最長 5 分なので、コマンドのタイムアウトは 5 分より長くする。ブラウザの無い環境は http://127.0.0.1:9/im/account で発行して login --url http://127.0.0.1:9/im に貼る）
+  2. 確認（Codex）: 新しいセッションで MCP の setup が「導入済み」を返し、guide → next（dry_run）が通る。CLI は MCP に無い操作だけ（AGENTS.md）
+Codex の設定:
+
+  - AI の操作は MCP のツールが主（AGENTS.md の案内）。MCP の接続は ~/.codex/config.toml に利用者が足す（init は書かない）:
+
+      [mcp_servers.looptrack]
+      url = "http://127.0.0.1:9/im/mcp"
+      http_headers = { "X-Looptrack-Project" = "demo" }
+      # 認証はブラウザでの許可（codex mcp login looptrack）
+
+  - .codex/config.toml（プロジェクト）の [shell_environment_policy] の set に LOOPTRACK_API_URL / LOOPTRACK_PROJECT を init が書いた
+    （MCP に無い操作で AI が打つ looptrack issue 用。サンドボックスのネットワークの許可は書かない。CLI は実行のたびに利用者の承認が要る）
+  - フックの信頼: Codex のフックは、プロジェクトが信頼済み（trusted）で、かつフックごとに信頼したものだけが動く（未信頼・変わったフックは知らせなしに飛ばされる）。ターミナルの Codex CLI（codex）をこのディレクトリで起動し、/hooks で .codex/hooks.json のフックを確認して信頼する。信頼は ~/.codex/config.toml の [hooks.state] に記録され、デスクトップ版にも効く（デスクトップ版のチャット欄の /hooks はコマンドにならない）。その後に始めたセッションから動く
+  - init がフックの配線を変えたとき（再実行で「更新 .codex/hooks.json」）も、変わったフックを同じ手順で信頼し直す
+  - 旧来の notify はフックで置き換えた（既存の notify 設定は変えない。フックの無い古い Codex は更新する）
+  - 鮮度ガード（Stop で止める）は Claude Code だけに配線する
+
+#### stderr
+
+#### files

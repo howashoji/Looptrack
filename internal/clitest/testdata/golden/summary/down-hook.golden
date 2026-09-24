@@ -1,0 +1,16 @@
+# summary/down-hook
+$ issue summary --agent claude-code
+
+#### exit 0
+
+#### stdout
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/summary?limit=10
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,29 @@
+# summary/old-server
+$ issue summary
+
+#### exit 0
+
+#### stdout
+── 進行中（In Progress） ──
+該当なし
+
+── レビュー待ち（In Review） ──
+ID        TYPE        STATUS      PRI BLOCKED  ASSIGNEE     TITLE
+DEMO-0003 requirement In Review   P2  -        bob(!)       認証の要件
+(!) は担当がこのプロジェクトで変更できなくなった（権限の解除・無効化）もの。引き継ぐなら assign（MCP は assign_issue）
+
+── 着手可能（ready・上位 5 / 全 5 件） ──
+ID        TYPE        STATUS      PRI BLOCKED   TITLE
+DEMO-0002 bug         Todo        P0  DEMO-0001 保存でエラーになる
+
+未クローズ 2 件（bug 0 件）
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/summary?limit=10
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

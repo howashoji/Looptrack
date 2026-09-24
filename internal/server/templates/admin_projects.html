@@ -1,0 +1,81 @@
+{{define "admin_projects.html"}}{{template "head" (headData .Lang (T .Lang "server.web.common.admin_projects"))}}
+{{template "nav" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.common.admin_projects"}}</h1>
+  <p class="muted">{{T .Lang "server.web.admin_projects.intro_1"}}<strong>{{T .Lang "server.web.admin_projects.intro_strong"}}</strong>{{T .Lang "server.web.admin_projects.intro_2"}}<a href="{{base}}/admin/users">{{T .Lang "server.web.common.admin_users"}}</a>{{T .Lang "server.web.admin_projects.intro_3"}}</p>
+  {{template "messages" .}}
+  {{template "replacement" .}}
+  {{range .Projects}}
+  {{$act := printf "%s/admin/projects/%s/member" base .Slug}}
+  <section class="panel" id="p-{{.Slug}}">
+    <h2>{{.Name}} <span class="muted">{{.Slug}}{{T $.Lang "server.web.admin_user.sep"}}{{.Prefix}}-nnnn{{T $.Lang "server.web.admin_user.sep"}}{{if .MyRole}}{{T $.Lang "server.web.admin_projects.my_role" "role" .MyRole}}{{else}}{{T $.Lang "server.web.admin_projects.not_member"}}{{end}}</span></h2>
+    <p><a href="{{base}}/p/{{.Slug}}/">{{T $.Lang "server.web.admin_projects.open"}}</a></p>
+    <table class="list">
+      <thead><tr><th>{{T $.Lang "server.web.admin_users.th_login"}}</th><th>{{T $.Lang "server.web.admin_users.th_name"}}</th><th>{{T $.Lang "server.web.admin_projects.th_role"}}</th></tr></thead>
+      <tbody>
+      {{range .Members}}
+      <tr{{if .Disabled}} class="inactive"{{end}}>
+        <td><a href="{{base}}/admin/users/{{.Login}}">{{.Login}}</a>{{if .Disabled}} <span class="muted">{{T $.Lang "server.web.admin_users.state_disabled"}}</span>{{end}}</td><td>{{.Name}}</td>
+        <td><form method="post" action="{{$act}}" class="row tight">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="login" value="{{.Login}}">
+          <select name="role"><option value="">{{T $.Lang "server.web.admin_projects.member_none"}}</option>{{$cur := .Role}}{{range $.MemberRoles}}<option value="{{.}}"{{if eq . $cur}} selected{{end}}>{{.}}</option>{{end}}</select>
+          <button type="submit" class="small">{{T $.Lang "server.web.admin_user.member_submit"}}</button>
+        </form></td>
+      </tr>
+      {{else}}
+      <tr><td colspan="3" class="muted">{{T $.Lang "server.web.admin_projects.no_members"}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{if .Candidates}}
+    <form method="post" action="{{$act}}" class="row">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <label>{{T $.Lang "server.web.admin_projects.candidate"}}<select name="login">{{range .Candidates}}<option value="{{.Login}}">{{.Login}}{{if .Name}}{{T $.Lang "server.web.admin_projects.user_name" "name" .Name}}{{end}}</option>{{end}}</select></label>
+      <label>{{T $.Lang "server.web.admin_projects.th_role"}}<select name="role">{{range $.MemberRoles}}<option value="{{.}}"{{if eq . "editor"}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+      <button type="submit">{{T $.Lang "server.web.admin_users.add_submit"}}</button>
+    </form>
+    {{end}}
+    <h3 id="prompts-{{.Slug}}">{{T $.Lang "server.web.admin_projects.prompts"}}{{if .SendPrompts.Enabled}}<strong>{{T $.Lang "server.web.admin_projects.prompts_on"}}</strong>{{else}}{{T $.Lang "server.web.admin_projects.prompts_off"}}{{end}}</h3>
+    <form method="post" action="{{base}}/admin/projects/{{.Slug}}/send-prompts" class="row">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      {{if .SendPrompts.Enabled}}<input type="hidden" name="enabled" value="off"><button type="submit" class="small">{{T $.Lang "server.web.admin_projects.prompts_set_off"}}</button>
+      {{else}}<input type="hidden" name="enabled" value="on"><button type="submit" class="small">{{T $.Lang "server.web.admin_projects.prompts_set_on"}}</button>{{end}}
+      {{if .SendPrompts.Last}}<span class="muted">{{T $.Lang "server.web.admin_projects.last_change"}}{{.SendPrompts.Last}}</span>{{end}}
+    </form>
+  </section>
+  {{else}}
+  <p class="muted">{{T .Lang "server.web.admin_projects.no_projects"}}</p>
+  {{end}}
+  <section class="panel" id="new">
+    <h2>{{T .Lang "server.web.project.new_h2"}}</h2>
+    <form method="post" action="{{base}}/admin/projects" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.project.slug_label"}}<input name="slug" value="{{.Form.slug}}" maxlength="64" pattern="[a-z0-9][a-z0-9\-]*" autocomplete="off" required></label>
+      <label>{{T .Lang "server.web.project.prefix_label"}}<input name="prefix" value="{{.Form.prefix}}" maxlength="24" pattern="[A-Z][A-Z0-9]*(-[A-Z0-9]+)*" autocomplete="off"></label>
+      <label>{{T .Lang "server.web.project.name_label"}}<input name="name" value="{{.Form.name}}" maxlength="255"></label>
+      <button type="submit">{{T .Lang "server.web.admin_projects.new_submit"}}</button>
+    </form>
+    <p class="muted">{{T .Lang "server.web.admin_projects.new_note"}}</p>
+  </section>
+  <p class="muted">{{T .Lang "server.web.admin.roles_note"}}</p>
+  <p class="muted">{{T .Lang "server.web.admin_projects.prompts_note"}}</p>
+</main>
+{{template "foot"}}{{end}}
+
+{{/* 参加を外す・viewer に下げる相手が担当の未クローズのイシューを持つときの、代わりの担当者の選択（利用者の画面と共用）。
+     .Lang に届くように、呼び出し側は画面全体のデータを渡す（中で .Pending を取り出す）。 */}}
+{{define "replacement"}}{{with .Pending}}
+<section class="panel" id="replacement">
+  <h2>{{T $.Lang "server.web.replacement.h2"}}</h2>
+  <p>{{T $.Lang "server.web.replacement.intro" "login" .Login "slug" .Slug}}<strong>{{T $.Lang "server.web.replacement.count" "n" (len .Issues) "slug" .Slug}}</strong>{{T $.Lang "server.web.replacement.ids_open"}}{{range $i, $id := .Issues}}{{if $i}}, {{end}}{{$id}}{{end}}{{T $.Lang "server.web.replacement.ids_close"}}{{T $.Lang "server.web.replacement.after" "what" .What "login" .Login}}</p>
+  <form method="post" action="{{.Action}}" class="row">
+    <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="{{.HiddenName}}" value="{{.HiddenID}}"><input type="hidden" name="role" value="{{.Role}}">
+    <label>{{T $.Lang "server.web.replacement.select"}}<select name="replacement" required>
+      <option value="">{{T $.Lang "server.web.replacement.choose"}}</option>
+      {{range .Candidates}}<option value="{{.Login}}">{{.Login}}{{if .Name}}{{T $.Lang "server.web.admin_projects.user_name" "name" .Name}}{{end}}</option>{{end}}
+      <option value="-">{{T $.Lang "server.web.replacement.unassign"}}</option>
+    </select></label>
+    <button type="submit" class="danger">{{T $.Lang "server.web.replacement.submit" "what" .What}}</button>
+  </form>
+</section>
+{{end}}{{end}}

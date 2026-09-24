@@ -1,0 +1,35 @@
+{
+  "note": "予備: 入力に sessionId が無い → COPILOT_AGENT_SESSION_ID（CLI がシェルに渡す。hook に渡るかは未確認）",
+  "args": [
+    "--agent",
+    "copilot",
+    "--event",
+    "sessionEnd"
+  ],
+  "env": {
+    "COPILOT_AGENT_SESSION_ID": "cccccccc-dddd-4eee-8fff-000000000001",
+    "COPILOT_CLI": "1",
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "timestamp": 1789732800000,
+    "cwd": "/home/dev/work/sample-app",
+    "reason": "user_exit"
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "SessionEnd",
+    "raw_name": "sessionEnd",
+    "shape": "camelCase",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "reason": "user_exit"
+  },
+  "result": {},
+  "output": {
+    "stdout": null,
+    "exit_code": 0
+  }
+}

@@ -1,0 +1,330 @@
+# CI: Go・node のテストと lint、クロスビルドの確認を回す。
+# 手順・前提は docs/server/RELEASE.md。
+#
+# 起動（2026-09-21 に push と pull_request の契機を外した）:
+#   - 手動（workflow_dispatch）: 本番の配置・配布物の更新・リリースのタグの直前と、Windows に関わる変更を
+#     まとめた区切り（1 日 0〜2 回）。回す SHA は手元の全検査（CONTRIBUTING.md の「Running the tests」）が緑のものだけ。
+#     入力 full は既定で入っているので、手を加えずに起こすと重いジョブも回る。軽いぶんだけで足りるときは外す
+#     （`gh workflow run ci.yml -f full=false`）。
+#   - 週次（月曜の朝）: 重いものをまとめて回す。
+#
+# ジョブの分け方:
+#   - 契機に関わらず回るのは linux の lint とテスト・Windows の go test・デスクトップ版の linux/amd64 のビルド・
+#     小さい検査をまとめた 1 ジョブだけ。
+#   - 重いもの（macOS の go test とデスクトップ版の cgo ビルド・6 対象のクロスビルド・デスクトップ版の 4 対象）は
+#     週次（月曜の朝）と手動の full だけで回す。
+#   - リリースの前は手動で full を回す（タグの本番のビルドは release.yml）。
+#
+# 方針:
+#   - テストに LOOPTRACK_*・IM_*（旧名）を渡さない（過去にテストが本番へ書き込んだ。渡すのは Go の
+#     LOOPTRACK_TEST_DSN だけで、service の MySQL を指す）。
+#   - DB を使う Go のテストは、LOOPTRACK_TEST_DB=mysql が無ければ LOOPTRACK_TEST_DSN が空でも「省略」にならず、
+#     SQLite に落ちて通る（省略の文言を見る検査が無言のまま緑になる）。linux のジョブは LOOPTRACK_TEST_DSN と
+#     LOOPTRACK_TEST_DB=mysql の両方を渡すので、MySQL で走り、DSN が落ちれば省略になる。省略が出たら失敗にする。
+#   - macOS・Windows の Go のテストは MySQL なし（DB を使うテストは省略されず、SQLite で走る。MySQL の経路は linux で確かめる）。
+#   - Windows も落ちたら赤にする（全パッケージが Windows でも通る。DB のテストも省略しない）。
+name: ci
+
+on:
+  schedule:
+    # 毎週月曜の 05:00 JST（日曜 20:00 UTC）。重いジョブはここでまとめて回す。
+    - cron: "0 20 * * 0"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "重いジョブ（macOS・6 対象のクロスビルド・デスクトップ版の 4 対象）も回す"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # 同じ ref で続けざまに起こしても古い run を打ち切る（最新の commit だけ確かめれば足りる）。
+  cancel-in-progress: true
+
+env:
+  # Go の版。go.mod の go 行は下限（1.26.0）。CI とリリースは手元（deploy/build.sh）と同じ系列の最新パッチで回す。
+  GO_VERSION: "1.27.x"
+  NODE_VERSION: "22"
+
+jobs:
+  go-lint:
+    name: go (gofmt・vet・mod tidy・govulncheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "::error::gofmt が必要なファイルがあります（gofmt -w で直す）"
+            echo "$out"
+            exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - name: go mod tidy
+        run: go mod tidy -diff
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+  go-test-linux:
+    name: go test (linux・MySQL 8.4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        # deploy/dev/compose.yaml と同じ版。パスワードはこのジョブの使い捨てのコンテナ専用。
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: imdev
+          TZ: Asia/Tokyo
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pimdev --silent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+          --health-start-period 30s
+    env:
+      LOOPTRACK_TEST_DSN: root:imdev@tcp(127.0.0.1:3306)/?parseTime=true
+      # DSN が落ちたときに SQLite へ落ちずに「省略」になるようにする（下の省略の検査が鳴る形にするため）。
+      LOOPTRACK_TEST_DB: mysql
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: LOOPTRACK_*・IM_* が LOOPTRACK_TEST_DSN・LOOPTRACK_TEST_DB のほかに無いことを確かめる
+        run: |
+          extra=$(env | sed -n 's/^\(IM_[A-Za-z0-9_]*\)=.*/\1/p; s/^\(LOOPTRACK_[A-Za-z0-9_]*\)=.*/\1/p' | grep -vxE 'LOOPTRACK_TEST_DSN|LOOPTRACK_TEST_DB' || true)
+          if [ -n "$extra" ]; then
+            echo "::error::テストに渡してはいけない環境変数があります: $extra"
+            exit 1
+          fi
+      - name: go test ./...
+        # -v の全文は長いので go-test.log に置き、画面にはパッケージの結果と失敗だけを出す（失敗時は全文を artifact に残す）。
+        run: |
+          rc=0
+          go test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
+          grep -E '^(ok|FAIL|panic:)' go-test.log || true
+          if [ "$rc" -ne 0 ]; then
+            grep -n -B2 -A30 -E -- '--- FAIL|^panic:' go-test.log | head -400 || true
+            exit "$rc"
+          fi
+      - name: DB を使うテストが省略されていないことを確かめる
+        run: |
+          if grep -n -E 'LOOPTRACK_TEST_DSN が未設定' go-test.log; then
+            echo "::error::CI で省略してはいけないテストが省略されました"
+            exit 1
+          fi
+          echo "省略された主なテスト（参考）:"
+          grep -E -- '--- SKIP' go-test.log | sed 's/ (.*//' | sort | uniq -c | sort -rn | head -20 || true
+      - name: 失敗時に go test の全文を残す
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-test-log
+          path: go-test.log
+          retention-days: 7
+
+  go-test-windows:
+    name: go test (windows・DB なし)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      # Windows の runner は checkout が D:・一時ディレクトリが C:。ドライブが違うと init が相対 symlink（共通 skill）を作れず
+      # （注意を出して置かない）、golden（同じドライブの前提）と違う。一時ディレクトリを checkout と同じドライブの根の直下に置く
+      # （golden の正規化は、一時ディレクトリからリポジトリへの相対パスが根まで上がる形（../../$REPO）を前提にする）。
+      - name: 一時ディレクトリを checkout と同じドライブにする（Windows）
+        run: |
+          tmp="${GITHUB_WORKSPACE:0:2}\\imtest-tmp"
+          mkdir -p "$(cygpath -u "$tmp")"
+          echo "TMP=$tmp" >> "$GITHUB_ENV"
+          echo "TEMP=$tmp" >> "$GITHUB_ENV"
+      - name: go test ./...
+        # DB を使うテストは既定で SQLite で走る。Windows でも省略しない。
+        run: go test -count=1 ./...
+
+  # macOS は重いので、毎回は回さない（週次と手動の full だけ）。
+  go-test-macos:
+    name: go test (macos・DB なし)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: go test ./...
+        # DB を使うテストは既定で SQLite で走る。
+        run: go test -count=1 ./...
+
+  # 6 対象のクロスビルドは 6 分かかる。日常はデスクトップ版の linux/amd64 のビルドで代わりにし、週次と手動の full だけで回す。
+  cross-build:
+    name: クロスビルド（6 対象）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: deploy/release/dist.sh build
+        run: bash deploy/release/dist.sh build "ci-${GITHUB_SHA::12}" dist
+      - name: SHA256SUMS
+        run: bash deploy/release/dist.sh sums dist
+      - name: 版が埋め込まれていることを確かめる（linux/amd64）
+        run: |
+          got=$("./dist/looptrack_ci-${GITHUB_SHA::12}_linux_amd64" version)
+          case "$got" in "looptrack ci-${GITHUB_SHA::12}"*) ;; *) echo "::error::looptrack version が $got"; exit 1 ;; esac
+
+  # デスクトップ版（-tags desktop）のビルドの回帰を拾う。ビルドと vet と、desktop タグのテスト
+  # （トレイのメニューの並びなど。通常のビルドに入らないので、ここで回さないと誰も回さない）。
+  # ビルドの仕方は release.yml の desktop-* と deploy/release/desktop.sh に合わせる: Linux・Windows は cgo なしのクロスビルド、
+  # macOS は cgo（fyne.io/systray の Cocoa）なので macOS の runner で arm64・amd64 の両方をビルドする。
+  # 毎回回すのはこの 1 対象だけ（-tags desktop のコードが通常のビルドに入らないので、回帰を拾うのに 1 本は要る）。
+  # 残りの 3 対象と macOS の cgo は週次と手動の full に回す。
+  desktop-build:
+    name: デスクトップ版のビルド（linux/amd64・cgo なし）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CGO_ENABLED: "0"
+      GOOS: linux
+      GOARCH: amd64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: go build -tags desktop
+        run: go build -trimpath -tags desktop ./...
+      - name: go vet -tags desktop
+        run: go vet -tags desktop ./...
+      - name: go test -tags desktop（トレイ）
+        run: go test -tags desktop ./internal/client/desktop/...
+
+  desktop-cross:
+    name: デスクトップ版のビルド（${{ matrix.goos }}/${{ matrix.goarch }}・cgo なし）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full)
+    strategy:
+      fail-fast: false
+      matrix:
+        goos: [linux, windows]
+        goarch: [amd64, arm64]
+    env:
+      CGO_ENABLED: "0"
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: go build -tags desktop
+        run: go build -trimpath -tags desktop ./...
+      - name: go vet -tags desktop
+        run: go vet -tags desktop ./...
+
+  desktop-macos:
+    name: デスクトップ版のビルド（macOS・cgo）
+    runs-on: macos-15
+    timeout-minutes: 20
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full)
+    env:
+      CGO_ENABLED: "1"
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      CGO_CFLAGS: -mmacosx-version-min=13.0
+      CGO_LDFLAGS: -mmacosx-version-min=13.0
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: go build -tags desktop（arm64・amd64）
+        run: |
+          for arch in arm64 amd64; do
+            echo "darwin/$arch"
+            GOARCH="$arch" go build -trimpath -tags desktop ./...
+          done
+      - name: go vet -tags desktop
+        run: go vet -tags desktop ./...
+
+  # 1 分に満たない検査は 1 ジョブにまとめる（ジョブごとの起動の手間を 1 回で済ませる）。
+  # 1 つが落ちても残りの結果が見えるよう、各ステップは打ち切り以外では必ず走らせる。
+  checks:
+    name: 検査（shellcheck・node・actionlint・NOTICE）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: shellcheck（error だけ）
+        # 配布物の scripts・skills と kit/loop の bash は撤去した（hook・verify は Go のテストに移した）。
+        # 残る .sh は配布・運用の手順（deploy/）だけ。
+        if: ${{ !cancelled() }}
+        run: shellcheck -S error deploy/*.sh deploy/dev/*.sh deploy/release/*.sh
+      - name: public-scan（公開物に社内固有の語・旧名・内部管理番号・リンク切れが無い）
+        # 毎回走る checks の 1 ステップとして持つ（ジョブを増やすと private の Actions の枠を余計に使う）。
+        # 手元では go test ./internal/docscheck/ が同じスクリプトを呼ぶ（Windows では skip）。
+        if: ${{ !cancelled() }}
+        run: bash deploy/public-scan.sh
+      - name: node --test（画面の render_test）
+        if: ${{ !cancelled() }}
+        working-directory: internal/server/static
+        run: node --test render_test.mjs
+      - name: actionlint（workflow の lint）
+        if: ${{ !cancelled() }}
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - name: NOTICE（第三者のライセンス文）が最新
+        # 配布物に添える第三者のライセンス文（ルートの NOTICE）が依存と合っていること。
+        # 依存を足した・版を上げたのに作り直し忘れると落ちる。
+        if: ${{ !cancelled() }}
+        run: |
+          go run ./internal/tools/notice
+          if ! git diff --exit-code -- NOTICE; then
+            echo "::error::NOTICE が依存と合っていません。go run ./internal/tools/notice で作り直してコミットしてください（docs/server/RELEASE.md「NOTICE」）"
+            exit 1
+          fi

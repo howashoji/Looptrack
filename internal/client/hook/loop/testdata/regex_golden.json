@@ -1,0 +1,629 @@
+{
+ "_comment": "Python 3.12.8 の shlex・re で記録した結果（記録の仕掛けは撤去済み）",
+ "cases": [
+  {
+   "s": "git commit -m x",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "git",
+    "commit",
+    "-m",
+    "x"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "git commit -m x",
+   "heredoc": null
+  },
+  {
+   "s": "git add a && git commit -m 'x y'",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "git",
+    "add",
+    "a",
+    "&&",
+    "git",
+    "commit",
+    "-m",
+    "x y"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "git add a && git commit -m 'x y'",
+   "heredoc": null
+  },
+  {
+   "s": "echo \"a;b\" | grep c",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "echo",
+    "a;b",
+    "|",
+    "grep",
+    "c"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "echo \"a;b\" | grep c",
+   "heredoc": null
+  },
+  {
+   "s": "a#b c",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a#b c",
+   "heredoc": null
+  },
+  {
+   "s": "a &&b||c;d",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a",
+    "&&",
+    "b",
+    "||",
+    "c",
+    ";",
+    "d"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a &&b||c;d",
+   "heredoc": null
+  },
+  {
+   "s": "(cd x; ls)",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "(",
+    "cd",
+    "x",
+    ";",
+    "ls",
+    ")"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "(cd x; ls)",
+   "heredoc": null
+  },
+  {
+   "s": "echo \"unclosed",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": null,
+   "redirect": false,
+   "ids": [],
+   "clean": "echo \"unclosed",
+   "heredoc": null
+  },
+  {
+   "s": "x\\",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": null,
+   "redirect": false,
+   "ids": [],
+   "clean": "x\\",
+   "heredoc": null
+  },
+  {
+   "s": "echo \"a\\\"b\" 'c\\d' e\\ f",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "echo",
+    "a\"b",
+    "c\\d",
+    "e f"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "echo \"a\\\"b\" 'c\\d' e\\ f",
+   "heredoc": null
+  },
+  {
+   "s": "\"\"",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    ""
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "\"\"",
+   "heredoc": null
+  },
+  {
+   "s": "\"\" x",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "",
+    "x"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "\"\" x",
+   "heredoc": null
+  },
+  {
+   "s": "x ''",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "x",
+    ""
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "x ''",
+   "heredoc": null
+  },
+  {
+   "s": "a\tb\nc",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a",
+    "b",
+    "c"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a\tb\nc",
+   "heredoc": null
+  },
+  {
+   "s": "日本語 の 語",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "日本語",
+    "の",
+    "語"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "日本語 の 語",
+   "heredoc": null
+  },
+  {
+   "s": "a;;b",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a",
+    ";;",
+    "b"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a;;b",
+   "heredoc": null
+  },
+  {
+   "s": "x|&y",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "x",
+    "|&",
+    "y"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "x|&y",
+   "heredoc": null
+  },
+  {
+   "s": "echo x > f.txt",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "echo",
+    "x",
+    ">",
+    "f.txt"
+   ],
+   "redirect": true,
+   "ids": [],
+   "clean": "echo x > f.txt",
+   "heredoc": null
+  },
+  {
+   "s": "ls 2>/dev/null",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "ls",
+    "2>/dev/null"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "ls 2>/dev/null",
+   "heredoc": null
+  },
+  {
+   "s": "cat x 2>&1 | head",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "cat",
+    "x",
+    "2>",
+    "&",
+    "1",
+    "|",
+    "head"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "cat x 2>&1 | head",
+   "heredoc": null
+  },
+  {
+   "s": "a >> b",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a",
+    ">>",
+    "b"
+   ],
+   "redirect": true,
+   "ids": [],
+   "clean": "a >> b",
+   "heredoc": null
+  },
+  {
+   "s": "a >& b",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a",
+    ">",
+    "&",
+    "b"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a >& b",
+   "heredoc": null
+  },
+  {
+   "s": "a>/dev/null",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a>/dev/null"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a>/dev/null",
+   "heredoc": null
+  },
+  {
+   "s": "a > /dev/nullx",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a",
+    ">",
+    "/dev/nullx"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a > /dev/nullx",
+   "heredoc": null
+  },
+  {
+   "s": "a>",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a>"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a>",
+   "heredoc": null
+  },
+  {
+   "s": "a > |b",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a",
+    ">",
+    "|",
+    "b"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a > |b",
+   "heredoc": null
+  },
+  {
+   "s": "x 1>y",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "x",
+    "1>y"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "x 1>y",
+   "heredoc": null
+  },
+  {
+   "s": "cat <<'EOF' > n.txt",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "cat",
+    "<<EOF",
+    ">",
+    "n.txt"
+   ],
+   "redirect": true,
+   "ids": [],
+   "clean": "cat <<'EOF' > n.txt",
+   "heredoc": "EOF"
+  },
+  {
+   "s": "cat <<EOF",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "cat",
+    "<<EOF"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "cat <<EOF",
+   "heredoc": "EOF"
+  },
+  {
+   "s": "cat <<\"EOF\"",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "cat",
+    "<<EOF"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "cat <<\"EOF\"",
+   "heredoc": "EOF"
+  },
+  {
+   "s": "cat <<-  TAG",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "cat",
+    "<<-",
+    "TAG"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "cat <<-  TAG",
+   "heredoc": "TAG"
+  },
+  {
+   "s": "cat <<'EOF\"",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": null,
+   "redirect": false,
+   "ids": [],
+   "clean": "cat <<'EOF\"",
+   "heredoc": null
+  },
+  {
+   "s": "cat <<< \"x\"",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "cat",
+    "<<<",
+    "x"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "cat <<< \"x\"",
+   "heredoc": "x"
+  },
+  {
+   "s": "a <<1",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "a",
+    "<<1"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "a <<1",
+   "heredoc": null
+  },
+  {
+   "s": "cat <<'A' <<B",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "cat",
+    "<<A",
+    "<<B"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "cat <<'A' <<B",
+   "heredoc": "A"
+  },
+  {
+   "s": "TST-0015に着手して。",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "TST-0015に着手して。"
+   ],
+   "redirect": false,
+   "ids": [
+    "TST-0015"
+   ],
+   "clean": "TST-0015に着手して。",
+   "heredoc": null
+  },
+  {
+   "s": "TST-0000-00001 でログイン",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "TST-0000-00001",
+    "でログイン"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "TST-0000-00001 でログイン",
+   "heredoc": null
+  },
+  {
+   "s": "TST-00015 の件",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "TST-00015",
+    "の件"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "TST-00015 の件",
+   "heredoc": null
+  },
+  {
+   "s": "TST-0005以外を調査して。",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "TST-0005以外を調査して。"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "を調査して。",
+   "heredoc": null
+  },
+  {
+   "s": "xTST-0001 と TST-0002以外と TST-0003",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "xTST-0001",
+    "と",
+    "TST-0002以外と",
+    "TST-0003"
+   ],
+   "redirect": false,
+   "ids": [
+    "TST-0003"
+   ],
+   "clean": "xTST-0001 と と TST-0003",
+   "heredoc": null
+  },
+  {
+   "s": "TST-0001-2",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "TST-0001-2"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "TST-0001-2",
+   "heredoc": null
+  },
+  {
+   "s": "TST-0001-x",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "TST-0001-x"
+   ],
+   "redirect": false,
+   "ids": [
+    "TST-0001"
+   ],
+   "clean": "TST-0001-x",
+   "heredoc": null
+  },
+  {
+   "s": "-TST-0001",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "-TST-0001"
+   ],
+   "redirect": false,
+   "ids": [],
+   "clean": "-TST-0001",
+   "heredoc": null
+  },
+  {
+   "s": "TST-0001TST-0002",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "TST-0001TST-0002"
+   ],
+   "redirect": false,
+   "ids": [
+    "TST-0001"
+   ],
+   "clean": "TST-0001TST-0002",
+   "heredoc": null
+  },
+  {
+   "s": "（TST-0009）に着手",
+   "prefix": "TST",
+   "width": 4,
+   "shlex": [
+    "（TST-0009）に着手"
+   ],
+   "redirect": false,
+   "ids": [
+    "TST-0009"
+   ],
+   "clean": "（TST-0009）に着手",
+   "heredoc": null
+  },
+  {
+   "s": "A.B-012 と A.B-013以外",
+   "prefix": "A.B",
+   "width": 3,
+   "shlex": [
+    "A.B-012",
+    "と",
+    "A.B-013以外"
+   ],
+   "redirect": false,
+   "ids": [
+    "A.B-012"
+   ],
+   "clean": "A.B-012 と ",
+   "heredoc": null
+  }
+ ]
+}

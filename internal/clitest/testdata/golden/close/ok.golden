@@ -1,0 +1,26 @@
+# close/ok
+$ issue close DEMO-0001 --comment '検証: go test が通った'
+
+#### exit 0
+
+#### stdout
+DEMO-0001: In Progress → Done
+コメント追記: DEMO-0001
+要件 DEMO-0003 の下位がすべて完了しました。受け入れ条件を検証して close してください
+
+#### stderr
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/status?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "comment": "検証: go test が通った",
+      "override_reason": "",
+      "status": "Done"
+    }
+
+#### files (0)

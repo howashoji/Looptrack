@@ -1,0 +1,15 @@
+# login/empty-token
+$ issue login
+env LOOPTRACK_TOKEN=
+stdin "\n"
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: トークンが空です
+
+#### requests (0)
+
+#### files (0)

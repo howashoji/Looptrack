@@ -1,0 +1,89 @@
+# comment/copilot-otel
+$ issue comment DEMO-0001 原因が分かった。
+env COPILOT_AGENT_SESSION_ID=5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f
+env COPILOT_CLI=1
+
+#### exit 0
+
+#### stdout
+コメント追記: DEMO-0001
+
+#### stderr
+
+#### requests (2)
+POST /im/api/v1/issues/DEMO-0001/comments?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Agent: copilot
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: 5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f
+  body:
+    {
+      "text": "原因が分かった。"
+    }
+POST /im/api/v1/projects/demo/usage
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Agent: copilot
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: 5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f
+  body:
+    {
+      "at": "2024-05-02T01:00:07.500000Z",
+      "branch": "",
+      "branches": null,
+      "by_model": {
+        "gpt-5.6-luna": {
+          "cache_create": 27975,
+          "cache_read": 215000,
+          "input": 25,
+          "output": 950,
+          "reasoning": 7,
+          "responses": 2
+        }
+      },
+      "client": "copilot",
+      "client_version": "1.0.86",
+      "conversation_id": "5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f",
+      "cwd_name": "ws",
+      "excluded": false,
+      "human": {
+        "auto": 0,
+        "idle_lt5_pct": null,
+        "idle_median_m": null,
+        "intr": 0,
+        "long_breaks": 0,
+        "pure": 1,
+        "work_m": 0.1
+      },
+      "io": null,
+      "issue": "DEMO-0001",
+      "op": "comment",
+      "responses": 2,
+      "session_id": "5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f",
+      "sub_responses": 0,
+      "tokens": {
+        "main": {
+          "cache_create": 27975,
+          "cache_read": 215000,
+          "input": 25,
+          "output": 950
+        },
+        "sub": {
+          "cache_create": 0,
+          "cache_read": 0,
+          "input": 0,
+          "output": 0
+        }
+      },
+      "trigger": "issue_op",
+      "via": "cli"
+    }
+
+#### files (1)
+home/.copilot/otel/copilot-otel.jsonl (0644)
+    {"type":"span","traceId":"t1","spanId":"c1","parentSpanId":"a1","name":"chat x","kind":0,"startTime":[1714611601,0],"endTime":[1714611603,500000000],"attributes":{"gen_ai.operation.name":"chat","gen_ai.conversation.id":"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f","gen_ai.response.model":"gpt-5.6-luna","gen_ai.usage.input_tokens":120000,"gen_ai.usage.cache_read.input_tokens":100000,"gen_ai.usage.cache_write.input_tokens":19990,"gen_ai.usage.output_tokens":500,"gen_ai.usage.reasoning.output_tokens":7},"resource":{"attributes":{"service.name":"github-copilot","service.version":"1.0.86"}}}
+    {"type":"span","traceId":"t1","spanId":"c2","parentSpanId":"a1","name":"chat x","kind":0,"startTime":[1714611605,0],"endTime":[1714611607,500000000],"attributes":{"gen_ai.operation.name":"chat","gen_ai.conversation.id":"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f","gen_ai.response.model":"gpt-5.6-luna","gen_ai.usage.input_tokens":123000,"gen_ai.usage.cache_read.input_tokens":115000,"gen_ai.usage.cache_write.input_tokens":7985,"gen_ai.usage.output_tokens":450},"resource":{"attributes":{"service.name":"github-copilot","service.version":"1.0.86"}}}
+    {"type":"span","traceId":"t1","spanId":"a1","parentSpanId":null,"name":"invoke_agent x","kind":0,"startTime":[1714611600,0],"endTime":[1714611602,500000000],"attributes":{"gen_ai.operation.name":"invoke_agent","gen_ai.conversation.id":"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f","gen_ai.usage.input_tokens":243000,"gen_ai.usage.output_tokens":950,"github.copilot.turn_count":2},"resource":{"attributes":{"service.name":"github-copilot","service.version":"1.0.86"}}}

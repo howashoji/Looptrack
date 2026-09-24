@@ -1,0 +1,22 @@
+# init/loop-without-kit
+$ issue init --project demo --source server --loop
+
+#### exit 1
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・$API・AI claude-code）
+
+#### stderr
+エラー: サーバの配布物に kit/loop（manifest.json）がありません。loop は入れられません
+
+#### requests (2)
+GET /im/api/v1/dist
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+GET /im/api/v1/dist/kit/core/skills/issue/SKILL.md
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

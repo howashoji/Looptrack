@@ -1,0 +1,6 @@
+[
+ {
+  "call": "{\"fn\":\"codex\",\"path\":\"<TMP>/001/.codex/sessions/2026/09/18/rollout-2026-09-18T01-00-00-0199aaaa-bbbb-cccc-dddd-eeeeffff0001.jsonl\",\"ws\":true,\"env\":{\"HOME\":\"<TMP>/001\"}}",
+  "out": "{\"client\": \"codex\", \"client_version\": \"0.140.0\", \"session_id\": \"0199aaaa-bbbb-cccc-dddd-eeeeffff0001\", \"conversation_id\": \"20260918100001-f809f3\", \"at\": \"2026-09-18T01:03:02.500000Z\", \"tokens\": {\"main\": {\"input\": 600, \"cache_create\": 0, \"cache_read\": 900, \"output\": 100}, \"sub\": {\"input\": 0, \"cache_create\": 0, \"cache_read\": 0, \"output\": 0}}, \"responses\": 2, \"sub_responses\": 0, \"by_model\": {\"(codex)\": {\"input\": 600, \"cache_create\": 0, \"cache_read\": 900, \"output\": 100, \"responses\": 2, \"reasoning\": 40}}, \"io\": null, \"human\": {\"pure\": 2, \"auto\": 0, \"intr\": 0, \"idle_median_m\": 2.9, \"idle_lt5_pct\": 100, \"long_breaks\": 0, \"work_m\": 0.1}, \"branch\": \"\", \"branches\": null, \"cwd_name\": \"\", \"excluded\": false, \"segments\": [{\"start\": \"2026-09-18T01:00:01.000000Z\", \"kind\": \"human\", \"idle_m\": null, \"work_m\": 0.1, \"responses\": 1, \"sub_responses\": 0, \"main\": 1080, \"sub\": 0}, {\"start\": \"2026-09-18T01:03:00.000000Z\", \"kind\": \"human\", \"idle_m\": 2.9, \"work_m\": 0.0, \"responses\": 1, \"sub_responses\": 0, \"main\": 520, \"sub\": 0}]}"
+ }
+]

@@ -1,0 +1,53 @@
+{
+  "note": "Codex の PreToolUse の deny は実物で未確認 → 既定では拒否せず systemMessage",
+  "args": [
+    "--agent",
+    "codex"
+  ],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "rm -rf build"
+    },
+    "tool_use_id": "call_AAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  "event": {
+    "agent": "codex",
+    "name": "PreToolUse",
+    "raw_name": "PreToolUse",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Bash",
+      "raw_name": "Bash",
+      "name": "Bash",
+      "use_id": "call_AAAAAAAAAAAAAAAAAAAAAAAA",
+      "input": {
+        "command": "rm -rf build"
+      }
+    }
+  },
+  "result": {
+    "deny": "消す前に確認"
+  },
+  "output": {
+    "stdout": {
+      "systemMessage": "消す前に確認"
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "system_message": "消す前に確認"
+  }
+}

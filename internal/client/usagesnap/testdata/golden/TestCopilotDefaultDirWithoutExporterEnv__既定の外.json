@@ -1,0 +1,10 @@
+[
+ {
+  "call": "{\"fn\":\"collect\",\"client\":\"copilot\",\"sid\":\"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\",\"env\":{\"COPILOT_CLI\":\"1\",\"COPILOT_CLI_BINARY_VERSION\":\"1.0.86\",\"COPILOT_HOME\":\"<TMP>/001/ch\",\"COPILOT_PROJECT_DIR\":\"<TMP>/001/proj\",\"COPILOT_TRACEPARENT\":\"00-0a1b2c3d4e5f60718293a4b5c6d7e8f9-89fb757792def800-01\",\"HOME\":\"<TMP>/001\"}}",
+  "out": "null"
+ },
+ {
+  "call": "{\"fn\":\"collect\",\"client\":\"copilot\",\"sid\":\"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\",\"env\":{\"COPILOT_CLI\":\"1\",\"COPILOT_CLI_BINARY_VERSION\":\"1.0.86\",\"COPILOT_HOME\":\"<TMP>/001/ch\",\"COPILOT_PROJECT_DIR\":\"<TMP>/001/proj\",\"COPILOT_TRACEPARENT\":\"00-0a1b2c3d4e5f60718293a4b5c6d7e8f9-89fb757792def800-01\",\"HOME\":\"<TMP>/001\"}}",
+  "out": "{\"client\": \"copilot\", \"client_version\": \"1.0.86\", \"session_id\": \"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\", \"conversation_id\": \"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\", \"at\": \"2026-09-19T05:44:05.313000Z\", \"tokens\": {\"main\": {\"input\": 30, \"cache_create\": 26583, \"cache_read\": 182129, \"output\": 1369}, \"sub\": {\"input\": 0, \"cache_create\": 0, \"cache_read\": 0, \"output\": 0}}, \"responses\": 10, \"sub_responses\": 0, \"by_model\": {\"gpt-5.6-luna\": {\"input\": 30, \"cache_create\": 26583, \"cache_read\": 182129, \"output\": 1369, \"reasoning\": 433, \"responses\": 10}}, \"io\": null, \"human\": {\"pure\": 1, \"auto\": 0, \"intr\": 0, \"idle_median_m\": null, \"idle_lt5_pct\": null, \"long_breaks\": 0, \"work_m\": 0.4}, \"branch\": \"\", \"branches\": null, \"cwd_name\": \"\", \"excluded\": false}"
+ }
+]

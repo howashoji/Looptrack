@@ -1,0 +1,21 @@
+# matrix/ok
+$ issue matrix
+
+#### exit 0
+
+#### stdout
+# トレーサビリティ表
+
+| 要件 | 設計 | 実装 | テスト |
+| -- | -- | -- | -- |
+| DEMO-0003 認証の要件 | - | DEMO-0001 | DEMO-0004 |
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/matrix?format=md
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

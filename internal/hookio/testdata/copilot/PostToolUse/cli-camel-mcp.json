@@ -1,0 +1,63 @@
+{
+  "note": "CLI の postToolUse の MCP（<サーバ>-<ツール>。サーバ名の - は最後の - で分ける）。toolResult は resultType・textResultForLlm",
+  "args": [
+    "--agent",
+    "copilot",
+    "--event",
+    "postToolUse"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "sessionId": "cccccccc-dddd-4eee-8fff-000000000001",
+    "timestamp": 1789732800000,
+    "cwd": "/home/dev/work/sample-app",
+    "toolName": "im-oauth-set_status",
+    "toolArgs": "{\"id\":\"IM-0001\",\"status\":\"Done\"}",
+    "toolResult": {
+      "resultType": "success",
+      "textResultForLlm": "IM-0001: In Progress → Done"
+    }
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "PostToolUse",
+    "raw_name": "postToolUse",
+    "shape": "camelCase",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "MCP",
+      "raw_name": "im-oauth-set_status",
+      "server": "im-oauth",
+      "name": "set_status",
+      "input": {
+        "id": "IM-0001",
+        "status": "Done"
+      },
+      "response": {
+        "raw": {
+          "resultType": "success",
+          "textResultForLlm": "IM-0001: In Progress → Done"
+        },
+        "text": "IM-0001: In Progress → Done"
+      }
+    }
+  },
+  "result": {
+    "context": "作業の完了を検知しました（イシュー Done: IM-0001）"
+  },
+  "output": {
+    "stdout": {
+      "additionalContext": "作業の完了を検知しました（イシュー Done: IM-0001）",
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "作業の完了を検知しました（イシュー Done: IM-0001）"
+      }
+    },
+    "exit_code": 0
+  }
+}

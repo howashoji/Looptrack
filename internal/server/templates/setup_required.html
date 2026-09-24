@@ -1,0 +1,7 @@
+{{define "setup_required.html"}}{{template "head" (headData .Lang (T .Lang "server.web.setup_required.title"))}}
+<main class="card">
+  <h1>{{T .Lang "server.web.common.brand"}}</h1>
+  <p class="error" role="alert">{{.Message}}</p>
+  <p>{{T .Lang "server.web.setup_required.hint"}}</p>
+</main>
+{{template "foot"}}{{end}}

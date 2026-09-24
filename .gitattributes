@@ -1,0 +1,17 @@
+# 改行は LF に固定する。Windows の checkout（core.autocrlf=true。GitHub の Windows の runner の既定）で
+# CRLF に変わると、CLI の golden（internal/clitest/testdata）・go:embed で埋め込む配布物（scripts・kit）・その SHA-256 が
+# LF の正本と食い違う。バイナリは text=auto が判定して変えない。
+* text=auto eol=lf
+
+# 公開物（git archive で作る）から外すもの。運用の環境に固有のファイルは private/ にまとめる。
+# 公開物に固有の語・旧名が残っていないかは deploy/public-scan.sh で調べる。公開物で使う例は docs/projects/example.md・deploy/rules/example.json。
+/private/ export-ignore
+# このリポジトリで作業する AI ツール向けの設定と指示（置き場を変えられないのでルートに置く）。
+# 導入先へ配るのは kit/ と実行ファイルで、これらは開発側の運用なので公開物には入れない。
+# 公開物に AI ツールの設定が入っていないことは deploy/public-scan.sh の「AI ツールの設定」が確かめる。
+/.claude/ export-ignore
+/.codex/ export-ignore
+/CLAUDE.md export-ignore
+/AGENTS.md export-ignore
+# AI ツールの作業の副産物（設計のメモ）。製品の文書ではない
+/docs/superpowers/ export-ignore

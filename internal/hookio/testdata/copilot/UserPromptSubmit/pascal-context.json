@@ -1,0 +1,41 @@
+{
+  "note": "PascalCase の配線の注入（効かない見込みだが害は無いので置く・kit/README）",
+  "args": [
+    "--agent",
+    "copilot"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "timestamp": "2026-09-18T12:00:00.000Z",
+    "cwd": "/home/dev/work/sample-app",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "確認して"
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "UserPromptSubmit",
+    "raw_name": "UserPromptSubmit",
+    "shape": "snake_case",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "prompt": "確認して"
+  },
+  "result": {
+    "context": "確認モード: 調査と計画の提示で留める"
+  },
+  "output": {
+    "stdout": {
+      "additionalContext": "確認モード: 調査と計画の提示で留める",
+      "hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit",
+        "additionalContext": "確認モード: 調査と計画の提示で留める"
+      }
+    },
+    "exit_code": 0
+  }
+}

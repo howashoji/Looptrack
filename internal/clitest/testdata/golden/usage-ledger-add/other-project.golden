@@ -1,0 +1,14 @@
+# usage-ledger-add/other-project
+$ issue usage ledger add 名前 --from-report -
+stdin "{\"project\":\"other\",\"from\":\"2024-04-01T00:00:00Z\",\"to\":\"2024-05-01T00:00:00Z\",\"data_end\":\"2024-04-30T12:00:00Z\",\"excluded_conversations\":[\"c-1\"],\"total_tokens\":123456,\"request\":{\"id\":7},\"issues\":[{\"id\":\"DEMO-0001\",\"tokens\":123456}]}"
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --from-report は別のプロジェクト（other）の集計です
+
+#### requests (0)
+
+#### files (0)

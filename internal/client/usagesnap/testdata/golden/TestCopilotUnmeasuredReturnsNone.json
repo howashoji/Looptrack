@@ -1,0 +1,14 @@
+[
+ {
+  "call": "{\"fn\":\"collect\",\"client\":\"copilot\",\"sid\":\"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\",\"env\":{\"COPILOT_HOME\":\"<TMP>/001/.copilot\",\"HOME\":\"<TMP>/001\"}}",
+  "out": "null"
+ },
+ {
+  "call": "{\"fn\":\"collect\",\"client\":\"copilot\",\"sid\":\"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\",\"env\":{\"COPILOT_HOME\":\"<TMP>/001/.copilot\",\"HOME\":\"<TMP>/001\"}}",
+  "out": "null"
+ },
+ {
+  "call": "{\"fn\":\"collect\",\"client\":\"copilot\",\"env\":{\"COPILOT_HOME\":\"<TMP>/001/.copilot\",\"HOME\":\"<TMP>/001\"}}",
+  "out": "null"
+ }
+]

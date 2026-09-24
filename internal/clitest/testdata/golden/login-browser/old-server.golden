@@ -1,0 +1,16 @@
+# login-browser/old-server
+$ issue login --browser
+env LOOPTRACK_TOKEN=
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: このサーバは login --browser に対応していません（戻り先のポート照合と更新トークンが無い古い版です）。サーバの更新が必要です。当面は $API/account でトークンを発行し looptrack issue login --url $API で登録してください
+
+#### requests (1)
+GET /im/.well-known/oauth-authorization-server
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,40 @@
+{
+  "note": "Codex の UserPromptSubmit の差し戻し（decision: block）。kit では未使用（session-scope-guard が使っていた束縛は削除した）",
+  "args": [
+    "--agent",
+    "codex"
+  ],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "UserPromptSubmit",
+    "model": "gpt-5-codex",
+    "prompt": "続けて"
+  },
+  "event": {
+    "agent": "codex",
+    "name": "UserPromptSubmit",
+    "raw_name": "UserPromptSubmit",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "prompt": "続けて"
+  },
+  "result": {
+    "block": "[文脈の大きさ] 文脈が大きすぎます"
+  },
+  "output": {
+    "stdout": {
+      "decision": "block",
+      "reason": "[文脈の大きさ] 文脈が大きすぎます"
+    },
+    "exit_code": 0
+  }
+}

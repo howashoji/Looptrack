@@ -1,0 +1,6 @@
+[
+ {
+  "call": "{\"fn\":\"codex_find\",\"sid\":\"01a0b47f-67a4-79b2-b34c-3429c49662c8\",\"cwd\":\"/nowhere\",\"env\":{\"HOME\":\"<TMP>/001\"}}",
+  "out": "\"<TMP>/001/.codex/sessions/2026/09/18/rollout-2026-09-18T21-31-28-01a0b47f-67a4-79b2-b34c-3429c49662c8_01a0b480-1709-7d90-8d0e-1fbdc20f17ee.jsonl\""
+ }
+]

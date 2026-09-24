@@ -1,0 +1,64 @@
+{
+  "note": "PostToolUse の MCP（tool_response は content の配列）",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__im__set_status",
+    "tool_input": {
+      "id": "IM-0001",
+      "status": "Done",
+      "comment": "検証済み"
+    },
+    "tool_response": [
+      {
+        "type": "text",
+        "text": "IM-0001: In Progress → Done"
+      }
+    ]
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "PostToolUse",
+    "raw_name": "PostToolUse",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "MCP",
+      "raw_name": "mcp__im__set_status",
+      "server": "im",
+      "name": "set_status",
+      "input": {
+        "comment": "検証済み",
+        "id": "IM-0001",
+        "status": "Done"
+      },
+      "response": {
+        "raw": [
+          {
+            "text": "IM-0001: In Progress → Done",
+            "type": "text"
+          }
+        ],
+        "text": "IM-0001: In Progress → Done"
+      }
+    }
+  },
+  "result": {},
+  "output": {
+    "stdout": null,
+    "exit_code": 0
+  }
+}

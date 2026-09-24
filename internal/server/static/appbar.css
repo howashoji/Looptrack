@@ -1,0 +1,108 @@
+/* 全画面共通のヘッダ。画面ごとのスタイルシート（app.css / hub.css / board.css）と変数名が違うため、
+   色・字体はここで閉じて持つ（どの画面のスタイルシートと組んでも同じ見た目にする）。
+   メニューは <details> で開閉する（アカウント設定の画面は JS を載せない）。
+   テンプレートは layout.html の nav / appbar_start / appbar_end。ページ固有の要素（差し込み枠）のクラスもここに置く。 */
+.appbar{
+  --ab-bg:#ffffff; --ab-bg-2:#f4f5f7; --ab-line:#e3e3e6; --ab-fg:#1b1c1e; --ab-fg-2:#5c5f66; --ab-fg-3:#8b8f97;
+  --ab-accent:#4a5bd8; --ab-danger:#d7263d;
+  --ab-shadow:0 1px 2px rgba(16,18,24,.06), 0 12px 32px rgba(16,18,24,.12);
+  background:var(--ab-bg); color:var(--ab-fg); border-bottom:1px solid var(--ab-line);
+  padding:0 18px;
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",Meiryo,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+@media (prefers-color-scheme: dark){
+  .appbar{
+    --ab-bg:#17191d; --ab-bg-2:#22252b; --ab-line:#2a2e35; --ab-fg:#e8eaed; --ab-fg-2:#a3a8b2; --ab-fg-3:#767c88;
+    --ab-accent:#8b9aff; --ab-danger:#ff6b7d;
+    --ab-shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.45);
+  }
+}
+/* 行はブランド・差し込み枠・利用者メニューの 3 列で、折り返さない。折り返すのは差し込み枠の中だけなので、
+   どの幅でも利用者メニューは 1 行目の右端に残る。各列の 1 行目の中心を y=26（= 1 行のヘッダの中心）に揃える */
+.appbar-row{display:flex; align-items:flex-start; gap:12px; min-height:52px; padding:6px 0}
+.appbar-brand{flex:none; line-height:40px; font-weight:700; font-size:15px; color:var(--ab-fg); text-decoration:none; white-space:nowrap}
+.appbar-brand:hover{color:var(--ab-accent)}
+.appbar form{margin:0}
+
+/* ---------- 差し込み枠 ---------- */
+.appbar-slot{flex:1 1 0; min-width:0; display:flex; flex-wrap:wrap; align-items:center; column-gap:12px; row-gap:8px}
+/* 1 行目の高さを 40px 以上にする支柱（幅 0。直後の隙間は負の余白で打ち消す） */
+.appbar-slot::before{content:""; flex:none; width:0; height:40px; margin-right:-12px}
+/* パンくず: イシュー管理 / <上の階層（appbar-crumb）> / <この画面（appbar-title）>。
+   幅 0 から、他の要素（ボードの検索など）より先に中身の幅まで伸びる（flex-grow を大きく・max-width で止める）。
+   足りなければ省略記号で縮むが、6em（全角 6 文字）を切るほどなら後ろの要素（レポート作成など）を次の行へ送る。
+   狭い画面では途中の階層を畳む（下の @media） */
+.appbar-sep{flex:none; color:var(--ab-fg-3)}
+.appbar-crumb, .appbar-title{flex:100 1 0; max-width:max-content; min-width:6em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.appbar-crumb{color:var(--ab-fg-2); text-decoration:none}
+.appbar-crumb:hover{color:var(--ab-accent); text-decoration:underline}
+.appbar-title{font-weight:600; color:var(--ab-fg)}
+.appbar-title small{display:block; overflow:hidden; text-overflow:ellipsis; font-weight:400; font-size:11px; color:var(--ab-fg-3)}
+/* 画面の操作（ボードの「レポート作成」）。差し込み枠の右端（利用者メニューのすぐ左）に寄せる */
+.appbar-action{
+  flex:none; margin-left:auto; padding:4px 12px; border:1px solid var(--ab-line); border-radius:999px; color:var(--ab-fg-2); font-size:13px;
+  text-decoration:none; white-space:nowrap;
+}
+.appbar-action:hover{background:var(--ab-bg-2); color:var(--ab-fg)}
+/* ボタンの操作（ボードの「起票」）もリンクと同じ見た目にする。並べたときは先頭だけが右へ寄る */
+button.appbar-action{background:transparent; font:inherit; font-size:13px; line-height:inherit; cursor:pointer}
+.appbar-action + .appbar-action{margin-left:0}
+/* ヘッダの下段（ボードの絞り込み）。行の下に全幅で置く */
+.appbar-below{margin-top:2px; padding-bottom:6px}
+/* ---------- ユーザー名のメニュー ---------- */
+.usermenu{flex:none; position:relative; margin-top:2px}
+.usermenu > summary{
+  display:flex; align-items:center; gap:8px; list-style:none; cursor:pointer; user-select:none;
+  padding:3px 10px 3px 3px; border:1px solid transparent; border-radius:999px; color:var(--ab-fg-2); font-size:13px; white-space:nowrap;
+}
+.usermenu > summary::-webkit-details-marker{display:none}
+/* 表示名は 10em で省略する（長い名前でヘッダの 1 行目を溢れさせない） */
+.usermenu-name{max-width:10em; overflow:hidden; text-overflow:ellipsis}
+.usermenu > summary:hover, .usermenu[open] > summary{background:var(--ab-bg-2); border-color:var(--ab-line); color:var(--ab-fg)}
+.usermenu > summary:focus-visible{outline:2px solid var(--ab-accent); outline-offset:2px}
+.usermenu > summary::after{content:""; width:6px; height:6px; margin-left:2px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:translateY(-2px) rotate(45deg)}
+.usermenu[open] > summary::after{transform:translateY(1px) rotate(225deg)}
+.avatar{
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+  width:28px; height:28px; border-radius:50%; background:var(--ab-accent); color:var(--ab-bg); font-size:13px; font-weight:700;
+}
+.usermenu-panel{
+  position:absolute; right:0; top:calc(100% + 6px); z-index:50; min-width:220px;
+  background:var(--ab-bg); border:1px solid var(--ab-line); border-radius:10px; box-shadow:var(--ab-shadow); padding:6px;
+}
+.usermenu-who{padding:8px 10px 10px; border-bottom:1px solid var(--ab-line); margin-bottom:6px}
+.usermenu-who strong{display:block; font-size:13.5px; color:var(--ab-fg)}
+.usermenu-who span{font-size:12px; color:var(--ab-fg-3)}
+.appbar .usermenu-item{
+  display:block; box-sizing:border-box; width:100%; margin:0; padding:7px 10px; border:0; border-radius:6px;
+  background:none; color:var(--ab-fg); font:inherit; font-size:13.5px; text-align:left; text-decoration:none; cursor:pointer;
+}
+.appbar .usermenu-item:hover, .appbar .usermenu-item:focus-visible{background:var(--ab-bg-2); outline:none}
+.usermenu-sep{height:1px; margin:6px 0; background:var(--ab-line)}
+.appbar .usermenu-item.danger{color:var(--ab-danger)}
+
+/* 幅が足りない画面で行の下へ全幅で回す要素（ボードの検索とタブ）。広い画面では差し込み枠の中に並ぶ */
+@media (max-width: 1000px){
+  /* 差し込み枠を解いて部品を行に直に並べ、appbar-wide だけを利用者メニューの後ろ（次の行・全幅）へ送る。
+     1 行目に残るのはブランド・パンくず（6em まで縮む）・画面の操作・利用者メニュー（名前は 10em まで）だけなので、
+     601px 以上ならどの画面でも 1 行に収まる（600px 以下は下の @media でさらに減らす） */
+  .appbar-row{flex-wrap:wrap; align-items:center; row-gap:8px}
+  .appbar-slot{display:contents}
+  .appbar-slot::before{content:none}
+  .appbar-wide{order:2; flex-basis:100%}
+  .usermenu{margin-top:0; margin-left:auto}
+  .appbar-action ~ .usermenu{margin-left:0}
+}
+
+@media (max-width: 600px){
+  .appbar{padding:0 12px}
+  /* 画面の操作（レポート作成）は 2 行目の右端へ。高さ 0 の全幅の要素で 1 行目を利用者メニューの後ろで切る */
+  .appbar-row:has(.appbar-action)::before{content:""; order:1; flex-basis:100%; height:0; margin-top:-8px}
+  .appbar-action{order:1}
+  .appbar-action ~ .usermenu{margin-left:auto}
+  /* 途中の階層（とその後ろの区切り）は畳み、この画面の名前を読める幅で残す */
+  .appbar-crumb, .appbar-crumb + .appbar-sep{display:none}
+  .usermenu-name{display:none}
+  .usermenu > summary{padding-right:8px}
+}

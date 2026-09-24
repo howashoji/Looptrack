@@ -1,0 +1,979 @@
+{
+ "project": "demo",
+ "from": "2026-08-31T15:00:00Z",
+ "to": "2026-09-30T15:00:00Z",
+ "data_end": "2026-09-18T01:00:00Z",
+ "period": "2026-09-01 00:00 〜 2026-10-01 00:00（日本時間・終わりを含まない）",
+ "since_last": true,
+ "last_report": {
+  "name": "2026年8月"
+ },
+ "generated": "2026-09-18 10:00",
+ "request": {
+  "id": 3,
+  "created_at": "2026-09-17T23:00:00Z",
+  "requested_by": "alice",
+  "target": "ラベル api",
+  "note": "月次"
+ },
+ "total": {
+  "main": {
+   "input": 1000,
+   "cache_create": 200,
+   "cache_read": 5000,
+   "output": 300
+  },
+  "sub": {
+   "input": 100,
+   "cache_create": 0,
+   "cache_read": 0,
+   "output": 0
+  },
+  "responses": 1,
+  "sub_responses": 0
+ },
+ "total_tokens": 6600,
+ "stage_count": 4,
+ "unattributed": {
+  "key": "",
+  "total": {
+   "main": {
+    "input": 50,
+    "cache_create": 0,
+    "cache_read": 0,
+    "output": 0
+   },
+   "sub": {
+    "input": 0,
+    "cache_create": 0,
+    "cache_read": 0,
+    "output": 0
+   },
+   "responses": 1,
+   "sub_responses": 0
+  },
+  "total_tokens": 50,
+  "stages": 1,
+  "issues": 0
+ },
+ "excluded_total": {
+  "main": {
+   "input": 700,
+   "cache_create": 0,
+   "cache_read": 0,
+   "output": 0
+  },
+  "sub": {
+   "input": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "output": 0
+  },
+  "responses": 1,
+  "sub_responses": 0
+ },
+ "excluded_tokens": 700,
+ "excluded_stage_count": 1,
+ "excluded_conversations": [
+  "conv-x"
+ ],
+ "inconsistent": 1,
+ "by_issue": [
+  {
+   "id": "DEMO-0025",
+   "title": "イシュー 25 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 2500,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 2500,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0024",
+   "title": "イシュー 24 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 2400,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 2400,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0023",
+   "title": "イシュー 23 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 2300,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 2300,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0022",
+   "title": "イシュー 22 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 2200,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 2200,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0021",
+   "title": "イシュー 21 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 2100,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 2100,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0020",
+   "title": "イシュー 20 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 2000,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 2000,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0019",
+   "title": "イシュー 19 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1900,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1900,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0018",
+   "title": "イシュー 18 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1800,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1800,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0017",
+   "title": "イシュー 17 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1700,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1700,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0016",
+   "title": "イシュー 16 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1600,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1600,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0015",
+   "title": "イシュー 15 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1500,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1500,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0014",
+   "title": "イシュー 14 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1400,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1400,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0013",
+   "title": "イシュー 13 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1300,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1300,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0012",
+   "title": "イシュー 12 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1200,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1200,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0011",
+   "title": "イシュー 11 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1100,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1100,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0010",
+   "title": "イシュー 10 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 1000,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1000,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0009",
+   "title": "イシュー 9 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 900,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 900,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0008",
+   "title": "イシュー 8 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 800,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 800,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0007",
+   "title": "イシュー 7 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 700,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 700,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0006",
+   "title": "イシュー 6 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 600,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 600,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0005",
+   "title": "イシュー 5 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 500,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 500,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0004",
+   "title": "イシュー 4 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 400,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 400,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0003",
+   "title": "イシュー 3 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 300,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 300,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0002",
+   "title": "イシュー 2 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 200,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 200,
+   "stages": 1
+  },
+  {
+   "id": "DEMO-0001",
+   "title": "イシュー 1 <b>&",
+   "type": "task",
+   "status": "Done",
+   "labels": [
+    "api"
+   ],
+   "total": {
+    "main": {
+     "input": 100,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 100,
+   "stages": 1
+  }
+ ],
+ "by_label": [
+  {
+   "key": "api",
+   "total": {
+    "main": {
+     "input": 900,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 900,
+   "stages": 3,
+   "issues": 2
+  },
+  {
+   "key": "",
+   "total": {
+    "main": {
+     "input": 100,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 100,
+   "stages": 1,
+   "issues": 1
+  }
+ ],
+ "by_type": [
+  {
+   "key": "task",
+   "total": {
+    "main": {
+     "input": 1000,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1000,
+   "stages": 4,
+   "issues": 3
+  }
+ ],
+ "by_stage": [
+  {
+   "key": "comment",
+   "total": {
+    "main": {
+     "input": 600,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 600,
+   "stages": 2,
+   "issues": 2
+  },
+  {
+   "key": "stop",
+   "total": {
+    "main": {
+     "input": 400,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 400,
+   "stages": 2,
+   "issues": 1
+  }
+ ],
+ "by_client": [
+  {
+   "key": "claude-code",
+   "total": {
+    "main": {
+     "input": 1000,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1000,
+   "stages": 4,
+   "issues": 3
+  }
+ ],
+ "by_case": [
+  {
+   "key": "CASE-101",
+   "total": {
+    "main": {
+     "input": 800,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 800,
+   "stages": 3,
+   "issues": 2
+  },
+  {
+   "key": "",
+   "total": {
+    "main": {
+     "input": 200,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 200,
+   "stages": 1,
+   "issues": 0
+  }
+ ],
+ "case_pattern": "CASE-\\d+",
+ "conversations": [
+  {
+   "conversation_id": "0123456789abcdef",
+   "client": "claude-code",
+   "sessions": [
+    "s1"
+   ],
+   "first_at": "2026-09-01T00:00:00Z",
+   "last_at": "2026-09-02T03:04:00Z",
+   "total": {
+    "main": {
+     "input": 1000,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1000,
+   "stages": 4,
+   "unattributed_tokens": 50,
+   "issues": [
+    "DEMO-0001",
+    "DEMO-0002"
+   ]
+  }
+ ]
+}

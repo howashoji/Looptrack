@@ -1,0 +1,19 @@
+{{define "account_totp.html"}}{{template "head" (headData .Lang (T .Lang "server.web.account_totp.title"))}}
+{{template "nav" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.account_totp.title"}}</h1>
+  <p class="muted">{{T .Lang "server.web.common.back_prefix"}}<a href="{{base}}/account">{{T .Lang "server.web.common.account_settings"}}</a>{{T .Lang "server.web.common.back_suffix"}}</p>
+  <section class="panel">
+    <p>{{T .Lang "server.web.totp_setup.scan"}}</p>
+    <img class="qr" src="{{.QR}}" width="220" height="220" alt="{{T .Lang "server.web.totp_setup.qr_alt"}}">
+    <p class="secret">{{T .Lang "server.web.totp_setup.manual"}}<code data-secret>{{.Secret}}</code></p>
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+    <form method="post" action="{{base}}/account/totp" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.totp.code"}}<input name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" autocomplete="one-time-code" required autofocus></label>
+      <button type="submit">{{T .Lang "server.web.account_totp.submit"}}</button>
+    </form>
+    <p class="muted">{{T .Lang "server.web.account_totp.note"}}</p>
+  </section>
+</main>
+{{template "foot"}}{{end}}

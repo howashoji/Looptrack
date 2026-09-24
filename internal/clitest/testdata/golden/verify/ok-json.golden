@@ -1,0 +1,79 @@
+# verify/ok-json
+$ issue verify DEMO-0001 --json
+
+#### exit 0
+
+#### stdout
+{
+  "id": "DEMO-0001",
+  "body_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "ok": true,
+  "passed": 2,
+  "failed": 0,
+  "results": [
+    {
+      "command": "echo ok",
+      "status": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "output_tail": "ok\n"
+    },
+    {
+      "command": "printf '出力\\n2 行目\\n'",
+      "status": "ok",
+      "exit_code": 0,
+      "duration_ms": 0,
+      "output_tail": "出力\n2 行目\n"
+    }
+  ],
+  "recorded": true,
+  "cached_not_recorded": false,
+  "response": {
+    "issue": {
+      "id": "DEMO-0001"
+    },
+    "seq": 2,
+    "ok": true,
+    "passed": 2,
+    "failed": 0,
+    "message": "verify を記録: DEMO-0001（2/2 成功）"
+  },
+  "error": null
+}
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+POST /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "body_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "host": "$HOST",
+      "results": [
+        {
+          "command": "echo ok",
+          "duration_ms": 0,
+          "exit_code": 0,
+          "output_tail": "ok\n",
+          "status": "ok"
+        },
+        {
+          "command": "printf '出力\\n2 行目\\n'",
+          "duration_ms": 0,
+          "exit_code": 0,
+          "output_tail": "出力\n2 行目\n",
+          "status": "ok"
+        }
+      ],
+      "workspace": "ws"
+    }
+
+#### files (0)

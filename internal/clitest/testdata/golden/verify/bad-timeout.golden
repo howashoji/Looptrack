@@ -1,0 +1,17 @@
+# verify/bad-timeout
+$ issue verify DEMO-0001 --timeout 0
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --timeout と --total-timeout は正の秒数で指定してください
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

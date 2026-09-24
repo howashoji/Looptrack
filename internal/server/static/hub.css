@@ -1,0 +1,55 @@
+
+:root{
+  --bg:#f7f7f8; --panel:#ffffff; --panel-2:#fbfbfc; --line:#e3e3e6; --line-2:#ecedef;
+  --fg:#1b1c1e; --fg-2:#5c5f66; --fg-3:#8b8f97;
+  --accent:#4a5bd8; --accent-soft:#eceefb;
+  --ok:#1f9254; --warn:#b45309; --bug:#d7263d;
+  --shadow:0 1px 2px rgba(16,18,24,.06), 0 8px 24px rgba(16,18,24,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1113; --panel:#17191d; --panel-2:#1c1f24; --line:#2a2e35; --line-2:#23262c;
+    --fg:#e8eaed; --fg-2:#a3a8b2; --fg-3:#767c88;
+    --accent:#8b9aff; --accent-soft:#1e2440;
+    --ok:#4ade80; --warn:#fbbf24; --bug:#ff6b7d;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font:14px/1.65 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",Meiryo,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+/* ヘッダは appbar.css（全画面共通） */
+.page-head{margin:0 0 16px}
+.page-head h1{margin:0; font-size:19px; letter-spacing:.02em}
+.page-head p{margin:4px 0 0; color:var(--fg-3); font-size:12.5px}
+main{max-width:1080px; margin:0 auto; padding:22px 20px 64px}
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px}
+a.card{
+  display:block; text-decoration:none; color:inherit;
+  background:var(--panel); border:1px solid var(--line); border-radius:12px;
+  padding:16px 17px 14px; box-shadow:var(--shadow); transition:border-color .12s, transform .12s;
+}
+a.card:hover{border-color:var(--accent); transform:translateY(-1px)}
+.ctop{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap}
+.cname{font-size:16px; font-weight:700; line-height:1.4}
+.cpre{
+  font-size:10.5px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  border:1px solid var(--line); border-radius:5px; padding:1px 6px; color:var(--fg-3);
+}
+.cdesc{margin:7px 0 0; font-size:12.5px; color:var(--fg-2)}
+.bar{display:flex; height:6px; border-radius:999px; overflow:hidden; margin:13px 0 10px; background:var(--line-2)}
+.bar i{display:block; height:100%}
+.stats{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; font-size:11.5px; color:var(--fg-2)}
+.stats b{font-variant-numeric:tabular-nums; font-size:15px; font-weight:700; color:var(--fg); display:block; line-height:1.3}
+.stats .ok b{color:var(--ok)} .stats .warn b{color:var(--warn)} .stats .bug b{color:var(--bug)}
+.cfoot{margin-top:11px; padding-top:9px; border-top:1px solid var(--line-2);
+       display:flex; gap:8px; align-items:center; font-size:11px; color:var(--fg-3)}
+.cfoot .go{margin-left:auto; color:var(--accent); font-weight:600}
+.empty{border:1px dashed var(--line); border-radius:12px; padding:26px; text-align:center; color:var(--fg-3)}
+footer{max-width:1080px; margin:0 auto; padding:0 20px 40px; color:var(--fg-3); font-size:11.5px}
+code{background:var(--panel-2); border:1px solid var(--line-2); border-radius:4px; padding:.5px 5px; font-size:11.5px}

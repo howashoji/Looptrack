@@ -1,0 +1,22 @@
+# list/other-session
+$ issue list
+
+#### exit 0
+
+#### stdout
+ID        TYPE        STATUS      PRI BLOCKED   ASSIGNEE     TITLE
+DEMO-0010 bug         In Progress P1  -         alice        別のセッションが着手中
+DEMO-0002 bug         Todo        P0  DEMO-0001 -            保存でエラーになる
+
+2 件
+※ DEMO-0010（3時間） は別のセッションが着手しています。横取りせず、引き取るときは先に一声かけてください。
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?sort=priority
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

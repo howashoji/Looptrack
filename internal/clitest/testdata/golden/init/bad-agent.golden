@@ -1,0 +1,13 @@
+# init/bad-agent
+$ issue init --project demo --agent cursor
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --agent は claude-code / codex / copilot / other のいずれかです（指定値: cursor）
+
+#### requests (0)
+
+#### files (0)

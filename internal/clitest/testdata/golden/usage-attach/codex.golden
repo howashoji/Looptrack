@@ -1,0 +1,100 @@
+# usage-attach/codex
+$ issue usage attach DEMO-0002
+env CODEX_THREAD_ID=0199aaaa-bbbb-cccc-dddd-eeeeffff0001
+
+#### exit 0
+
+#### stdout
+トークン情報: 付与 #12（codex・1,600 トークン）
+
+#### stderr
+
+#### requests (1)
+POST /im/api/v1/projects/demo/usage
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: 0199aaaa-bbbb-cccc-dddd-eeeeffff0001
+  body:
+    {
+      "at": "2024-05-02T01:03:02.500000Z",
+      "branch": "",
+      "branches": null,
+      "by_model": {
+        "(codex)": {
+          "cache_create": 0,
+          "cache_read": 900,
+          "input": 600,
+          "output": 100,
+          "reasoning": 40,
+          "responses": 2
+        }
+      },
+      "client": "codex",
+      "client_version": "0.140.0",
+      "conversation_id": "20240502100001-f809f3",
+      "cwd_name": "",
+      "excluded": false,
+      "human": {
+        "auto": 0,
+        "idle_lt5_pct": 100,
+        "idle_median_m": 2.9,
+        "intr": 0,
+        "long_breaks": 0,
+        "pure": 2,
+        "work_m": 0.1
+      },
+      "io": null,
+      "issue": "DEMO-0002",
+      "responses": 2,
+      "segments": [
+        {
+          "idle_m": null,
+          "kind": "human",
+          "main": 1080,
+          "responses": 1,
+          "start": "2024-05-02T01:00:01.000000Z",
+          "sub": 0,
+          "sub_responses": 0,
+          "work_m": 0.1
+        },
+        {
+          "idle_m": 2.9,
+          "kind": "human",
+          "main": 520,
+          "responses": 1,
+          "start": "2024-05-02T01:03:00.000000Z",
+          "sub": 0,
+          "sub_responses": 0,
+          "work_m": 0.0
+        }
+      ],
+      "session_id": "0199aaaa-bbbb-cccc-dddd-eeeeffff0001",
+      "sub_responses": 0,
+      "tokens": {
+        "main": {
+          "cache_create": 0,
+          "cache_read": 900,
+          "input": 600,
+          "output": 100
+        },
+        "sub": {
+          "cache_create": 0,
+          "cache_read": 0,
+          "input": 0,
+          "output": 0
+        }
+      },
+      "trigger": "manual",
+      "via": "cli"
+    }
+
+#### files (1)
+home/.codex/sessions/2026/09/18/rollout-2026-09-18T10-00-00-0199aaaa-bbbb-cccc-dddd-eeeeffff0001.jsonl (0644)
+    {"timestamp":"2024-05-02T01:00:00.000Z","type":"session_meta","payload":{"id":"0199aaaa-bbbb-cccc-dddd-eeeeffff0001","cwd":"/work/demo","cli_version":"0.140.0","originator":"codex_cli_rs"}}
+    {"timestamp":"2024-05-02T01:00:01.000Z","type":"event_msg","payload":{"type":"user_message","message":"直して"}}
+    {"timestamp":"2024-05-02T01:00:05.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[]}}
+    {"timestamp":"2024-05-02T01:00:05.500Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1000,"cached_input_tokens":600,"output_tokens":80,"reasoning_output_tokens":30,"total_tokens":1080}}}}
+    {"timestamp":"2024-05-02T01:03:00.000Z","type":"event_msg","payload":{"type":"user_message","message":"ありがとう"}}
+    {"timestamp":"2024-05-02T01:03:02.500Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1500,"cached_input_tokens":900,"output_tokens":100,"reasoning_output_tokens":40,"total_tokens":1600}}}}

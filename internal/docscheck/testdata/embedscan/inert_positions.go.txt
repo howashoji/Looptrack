@@ -1,0 +1,14 @@
+// 走査の固定データ: ここに書いた //go:embed はどれも Go が directive として扱わないので、走査は 1 つも拾わないこと。
+package probe
+
+/*
+//go:embed block_comment_test.mjs
+*/
+
+// 散文の中で書き方に触れただけの行: //go:embed prose_test.mjs
+
+var codeOnSameLine = 1 //go:embed same_line_test.mjs
+
+const rawString = `
+//go:embed raw_string_test.mjs
+`

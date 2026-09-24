@@ -1,0 +1,13 @@
+# init/loop-and-no-loop
+$ issue init --project demo --loop --no-loop
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --loop と --no-loop は一緒に使えません
+
+#### requests (0)
+
+#### files (0)

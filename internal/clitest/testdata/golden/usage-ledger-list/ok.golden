@@ -1,0 +1,21 @@
+# usage-ledger-list/ok
+$ issue usage ledger list
+
+#### exit 0
+
+#### stdout
+#     期間の始まり           データ終端            作成                       トークン 名前
+2     2024-04-01 09:00 2024-04-30 21:00 2024-05-01 10:00      123,456 2024-04 月次
+1     （最初から）           2024-04-01 00:00 2024-04-01 10:00            - 初回
+
+2 件。次の --since-last は 2024-04-30 21:00 から（日本時間）
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/ledger
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

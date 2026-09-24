@@ -1,0 +1,90 @@
+# edit/force
+$ issue edit DEMO-0001 --force
+
+#### exit 0
+
+#### stdout
+作業コピー: .claude/.looptrack-work/DEMO-0001.md（版 3）
+Read / Edit で直し、looptrack issue push DEMO-0001 で反映する（コメント節は編集不可。追記は comment）
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (4)
+ws/.claude/.looptrack-work/.gitignore (0644)
+    *
+ws/.claude/.looptrack-work/DEMO-0001.base.md (0644)
+    ---
+    id: DEMO-0001
+    title: ログイン画面を作る
+    type: task
+    status: In Progress
+    assignee: alice
+    priority: P1
+    labels: []
+    parent: ""
+    blocked_by: []
+    traces: []
+    refs: []
+    created: 2024-05-01 10:00
+    updated: 2024-05-02 11:30
+    ---
+
+    # DEMO-0001 ログイン画面を作る
+
+    ## 内容
+
+    ログイン画面を作る。
+
+    ## 受け入れ条件
+
+    - [ ] ID とパスワードでログインできる
+
+    ## コメント
+
+    ### 2024-05-02 11:30
+
+    着手。
+ws/.claude/.looptrack-work/DEMO-0001.json (0644)
+    {
+      "id": "DEMO-0001",
+      "project": "demo",
+      "version": 3
+    }
+ws/.claude/.looptrack-work/DEMO-0001.md (0644)
+    ---
+    id: DEMO-0001
+    title: ログイン画面を作る
+    type: task
+    status: In Progress
+    assignee: alice
+    priority: P1
+    labels: []
+    parent: ""
+    blocked_by: []
+    traces: []
+    refs: []
+    created: 2024-05-01 10:00
+    updated: 2024-05-02 11:30
+    ---
+
+    # DEMO-0001 ログイン画面を作る
+
+    ## 内容
+
+    ログイン画面を作る。
+
+    ## 受け入れ条件
+
+    - [ ] ID とパスワードでログインできる
+
+    ## コメント
+
+    ### 2024-05-02 11:30
+
+    着手。

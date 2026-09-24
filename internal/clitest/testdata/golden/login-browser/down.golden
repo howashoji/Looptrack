@@ -1,0 +1,16 @@
+# login-browser/down
+$ issue login --browser
+env LOOPTRACK_TOKEN=
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: サーバに接続できません（$API）: $REASON
+
+#### requests (1)
+GET /im/.well-known/oauth-authorization-server
+  X-Looptrack-Lang: ja
+
+#### files (0)

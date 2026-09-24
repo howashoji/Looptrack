@@ -1,0 +1,57 @@
+{{define "report_requests.html"}}{{template "head" (headData .Lang (T .Lang "server.web.report_requests.title"))}}
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <a class="appbar-crumb" href="{{base}}/p/{{.Slug}}/">{{.Name}}</a>
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <span class="appbar-title">{{T .Lang "server.web.report_requests.title"}}</span>
+{{template "appbar_end" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.report_requests.h1"}}</h1>
+  <p class="muted">{{T .Lang "server.web.report_requests.intro_1"}}<code>token-report</code>{{T .Lang "server.web.report_requests.intro_2"}}</p>
+  {{template "messages" .}}
+
+  {{if .CanWrite}}
+  <section class="panel">
+    <h2>{{T .Lang "server.web.report_requests.new_h2"}}</h2>
+    <form method="post" action="{{base}}/p/{{.Slug}}/report-requests" class="request-form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <fieldset>
+        <legend>{{T .Lang "server.web.report_requests.period"}}</legend>
+        <label class="choice"><input type="radio" name="mode" value="since_last"{{if .Form.SinceLast}} checked{{end}}>{{T .Lang "server.web.report_requests.since_last"}}</label>
+        <label class="choice"><input type="radio" name="mode" value="period"{{if not .Form.SinceLast}} checked{{end}}>{{T .Lang "server.web.report_requests.period_custom"}}</label>
+        <div class="row">
+          <label>{{T .Lang "server.web.report_requests.from"}}<input type="date" name="from" value="{{.Form.From}}"></label>
+          <label>{{T .Lang "server.web.report_requests.to"}}<input type="date" name="to" value="{{.Form.To}}"></label>
+        </div>
+      </fieldset>
+      <label>{{T .Lang "server.web.report_requests.target"}}<input name="target" maxlength="500" value="{{.Form.Target}}" placeholder="{{T .Lang "server.web.report_requests.target_placeholder"}}"></label>
+      <label>{{T .Lang "server.web.report_requests.note"}}<textarea name="note" maxlength="2000" rows="3" placeholder="{{T .Lang "server.web.report_requests.note_placeholder"}}">{{.Form.Note}}</textarea></label>
+      <button type="submit" class="inline">{{T .Lang "server.web.report_requests.submit"}}</button>
+    </form>
+    <p class="muted">{{T .Lang "server.web.report_requests.submit_note"}}</p>
+  </section>
+  {{else}}
+  <p class="notice">{{T .Lang "server.web.report_requests.no_write"}}</p>
+  {{end}}
+
+  <section class="panel">
+    <h2>{{T .Lang "server.web.report_requests.list_h2"}}</h2>
+    {{with .Requests}}
+    <table class="list">
+      <thead><tr><th>#</th><th>{{T $.Lang "server.web.report_requests.th_created"}}</th><th>{{T $.Lang "server.web.report_requests.th_by"}}</th><th>{{T $.Lang "server.web.report_requests.th_period"}}</th><th>{{T $.Lang "server.web.report_requests.th_target"}}</th><th>{{T $.Lang "server.web.report_requests.th_state"}}</th></tr></thead>
+      <tbody>
+      {{range .}}
+      <tr{{if .Done}} class="inactive"{{end}}>
+        <td>{{.ID}}</td><td>{{.Created}}</td><td>{{.RequestedBy}}</td><td class="name">{{.Period}}</td>
+        <td class="name">{{if .Target}}{{.Target}}{{else}}{{T $.Lang "server.web.report_requests.target_all"}}{{end}}{{if .Note}}<br><span class="muted">{{.Note}}</span>{{end}}</td>
+        <td class="name">{{if .Done}}{{T $.Lang "server.web.report_requests.done" "id" .Report.ID "name" .Report.Name}}{{else}}{{T $.Lang "server.web.report_requests.not_done"}}<br><span class="muted">{{T $.Lang "server.web.report_requests.not_done_hint" "id" .ID}}</span>{{end}}</td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">{{T .Lang "server.web.report_requests.none"}}</p>
+    {{end}}
+  </section>
+</main>
+{{template "foot"}}{{end}}

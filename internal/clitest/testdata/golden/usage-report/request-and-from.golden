@@ -1,0 +1,13 @@
+# usage-report/request-and-from
+$ issue usage report --request 7 --from 2024-04-01
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --request は --since-last / --from / --to と同時に指定できません（依頼の期間を使います）
+
+#### requests (0)
+
+#### files (0)

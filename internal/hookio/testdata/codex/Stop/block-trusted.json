@@ -1,0 +1,39 @@
+{
+  "note": "TrustUnconfirmed なら decision: block",
+  "args": [
+    "--agent",
+    "codex"
+  ],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "trust_unconfirmed": true,
+  "input": {
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "Stop",
+    "stop_hook_active": false
+  },
+  "event": {
+    "agent": "codex",
+    "name": "Stop",
+    "raw_name": "Stop",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app"
+  },
+  "result": {
+    "block": "引き継ぎが作業の完了に追いついていません"
+  },
+  "output": {
+    "stdout": {
+      "decision": "block",
+      "reason": "引き継ぎが作業の完了に追いついていません"
+    },
+    "exit_code": 0
+  }
+}

@@ -1,0 +1,14 @@
+# summary/no-api-hook-json
+$ issue summary --hook-json --agent copilot
+env LOOPTRACK_API_URL=
+env LOOPTRACK_PROJECT=
+
+#### exit 0
+
+#### stdout
+
+#### stderr
+
+#### requests (0)
+
+#### files (0)

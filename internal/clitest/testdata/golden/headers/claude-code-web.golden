@@ -1,0 +1,52 @@
+# headers/claude-code-web
+$ issue show DEMO-0001
+env CLAUDE_CODE_REMOTE=true
+env CLAUDE_CODE_REMOTE_SESSION_ID=cse_web
+env CLAUDE_CODE_SESSION_ID=cc-web-1
+
+#### exit 0
+
+#### stdout
+---
+id: DEMO-0001
+title: ログイン画面を作る
+type: task
+status: In Progress
+assignee: alice
+priority: P1
+labels: []
+parent: ""
+blocked_by: []
+traces: []
+refs: []
+created: 2024-05-01 10:00
+updated: 2024-05-02 11:30
+---
+
+# DEMO-0001 ログイン画面を作る
+
+## 内容
+
+ログイン画面を作る。
+
+## 受け入れ条件
+
+- [ ] ID とパスワードでログインできる
+
+## コメント
+
+### 2024-05-02 11:30
+
+着手。
+
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001?format=md&project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: cc-web-1
+
+#### files (0)

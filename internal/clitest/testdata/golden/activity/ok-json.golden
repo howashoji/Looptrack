@@ -1,0 +1,44 @@
+# activity/ok-json
+$ issue activity DEMO-0001 DEMO-0002 --since 1714600000.25 --json
+
+#### exit 0
+
+#### stdout
+{
+  "items": [
+    {
+      "id": "DEMO-0001",
+      "project": "demo",
+      "title": "ログイン画面を作る",
+      "status": "In Progress",
+      "closed": false,
+      "last_at": "2024-05-02T02:30:00Z",
+      "last_epoch": 1714617000,
+      "last_kind": "comment",
+      "last_via": "cli",
+      "events_since": 2
+    },
+    {
+      "id": "DEMO-0002",
+      "project": "demo",
+      "title": "保存でエラーになる",
+      "status": "Todo",
+      "closed": false,
+      "last_at": "2024-05-01T01:00:00Z",
+      "last_epoch": 1714525200,
+      "last_kind": "create",
+      "last_via": "mcp",
+      "events_since": 0
+    }
+  ]
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/activity?ids=DEMO-0001%2CDEMO-0002&since=1714600000.25
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,817 @@
+# リリース物を作る: 6 対象の実行ファイル・SHA256SUMS・コンテナイメージ（linux/amd64・arm64）。
+# 実行ファイルに添えて NOTICE・OFL-BIZUDGothic.txt と、インストーラ install.sh・MySQL の最小権限 grants.sql も資産にする
+# （install.sh は「Releases から 1 行で取得して実行する」入口。どれも SHA256SUMS に載る）。
+# 手順は docs/server/RELEASE.md。
+#
+# 起動:
+#   - タグ v* の push       → 作って workflow の artifact に置く。公開（GHCR・Releases）は変数 RELEASE_PUBLISH が "true" のときだけ
+#   - 手動（workflow_dispatch）→ 版を指定して作る。publish を true にすると公開まで行う（タグが既にあること）
+# 公開前（private リポジトリ）の既定は「作るだけ」。公開に要るのは GITHUB_TOKEN だけ（packages / contents の write をジョブで与える）。
+#
+# 署名: 変数 RELEASE_SIGN が "true" のとき、
+#   sign-macos（macOS の runner）: darwin の実行ファイルに Developer ID で署名し公証する（deploy/release/sign-macos.sh）
+#   sums     : 署名の後の最終ファイルから SHA256SUMS を作る（署名しないときも、このジョブが作る）
+#   sign-sums: SHA256SUMS を minisign で署名する（SHA256SUMS.minisig。公開鍵は deploy/release/minisign.pub）
+# 署名と公開のジョブは Environment「release」（タグ v* のみ・承認つき）の Secrets を使う。Secrets が無ければ、そのジョブは何もせずにエラーで止まる。
+# 公開（publish）は署名を必須にする（RELEASE_SIGN が "true" でないと meta で止まる。self-update は署名の無い配布から更新しないため）。
+# Windows は当面署名しない（公開後に SignPath Foundation）。
+#
+# デスクトップ版（deploy/release/desktop.sh・RELEASE.md「デスクトップ版」）:
+#   desktop-macos  : macOS の runner で universal の Looptrack.app（cgo・lipo）と、署名なしの dmg を作る
+#   desktop-linux  : AppImage（x86_64・aarch64。cgo なし）。x86_64 は中身を展開して起動と --quit まで確かめる
+#   desktop-windows: Looptrack.exe（GUI・アイコン）と cli/looptrack.exe の zip（amd64・arm64。cgo なし。ubuntu でクロスビルド）
+#   desktop-windows-installer: 上の zip を Windows の runner で受け取り、まず展開した場所からそのまま起動して確かめ
+#                    （deploy/release/desktop_smoke.ps1。zip はインストーラを通さない配り方なので、別に確かめる）、
+#                    同じ中身を Inno Setup 7 でインストーラにする。amd64 は windows-2025・arm64 は windows-11-arm。
+#                    インストーラは導入 → 起動中の上書き → アンインストールまで試す
+#   署名するときは sign-macos が .app に署名・公証・staple → dmg を作り直して署名・公証し、署名なしの dmg を置き換える。
+#   どれも sums ジョブで合流し、SHA256SUMS は署名の後の最終ファイルから作る（今までの順を変えない）。
+# 秘密の扱い: set -x を使わない・秘密を echo しない・復号したファイルは $RUNNER_TEMP に置き、if: always() の片付けで消す。
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 版（タグ名。例 v1.0.0-rc.1）。空なら「日付-コミット ID」で試しに作る（公開はしない）
+        required: false
+        default: ""
+      publish:
+        description: GHCR への push と Releases の下書き作成まで行う（version のタグが push 済みであること）
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: "1.27.x"
+  # 版と起動の確認は日本語の文面（「（desktop」「既に起動しています」）で見る。runner の言語は英語なので、ここで固定する
+  # （固定しないと looptrack version が "(desktop" を返し、作ったものが正しくても「version が違います」で落ちる）。
+  LOOPTRACK_LANG: ja
+  # 作る実行ファイル（cmd/ の下の名前）。サーバも looptrack に統合した（NOTICE・OFL-BIZUDGothic.txt も置かれる）。
+  RELEASE_CMDS: looptrack
+  # コンテナイメージの名前（GHCR。ghcr.io/<owner>/looptrack）。
+  IMAGE_NAME: looptrack
+
+jobs:
+  meta:
+    name: 版と公開の判定
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      sign: ${{ steps.v.outputs.sign }}
+    steps:
+      - id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          IN_VERSION: ${{ inputs.version }}
+          IN_PUBLISH: ${{ inputs.publish }}
+          VAR_PUBLISH: ${{ vars.RELEASE_PUBLISH }}
+          VAR_SIGN: ${{ vars.RELEASE_SIGN }}
+        run: |
+          semver='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+          publish=false
+          if [ "$EVENT" = push ]; then
+            version="$REF_NAME"
+            [ "$VAR_PUBLISH" = true ] && publish=true
+          elif [ -n "$IN_VERSION" ]; then
+            version="$IN_VERSION"
+            [ "$IN_PUBLISH" = true ] && publish=true
+          else
+            version="$(date -u +%Y%m%d)-${GITHUB_SHA::12}"
+            if [ "$IN_PUBLISH" = true ]; then
+              echo "::error::publish には version（push 済みのタグ）が要ります"
+              exit 1
+            fi
+          fi
+          if [ "$publish" = true ] && [[ ! "$version" =~ $semver ]]; then
+            echo "::error::公開する版は vX.Y.Z または vX.Y.Z-<pre> の形にする: $version"
+            exit 1
+          fi
+          sign=false
+          [ "$VAR_SIGN" = true ] && sign=true
+          if [ "$publish" = true ] && [ "$sign" != true ]; then
+            echo "::error::公開する版は署名が要ります（リポジトリ変数 RELEASE_SIGN を true にし、Environment「release」に Secrets を登録する。RELEASE.md「署名」）"
+            exit 1
+          fi
+          prerelease=false
+          [[ "$version" == *-* ]] && prerelease=true
+          {
+            echo "version=$version"
+            echo "publish=$publish"
+            echo "prerelease=$prerelease"
+            echo "sign=$sign"
+          } >> "$GITHUB_OUTPUT"
+          echo "版: $version / 公開: $publish / プレリリース: $prerelease / 署名: $sign" >> "$GITHUB_STEP_SUMMARY"
+
+  binaries:
+    name: 実行ファイル（6 対象）
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # workflow_dispatch で version を指定したときは、そのタグの内容から作る
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: ビルド
+        run: bash deploy/release/dist.sh build "$VERSION" dist
+      - name: 版が埋め込まれていることを確かめる（linux/amd64）
+        run: |
+          got=$("./dist/looptrack_${VERSION}_linux_amd64" version)
+          case "$got" in "looptrack $VERSION"*) ;; *) echo "::error::looptrack version が $got"; exit 1 ;; esac
+          test -s dist/OFL-BIZUDGothic.txt || { echo "::error::OFL-BIZUDGothic.txt がありません"; exit 1; }
+          test -s dist/NOTICE || { echo "::error::NOTICE（第三者のライセンス文）がありません"; exit 1; }
+          # インストーラと MySQL の最小権限（取得の 1 行の入口。リポジトリの写しと同じであること）
+          for f in install.sh grants.sql; do
+            test -s "dist/$f" || { echo "::error::$f がありません（リリースの資産）"; exit 1; }
+            cmp -s "deploy/$f" "dist/$f" || { echo "::error::dist/$f がリポジトリの deploy/$f と違います"; exit 1; }
+          done
+          test -x dist/install.sh || { echo "::error::install.sh に実行権がありません"; exit 1; }
+      # 署名前のファイル。SHA256SUMS はまだ作らない（署名でバイト列が変わるので、sums ジョブで最終ファイルから作る）
+      - uses: actions/upload-artifact@v7
+        with:
+          name: build-${{ needs.meta.outputs.version }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop-macos:
+    name: デスクトップ版（macOS の .app・dmg）
+    needs: meta
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: .app（universal・cgo）
+        run: bash deploy/release/desktop.sh macos-app "$VERSION" out
+      - name: 版と起動を確かめる（トレイなし・一時ディレクトリ）
+        run: |
+          bin=out/Looptrack.app/Contents/MacOS/looptrack
+          archs=$(lipo -archs "$bin")
+          case "$archs" in *x86_64*arm64* | *arm64*x86_64*) ;; *) echo "::error::universal ではありません: $archs"; exit 1 ;; esac
+          got=$("$bin" version)
+          case "$got" in "looptrack ${VERSION}（desktop"*) ;; *) echo "::error::version が違います: ${got}"; exit 1 ;; esac
+          bash deploy/release/desktop_smoke.sh "$bin"
+          test -s out/Looptrack.app/Contents/Resources/NOTICE || { echo "::error::.app に NOTICE がありません"; exit 1; }
+      - name: 署名なしの dmg
+        run: bash deploy/release/desktop.sh macos-dmg "$VERSION" out/Looptrack.app dmg
+      # .app は zip にして渡す（artifact は実行権限・シンボリックリンクを保たない）。署名は sign-macos で行う
+      - name: .app を zip にする
+        run: ditto -c -k --keepParent out/Looptrack.app Looptrack.app.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-macos-app-${{ needs.meta.outputs.version }}
+          path: Looptrack.app.zip
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-macos-${{ needs.meta.outputs.version }}
+          path: dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop-linux:
+    name: デスクトップ版（Linux の AppImage・${{ matrix.arch }}）
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: squashfs-tools・desktop-file-utils
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools desktop-file-utils >/dev/null
+      - name: AppImage
+        run: bash deploy/release/desktop.sh appimage "$VERSION" "$ARCH" out
+      - name: 中身を展開して版と起動を確かめる（x86_64 だけ）
+        if: ${{ matrix.arch == 'amd64' }}
+        run: |
+          img=$(realpath out/*.AppImage)
+          mkdir x
+          (cd x && "$img" --appimage-extract >/dev/null)
+          case "$(x/squashfs-root/AppRun version)" in "looptrack ${VERSION}（desktop"*) ;; *) echo "::error::version が違います"; exit 1 ;; esac
+          bash deploy/release/desktop_smoke.sh x/squashfs-root/AppRun
+          test -s x/squashfs-root/usr/share/doc/looptrack/NOTICE || { echo "::error::AppImage に NOTICE がありません"; exit 1; }
+          test -s x/squashfs-root/usr/share/doc/looptrack/AppImage-type2-runtime-LICENSE.txt || { echo "::error::AppImage に runtime のライセンス文がありません"; exit 1; }
+          # runtime に静的リンクされた部品（libfuse は LGPL-2.1）の全文・一覧・作り直しの手順が入っていること
+          lic=x/squashfs-root/usr/share/doc/looptrack/licenses
+          for f in LGPL-2.1.txt RELINKING.md runtime-components.json; do
+            test -s "$lic/$f" || { echo "::error::AppImage に $f がありません（LGPL-2.1 §6 の同梱）"; exit 1; }
+          done
+          for f in deploy/release/licenses/*.txt; do
+            b=$(basename "$f")
+            # runtime 自身の MIT は 1 つ上（usr/share/doc/looptrack/）に入る。上で確かめた
+            if [ "$b" = AppImage-type2-runtime-LICENSE.txt ]; then continue; fi
+            cmp -s "$f" "$lic/$b" || { echo "::error::AppImage の $b がリポジトリの写しと違うか入っていません"; exit 1; }
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-linux-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
+          path: out/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop-windows:
+    name: デスクトップ版（Windows の zip・${{ matrix.arch }}）
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: zip（Looptrack.exe と cli/looptrack.exe）
+        run: bash deploy/release/desktop.sh windows-zip "$VERSION" "$ARCH" out
+      # ここは ubuntu の runner なので一覧しか見られない。展開して起動する確認は、
+      # zip を受け取る desktop-windows-installer のジョブ（Windows の runner）で行う。
+      - name: 中身を確かめる
+        run: |
+          list=$(unzip -l out/*.zip)
+          echo "$list"
+          for f in Looptrack/Looptrack.exe Looptrack/cli/looptrack.exe Looptrack/OFL-BIZUDGothic.txt Looptrack/NOTICE; do
+            grep -qF "$f" <<<"$list" || { echo "::error::zip に $f がありません"; exit 1; }
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-windows-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
+          path: out/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop-windows-installer:
+    name: デスクトップ版（Windows の zip の起動確認とインストーラ・${{ matrix.arch }}）
+    # 上の zip の中身を、まず展開した場所からそのまま起動して確かめ（zip の配り方の確認）、
+    # そのあと同じ中身をインストーラに入れる（同じ実行ファイル）。ISCC は Windows でしか動かない
+    needs: [meta, desktop-windows]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      ARCH: ${{ matrix.arch }}
+      # Inno Setup 7.1.0（GitHub Releases。版と SHA-256 で固定する。x86 の版は x64・arm64 の Windows でも動く）
+      INNO_URL: https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x86.exe
+      INNO_SHA256: f9671174e0d15ba9b4f6b56564c6aed32ea8db9c3cb9bf6f2af0850fe7894f60
+      # Looptrack.iss の AppId（HKCU の Uninstall キーの名前）
+      APP_ID: "{90128D15-CB14-42C2-9C7E-38680F79F5C9}"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-windows-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
+          path: zip
+      - name: Inno Setup 7.1.0 を入れる（SHA-256 を照合して無人で）
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'innosetup.exe'
+          Invoke-WebRequest -Uri $env:INNO_URL -OutFile $exe -UseBasicParsing
+          $got = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          if ($got -ne $env:INNO_SHA256) { throw "Inno Setup の SHA-256 が違います: $got" }
+          $p = Start-Process -FilePath $exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Inno Setup を入れられません（$($p.ExitCode)）" }
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 7\ISCC.exe'
+          if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 7\ISCC.exe' }
+          if (-not (Test-Path $iscc)) { throw 'ISCC.exe が見つかりません' }
+          # bash から呼ぶので、区切りは / にする
+          "ISCC=$($iscc -replace '\\','/')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "ISCC: $iscc"
+      - name: zip を展開する（Git Bash の unzip に頼らない）
+        shell: pwsh
+        run: |
+          $zip = (Get-ChildItem zip\*.zip)[0].FullName
+          Expand-Archive -Path $zip -DestinationPath stage -Force
+          Get-ChildItem -Recurse stage | Select-Object -ExpandProperty FullName
+      # zip はインストーラを通さず、展開した場所からそのまま起動する配り方。展開先が利用者の任意の場所なので、
+      # インストーラ版が通っても同じとは限らない。ここで zip の中身を直接起動して確かめる（macOS・Linux の
+      # desktop_smoke.sh と同じ検査の Windows 版）。
+      - name: smoke test（zip を展開した場所からそのまま起動する）
+        shell: pwsh
+        run: pwsh -File deploy/release/desktop_smoke.ps1 -Exe stage\Looptrack\Looptrack.exe
+      - name: インストーラ（desktop.sh windows-installer）
+        shell: bash
+        run: bash deploy/release/desktop.sh windows-installer "$VERSION" "$ARCH" stage out
+      - name: smoke test（導入 → 起動中の上書き → アンインストール）
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $setup = (Get-ChildItem out\*_setup.exe)[0].FullName
+          $app   = Join-Path $env:LOCALAPPDATA 'Programs\Looptrack Desktop'
+          $data  = Join-Path $env:LOCALAPPDATA 'Looptrack'
+          $cli   = Join-Path $env:LOCALAPPDATA 'Programs\looptrack\looptrack.exe'
+          $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          $unKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$($env:APP_ID)_is1"
+          $lnk = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Looptrack\Looptrack.lnk'
+          $setupArgs = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/TASKS=startup,cli',
+                    "/LOG=$env:RUNNER_TEMP\install.log")
+
+          Write-Host '--- サイレント導入（選択肢は両方 on）'
+          $p = Start-Process -FilePath $setup -ArgumentList $setupArgs -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "インストーラが $($p.ExitCode) で終わりました" }
+          foreach ($f in @('Looptrack.exe','cli\looptrack.exe','NOTICE.txt','OFL-BIZUDGothic.txt')) {
+            if (-not (Test-Path (Join-Path $app $f))) { throw "$f がありません（$app）" }
+          }
+          if (-not (Test-Path $unKey)) { throw "HKCU の Uninstall キーがありません: $unKey" }
+          if (-not (Test-Path $lnk)) { throw "スタートメニューの .lnk がありません: $lnk" }
+          Write-Host '--- 同梱の CLI と、選択肢で置いた CLI の写し'
+          & (Join-Path $app 'cli\looptrack.exe') version
+          if ($LASTEXITCODE -ne 0) { throw "同梱の CLI が動きません（$LASTEXITCODE）" }
+          if (-not (Test-Path $cli)) { throw "CLI の写しがありません: $cli" }
+          & $cli version
+          if ($LASTEXITCODE -ne 0) { throw "CLI の写しが動きません（$LASTEXITCODE）" }
+          $run = (Get-ItemProperty -Path $runKey -Name Looptrack -ErrorAction SilentlyContinue).Looptrack
+          if (-not $run) { throw 'ログイン時の起動（HKCU の Run の値）が登録されていません' }
+          Write-Host "Run の値: $run"
+
+          Write-Host '--- 起動してから上書き（更新）'
+          $proc = Start-Process -FilePath (Join-Path $app 'Looptrack.exe') `
+            -ArgumentList 'desktop','--background','--no-tray' -PassThru
+          $up = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            & $cli desktop --status *> $null
+            if ($LASTEXITCODE -eq 0) { $up = $true; break }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $up) { throw 'デスクトップ版が起動しません' }
+          if (-not (Test-Path (Join-Path $data 'looptrack.db'))) { throw 'データの置き場に DB がありません' }
+          'smoke' | Out-File -FilePath (Join-Path $data 'smoke.txt') -Encoding utf8
+          $p = Start-Process -FilePath $setup -ArgumentList $setupArgs -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "起動中の上書きが $($p.ExitCode) で終わりました" }
+          Wait-Process -Id $proc.Id -Timeout 60 -ErrorAction SilentlyContinue
+          $proc.Refresh()
+          if (-not $proc.HasExited) { throw '上書きのときに起動中のインスタンスが止まっていません' }
+          if (-not (Test-Path (Join-Path $app 'Looptrack.exe'))) { throw '上書きの後に Looptrack.exe がありません' }
+          if (-not (Test-Path (Join-Path $data 'smoke.txt'))) { throw '上書きでデータが消えました' }
+
+          Write-Host '--- アンインストール（データは残り、Run の値と CLI の写しは消える）'
+          $uninst = (Get-ItemProperty -Path $unKey).UninstallString.Trim('"')
+          Start-Process -FilePath $uninst -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait | Out-Null
+          # unins000.exe は自分を消すために子プロセスに引き継いで先に終わるので、消えるまで待つ
+          for ($i = 0; $i -lt 60; $i++) {
+            if (-not (Test-Path (Join-Path $app 'Looptrack.exe'))) { break }
+            Start-Sleep -Seconds 1
+          }
+          if (Test-Path (Join-Path $app 'Looptrack.exe')) { throw 'アンインストールされていません' }
+          if (Test-Path $unKey) { throw 'HKCU の Uninstall キーが残っています' }
+          if (Test-Path $lnk) { throw 'スタートメニューの .lnk が残っています' }
+          if (-not (Test-Path (Join-Path $data 'smoke.txt'))) { throw 'アンインストールでデータが消えました' }
+          if ((Get-ItemProperty -Path $runKey -Name Looptrack -ErrorAction SilentlyContinue)) {
+            throw 'ログイン時の起動（HKCU の Run の値）が残っています'
+          }
+          if (Test-Path $cli) { throw "CLI の写しが残っています: $cli" }
+          Write-Host 'smoke test: OK'
+      - name: 失敗したらインストーラのログを残す
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-log-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
+          path: ${{ runner.temp }}/install.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-windows-installer-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
+          path: out/*_setup.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-macos:
+    name: macOS の署名と公証（darwin の実行ファイル・デスクトップ版の .app と dmg）
+    needs: [meta, binaries, desktop-macos]
+    if: ${{ needs.meta.outputs.sign == 'true' }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - name: Secrets と変数があることを確かめる
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_P12_PASSWORD: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+        run: |
+          # 値は出さない（無いものの名前だけ）
+          missing=""
+          for n in MACOS_CERT_P12_BASE64 MACOS_CERT_P12_PASSWORD APPLE_API_KEY_P8_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER_ID APPLE_TEAM_ID MACOS_SIGN_IDENTITY; do
+            [ -n "${!n}" ] || missing="$missing $n"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::署名に要る Secrets / 変数がありません:$missing（Environment「release」に登録する。RELEASE.md「署名」）"
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-${{ needs.meta.outputs.version }}
+          path: dist
+      - name: 一時キーチェーンに証明書を入れる
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_P12_PASSWORD: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+        run: |
+          umask 077
+          kc="$RUNNER_TEMP/looptrack-signing.keychain-db"
+          p12="$RUNNER_TEMP/looptrack-cert.p12"
+          printf '%s' "$MACOS_CERT_P12_BASE64" | base64 --decode >"$p12"
+          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode >"$RUNNER_TEMP/looptrack-AuthKey.p8"
+          # キーチェーンのパスワードはこのステップの中だけで使う使い捨て（出力しない）
+          kc_pw=$(openssl rand -base64 32)
+          security create-keychain -p "$kc_pw" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$kc_pw" "$kc"
+          security import "$p12" -P "$MACOS_CERT_P12_PASSWORD" -f pkcs12 -k "$kc" -T /usr/bin/codesign >/dev/null
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kc_pw" "$kc" >/dev/null
+          rm -f "$p12"
+          # 検索リストの先頭に足す（codesign が鍵を見つけられるように）
+          existing=$(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"$//')
+          # shellcheck disable=SC2086
+          security list-keychains -d user -s "$kc" $existing
+          # 一時キーチェーンの署名の身元の数だけ出す（1 のはず）
+          echo "署名の身元: $(security find-identity -v -p codesigning "$kc" | grep -c '"') 個"
+      - name: 署名と公証（sign-macos.sh）
+        env:
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          bash deploy/release/sign-macos.sh --keychain "$RUNNER_TEMP/looptrack-signing.keychain-db" \
+            --api-key "$RUNNER_TEMP/looptrack-AuthKey.p8" \
+            dist/*_darwin_amd64 dist/*_darwin_arm64
+      - uses: actions/download-artifact@v8
+        with:
+          name: unsigned-macos-app-${{ needs.meta.outputs.version }}
+          path: desktop-in
+      # .app に署名・公証・staple してから dmg を作り、dmg にも署名・公証・staple する（sign-macos.sh の説明のとおり 2 回に分ける）
+      - name: デスクトップ版の署名と公証（.app → dmg）
+        env:
+          MACOS_SIGN_IDENTITY: ${{ vars.MACOS_SIGN_IDENTITY }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          mkdir desktop
+          ditto -x -k desktop-in/Looptrack.app.zip desktop
+          bash deploy/release/sign-macos.sh --keychain "$RUNNER_TEMP/looptrack-signing.keychain-db" \
+            --api-key "$RUNNER_TEMP/looptrack-AuthKey.p8" desktop/Looptrack.app
+          bash deploy/release/desktop.sh macos-dmg "$VERSION" desktop/Looptrack.app dist
+          bash deploy/release/sign-macos.sh --keychain "$RUNNER_TEMP/looptrack-signing.keychain-db" \
+            --api-key "$RUNNER_TEMP/looptrack-AuthKey.p8" dist/*.dmg
+      - name: 署名後も動くことを確かめる（darwin/arm64）
+        run: |
+          chmod +x dist/*_darwin_arm64
+          got=$("./dist/looptrack_${VERSION}_darwin_arm64" version)
+          case "$got" in "looptrack $VERSION"*) ;; *) echo "::error::looptrack version が $got"; exit 1 ;; esac
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signed-macos-${{ needs.meta.outputs.version }}
+          path: |
+            dist/*_darwin_amd64
+            dist/*_darwin_arm64
+            dist/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+      - name: 片付け（一時キーチェーン・証明書・API キー）
+        if: ${{ always() }}
+        run: |
+          security delete-keychain "$RUNNER_TEMP/looptrack-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/looptrack-cert.p12" "$RUNNER_TEMP/looptrack-AuthKey.p8"
+
+  sums:
+    name: SHA256SUMS（署名の後の最終ファイルから）
+    needs: [meta, binaries, desktop-macos, desktop-linux, desktop-windows, desktop-windows-installer, sign-macos]
+    # 署名するときは sign-macos の成功、しないときは sign-macos を飛ばしたことを条件にする
+    if: >-
+      ${{ !cancelled() && needs.binaries.result == 'success' && needs.desktop-macos.result == 'success' &&
+      needs.desktop-linux.result == 'success' && needs.desktop-windows.result == 'success' &&
+      needs.desktop-windows-installer.result == 'success' &&
+      ((needs.meta.outputs.sign == 'true' && needs.sign-macos.result == 'success') ||
+      (needs.meta.outputs.sign != 'true' && needs.sign-macos.result == 'skipped')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-${{ needs.meta.outputs.version }}
+          path: dist
+      # デスクトップ版（dmg・AppImage・zip）。dmg は、署名するときは下で署名済みのものに置き換わる
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-*-${{ needs.meta.outputs.version }}
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        if: ${{ needs.meta.outputs.sign == 'true' }}
+        with:
+          name: signed-macos-${{ needs.meta.outputs.version }}
+          path: signed
+      - name: 署名済みの darwin の実行ファイルと dmg で置き換える
+        if: ${{ needs.meta.outputs.sign == 'true' }}
+        run: |
+          n=0
+          for f in signed/*; do
+            b=$(basename "$f")
+            [ -f "dist/$b" ] || { echo "::error::署名済みのファイルが署名前の一覧にありません: $b"; exit 1; }
+            cp -f "$f" "dist/$b"
+            n=$((n + 1))
+          done
+          [ "$n" -eq 5 ] || { echo "::error::署名済みのファイルが $n 個（darwin の実行ファイル 4 個と dmg 1 個のはず）"; exit 1; }
+          echo "darwin の実行ファイルと dmg の $n 個を署名済みのものに置き換えた"
+      - name: デスクトップ版がそろっていることを確かめる
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          for f in "Looptrack_${VERSION}_macos_universal.dmg" "Looptrack_${VERSION}_linux_x86_64.AppImage" \
+            "Looptrack_${VERSION}_linux_aarch64.AppImage" "Looptrack_${VERSION}_windows_amd64.zip" "Looptrack_${VERSION}_windows_arm64.zip" \
+            "Looptrack_${VERSION}_windows_amd64_setup.exe" "Looptrack_${VERSION}_windows_arm64_setup.exe"; do
+            [ -f "dist/$f" ] || { echo "::error::$f がありません"; exit 1; }
+          done
+      - name: 添えるファイルがそろっていることを確かめる
+        run: |
+          # ライセンス文と、取得の 1 行の入口（install.sh・grants.sql）。binaries ジョブが置いたものがここまで来ていること
+          for f in NOTICE OFL-BIZUDGothic.txt install.sh grants.sql; do
+            test -s "dist/$f" || { echo "::error::$f がありません（リリースの資産）"; exit 1; }
+          done
+          for f in install.sh grants.sql; do
+            cmp -s "deploy/$f" "dist/$f" || { echo "::error::dist/$f がリポジトリの deploy/$f と違います"; exit 1; }
+          done
+      - name: SHA256SUMS
+        run: bash deploy/release/dist.sh sums dist
+      - name: SHA256SUMS に載っていることを確かめる
+        run: |
+          # install.sh は取得した後に SHA-256 で確かめられること（Releases から 1 行で取る経路）
+          for f in NOTICE OFL-BIZUDGothic.txt install.sh grants.sql; do
+            grep -qE "^[0-9a-f]{64} [ *]?$f\$" dist/SHA256SUMS || { echo "::error::SHA256SUMS に $f がありません"; exit 1; }
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: binaries-${{ needs.meta.outputs.version }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  sign-sums:
+    name: SHA256SUMS の署名（minisign）
+    needs: [meta, sums]
+    if: ${{ needs.meta.outputs.sign == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+    steps:
+      - name: Secrets があることを確かめる
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+        run: |
+          missing=""
+          for n in MINISIGN_SECRET_KEY MINISIGN_PASSWORD; do
+            [ -n "${!n}" ] || missing="$missing $n"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::署名に要る Secrets がありません:$missing（Environment「release」に登録する。RELEASE.md「署名」）"
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: binaries-${{ needs.meta.outputs.version }}
+          path: dist
+      - name: minisign を入れる
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign >/dev/null
+          minisign -v
+      - name: 署名（dist.sh sign-sums）
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/looptrack-minisign.key"
+          printf '%s\n' "$MINISIGN_SECRET_KEY" >"$key"
+          # パスワードは標準入力の 1 行で渡す（minisign は端末が無ければ標準入力から読む）
+          printf '%s\n' "$MINISIGN_PASSWORD" | MINISIGN_SECRET_KEY_FILE="$key" \
+            bash deploy/release/dist.sh sign-sums dist "looptrack $VERSION SHA256SUMS"
+          rm -f "$key"
+      - name: 確かめる（SHA256SUMS の照合と、リポジトリの公開鍵での署名の確認）
+        run: bash deploy/release/dist.sh verify dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sums-signature-${{ needs.meta.outputs.version }}
+          path: dist/SHA256SUMS.minisig
+          if-no-files-found: error
+          retention-days: 14
+      - name: 片付け（秘密鍵）
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/looptrack-minisign.key"
+
+  image:
+    name: コンテナイメージ（linux/${{ matrix.arch }}）
+    # linux の looptrack だけを使うので署名とは独立。sums の最終ファイル（SHA256SUMS に載っているものと同じバイト列）から作る
+    needs: [meta, sums]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      PUBLISH: ${{ needs.meta.outputs.publish }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: binaries-${{ needs.meta.outputs.version }}
+          path: dist
+      # deploy/build.sh と同じ内容: deploy/Dockerfile（scratch）に、リリースと同じ linux 向けの looptrack を置くだけ（ENTRYPOINT /looptrack・CMD serve）。
+      # イメージの中の実行ファイルは SHA256SUMS に載っているものと同じバイト列になる。
+      - name: ビルドの材料
+        run: |
+          bash deploy/release/dist.sh image-context "$VERSION" "$ARCH" dist "ctx-$ARCH"
+          test -s "ctx-$ARCH/NOTICE" || { echo "::error::イメージの材料に NOTICE がありません"; exit 1; }
+      - uses: docker/setup-buildx-action@v4
+      - name: GHCR にログイン（公開するときだけ）
+        if: ${{ needs.meta.outputs.publish == 'true' }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: docker build
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          ref="ghcr.io/$owner/$IMAGE_NAME:$VERSION-$ARCH"
+          labels=(
+            --label "org.opencontainers.image.source=$REPO_URL"
+            --label "org.opencontainers.image.version=$VERSION"
+            --label "org.opencontainers.image.revision=$GITHUB_SHA"
+          )
+          if [ "$PUBLISH" = true ]; then
+            docker buildx build --platform "linux/$ARCH" "${labels[@]}" -t "$ref" --push "ctx-$ARCH"
+          else
+            # 公開しないときは tar にして artifact に置く（docker load で読める）
+            docker buildx build --platform "linux/$ARCH" "${labels[@]}" -t "$ref" \
+              --output "type=docker,dest=image-$ARCH.tar" "ctx-$ARCH"
+            ls -l "image-$ARCH.tar"
+          fi
+      - name: イメージを artifact に置く（公開しないとき）
+        if: ${{ needs.meta.outputs.publish != 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-${{ needs.meta.outputs.version }}-${{ matrix.arch }}
+          path: image-${{ matrix.arch }}.tar
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: 公開（GHCR の multi-arch・Releases の下書き）
+    needs: [meta, sums, sign-sums, image]
+    # 公開は署名が必須（meta で RELEASE_SIGN を確かめている）。sign-sums の成功を条件にする
+    if: >-
+      ${{ !cancelled() && needs.meta.outputs.publish == 'true' && needs.sums.result == 'success' &&
+      needs.sign-sums.result == 'success' && needs.image.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+      packages: write
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      PRERELEASE: ${{ needs.meta.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: binaries-${{ needs.meta.outputs.version }}
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: sums-signature-${{ needs.meta.outputs.version }}
+          path: dist
+      - name: 公開する前に確かめる（SHA256SUMS と minisign の署名）
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq minisign >/dev/null
+          bash deploy/release/dist.sh verify dist
+          # Releases の資産に入れるもの（install.sh は「1 行で取得して実行する」入口。grants.sql は install.sh が案内する順番で流す）
+          for f in NOTICE OFL-BIZUDGothic.txt install.sh grants.sql; do
+            test -s "dist/$f" || { echo "::error::$f がありません（Releases の資産）"; exit 1; }
+          done
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: multi-arch のタグ（<版>、正式版なら latest も）
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          base="ghcr.io/$owner/$IMAGE_NAME"
+          tags=(-t "$base:$VERSION")
+          [ "$PRERELEASE" = true ] || tags+=(-t "$base:latest")
+          docker buildx imagetools create "${tags[@]}" "$base:$VERSION-amd64" "$base:$VERSION-arm64"
+          docker buildx imagetools inspect "$base:$VERSION"
+      # 下書きで作る。中身（SHA256SUMS・イメージ）を確かめてから、人が Releases の画面で公開する（RELEASE.md）。
+      - name: Releases の下書き
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          flags=(--draft --verify-tag --title "$VERSION" --generate-notes)
+          [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+          gh release create "$VERSION" "${flags[@]}" dist/*

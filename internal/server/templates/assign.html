@@ -1,0 +1,21 @@
+{{define "assign.html"}}{{template "head" (headData .Lang (T .Lang "server.web.assign.title"))}}
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <a class="appbar-crumb" href="{{base}}/p/{{.Slug}}/#{{.ID}}">{{.Slug}}</a>
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <span class="appbar-title">{{T .Lang "server.web.assign.crumb" "id" .ID}}</span>
+{{template "appbar_end" .}}
+<main class="page">
+  <h1>{{T .Lang "server.web.assign.h1"}}</h1>
+  {{template "messages" .}}
+  {{if .Overridable}}
+  <form method="post" action="{{base}}/p/{{.Slug}}/issues/{{.ID}}/assign">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="assignee" value="{{.Assignee}}">
+    <label>{{T .Lang "server.web.assign.reason"}}<input name="override_reason" maxlength="500" required></label>
+    <button type="submit" class="inline">{{T .Lang "server.web.assign.submit"}}</button>
+  </form>
+  {{end}}
+  <p><a href="{{base}}/p/{{.Slug}}/#{{.ID}}">{{T .Lang "server.web.assign.back"}}</a></p>
+</main>
+{{template "foot"}}{{end}}

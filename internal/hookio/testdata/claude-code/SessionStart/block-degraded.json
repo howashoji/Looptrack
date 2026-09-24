@@ -1,0 +1,42 @@
+{
+  "note": "SessionStart は差し戻せない → 理由を systemMessage に回す（元の systemMessage の後ろ）",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "SessionStart",
+    "source": "resume"
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "SessionStart",
+    "raw_name": "SessionStart",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "source": "resume"
+  },
+  "result": {
+    "block": "止められないイベント",
+    "system_message": "導入が未完了です"
+  },
+  "output": {
+    "stdout": {
+      "systemMessage": "導入が未完了です\n\n止められないイベント"
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "system_message": "導入が未完了です\n\n止められないイベント"
+  }
+}

@@ -1,0 +1,112 @@
+{{define "account.html"}}{{template "head" (headData .Lang (T .Lang "server.web.common.account_settings"))}}
+{{template "nav" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.common.account_settings"}}</h1>
+  <p class="muted">{{T .Lang "server.web.common.login_role" "login" .User.Login "role" .User.Role}}</p>
+  {{template "messages" .}}
+
+  {{if .NewToken}}
+  <section class="panel created">
+    <h2>{{T .Lang "server.web.account.token_created" "name" .NewName}}</h2>
+    <p><strong>{{T .Lang "server.web.account.token_created_warn"}}</strong>{{T .Lang "server.web.account.token_created_hint"}}</p>
+    <label>{{T .Lang "server.web.account.token_label"}}<input class="mono" readonly value="{{.NewToken}}" data-new-token></label>
+    <p>{{T .Lang "server.web.account.cli_hint_before"}}<code>~/.config/looptrack/credentials.json</code>{{T .Lang "server.web.account.cli_hint_middle"}}<code>%APPDATA%\looptrack\credentials.json</code>{{T .Lang "server.web.account.cli_hint_after"}}</p>
+    <pre><code>looptrack issue login --url {{.LoginURL}}</code></pre>
+  </section>
+  {{end}}
+
+  <section class="panel">
+    <h2>{{T .Lang "server.web.account.tokens_h2"}}</h2>
+    <p class="muted">{{T .Lang "server.web.account.tokens_note_before"}}<code>looptrack issue login --browser --url {{.LoginURL}}</code>{{T .Lang "server.web.account.tokens_note_after"}}</p>
+    <form method="post" action="{{base}}/account/tokens" class="row">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label class="grow">{{T .Lang "server.web.account.token_name"}}<input name="name" maxlength="255" required placeholder="{{T .Lang "server.web.account.token_name_placeholder"}}"></label>
+      <label>{{T .Lang "server.web.account.token_days"}}<select name="days">{{range .Days}}<option value="{{.}}"{{if eq . $.DefaultDays}} selected{{end}}>{{T $.Lang "server.web.account.token_days_option" "n" .}}</option>{{end}}</select></label>
+      <button type="submit">{{T .Lang "server.web.account.token_issue"}}</button>
+    </form>
+    {{template "tokens" .}}
+  </section>
+
+  <section class="panel" id="lang">
+    <h2>{{T .Lang "server.web.account.lang_h2"}}</h2>
+    <p class="muted">{{T .Lang "server.web.account.lang_note_before"}}<code>LOOPTRACK_LANG</code>{{T .Lang "server.web.account.lang_note_after"}}</p>
+    <form method="post" action="{{base}}/account/lang" class="row">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.account.lang_label"}}<select name="lang">
+        <option value=""{{if not .User.Lang.Valid}} selected{{end}}>{{T .Lang "server.web.account.lang_unset"}}</option>
+        <option value="ja"{{if eq .User.Lang.String "ja"}} selected{{end}}>{{T .Lang "server.web.account.lang_ja"}}</option>
+        <option value="en"{{if eq .User.Lang.String "en"}} selected{{end}}>{{T .Lang "server.web.account.lang_en"}}</option>
+      </select></label>
+      <button type="submit">{{T .Lang "server.web.account.lang_submit"}}</button>
+    </form>
+  </section>
+
+  <section class="panel" id="two-factor">
+    <h2>{{T .Lang "server.web.account.totp_h2"}}</h2>
+    {{if .User.TOTPEnabled}}
+    <p>{{T .Lang "server.web.account.totp_on"}}</p>
+    {{if .TwoFactorRequired}}
+    <p class="muted">{{T .Lang "server.web.account.totp_required_note"}}</p>
+    {{else}}
+    <form method="post" action="{{base}}/account/totp/disable" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.account.current_password"}}<input type="password" name="password" autocomplete="current-password" required></label>
+      <label>{{T .Lang "server.web.totp.code"}}<input name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" autocomplete="one-time-code" required></label>
+      <button type="submit" class="danger">{{T .Lang "server.web.account.totp_disable"}}</button>
+    </form>
+    <p class="muted">{{T .Lang "server.web.account.totp_disable_note"}}</p>
+    {{end}}
+    {{else}}
+    <p>{{T .Lang "server.web.account.totp_off"}}{{if not .TwoFactorRequired}}{{T .Lang "server.web.account.totp_optional_note"}}{{end}}{{T .Lang "server.web.account.totp_off_hint"}}</p>
+    <form method="get" action="{{base}}/account/totp"><button type="submit">{{T .Lang "server.web.account.totp_enable"}}</button></form>
+    {{end}}
+  </section>
+
+  <section class="panel">
+    <h2>{{T .Lang "server.web.account.password_h2"}}</h2>
+    <form method="post" action="{{base}}/account/password" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.account.current_password"}}<input type="password" name="current" autocomplete="current-password" required></label>
+      <label>{{T .Lang "server.web.account.new_password" "n" .MinPassword}}<input type="password" name="new" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <label>{{T .Lang "server.web.account.new_password_confirm"}}<input type="password" name="confirm" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <button type="submit">{{T .Lang "server.web.account.password_submit"}}</button>
+    </form>
+    <p class="muted">{{T .Lang "server.web.account.password_note"}}</p>
+  </section>
+</main>
+{{template "foot"}}{{end}}
+
+{{define "tokens"}}
+{{with .Tokens.Active}}
+<table class="list">
+  <thead><tr>{{template "token_head" $}}<th></th></tr></thead>
+  <tbody>
+  {{range .}}
+  <tr>
+    {{template "token_cells" .}}
+    <td><form method="post" action="{{$.RevokeAction}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="token" value="{{.ID}}"><button type="submit" class="danger small">{{T $.Lang "server.web.account.token_revoke"}}</button></form></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">{{T .Lang "server.web.account.tokens_none"}}</p>
+{{end}}
+{{with .Tokens.Inactive}}
+<details class="inactive-tokens">
+  <summary>{{T $.Lang "server.web.account.tokens_inactive" "n" (len .)}}</summary>
+  <table class="list">
+    <thead><tr>{{template "token_head" $}}</tr></thead>
+    <tbody>
+    {{range .}}<tr class="inactive">{{template "token_cells" .}}</tr>
+    {{end}}
+    </tbody>
+  </table>
+</details>
+{{end}}
+{{end}}
+
+{{define "token_head"}}<th>{{T .Lang "server.web.account.th_id"}}</th><th>{{T .Lang "server.web.account.th_kind"}}</th><th>{{T .Lang "server.web.account.th_name"}}</th><th>{{T .Lang "server.web.account.th_prefix"}}</th><th>{{T .Lang "server.web.account.th_created"}}</th><th>{{T .Lang "server.web.account.th_expires"}}</th><th>{{T .Lang "server.web.account.th_last_used"}}</th><th>{{T .Lang "server.web.account.th_state"}}</th>{{end}}
+
+{{define "token_cells"}}<td>{{.ID}}</td><td>{{if eq .Kind "oauth"}}OAuth{{else}}PAT{{end}}</td><td class="name">{{.Name}}</td><td><code>{{.Prefix}}…</code></td>
+    <td>{{.Created}}</td><td>{{.Expires}}</td><td>{{.LastUsed}}</td><td>{{.State}}</td>{{end}}

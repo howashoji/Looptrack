@@ -1,0 +1,35 @@
+{{define "first_run.html"}}{{template "head" (headData .Lang (T .Lang "server.web.first_run.title"))}}
+<main class="page">
+  <h1>{{T .Lang "server.web.common.brand"}} — {{T .Lang "server.web.first_run.title"}}</h1>
+  <p>{{T .Lang "server.web.first_run.intro_1"}}<code>looptrack setup</code>{{T .Lang "server.web.first_run.intro_2"}}</p>
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  <form method="post" action="{{base}}/first-run" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <section class="panel">
+      <h2>{{T .Lang "server.web.first_run.admin_h2"}}</h2>
+      <p class="muted">{{T .Lang "server.web.first_run.admin_note"}}</p>
+      <label>{{T .Lang "server.web.admin_users.login_name"}}<input name="login" value="{{.Form.login}}" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" required autofocus></label>
+      <label>{{T .Lang "server.web.first_run.display_name"}}<input name="name" value="{{.Form.name}}" maxlength="255"></label>
+      <label>{{T .Lang "server.web.first_run.password" "n" .MinPassword}}<input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <label>{{T .Lang "server.web.first_run.password_confirm"}}<input type="password" name="confirm" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+    </section>
+    <section class="panel">
+      <h2>{{T .Lang "server.web.first_run.totp_h2"}}</h2>
+      <p class="muted">{{T .Lang "server.web.first_run.totp_note"}}</p>
+      <fieldset>
+        <legend>{{T .Lang "server.web.first_run.totp_legend"}}</legend>
+        <label class="choice"><input type="radio" name="two_factor" value="required"{{if eq .Form.two_factor "required"}} checked{{end}} required>{{T .Lang "server.web.first_run.totp_required"}}</label>
+        <label class="choice"><input type="radio" name="two_factor" value="optional"{{if eq .Form.two_factor "optional"}} checked{{end}}>{{T .Lang "server.web.first_run.totp_optional"}}</label>
+      </fieldset>
+    </section>
+    <section class="panel">
+      <h2>{{T .Lang "server.web.first_run.project_h2"}}</h2>
+      <p class="muted">{{T .Lang "server.web.first_run.project_note"}}</p>
+      <label>{{T .Lang "server.web.project.slug_label"}}<input name="project" value="{{.Form.project}}" maxlength="64" pattern="[a-z0-9][a-z0-9\-]*|-"></label>
+      <label>{{T .Lang "server.web.project.prefix_label"}}<input name="project_prefix" value="{{.Form.project_prefix}}" maxlength="24" pattern="[A-Z][A-Z0-9]*(-[A-Z0-9]+)*"></label>
+      <label>{{T .Lang "server.web.project.name_label"}}<input name="project_name" value="{{.Form.project_name}}" maxlength="255"></label>
+    </section>
+    <button type="submit">{{T .Lang "server.web.first_run.submit"}}</button>
+  </form>
+</main>
+{{template "foot"}}{{end}}

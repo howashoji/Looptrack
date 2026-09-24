@@ -1,0 +1,14 @@
+# init/dist-with-link
+$ issue init --project demo --source link --dist $API/setup/x
+
+#### exit 1
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・$API・AI claude-code）
+
+#### stderr
+エラー: --dist は --source server と一緒に使います
+
+#### requests (0)
+
+#### files (0)

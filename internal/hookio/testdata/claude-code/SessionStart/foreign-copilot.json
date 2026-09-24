@@ -1,0 +1,35 @@
+{
+  "note": ".claude/settings.json の配線（--agent claude-code）を VS Code の Copilot が起動（CLAUDE_* なし・VSCODE_PID あり）→ Foreign。Run は何もしない",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "COPILOT_AGENT": "1",
+    "VSCODE_PID": "4242"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "timestamp": "2026-09-18T12:00:00.000Z",
+    "cwd": "/home/dev/work/sample-app",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "hook_event_name": "SessionStart",
+    "source": "new"
+  },
+  "event": {
+    "agent": "claude-code",
+    "foreign": true,
+    "name": "SessionStart",
+    "raw_name": "SessionStart",
+    "shape": "snake_case",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "source": "new"
+  },
+  "result": {},
+  "output": {
+    "stdout": null,
+    "exit_code": 0
+  }
+}

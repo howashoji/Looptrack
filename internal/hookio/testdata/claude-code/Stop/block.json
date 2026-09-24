@@ -1,0 +1,38 @@
+{
+  "note": "Stop の差し戻し（stop-handoff-freshness の decision: block）",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "Stop",
+    "stop_hook_active": false
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "Stop",
+    "raw_name": "Stop",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app"
+  },
+  "result": {
+    "block": "引き継ぎが作業の完了に追いついていません"
+  },
+  "output": {
+    "stdout": {
+      "decision": "block",
+      "reason": "引き継ぎが作業の完了に追いついていません"
+    },
+    "exit_code": 0
+  }
+}

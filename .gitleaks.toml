@@ -1,0 +1,20 @@
+# gitleaks（秘匿情報の検査）の設定。
+#
+#   gitleaks detect --no-git --source .        # いまの木を調べる
+#   gitleaks detect                            # 履歴も調べる
+#
+# 既定の規則をそのまま使い、下の 2 つだけを例外にする。
+# どちらも「出力から秘密をマスクする機能」のテストの入力で、秘密の形をした値がそこに在るのが仕事。
+# 本物の秘密ではない（AWS のキーは AKIA + 英字の並び、RSA の鍵は 3 行の偽物、パスワードは 0123456789）。
+
+title = "looptrack"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "秘密のマスクを確かめるテストの入力（合成値）"
+paths = [
+  '''internal/domain/testdata/verify_commands\.json''',
+  '''internal/domain/verify_test\.go''',
+]

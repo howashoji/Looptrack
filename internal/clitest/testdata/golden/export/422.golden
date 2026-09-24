@@ -1,0 +1,18 @@
+# export/422
+$ issue export --xlsx out/issues.xlsx --status Todo --all
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: DEMO-0001 は検証コマンドを持っていますが、verify の記録がありません。次を実行してから閉じてください: looptrack issue verify DEMO-0001
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues.xlsx?all=1&sort=priority&status=Todo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (1)
+ws/out/.keep (0644)

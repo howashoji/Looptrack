@@ -1,0 +1,13 @@
+# init/missing-dir
+$ issue init --project demo --dir no-such-dir
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 導入先がありません: $TMP/ws/no-such-dir
+
+#### requests (0)
+
+#### files (0)

@@ -1,0 +1,16 @@
+# summary-agent/401
+$ issue summary --agent claude-code --limit 3
+
+#### exit 0
+
+#### stdout
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/summary?limit=3
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

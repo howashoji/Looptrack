@@ -1,0 +1,38 @@
+# next/ok
+$ issue next --type bug,task --comment 着手します --assignee me --override 理由
+
+#### exit 0
+
+#### stdout
+着手: DEMO-0002 保存でエラーになる（Todo → In Progress）
+
+## 内容
+
+保存でエラーになる。
+
+## 受け入れ条件
+
+- [ ] 保存できる
+
+
+#### stderr
+
+#### requests (1)
+POST /im/api/v1/projects/demo/next
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "assignee": "me",
+      "comment": "着手します",
+      "dry_run": false,
+      "override_reason": "理由",
+      "types": [
+        "bug",
+        "task"
+      ]
+    }
+
+#### files (0)

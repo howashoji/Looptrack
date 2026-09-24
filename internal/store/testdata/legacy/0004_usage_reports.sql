@@ -1,0 +1,23 @@
+CREATE TABLE usage_reports (
+  id                     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id             BIGINT UNSIGNED NOT NULL,
+  name                   VARCHAR(200)    NOT NULL COMMENT 'レポート名（プロジェクト内で一意）',
+  period_from            DATETIME(6)     NULL COMMENT '対象期間の始まり（含む・UTC）。NULL は最初のデータから',
+  period_to              DATETIME(6)     NOT NULL COMMENT '対象期間の終わり（含まない・UTC）',
+  data_end               DATETIME(6)     NOT NULL COMMENT 'データ終端（UTC）。次回の「前回以降」はここから',
+  excluded_conversations JSON            NULL COMMENT '集計から外した会話 ID の一覧',
+  total_tokens           BIGINT UNSIGNED NULL COMMENT 'レポートに載せた合計（控え）',
+  note                   TEXT            NULL,
+  request_id             BIGINT UNSIGNED NULL COMMENT '画面からの作成依頼（IM-0062）の ID',
+  created_by             BIGINT UNSIGNED NOT NULL,
+  token_id               BIGINT UNSIGNED NULL,
+  via                    VARCHAR(16)     NOT NULL COMMENT 'cli / api / web / mcp',
+  created_at             DATETIME(6)     NOT NULL COMMENT 'レポートを作った日時（過去の台帳を取り込むときは元の日時）',
+  recorded_at            DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '台帳に登録した日時',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_usage_reports_name (project_id, name),
+  KEY k_usage_reports_data_end (project_id, data_end),
+  CONSTRAINT fk_usage_reports_project FOREIGN KEY (project_id) REFERENCES projects (id),
+  CONSTRAINT fk_usage_reports_user FOREIGN KEY (created_by) REFERENCES users (id),
+  CONSTRAINT chk_usage_reports_period CHECK (period_from IS NULL OR period_from < period_to)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

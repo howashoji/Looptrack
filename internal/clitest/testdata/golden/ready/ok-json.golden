@@ -1,0 +1,41 @@
+# ready/ok-json
+$ issue ready --json
+
+#### exit 0
+
+#### stdout
+{
+  "count": 1,
+  "items": [
+    {
+      "id": "DEMO-0002",
+      "project": "demo",
+      "title": "保存でエラーになる",
+      "type": "bug",
+      "status": "Todo",
+      "priority": "P0",
+      "parent": "",
+      "labels": [],
+      "blocked_by": [
+        "DEMO-0001"
+      ],
+      "traces": [],
+      "refs": [],
+      "created": "2024-05-01 10:00",
+      "updated": "2024-05-02 11:30",
+      "closed": false,
+      "version": 3,
+      "file_name": "DEMO-0002-x.md"
+    }
+  ]
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/ready?sort=priority
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,44 @@
+{
+  "note": "Copilot CLI の camelCase の配線（sessionStart）。イベント名は入力に無く --event で渡す。initialPrompt は Prompt に",
+  "args": [
+    "--agent",
+    "copilot",
+    "--event",
+    "sessionStart"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "sessionId": "cccccccc-dddd-4eee-8fff-000000000001",
+    "timestamp": 1789732800000,
+    "cwd": "/home/dev/work/sample-app",
+    "source": "new",
+    "initialPrompt": "IM-0001 を進めて"
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "SessionStart",
+    "raw_name": "sessionStart",
+    "shape": "camelCase",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "prompt": "IM-0001 を進めて",
+    "source": "new"
+  },
+  "result": {
+    "context": "毎セッション守る規律（kit/loop の rules から注入）"
+  },
+  "output": {
+    "stdout": {
+      "additionalContext": "毎セッション守る規律（kit/loop の rules から注入）",
+      "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": "毎セッション守る規律（kit/loop の rules から注入）"
+      }
+    },
+    "exit_code": 0
+  }
+}

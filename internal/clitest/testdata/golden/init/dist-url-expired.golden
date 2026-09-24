@@ -1,0 +1,16 @@
+# init/dist-url-expired
+$ issue init --project demo --dist $API/setup/tkt_old
+env LOOPTRACK_TOKEN=
+
+#### exit 1
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・$API・AI claude-code）
+
+#### stderr
+エラー: 配布スクリプトを取得できません: 期限切れか無効な取得 URL です。MCP の setup をやり直してください
+
+#### requests (1)
+GET /im/setup/tkt_old/
+
+#### files (0)

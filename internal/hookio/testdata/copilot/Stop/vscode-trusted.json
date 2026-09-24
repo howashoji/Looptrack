@@ -1,0 +1,46 @@
+{
+  "note": "TrustUnconfirmed なら decision: block をトップレベルと hookSpecificOutput の両方に（VS Code の Stop は hookSpecificOutput を読む）",
+  "args": [
+    "--agent",
+    "copilot"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "trust_unconfirmed": true,
+  "input": {
+    "timestamp": "2026-09-18T12:00:00.000Z",
+    "cwd": "/home/dev/work/sample-app",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "hook_event_name": "Stop",
+    "stop_hook_active": false
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "Stop",
+    "raw_name": "Stop",
+    "shape": "snake_case",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app"
+  },
+  "result": {
+    "block": "引き継ぎが作業の完了に追いついていません"
+  },
+  "output": {
+    "stdout": {
+      "decision": "block",
+      "reason": "[Stop hook の差し戻し] 引き継ぎが作業の完了に追いついていません",
+      "hookSpecificOutput": {
+        "hookEventName": "Stop",
+        "decision": "block",
+        "reason": "[Stop hook の差し戻し] 引き継ぎが作業の完了に追いついていません"
+      }
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "block": "[Stop hook の差し戻し] 引き継ぎが作業の完了に追いついていません"
+  }
+}

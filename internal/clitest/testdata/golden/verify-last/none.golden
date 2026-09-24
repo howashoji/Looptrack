@@ -1,0 +1,17 @@
+# verify-last/none
+$ issue verify DEMO-0001 --last
+
+#### exit 0
+
+#### stdout
+直近の verify: 記録なし
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

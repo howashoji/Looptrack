@@ -1,0 +1,66 @@
+{
+  "note": "失敗した結果（isError）",
+  "args": [
+    "--agent",
+    "codex"
+  ],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git commit -m x"
+    },
+    "tool_response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "nothing to commit"
+        }
+      ],
+      "isError": true
+    }
+  },
+  "event": {
+    "agent": "codex",
+    "name": "PostToolUse",
+    "raw_name": "PostToolUse",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Bash",
+      "raw_name": "Bash",
+      "name": "Bash",
+      "input": {
+        "command": "git commit -m x"
+      },
+      "response": {
+        "raw": {
+          "content": [
+            {
+              "text": "nothing to commit",
+              "type": "text"
+            }
+          ],
+          "isError": true
+        },
+        "text": "nothing to commit",
+        "failed": true
+      }
+    }
+  },
+  "result": {},
+  "output": {
+    "stdout": null,
+    "exit_code": 0
+  }
+}

@@ -1,0 +1,138 @@
+# close/422-usage-required-attach-fails
+$ issue close DEMO-0001
+env CLAUDE_CODE_SESSION_ID=sess-golden-1
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: AI の Done にはトークン情報が要ります（usage attach DEMO-0001）
+
+#### requests (2)
+POST /im/api/v1/issues/DEMO-0001/status?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: sess-golden-1
+  body:
+    {
+      "comment": "",
+      "override_reason": "",
+      "status": "Done"
+    }
+POST /im/api/v1/projects/demo/usage
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: sess-golden-1
+  body:
+    {
+      "at": "2024-05-02T01:06:00.000000Z",
+      "branch": "fix/login",
+      "branches": [
+        "main",
+        "fix/login"
+      ],
+      "by_model": {
+        "claude-opus-5": {
+          "cache_create": 140,
+          "cache_create_1h": 0,
+          "cache_create_5m": 0,
+          "cache_read": 2200,
+          "input": 15,
+          "output": 130,
+          "responses": 2,
+          "thinking": 0
+        },
+        "claude-sonnet-5": {
+          "cache_create": 0,
+          "cache_create_1h": 0,
+          "cache_create_5m": 0,
+          "cache_read": 900,
+          "input": 3,
+          "output": 12,
+          "responses": 1,
+          "thinking": 0
+        }
+      },
+      "client": "claude-code",
+      "client_version": "2.1.271",
+      "conversation_id": "20240502100000-22175c",
+      "cwd_name": "-work-demo",
+      "excluded": false,
+      "human": {
+        "auto": 0,
+        "idle_lt5_pct": 100,
+        "idle_median_m": 4.8,
+        "intr": 0,
+        "long_breaks": 0,
+        "pure": 2,
+        "work_m": 1.2
+      },
+      "io": {
+        "add": 0,
+        "bbytes": 0,
+        "bins": 0,
+        "del": 0,
+        "edits": 0,
+        "pages": 0,
+        "rbytes": 0,
+        "reads": 0,
+        "rlines": 0,
+        "wbytes": 0
+      },
+      "issue": "DEMO-0001",
+      "responses": 3,
+      "segments": [
+        {
+          "idle_m": null,
+          "kind": "human",
+          "main": 1160,
+          "responses": 1,
+          "start": "2024-05-02T01:00:00.000000Z",
+          "sub": 0,
+          "sub_responses": 0,
+          "work_m": 0.2
+        },
+        {
+          "idle_m": 4.8,
+          "kind": "human",
+          "main": 2240,
+          "responses": 2,
+          "start": "2024-05-02T01:05:00.000000Z",
+          "sub": 0,
+          "sub_responses": 0,
+          "work_m": 1.0
+        }
+      ],
+      "session_id": "sess-golden-1",
+      "sub_responses": 0,
+      "tokens": {
+        "main": {
+          "cache_create": 140,
+          "cache_read": 3100,
+          "input": 18,
+          "output": 142
+        },
+        "sub": {
+          "cache_create": 0,
+          "cache_read": 0,
+          "input": 0,
+          "output": 0
+        }
+      },
+      "trigger": "manual",
+      "via": "cli"
+    }
+
+#### files (1)
+home/.claude/projects/-work-demo/sess-golden-1.jsonl (0644)
+    {"type":"user","timestamp":"2024-05-02T01:00:00.000Z","gitBranch":"main","version":"2.1.271","cwd":"/work/demo","origin":{"kind":"human"},"message":{"role":"user","content":"ログイン画面の不具合を直して"}}
+    {"type":"assistant","timestamp":"2024-05-02T01:00:10.000Z","gitBranch":"main","version":"2.1.271","message":{"id":"m1","model":"claude-opus-5","usage":{"input_tokens":10,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":20}}}
+    {"type":"assistant","timestamp":"2024-05-02T01:00:12.000Z","gitBranch":"main","version":"2.1.271","message":{"id":"m1","model":"claude-opus-5","usage":{"input_tokens":10,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":50}}}
+    {"type":"user","timestamp":"2024-05-02T01:05:00.000Z","gitBranch":"fix/login","version":"2.1.271","origin":{"kind":"human"},"message":{"role":"user","content":"テストも足して"}}
+    {"type":"assistant","timestamp":"2024-05-02T01:05:30.000Z","gitBranch":"fix/login","version":"2.1.271","message":{"id":"m2","model":"claude-opus-5","usage":{"input_tokens":5,"cache_creation_input_tokens":40,"cache_read_input_tokens":1200,"output_tokens":80}}}
+    {"type":"assistant","timestamp":"2024-05-02T01:06:00.000Z","gitBranch":"fix/login","version":"2.1.271","message":{"id":"m3","model":"claude-sonnet-5","usage":{"input_tokens":3,"cache_creation_input_tokens":0,"cache_read_input_tokens":900,"output_tokens":12}}}

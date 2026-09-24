@@ -1,0 +1,81 @@
+# list/ok-json
+$ issue list --json
+
+#### exit 0
+
+#### stdout
+{
+  "count": 3,
+  "items": [
+    {
+      "id": "DEMO-0001",
+      "project": "demo",
+      "title": "ログイン画面を作る",
+      "type": "task",
+      "status": "In Progress",
+      "priority": "P1",
+      "parent": "",
+      "labels": [],
+      "blocked_by": [],
+      "traces": [],
+      "refs": [],
+      "created": "2024-05-01 10:00",
+      "updated": "2024-05-02 11:30",
+      "closed": false,
+      "version": 3,
+      "file_name": "DEMO-0001-x.md",
+      "assignee": "alice"
+    },
+    {
+      "id": "DEMO-0002",
+      "project": "demo",
+      "title": "保存でエラーになる",
+      "type": "bug",
+      "status": "Todo",
+      "priority": "P0",
+      "parent": "",
+      "labels": [],
+      "blocked_by": [
+        "DEMO-0001"
+      ],
+      "traces": [],
+      "refs": [],
+      "created": "2024-05-01 10:00",
+      "updated": "2024-05-02 11:30",
+      "closed": false,
+      "version": 3,
+      "file_name": "DEMO-0002-x.md"
+    },
+    {
+      "id": "DEMO-0003",
+      "project": "demo",
+      "title": "認証の要件",
+      "type": "requirement",
+      "status": "In Review",
+      "priority": "P2",
+      "parent": "",
+      "labels": [],
+      "blocked_by": [],
+      "traces": [],
+      "refs": [],
+      "created": "2024-05-01 10:00",
+      "updated": "2024-05-02 11:30",
+      "closed": false,
+      "version": 3,
+      "file_name": "DEMO-0003-x.md",
+      "assignee": "bob",
+      "assignee_inactive": true,
+      "feedback_pending": 2
+    }
+  ]
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?sort=priority
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

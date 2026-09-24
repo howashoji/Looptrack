@@ -1,0 +1,34 @@
+# login-browser/register-fails
+$ issue login --browser
+env LOOPTRACK_TOKEN=
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: クライアントを登録できません: redirect_uris が不正です
+
+#### requests (2)
+GET /im/.well-known/oauth-authorization-server
+  X-Looptrack-Lang: ja
+POST /im/oauth/register
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "client_name": "looptrack（$HOST）",
+      "grant_types": [
+        "authorization_code",
+        "refresh_token"
+      ],
+      "redirect_uris": [
+        "http://127.0.0.1:$PORT/callback"
+      ],
+      "response_types": [
+        "code"
+      ],
+      "token_endpoint_auth_method": "none"
+    }
+
+#### files (0)

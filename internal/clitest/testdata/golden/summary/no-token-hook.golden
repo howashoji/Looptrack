@@ -1,0 +1,16 @@
+# summary/no-token-hook
+$ issue summary --agent claude-code
+env LOOPTRACK_TOKEN=
+
+#### exit 0
+
+#### stdout
+
+#### stderr
+
+#### requests (1)
+GET /im/healthz  [フィクスチャなし → 404]
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,26 @@
+# config/me-fails
+$ issue config
+
+#### exit 0
+
+#### stdout
+モード: API（$API）
+プロジェクト: demo（デモ・DEMO-0000・権限 viewer）
+注意: このプロジェクトには参加していません（閲覧のみ。書くには画面のプロジェクト管理で自分を editor 以上で参加させてください）
+利用者: ?
+トークン: 環境変数 LOOPTRACK_TOKEN
+導入セット: 不明（.claude/.looptrack-kit.json がありません。looptrack issue init で作られます）
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/projects/demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+GET /im/api/v1/me
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,379 @@
+{
+ "project": "demo",
+ "from": "2026-08-31T15:00:00Z",
+ "to": "2026-09-30T15:00:00Z",
+ "data_end": "2026-09-18T01:00:00Z",
+ "period": "2026-09-01 00:00 〜 2026-10-01 00:00（日本時間・終わりを含まない）",
+ "since_last": true,
+ "last_report": {
+  "name": "2026年8月"
+ },
+ "generated": "2026-09-18 10:00",
+ "request": {
+  "id": 3,
+  "created_at": "2026-09-17T23:00:00Z",
+  "requested_by": "alice",
+  "target": "ラベル api",
+  "note": "月次"
+ },
+ "total": {
+  "main": {
+   "input": 12345678,
+   "cache_create": 98765432,
+   "cache_read": 2987654321,
+   "output": 3456789
+  },
+  "sub": {
+   "input": 1000000,
+   "cache_create": 0,
+   "cache_read": 0,
+   "output": 0
+  },
+  "responses": 1,
+  "sub_responses": 0
+ },
+ "total_tokens": 6600,
+ "stage_count": 123456,
+ "unattributed": {
+  "key": "",
+  "total": {
+   "main": {
+    "input": 50,
+    "cache_create": 0,
+    "cache_read": 0,
+    "output": 0
+   },
+   "sub": {
+    "input": 0,
+    "cache_create": 0,
+    "cache_read": 0,
+    "output": 0
+   },
+   "responses": 1,
+   "sub_responses": 0
+  },
+  "total_tokens": 50,
+  "stages": 1,
+  "issues": 0
+ },
+ "excluded_total": {
+  "main": {
+   "input": 602209566,
+   "cache_create": 0,
+   "cache_read": 433180311,
+   "output": 0
+  },
+  "sub": {
+   "input": 0,
+   "cache_create": 0,
+   "cache_read": 0,
+   "output": 0
+  },
+  "responses": 1,
+  "sub_responses": 0
+ },
+ "excluded_tokens": 700,
+ "excluded_stage_count": 1,
+ "excluded_conversations": [
+  "conv-x"
+ ],
+ "inconsistent": 1,
+ "by_issue": [
+  {
+   "id": "IM-0058",
+   "title": "トークンレポートの PDF で、表の ID 列と合計列が狭く値の途中で折り返す（IM-0058）",
+   "type": "feature",
+   "status": "In Progress",
+   "labels": [],
+   "total": {
+    "main": {
+     "input": 602209566,
+     "cache_create": 12345678,
+     "cache_read": 4331803110,
+     "output": 9876543
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 0,
+   "stages": 1234
+  },
+  {
+   "id": "ABCD-0141",
+   "title": "トークンレポートの PDF で、表の ID 列と合計列が狭く値の途中で折り返す（ABCD-0141）",
+   "type": "requirement",
+   "status": "In Review",
+   "labels": [],
+   "total": {
+    "main": {
+     "input": 602209566,
+     "cache_create": 12345678,
+     "cache_read": 4331803110,
+     "output": 9876543
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 0,
+   "stages": 1234
+  },
+  {
+   "id": "DEMO-0001",
+   "title": "トークンレポートの PDF で、表の ID 列と合計列が狭く値の途中で折り返す（DEMO-0001）",
+   "type": "bug",
+   "status": "Done",
+   "labels": [],
+   "total": {
+    "main": {
+     "input": 602209566,
+     "cache_create": 12345678,
+     "cache_read": 4331803110,
+     "output": 9876543
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 0,
+   "stages": 1234
+  }
+ ],
+ "by_label": [
+  {
+   "key": "api",
+   "total": {
+    "main": {
+     "input": 900,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 900,
+   "stages": 3,
+   "issues": 2
+  },
+  {
+   "key": "",
+   "total": {
+    "main": {
+     "input": 100,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 100,
+   "stages": 1,
+   "issues": 1
+  }
+ ],
+ "by_type": [
+  {
+   "key": "requirement",
+   "total": {
+    "main": {
+     "input": 433180311,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 0,
+   "stages": 99999,
+   "issues": 1234
+  }
+ ],
+ "by_stage": [
+  {
+   "key": "comment",
+   "total": {
+    "main": {
+     "input": 600,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 600,
+   "stages": 2,
+   "issues": 2
+  },
+  {
+   "key": "stop",
+   "total": {
+    "main": {
+     "input": 400,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 400,
+   "stages": 2,
+   "issues": 1
+  }
+ ],
+ "by_client": [
+  {
+   "key": "claude-code",
+   "total": {
+    "main": {
+     "input": 1000,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 1000,
+   "stages": 4,
+   "issues": 3
+  }
+ ],
+ "by_case": [
+  {
+   "key": "CASE-101",
+   "total": {
+    "main": {
+     "input": 800,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 800,
+   "stages": 3,
+   "issues": 2
+  },
+  {
+   "key": "",
+   "total": {
+    "main": {
+     "input": 200,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 200,
+   "stages": 1,
+   "issues": 0
+  }
+ ],
+ "case_pattern": "CASE-\\d+",
+ "conversations": [
+  {
+   "conversation_id": "0123456789abcdef",
+   "client": "claude-code",
+   "sessions": [
+    "s1"
+   ],
+   "first_at": "2026-09-01T00:00:00Z",
+   "last_at": "2026-09-02T03:04:00Z",
+   "total": {
+    "main": {
+     "input": 1000,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "sub": {
+     "input": 0,
+     "cache_create": 0,
+     "cache_read": 0,
+     "output": 0
+    },
+    "responses": 1,
+    "sub_responses": 0
+   },
+   "total_tokens": 6022095660,
+   "stages": 4,
+   "unattributed_tokens": 433180311,
+   "issues": [
+    "IM-0058",
+    "ABCD-0141"
+   ]
+  }
+ ]
+}

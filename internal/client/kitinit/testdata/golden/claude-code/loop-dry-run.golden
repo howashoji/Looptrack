@@ -1,0 +1,342 @@
+# init --project demo --agent claude-code --loop --dry-run
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI claude-code・dry-run）
+kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
+配線: looptrack hook <名前> --agent <AI>
+導入セット: core + loop（hook 19 本を配線）
+  作成         .claude/rules/looptrack-loop/background-process.md
+      （kit kit/loop/rules/background-process.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/background-process.md
+      （kit kit/loop/rules/en/background-process.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/iteration-discipline.md
+      （kit kit/loop/rules/en/iteration-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/output-discipline.md
+      （kit kit/loop/rules/en/output-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/secrets-discipline.md
+      （kit kit/loop/rules/en/secrets-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/working-discipline.md
+      （kit kit/loop/rules/en/working-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/iteration-discipline.md
+      （kit kit/loop/rules/iteration-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/output-discipline.md
+      （kit kit/loop/rules/output-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/secrets-discipline.md
+      （kit kit/loop/rules/secrets-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/working-discipline.md
+      （kit kit/loop/rules/working-discipline.md の全文を作成する差分。省略）
+  作成         .claude/skills/iterate/SKILL.md
+      （kit kit/loop/skills/iterate/SKILL.md の全文を作成する差分。省略）
+  作成         .claude/skills/session-handoff/SKILL.md
+      （kit kit/loop/skills/session-handoff/SKILL.md の全文を作成する差分。省略）
+  作成         .claude/settings.json
+      --- /dev/null
+      +++ b/.claude/settings.json
+      @@ -0,0 +1,217 @@
+      +{
+      +  "env": {
+      +    "LOOPTRACK_API_URL": "http://127.0.0.1:9/im",
+      +    "LOOPTRACK_PROJECT": "demo"
+      +  },
+      +  "hooks": {
+      +    "SessionStart": [
+      +      {
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook summary --agent claude-code",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook session-start-rules --agent claude-code",
+      +            "timeout": 5
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook session-start-memories --agent claude-code",
+      +            "timeout": 5
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook session-start-iteration --agent claude-code",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook session-start-worktrees --agent claude-code",
+      +            "timeout": 10
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "UserPromptSubmit": [
+      +      {
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook issue-freshness-mark --agent claude-code",
+      +            "timeout": 5
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook user-prompt-rules --agent claude-code",
+      +            "timeout": 5
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook user-prompt-task-mode --agent claude-code",
+      +            "timeout": 5
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook session-scope-guard --agent claude-code",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook user-prompt-stale-base --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "PostToolUse": [
+      +      {
+      +        "matcher": "Bash|Read|Edit|Write|NotebookEdit",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook issue-freshness-mark --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      },
+      +      {
+      +        "matcher": "mcp__.*",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook usage --agent claude-code",
+      +            "timeout": 10
+      +          }
+      +        ]
+      +      },
+      +      {
+      +        "matcher": "Bash|mcp__.*",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook post-work-complete-handoff-mark --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "Stop": [
+      +      {
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook issue-freshness-check --agent claude-code",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook usage --agent claude-code",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook stop-tool-markup-guard --agent claude-code",
+      +            "timeout": 5
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook stop-handoff-freshness --agent claude-code",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook stop-runaway-background-process --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "SessionEnd": [
+      +      {
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook usage --agent claude-code",
+      +            "timeout": 10
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "PreToolUse": [
+      +      {
+      +        "matcher": "Edit|Write|NotebookEdit",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook pre-edit-task-mode-guard --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      },
+      +      {
+      +        "matcher": "Edit|Write|NotebookEdit|Bash|mcp__.*",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook pre-tool-scope-guard --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      },
+      +      {
+      +        "matcher": "Edit|Write|NotebookEdit|Read|Bash",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook pre-tool-secrets-guard --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      },
+      +      {
+      +        "matcher": "Bash",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook pre-tool-git-guard --agent claude-code",
+      +            "timeout": 5
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook pre-tool-wait-loop-guard --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      },
+      +      {
+      +        "matcher": "Task|Agent",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook pre-tool-subagent-bound --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "SubagentStop": [
+      +      {
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook subagent-stop-runaway-background-process --agent claude-code",
+      +            "timeout": 5
+      +          }
+      +        ]
+      +      }
+      +    ]
+      +  },
+      +  "permissions": {
+      +    "allow": [
+      +      "Bash(looptrack issue:*)"
+      +    ]
+      +  }
+      +}
+  作成         CLAUDE.md
+      --- /dev/null
+      +++ b/CLAUDE.md
+      @@ -0,0 +1,22 @@
+      +<!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
+      +## 課題管理（イシュー管理サーバ）
+      +
+      +**作業はイシュー登録から始める。会話だけで進めない。不具合は発覚と同時に起票する。**
+      +
+      +（この節は Claude Code 向け。GitHub Copilot・Codex はこの節ではなく AGENTS.md の「課題管理」節に従う。AGENTS.md に無ければ MCP の looptrack の `setup` ツールから始める。
+      +GitHub Copilot の CLI と VS Code は CLAUDE.md も読むため）
+      +
+      +- 操作: `looptrack issue`（API モード。`.claude/settings.json` の `env` に `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT=demo`）。skill は `/issue`
+      +- **使い方とルールは `looptrack issue guide` で読む**（共通規則 + このプロジェクトのルール + 運用文書を 1 回で返す。MCP なら `guide` ツール）
+      +- ループ運用の 1 周: `looptrack issue next`（着手）→ 作業 → `looptrack issue comment <ID> "…"`（分かった時点で記録）→ 受け入れ条件を検証 → `looptrack issue close <ID> --comment "検証結果"` → 次の `next`
+      +- 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
+      +
+      +イシューはサーバ（DB）が正本で、ローカルにファイルは無い。したがって:
+      +
+      +- **初回だけ** `looptrack issue login --browser --url http://127.0.0.1:9/im`（開いたブラウザで利用者がログインと承認をする。トークンは会話に出ず、以後は自動で更新される。ブラウザの無い環境は http://127.0.0.1:9/im/account で発行して `login --url http://127.0.0.1:9/im` に貼る）
+      +- 本文の編集は `looptrack issue edit <ID>` → `.claude/.looptrack-work/<ID>.md` を Read / Edit → `looptrack issue push <ID>`
+      +- イシューについて git の pull / commit / push は不要
+      +- 採番・クローズ済みの不変・プロジェクト別ルールはサーバが強制する。拒否されたらメッセージの指示に従う
+      +- `--traces` はイシュー ID 専用、`--refs` は文書 ID（`FR-`/`NFR-`/`UC-`/`ISS-`/`DEC-`）専用
+      +- 本文・コメントをシェル経由で渡すときはクォート付きヒアドキュメント（`<<'EOF'`）で囲む
+      +<!-- looptrack:end -->
+  作成         .claude/skills/issue/SKILL.md
+      （kit kit/core/skills/issue/SKILL.md の全文を作成する差分。省略）
+  作成         .claude/skills/token-report/SKILL.md
+      （kit kit/core/skills/token-report/SKILL.md の全文を作成する差分。省略）
+  作成         .gitignore
+      --- /dev/null
+      +++ b/.gitignore
+      @@ -0,0 +1 @@
+      +.claude/.looptrack-freshness/
+  作成         .claude/.looptrack-kit.json
+      --- /dev/null
+      +++ b/.claude/.looptrack-kit.json
+      @@ -0,0 +1,41 @@
+      +{
+      +  "version": 1,
+      +  "url": "http://127.0.0.1:9/im",
+      +  "project": "demo",
+      +  "agent": [
+      +    "claude-code"
+      +  ],
+      +  "source": "copy",
+      +  "core": {
+      +    "bundle_sha256": "$SHA256",
+      +    "files": {
+      +      "kit/core/skills/issue/SKILL.md": "$SHA256",
+      +      "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+      +      "kit/core/skills/token-report/SKILL.md": "$SHA256",
+      +      "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+      +    }
+      +  },
+      +  "loop": {
+      +    "installed": true,
+      +    "installed_at": "2026-09-19T12:34:56Z",
+      +    "bundle_sha256": "$SHA256",
+      +    "files": {
+      +      "kit/loop/manifest.json": "$SHA256",
+      +      "kit/loop/rules/background-process.md": "$SHA256",
+      +      "kit/loop/rules/iteration-discipline.md": "$SHA256",
+      +      "kit/loop/rules/output-discipline.md": "$SHA256",
+      +      "kit/loop/rules/secrets-discipline.md": "$SHA256",
+      +      "kit/loop/rules/working-discipline.md": "$SHA256",
+      +      "kit/loop/rules/en/background-process.md": "$SHA256",
+      +      "kit/loop/rules/en/iteration-discipline.md": "$SHA256",
+      +      "kit/loop/rules/en/output-discipline.md": "$SHA256",
+      +      "kit/loop/rules/en/secrets-discipline.md": "$SHA256",
+      +      "kit/loop/rules/en/working-discipline.md": "$SHA256",
+      +      "kit/loop/skills/iterate/SKILL.md": "$SHA256",
+      +      "kit/loop/skills/iterate/en/SKILL.md": "$SHA256",
+      +      "kit/loop/skills/session-handoff/SKILL.md": "$SHA256",
+      +      "kit/loop/skills/session-handoff/en/SKILL.md": "$SHA256"
+      +    },
+      +    "version": 1
+      +  }
+      +}
+dry-run のため何も書いていません。反映は --dry-run を外して再実行
+次に:
+  1. トークンが未登録: looptrack issue login --browser --url http://127.0.0.1:9/im を実行し、開いたブラウザで利用者がログインと承認をする（AI が実行してよい。待ち受けは最長 5 分なので、コマンドのタイムアウトは 5 分より長くする。ブラウザの無い環境は http://127.0.0.1:9/im/account で発行して login --url http://127.0.0.1:9/im に貼る）
+  2. 確認: looptrack issue config → guide → next --dry-run
+
+#### stderr
+
+#### files

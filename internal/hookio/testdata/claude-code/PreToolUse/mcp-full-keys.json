@@ -1,0 +1,67 @@
+{
+  "note": "Claude Code 2.1.278 の PreToolUse の全項目（scratchpad_dir・prompt_id・permission_mode・effort・mcp_server は hookio が読まない＝知らない項目が増えても Event が変わらないことの記録）。採り方: 一時ディレクトリにスタブの MCP サーバと「stdin を丸ごとファイルへ写すだけ」の PreToolUse・PostToolUse の hook を書いた .claude/settings.json を置き、claude -p でそのツールを 1 回だけ呼ばせて stdin を採り、実在の値（利用者名・パス・セッション ID・tool_use_id・MCP サーバ名）を合成値に置き換えた。",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "66666666-7777-4888-8999-aaaaaaaaaaaa",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/66666666-7777-4888-8999-aaaaaaaaaaaa.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "scratchpad_dir": "/tmp/claude-1000/-home-dev-work-sample-app/66666666-7777-4888-8999-aaaaaaaaaaaa/scratchpad",
+    "prompt_id": "cccccccc-dddd-4eee-8fff-111111111111",
+    "permission_mode": "default",
+    "effort": {
+      "level": "high"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__im__set_status",
+    "tool_input": {
+      "id": "ABC-0123",
+      "status": "Done"
+    },
+    "tool_use_id": "toolu_01CCCCCCCCCCCCCCCCCCCCCC",
+    "mcp_server": {
+      "name": "im",
+      "source": "dynamic"
+    }
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "PreToolUse",
+    "raw_name": "PreToolUse",
+    "shape": "snake_case",
+    "session_id": "66666666-7777-4888-8999-aaaaaaaaaaaa",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/66666666-7777-4888-8999-aaaaaaaaaaaa.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "MCP",
+      "raw_name": "mcp__im__set_status",
+      "server": "im",
+      "name": "set_status",
+      "use_id": "toolu_01CCCCCCCCCCCCCCCCCCCCCC",
+      "input": {
+        "id": "ABC-0123",
+        "status": "Done"
+      }
+    }
+  },
+  "result": {
+    "ask": "受け入れ条件の検証を先に"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "ask",
+        "permissionDecisionReason": "受け入れ条件の検証を先に"
+      }
+    },
+    "exit_code": 0
+  }
+}

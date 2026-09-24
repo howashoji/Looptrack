@@ -1,0 +1,25 @@
+# next-dry-run/404
+$ issue next --dry-run
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシューが見つかりません: DEMO-0999
+
+#### requests (1)
+POST /im/api/v1/projects/demo/next
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "comment": "",
+      "dry_run": true,
+      "override_reason": "",
+      "types": []
+    }
+
+#### files (0)

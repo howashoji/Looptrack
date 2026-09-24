@@ -1,0 +1,35 @@
+# usage-report/ok-json
+$ issue usage report --since-last --json
+
+#### exit 0
+
+#### stdout
+{
+  "project": "demo",
+  "from": "2024-04-01T00:00:00Z",
+  "to": "2024-05-01T00:00:00Z",
+  "data_end": "2024-04-30T12:00:00Z",
+  "excluded_conversations": [
+    "c-1"
+  ],
+  "total_tokens": 123456,
+  "request": {
+    "id": 7
+  },
+  "issues": [
+    {
+      "id": "DEMO-0001",
+      "tokens": 123456
+    }
+  ]
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/report?since_last=1
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

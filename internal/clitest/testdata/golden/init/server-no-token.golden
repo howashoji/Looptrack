@@ -1,0 +1,18 @@
+# init/server-no-token
+$ issue init --project demo --source server
+env LOOPTRACK_TOKEN=
+
+#### exit 1
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・$API・AI claude-code）
+
+#### stderr
+エラー: サーバから取得するにはトークンが要ります。looptrack issue login --browser --url $API でログインしてください（MCP の setup ツールが返す手順なら --dist の URL でトークンなしに取得できます）
+
+#### requests (1)
+GET /im/healthz  [フィクスチャなし → 404]
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

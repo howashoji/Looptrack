@@ -1,0 +1,26 @@
+# guide/ok-json
+$ issue guide --json
+
+#### exit 0
+
+#### stdout
+{
+  "project": "demo",
+  "common": "作業はイシューから始める",
+  "rules": {
+    "verify": {
+      "require_on_close": true
+    }
+  },
+  "docs": []
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/guide
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,27 @@
+{
+  "note": "予備: --agent も --event も無い camelCase の入力 → Copilot と推測し、source から sessionStart と推す",
+  "args": [],
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "sessionId": "cccccccc-dddd-4eee-8fff-000000000001",
+    "timestamp": 1789732800000,
+    "cwd": "/home/dev/work/sample-app",
+    "source": "resume"
+  },
+  "event": {
+    "agent": "copilot",
+    "agent_guessed": true,
+    "name": "SessionStart",
+    "raw_name": "sessionStart",
+    "shape": "camelCase",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "source": "resume"
+  },
+  "result": {},
+  "output": {
+    "stdout": null,
+    "exit_code": 0
+  }
+}

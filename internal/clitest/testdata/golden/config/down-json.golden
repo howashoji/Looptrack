@@ -1,0 +1,17 @@
+# config/down-json
+$ issue config --json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: サーバに接続できません（$API）: $REASON
+
+#### requests (1)
+GET /im/api/v1/projects/demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

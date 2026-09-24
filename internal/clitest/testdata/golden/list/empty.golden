@@ -1,0 +1,17 @@
+# list/empty
+$ issue list
+
+#### exit 0
+
+#### stdout
+該当なし
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?sort=priority
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

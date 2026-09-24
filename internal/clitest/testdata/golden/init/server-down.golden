@@ -1,0 +1,18 @@
+# init/server-down
+$ issue init --project demo --source server
+
+#### exit 1
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・$API・AI claude-code）
+
+#### stderr
+エラー: サーバに接続できません（$API）: $REASON
+
+#### requests (1)
+GET /im/api/v1/dist
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

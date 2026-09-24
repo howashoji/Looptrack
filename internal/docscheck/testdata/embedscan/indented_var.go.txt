@@ -1,0 +1,12 @@
+// 走査の固定データ: grouped var 宣言の中に字下げして書いた //go:embed は Go が directive として扱い実際に埋め込むので、走査も拾うこと。
+package probe
+
+import "embed"
+
+var (
+	//go:embed probe_test.mjs
+	probeTest string
+
+	//go:embed sub/*.txt
+	probeSub embed.FS
+)

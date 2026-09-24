@@ -1,0 +1,42 @@
+{{define "hub.html"}}<!doctype html>
+<html lang="{{T .Lang "server.web.common.html_lang"}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{T .Lang "server.web.common.brand"}} — {{T .Lang "server.web.hub.title"}}</title>
+<link rel="stylesheet" href="{{base}}/static/hub.css">
+<link rel="stylesheet" href="{{base}}/static/appbar.css">
+</head>
+<body data-base="{{.Base}}"{{if eq .User.Role "admin"}} data-admin="1"{{end}}>
+{{template "nav" .}}
+<main>
+  <div class="page-head">
+    <h1>{{T .Lang "server.web.hub.h1"}}</h1>
+    <p id="sub">{{T .Lang "server.web.hub.loading"}}</p>
+    {{if eq .User.Role "admin"}}<p>{{T .Lang "server.web.hub.admin_note_1"}}<a href="{{base}}/admin/projects">{{T .Lang "server.web.common.admin_projects"}}</a>{{T .Lang "server.web.hub.admin_note_2"}}<a href="{{base}}/admin/projects#new">{{T .Lang "server.web.project.new_h2"}}</a>{{T .Lang "server.web.hub.admin_note_3"}}</p>{{end}}
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+<footer>
+  {{T .Lang "server.web.hub.foot_1"}}<code>looptrack issue</code>{{T .Lang "server.web.hub.foot_2"}}<code>/issue</code>{{T .Lang "server.web.hub.foot_3"}}
+</footer>
+{{/* 画面が使う文面だけを埋め込み、hub.js が読む（対訳表は API で配らない）。 */}}
+<script type="application/json" id="i18n">{
+  "open": "{{T .Lang "server.web.hub.stat_open"}}",
+  "in_progress": "{{T .Lang "server.web.hub.stat_in_progress"}}",
+  "ready": "{{T .Lang "server.web.hub.stat_ready"}}",
+  "bugs": "{{T .Lang "server.web.hub.stat_bugs"}}",
+  "foot": "{{T .Lang "server.web.hub.card_foot"}}",
+  "go": "{{T .Lang "server.web.hub.card_open"}}",
+  "sub": "{{T .Lang "server.web.hub.sub"}}",
+  "empty_admin_1": "{{T .Lang "server.web.hub.empty_admin_1"}}",
+  "empty_admin_2": "{{T .Lang "server.web.hub.empty_admin_2"}}",
+  "empty_admin_3": "{{T .Lang "server.web.hub.empty_admin_3"}}",
+  "admin_projects": "{{T .Lang "server.web.common.admin_projects"}}",
+  "new_project": "{{T .Lang "server.web.project.new_h2"}}",
+  "empty": "{{T .Lang "server.web.hub.empty"}}"
+}</script>
+<script type="module" src="{{base}}/static/hub.js"></script>
+</body>
+</html>{{end}}

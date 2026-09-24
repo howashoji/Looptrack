@@ -1,0 +1,16 @@
+# login/no-url
+$ issue login
+env LOOPTRACK_API_URL=
+env LOOPTRACK_TOKEN=
+stdin "imp_x\n"
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: サーバの URL が分かりません。--url http://127.0.0.1:$PORT/looptrack を指定するか、環境変数 LOOPTRACK_API_URL を設定してください
+
+#### requests (0)
+
+#### files (0)

@@ -1,0 +1,13 @@
+# usage-ledger-add/no-to
+$ issue usage ledger add 名前 --from 2024-04-01
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 対象期間を指定してください: --from-report <usage report --json の出力> か --to（と --from・--data-end）
+
+#### requests (0)
+
+#### files (0)

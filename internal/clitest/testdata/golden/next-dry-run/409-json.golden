@@ -1,0 +1,25 @@
+# next-dry-run/409-json
+$ issue next --dry-run --json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: DEMO-0001 は他の操作で Done になっています
+
+#### requests (1)
+POST /im/api/v1/projects/demo/next
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "comment": "",
+      "dry_run": true,
+      "override_reason": "",
+      "types": []
+    }
+
+#### files (0)

@@ -1,0 +1,22 @@
+# verify-last/ok
+$ issue verify DEMO-0001 --last
+
+#### exit 0
+
+#### stdout
+直近の verify: 2024-05-02 11:40 1/2 成功・1 失敗（現在の本文に対する記録・build-01 demo-app）
+[1/2] ok      echo ok（$SEC 秒）
+      | ok
+[2/2] fail    make test（exit 2・$SEC 秒）
+      | FAIL: TestLogin
+      | make: *** [test] Error 2
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

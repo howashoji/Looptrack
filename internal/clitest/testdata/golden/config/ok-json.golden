@@ -1,0 +1,39 @@
+# config/ok-json
+$ issue config --json
+
+#### exit 0
+
+#### stdout
+{
+  "mode": "api",
+  "url": "$API",
+  "project": "demo",
+  "name": "デモ",
+  "prefix": "DEMO",
+  "width": 4,
+  "role": "editor",
+  "member": true,
+  "counter": 5,
+  "rules": {
+    "verify": {
+      "require_on_close": true
+    }
+  },
+  "token": "環境変数 LOOPTRACK_TOKEN",
+  "user": "alice",
+  "kit": null
+}
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/projects/demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+GET /im/api/v1/me
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

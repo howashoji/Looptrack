@@ -1,0 +1,47 @@
+{
+  "note": "CLI の agentStop（transcriptPath あり）。Stop の差し戻しは実物で未確認 → 既定は systemMessage",
+  "args": [
+    "--agent",
+    "copilot",
+    "--event",
+    "agentStop"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "sessionId": "cccccccc-dddd-4eee-8fff-000000000001",
+    "timestamp": 1789732800000,
+    "cwd": "/home/dev/work/sample-app",
+    "transcriptPath": "/home/dev/.copilot/session-state/cccccccc-dddd-4eee-8fff-000000000001/events.jsonl"
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "Stop",
+    "raw_name": "agentStop",
+    "shape": "camelCase",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "transcript_path": "/home/dev/.copilot/session-state/cccccccc-dddd-4eee-8fff-000000000001/events.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app"
+  },
+  "result": {
+    "block": "引き継ぎが作業の完了に追いついていません"
+  },
+  "output": {
+    "stdout": {
+      "decision": "block",
+      "reason": "[Stop hook の差し戻し] 引き継ぎが作業の完了に追いついていません",
+      "hookSpecificOutput": {
+        "hookEventName": "Stop",
+        "decision": "block",
+        "reason": "[Stop hook の差し戻し] 引き継ぎが作業の完了に追いついていません"
+      }
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "block": "[Stop hook の差し戻し] 引き継ぎが作業の完了に追いついていません"
+  }
+}

@@ -1,0 +1,37 @@
+{{define "admin_users.html"}}{{template "head" (headData .Lang (T .Lang "server.web.common.admin_users"))}}
+{{template "nav" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.common.admin_users"}}</h1>
+  {{template "messages" .}}
+  <p class="muted">{{T .Lang "server.web.admin_users.two_factor"}}<strong>{{.TwoFactorLabel}}</strong>{{T .Lang "server.web.admin_users.two_factor_link_before"}}<a href="{{base}}/admin/security">{{T .Lang "server.web.admin_users.two_factor_link"}}</a>{{T .Lang "server.web.admin_users.two_factor_link_after"}}</p>
+  <section class="panel">
+    <table class="list">
+      <thead><tr><th>{{T .Lang "server.web.admin_users.th_login"}}</th><th>{{T .Lang "server.web.admin_users.th_name"}}</th><th>{{T .Lang "server.web.admin_users.th_role"}}</th><th>{{T .Lang "server.web.admin_users.th_totp"}}</th><th>{{T .Lang "server.web.admin_users.th_state"}}</th><th>{{T .Lang "server.web.admin_users.th_last_login"}}</th></tr></thead>
+      <tbody>
+      {{range .Users}}
+      <tr{{if .Disabled}} class="inactive"{{end}}>
+        <td><a href="{{base}}/admin/users/{{.Login}}">{{.Login}}</a></td><td>{{.Name}}</td><td>{{.Role}}</td>
+        <td>{{if .TOTP}}{{T $.Lang "server.web.admin_users.totp_on"}}{{else}}{{T $.Lang "server.web.admin_users.totp_off"}}{{end}}</td><td>{{if .Disabled}}{{T $.Lang "server.web.admin_users.state_disabled"}}{{else}}{{T $.Lang "server.web.admin_users.state_enabled"}}{{end}}</td><td>{{.LastLogin}}</td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+  <section class="panel">
+    <h2>{{T .Lang "server.web.admin_users.add_h2"}}</h2>
+    <form method="post" action="{{base}}/admin/users" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.admin_users.login_name"}}<input name="login" value="{{.Form.login}}" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" autocomplete="off" required></label>
+      <label>{{T .Lang "server.web.admin_users.display_name"}}<input name="name" value="{{.Form.name}}" maxlength="255"></label>
+      <label>{{T .Lang "server.web.admin_users.role"}}<select name="role">
+        <option value="member"{{if ne .Form.role "admin"}} selected{{end}}>{{T .Lang "server.web.admin_users.role_member"}}</option>
+        <option value="admin"{{if eq .Form.role "admin"}} selected{{end}}>{{T .Lang "server.web.admin_users.role_admin"}}</option>
+      </select></label>
+      <label>{{T .Lang "server.web.admin_users.initial_password" "n" .MinPassword}}<input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <label>{{T .Lang "server.web.admin_users.initial_password_confirm"}}<input type="password" name="confirm" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <button type="submit">{{T .Lang "server.web.admin_users.add_submit"}}</button>
+    </form>
+    <p class="muted">{{T .Lang "server.web.admin_users.add_note"}}{{if .TwoFactorRequired}}{{T .Lang "server.web.admin_users.add_note_required"}}{{else}}{{T .Lang "server.web.admin_users.add_note_optional"}}{{end}}</p>
+  </section>
+</main>
+{{template "foot"}}{{end}}

@@ -1,0 +1,60 @@
+{
+  "note": "サブエージェントの中の Write（agent_id がある。session_id は親と同じ）",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PostToolUse",
+    "agent_id": "a1b2c3d4e5f6a7b8c",
+    "agent_type": "general-purpose",
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "/home/dev/work/sample-app/notes.txt",
+      "content": "x"
+    },
+    "tool_response": {
+      "filePath": "/home/dev/work/sample-app/notes.txt",
+      "type": "create"
+    }
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "PostToolUse",
+    "raw_name": "PostToolUse",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "subagent_id": "a1b2c3d4e5f6a7b8c",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Write",
+      "raw_name": "Write",
+      "name": "Write",
+      "input": {
+        "content": "x",
+        "file_path": "/home/dev/work/sample-app/notes.txt"
+      },
+      "response": {
+        "raw": {
+          "filePath": "/home/dev/work/sample-app/notes.txt",
+          "type": "create"
+        },
+        "text": "{\"filePath\":\"/home/dev/work/sample-app/notes.txt\",\"type\":\"create\"}"
+      }
+    }
+  },
+  "result": {},
+  "output": {
+    "stdout": null,
+    "exit_code": 0
+  }
+}

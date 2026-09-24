@@ -1,0 +1,23 @@
+# assign/401
+$ issue assign DEMO-0001 bob --override 引き継ぎ
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: トークンが無効です（looptrack issue login --browser でログインし直してください）
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/assign?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "assignee": "bob",
+      "override_reason": "引き継ぎ"
+    }
+
+#### files (0)

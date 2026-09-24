@@ -1,0 +1,24 @@
+# close/422
+$ issue close DEMO-0001 --comment '検証: go test が通った'
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: DEMO-0001 は検証コマンドを持っていますが、verify の記録がありません。次を実行してから閉じてください: looptrack issue verify DEMO-0001
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/status?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "comment": "検証: go test が通った",
+      "override_reason": "",
+      "status": "Done"
+    }
+
+#### files (0)

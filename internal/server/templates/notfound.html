@@ -1,0 +1,8 @@
+{{define "notfound.html"}}{{template "head" (headData .Lang (T .Lang "server.web.notfound.title"))}}
+{{template "nav" .}}
+<main class="page">
+  <h1>404</h1>
+  <p>{{.Message}}</p>
+  <p><a href="{{base}}/">{{T .Lang "server.web.common.back_to_projects"}}</a></p>
+</main>
+{{template "foot"}}{{end}}

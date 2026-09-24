@@ -1,0 +1,61 @@
+# index/ok
+$ issue index
+
+#### exit 0
+
+#### stdout
+# イシュー一覧
+
+> **自動生成** — `looptrack issue index` で再生成。手で編集しない。
+> 生成日時: $NOW
+
+## 着手可能（ready）
+
+blocked_by が全て解決済みで、未着手のもの。
+
+| ID | 型 | 優先度 | タイトル |
+| -- | -- | -- | -- |
+| DEMO-0003 | requirement | P2 | 認証の要件 |
+
+## Backlog（0 件）
+
+（なし）
+
+## Todo（1 件）
+
+| ID | 型 | 優先度 | ブロック元 | タイトル |
+| -- | -- | -- | -- | -- |
+| DEMO-0002 | bug | P0 | DEMO-0001 | 保存でエラーになる |
+
+## In Progress（1 件）
+
+| ID | 型 | 優先度 | ブロック元 | タイトル |
+| -- | -- | -- | -- | -- |
+| DEMO-0001 | task | P1 | - | ログイン画面を作る |
+
+## In Review（1 件）
+
+| ID | 型 | 優先度 | ブロック元 | タイトル |
+| -- | -- | -- | -- | -- |
+| DEMO-0003 | requirement | P2 | - | 認証の要件 |
+
+## Done（1 件）
+
+| ID | 型 | 優先度 | ブロック元 | タイトル |
+| -- | -- | -- | -- | -- |
+| DEMO-0004 | test | P3 | - | ログインの結合テスト |
+
+## Canceled（0 件）
+
+（なし）
+
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?all=1&sort=id
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,17 @@
+# list-filter/409-json
+$ issue list --status Todo --type bug --label ui --ref FR-1 --all --assignee me --sort updated --reverse --json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: DEMO-0001 は他の操作で Done になっています
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?all=1&assignee=me&label=ui&ref=FR-1&reverse=1&sort=updated&status=Todo&type=bug
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

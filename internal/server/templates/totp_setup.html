@@ -1,0 +1,15 @@
+{{define "totp_setup.html"}}{{template "head" (headData .Lang (T .Lang "server.web.totp_setup.title"))}}
+<main class="card">
+  <h1>{{T .Lang "server.web.totp_setup.title"}}</h1>
+  <p>{{if .Required}}{{T .Lang "server.web.totp_setup.required" "login" .Login}}{{else}}{{T .Lang "server.web.totp_setup.optional" "login" .Login}}{{end}}{{T .Lang "server.web.totp_setup.scan"}}</p>
+  <img class="qr" src="{{.QR}}" width="220" height="220" alt="{{T .Lang "server.web.totp_setup.qr_alt"}}">
+  <p class="secret">{{T .Lang "server.web.totp_setup.manual"}}<code data-secret>{{.Secret}}</code></p>
+  {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+  <form method="post" action="{{base}}/login/totp/setup">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="next" value="{{.Next}}">
+    <label>{{T .Lang "server.web.totp.code"}}<input name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" autocomplete="one-time-code" required autofocus></label>
+    <button type="submit">{{T .Lang "server.web.totp_setup.submit"}}</button>
+  </form>
+</main>
+{{template "foot"}}{{end}}

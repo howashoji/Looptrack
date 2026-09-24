@@ -1,0 +1,7 @@
+{
+  "description": "合成フィクスチャ（ハイフンを含む接頭辞・origin あり）",
+  "name": "サンプル保守",
+  "order": 2,
+  "prefix": "SMP-DEV",
+  "width": 4
+}

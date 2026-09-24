@@ -1,0 +1,17 @@
+# show/404-json
+$ issue show DEMO-0001 --json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシューが見つかりません: DEMO-0999
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -1,0 +1,17 @@
+# usage-report-period/404-json
+$ issue usage report --from 2024-04-01 --to '2024-04-30 09:30' --json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシューが見つかりません: DEMO-0999
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/report?from=2024-04-01&to=2024-04-30+09%3A30
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

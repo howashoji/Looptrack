@@ -1,0 +1,19 @@
+# login/404
+$ issue login
+env LOOPTRACK_TOKEN=
+stdin "imp_pasted_token\n"
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: トークンを確認できません: イシューが見つかりません: DEMO-0999
+
+#### requests (1)
+GET /im/api/v1/me
+  Authorization: Bearer imp_pasted_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

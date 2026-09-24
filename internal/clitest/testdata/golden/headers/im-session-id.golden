@@ -1,0 +1,24 @@
+# headers/im-session-id
+$ issue comment DEMO-0001 x
+env LOOPTRACK_SESSION_ID=sess-explicit
+
+#### exit 0
+
+#### stdout
+コメント追記: DEMO-0001
+
+#### stderr
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/comments?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: sess-explicit
+  body:
+    {
+      "text": "x"
+    }
+
+#### files (0)

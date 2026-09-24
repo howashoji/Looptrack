@@ -1,0 +1,20 @@
+# ready/ok
+$ issue ready
+
+#### exit 0
+
+#### stdout
+ID        TYPE        STATUS      PRI BLOCKED   TITLE
+DEMO-0002 bug         Todo        P0  DEMO-0001 保存でエラーになる
+
+1 件が着手可能
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/ready?sort=priority
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

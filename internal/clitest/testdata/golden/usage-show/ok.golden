@@ -1,0 +1,20 @@
+# usage-show/ok
+$ issue usage show DEMO-0001
+
+#### exit 0
+
+#### stdout
+DEMO-0001 トークン消費: 合計 123,456（段階 2・対象外 15・不整合 1）
+時刻(UTC)              きっかけ       操作       AI                   入力    ｷｬｯｼｭ作成    ｷｬｯｼｭ読取         出力        区間計
+2024-05-02 02:30:00  manual     -        claude-code      54,000     10,000     30,000      6,000    100,000 ※対象外
+2024-05-02 03:00:00  issue_op   status   codex            20,000          0      3,000        456     23,456 ※不整合
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001/usage?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

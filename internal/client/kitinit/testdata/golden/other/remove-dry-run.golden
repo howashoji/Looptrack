@@ -1,0 +1,11 @@
+# init --remove-loop --dry-run
+
+#### exit 0
+
+#### stdout
+init --remove-loop: $TMP/ws（dry-run）
+loop は入っていません（変更はありません）
+
+#### stderr
+
+#### files

@@ -1,0 +1,6 @@
+[
+ {
+  "call": "{\"fn\":\"collect\",\"client\":\"copilot\",\"sid\":\"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\",\"env\":{\"COPILOT_HOME\":\"<TMP>/001/.copilot\",\"HOME\":\"<TMP>/001\"}}",
+  "out": "{\"client\": \"copilot\", \"client_version\": \"\", \"session_id\": \"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\", \"conversation_id\": \"5f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f\", \"at\": \"2026-09-18T02:55:01.000000Z\", \"tokens\": {\"main\": {\"input\": 110, \"cache_create\": 0, \"cache_read\": 40, \"output\": 12}, \"sub\": {\"input\": 0, \"cache_create\": 0, \"cache_read\": 0, \"output\": 0}}, \"responses\": 2, \"sub_responses\": 0, \"by_model\": {\"gpt-5\": {\"input\": 60, \"cache_create\": 0, \"cache_read\": 40, \"output\": 7, \"reasoning\": 0, \"responses\": 1}, \"(copilot)\": {\"input\": 50, \"cache_create\": 0, \"cache_read\": 0, \"output\": 5, \"reasoning\": 0, \"responses\": 1}}, \"io\": null, \"human\": {\"pure\": 2, \"auto\": 0, \"intr\": 0, \"idle_median_m\": 1.6, \"idle_lt5_pct\": 100, \"long_breaks\": 0, \"work_m\": 0.0}, \"branch\": \"\", \"branches\": null, \"cwd_name\": \"\", \"excluded\": false}"
+ }
+]

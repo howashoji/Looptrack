@@ -1,0 +1,41 @@
+{
+  "note": "CLI（userPromptSubmitted）は設定ファイルの hook の出力を捨てる → 差し戻さず systemMessage",
+  "args": [
+    "--agent",
+    "copilot",
+    "--event",
+    "userPromptSubmitted"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "sessionId": "cccccccc-dddd-4eee-8fff-000000000001",
+    "timestamp": 1789732800000,
+    "cwd": "/home/dev/work/sample-app",
+    "prompt": "続けて"
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "UserPromptSubmit",
+    "raw_name": "userPromptSubmitted",
+    "shape": "camelCase",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "prompt": "続けて"
+  },
+  "result": {
+    "block": "[文脈の大きさ] 文脈が大きすぎます"
+  },
+  "output": {
+    "stdout": {
+      "systemMessage": "[文脈の大きさ] 文脈が大きすぎます"
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "system_message": "[文脈の大きさ] 文脈が大きすぎます"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "note": "VS Code の replace_string_in_file → Edit。ask は CLI が処理しない（未確認）→ 既定は systemMessage",
+  "args": [
+    "--agent",
+    "copilot"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "timestamp": "2026-09-18T12:00:00.000Z",
+    "cwd": "/home/dev/work/sample-app",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "replace_string_in_file",
+    "tool_input": {
+      "filePath": "/home/dev/work/other-app/a.go",
+      "oldString": "a",
+      "newString": "b"
+    }
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "PreToolUse",
+    "raw_name": "PreToolUse",
+    "shape": "snake_case",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Edit",
+      "raw_name": "replace_string_in_file",
+      "name": "replace_string_in_file",
+      "input": {
+        "filePath": "/home/dev/work/other-app/a.go",
+        "newString": "b",
+        "oldString": "a"
+      }
+    }
+  },
+  "result": {
+    "ask": "別のプロジェクトの変更です"
+  },
+  "output": {
+    "stdout": {
+      "systemMessage": "別のプロジェクトの変更です"
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "system_message": "別のプロジェクトの変更です"
+  }
+}

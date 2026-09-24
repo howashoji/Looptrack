@@ -1,0 +1,26 @@
+# login/ok
+$ issue login
+env LOOPTRACK_TOKEN=
+stdin "imp_pasted_token\n"
+
+#### exit 0
+
+#### stdout
+ログイン: alice（$API）。トークンを $TMP/home/.config/looptrack/credentials.json に保存しました
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/me
+  Authorization: Bearer imp_pasted_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (1)
+home/.config/looptrack/credentials.json (0600)
+    {
+      "$API": {
+        "login": "alice",
+        "token": "imp_pasted_token"
+      }
+    }

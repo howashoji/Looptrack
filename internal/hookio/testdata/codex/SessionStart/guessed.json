@@ -1,0 +1,35 @@
+{
+  "note": "予備: --agent なし。CODEX_THREAD_ID で Codex と推測し、入力に無い session_id も CODEX_THREAD_ID から。git の外なので ProjectDir は cwd",
+  "args": [],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
+  },
+  "input": {
+    "cwd": "/home/dev/scratch",
+    "hook_event_name": "SessionStart",
+    "source": "startup"
+  },
+  "event": {
+    "agent": "codex",
+    "agent_guessed": true,
+    "name": "SessionStart",
+    "raw_name": "SessionStart",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "cwd": "/home/dev/scratch",
+    "project_dir": "/home/dev/scratch",
+    "source": "startup"
+  },
+  "result": {
+    "context": "毎セッション守る規律（kit/loop の rules から注入）"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": "毎セッション守る規律（kit/loop の rules から注入）"
+      }
+    },
+    "exit_code": 0
+  }
+}

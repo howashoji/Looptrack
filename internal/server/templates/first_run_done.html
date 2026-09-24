@@ -1,0 +1,20 @@
+{{define "first_run_done.html"}}{{template "head" (headData .Lang (T .Lang "server.web.first_run_done.title"))}}
+{{template "nav" .}}
+<main class="page">
+  <h1>{{T .Lang "server.web.first_run_done.h1"}}</h1>
+  <p><a href="{{.Next}}">{{if .Project}}{{T .Lang "server.web.first_run_done.to_project" "project" .Project}}{{else}}{{T .Lang "server.web.first_run_done.to_board"}}{{end}}</a></p>
+  <p class="muted">{{T .Lang "server.web.first_run_done.url_before"}}<code>{{.URL}}</code>{{T .Lang "server.web.first_run_done.url_after"}}</p>
+  <section class="panel">
+    <h2>{{T .Lang "server.web.first_run_done.mcp_h2"}}</h2>
+    <p class="muted">{{T .Lang "server.web.first_run_done.mcp_note"}}</p>
+    {{range $i, $c := .MCP}}
+    <h3>{{$c.Client}} <span class="muted">{{$c.Where}}</span></h3>
+    <pre id="mcp-{{$i}}"><code>{{$c.Text}}</code></pre>
+    <button type="button" class="small" data-copy="mcp-{{$i}}">{{T $.Lang "server.web.first_run_done.copy"}}</button>
+    {{if $c.Note}}<p class="muted">{{$c.Note}}</p>{{end}}
+    {{end}}
+  </section>
+</main>
+<script type="application/json" id="i18n">{"copied": "{{T .Lang "server.web.first_run_done.copied"}}"}</script>
+<script src="{{base}}/static/copy.js"></script>
+{{template "foot"}}{{end}}

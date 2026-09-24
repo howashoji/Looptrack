@@ -1,0 +1,13 @@
+# usage-show/no-id
+$ issue usage show
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシュー ID を指定してください（usage show <ID>）
+
+#### requests (0)
+
+#### files (0)

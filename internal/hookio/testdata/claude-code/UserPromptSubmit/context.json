@@ -1,0 +1,41 @@
+{
+  "note": "UserPromptSubmit の注入（user-prompt-task-mode）",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app/src",
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "IM-0001 を確認して"
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "UserPromptSubmit",
+    "raw_name": "UserPromptSubmit",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app/src",
+    "project_dir": "/home/dev/work/sample-app",
+    "prompt": "IM-0001 を確認して"
+  },
+  "result": {
+    "context": "確認モード: 調査と計画の提示で留める"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "UserPromptSubmit",
+        "additionalContext": "確認モード: 調査と計画の提示で留める"
+      }
+    },
+    "exit_code": 0
+  }
+}

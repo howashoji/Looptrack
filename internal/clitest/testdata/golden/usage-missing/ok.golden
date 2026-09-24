@@ -1,0 +1,20 @@
+# usage-missing/ok
+$ issue usage missing
+
+#### exit 0
+
+#### stdout
+トークン情報の充足率 75.0%（直近 30 日・自分の AI 操作 4 件中 3 件に付与・未付与 1 件・対象外（人の操作）2 件）
+時刻(UTC)              ID        操作       経路   利用者          タイトル
+2024-05-02 03:00:00  DEMO-0002 status   mcp  alice        保存でエラーになる
+回収: イシューごとに looptrack issue usage attach <ID> を実行（対象 DEMO-0002）
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/coverage?days=30&mine=1
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

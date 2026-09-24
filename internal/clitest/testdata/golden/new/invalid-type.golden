@@ -1,0 +1,13 @@
+# new/invalid-type
+$ issue new x --type story
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --type は requirement / design / task / bug / test / epic のいずれかです（指定値: story）
+
+#### requests (0)
+
+#### files (0)

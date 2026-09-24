@@ -1,0 +1,57 @@
+{
+  "note": "TrustUnconfirmed（実物確認の試験）なら deny を出す。apply_patch は Edit。deny があれば ask は捨てる",
+  "args": [
+    "--agent",
+    "codex"
+  ],
+  "env": {
+    "CODEX_THREAD_ID": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "trust_unconfirmed": true,
+  "input": {
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Update File: src/main.go\n@@\n-a\n+b\n*** End Patch"
+    }
+  },
+  "event": {
+    "agent": "codex",
+    "name": "PreToolUse",
+    "raw_name": "PreToolUse",
+    "shape": "snake_case",
+    "session_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee",
+    "transcript_path": "/home/dev/.codex/sessions/2026/09/18/rollout-2026-09-18T12-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Edit",
+      "raw_name": "apply_patch",
+      "name": "apply_patch",
+      "input": {
+        "command": "*** Begin Patch\n*** Update File: src/main.go\n@@\n-a\n+b\n*** End Patch"
+      }
+    }
+  },
+  "result": {
+    "deny": "確認モード中です（編集しない）",
+    "ask": "捨てられる"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "確認モード中です（編集しない）"
+      }
+    },
+    "exit_code": 0
+  },
+  "effective": {
+    "deny": "確認モード中です（編集しない）"
+  }
+}

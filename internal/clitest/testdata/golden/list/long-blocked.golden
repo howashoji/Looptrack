@@ -1,0 +1,20 @@
+# list/long-blocked
+$ issue list
+
+#### exit 0
+
+#### stdout
+ID        TYPE        STATUS      PRI BLOCKED                    TITLE
+DEMO-0010 task        Todo        P2  DEMO-0001,DEMO-0002,DEMO-… 長い blocked_by
+
+1 件
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues?sort=priority
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

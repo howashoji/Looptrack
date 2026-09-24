@@ -1,0 +1,21 @@
+CREATE TABLE oauth_refresh_tokens (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  token_hash      BINARY(32)      NOT NULL COMMENT 'SHA-256',
+  family_id       CHAR(22)        NOT NULL COMMENT '認可コード 1 回から続く入れ替えの系列（乱数 16 バイトの base64url）',
+  user_id         BIGINT UNSIGNED NOT NULL,
+  client_id       VARCHAR(64)     NOT NULL,
+  access_token_id BIGINT UNSIGNED NOT NULL COMMENT '同時に発行したアクセストークン',
+  scope           VARCHAR(255)    NOT NULL DEFAULT '',
+  resource        VARCHAR(2048)   NOT NULL DEFAULT '',
+  created_at      DATETIME(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  expires_at      DATETIME(6)     NOT NULL,
+  used_at         DATETIME(6)     NULL COMMENT '入れ替えに使った時刻（以後この値の提示は再利用）',
+  revoked_at      DATETIME(6)     NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_oauth_refresh_hash (token_hash),
+  KEY k_oauth_refresh_family (family_id),
+  KEY k_oauth_refresh_access (access_token_id),
+  CONSTRAINT fk_oauth_refresh_user FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT fk_oauth_refresh_client FOREIGN KEY (client_id) REFERENCES oauth_clients (client_id),
+  CONSTRAINT fk_oauth_refresh_access FOREIGN KEY (access_token_id) REFERENCES api_tokens (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

@@ -1,0 +1,243 @@
+# init --project demo --agent copilot --loop --dry-run
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI copilot・dry-run）
+kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
+配線: looptrack hook <名前> --agent <AI>
+導入セット: core + loop（hook 19 本を配線）
+  作成         .claude/rules/looptrack-loop/background-process.md
+      （kit kit/loop/rules/background-process.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/background-process.md
+      （kit kit/loop/rules/en/background-process.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/iteration-discipline.md
+      （kit kit/loop/rules/en/iteration-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/output-discipline.md
+      （kit kit/loop/rules/en/output-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/secrets-discipline.md
+      （kit kit/loop/rules/en/secrets-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/en/working-discipline.md
+      （kit kit/loop/rules/en/working-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/iteration-discipline.md
+      （kit kit/loop/rules/iteration-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/output-discipline.md
+      （kit kit/loop/rules/output-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/secrets-discipline.md
+      （kit kit/loop/rules/secrets-discipline.md の全文を作成する差分。省略）
+  作成         .claude/rules/looptrack-loop/working-discipline.md
+      （kit kit/loop/rules/working-discipline.md の全文を作成する差分。省略）
+  作成         .claude/skills/iterate/SKILL.md
+      （kit kit/loop/skills/iterate/SKILL.md の全文を作成する差分。省略）
+  作成         .claude/skills/session-handoff/SKILL.md
+      （kit kit/loop/skills/session-handoff/SKILL.md の全文を作成する差分。省略）
+  作成         .github/hooks/looptrack.json
+      --- /dev/null
+      +++ b/.github/hooks/looptrack.json
+      @@ -0,0 +1,105 @@
+      +{
+      +  "version": 1,
+      +  "hooks": {
+      +    "SessionStart": [
+      +      {
+      +        "type": "command",
+      +        "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
+      +        "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
+      +        "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
+      +        "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
+      +        "timeoutSec": 15
+      +      }
+      +    ],
+      +    "PostToolUse": [
+      +      {
+      +        "type": "command",
+      +        "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event PostToolUse",
+      +        "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event PostToolUse",
+      +        "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event PostToolUse",
+      +        "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event PostToolUse",
+      +        "timeoutSec": 10
+      +      },
+      +      {
+      +        "type": "command",
+      +        "command": "looptrack hook post-work-complete-handoff-mark --agent copilot",
+      +        "bash": "looptrack hook post-work-complete-handoff-mark --agent copilot",
+      +        "powershell": "looptrack hook post-work-complete-handoff-mark --agent copilot",
+      +        "windows": "looptrack hook post-work-complete-handoff-mark --agent copilot",
+      +        "timeoutSec": 5
+      +      }
+      +    ],
+      +    "Stop": [
+      +      {
+      +        "type": "command",
+      +        "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event Stop",
+      +        "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event Stop",
+      +        "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event Stop",
+      +        "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event Stop",
+      +        "timeoutSec": 10
+      +      },
+      +      {
+      +        "type": "command",
+      +        "command": "looptrack hook stop-handoff-freshness --agent copilot",
+      +        "bash": "looptrack hook stop-handoff-freshness --agent copilot",
+      +        "powershell": "looptrack hook stop-handoff-freshness --agent copilot",
+      +        "windows": "looptrack hook stop-handoff-freshness --agent copilot",
+      +        "timeoutSec": 10
+      +      }
+      +    ],
+      +    "SessionEnd": [
+      +      {
+      +        "type": "command",
+      +        "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event SessionEnd",
+      +        "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event SessionEnd",
+      +        "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event SessionEnd",
+      +        "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event SessionEnd",
+      +        "timeoutSec": 10
+      +      }
+      +    ],
+      +    "UserPromptSubmit": [
+      +      {
+      +        "type": "command",
+      +        "command": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
+      +        "bash": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
+      +        "powershell": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
+      +        "windows": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
+      +        "timeoutSec": 15
+      +      }
+      +    ],
+      +    "PreToolUse": [
+      +      {
+      +        "type": "command",
+      +        "command": "looptrack hook pre-edit-task-mode-guard --agent copilot",
+      +        "bash": "looptrack hook pre-edit-task-mode-guard --agent copilot",
+      +        "powershell": "looptrack hook pre-edit-task-mode-guard --agent copilot",
+      +        "windows": "looptrack hook pre-edit-task-mode-guard --agent copilot",
+      +        "timeoutSec": 5
+      +      },
+      +      {
+      +        "type": "command",
+      +        "command": "looptrack hook pre-tool-secrets-guard --agent copilot",
+      +        "bash": "looptrack hook pre-tool-secrets-guard --agent copilot",
+      +        "powershell": "looptrack hook pre-tool-secrets-guard --agent copilot",
+      +        "windows": "looptrack hook pre-tool-secrets-guard --agent copilot",
+      +        "timeoutSec": 5
+      +      },
+      +      {
+      +        "type": "command",
+      +        "command": "looptrack hook pre-tool-git-guard --agent copilot",
+      +        "bash": "looptrack hook pre-tool-git-guard --agent copilot",
+      +        "powershell": "looptrack hook pre-tool-git-guard --agent copilot",
+      +        "windows": "looptrack hook pre-tool-git-guard --agent copilot",
+      +        "timeoutSec": 5
+      +      },
+      +      {
+      +        "type": "command",
+      +        "command": "looptrack hook pre-tool-wait-loop-guard --agent copilot",
+      +        "bash": "looptrack hook pre-tool-wait-loop-guard --agent copilot",
+      +        "powershell": "looptrack hook pre-tool-wait-loop-guard --agent copilot",
+      +        "windows": "looptrack hook pre-tool-wait-loop-guard --agent copilot",
+      +        "timeoutSec": 5
+      +      }
+      +    ]
+      +  }
+      +}
+  作成         AGENTS.md
+      --- /dev/null
+      +++ b/AGENTS.md
+      @@ -0,0 +1,214 @@
+      +<!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
+      +## 課題管理（イシュー管理サーバ）
+      +
+      +**作業はイシュー登録から始める。会話だけで進めない。不具合は発覚と同時に起票する。**
+      +
+      +- **操作は MCP のツール（サーバ名 looptrack）で行う**（GitHub Copilot。VS Code は `.vscode/mcp.json`、Copilot CLI はリポジトリの `.github/mcp.json` か `~/.copilot/mcp-config.json` の looptrack。
+      +  CLI の MCP のツールは呼ぶたびに承認が要る。利用者が `copilot --allow-tool='looptrack'` で起動すれば要らない）。
+      +  CLI（`looptrack issue`）は MCP に無い操作だけに使う
+      +- **使い方とルールは最初に `guide` ツールで読む**（共通規則 + このプロジェクトのルール + 運用文書を 1 回で返す）
+      +- ループ運用の 1 周: `next`（着手）→ 作業 → `add_comment`（分かった時点で記録）→ 受け入れ条件を検証 → `set_status` で Done（`comment` に検証結果）→ 次の `next`。
+      +  起票は `create_issue`、本文の編集は `get_issue` で version と全文を取り `update_issue` に直した全文を渡す。拒否されたらメッセージの指示に従う
+      +- 検証コマンド（本文の「## 検証コマンド」節）: `verify_issue` で一覧を取り、手元のシェルで順に全部実行して、結果を `report_verify` で送る
+      +- トークン情報: 利用者が GitHub Copilot の OpenTelemetry のファイル出力を有効にすると、フック（`.github/hooks/looptrack.json` の `looptrack hook usage`）が
+      +  MCP の操作・ターン終了のたびにイシューへ付ける（手順は AI-GUIDE §7-3-1）。有効にしていなければ付かず、未付与にも数えない。
+      +  Copilot CLI のシェルでは `looptrack issue usage attach <ID>` で付けられる（`COPILOT_AGENT_SESSION_ID` から会話を特定し、OTel のファイル出力から付ける）。
+      +  **VS Code の Copilot では `looptrack issue usage attach` を実行しない**（シェルにセッション ID が渡らず付けられない）
+      +- CLI が要るのは: `looptrack issue login --browser --url http://127.0.0.1:9/im`（初回だけ。フックの SessionStart が使うトークン。開いたブラウザで利用者がログインと承認をする）・
+      +  導入と更新（`init`・`installed`。`setup` ツールが返す手順どおり）。CLI を打つときはコマンドの前に `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` を付ける
+      +- MCP の looptrack が接続されていないときは、CLI の `next` / `comment` / `verify` / `close --comment` で同じ 1 周を回す（`LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` を前に付ける）。
+      +  本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡す。利用者に MCP の接続設定を勧める
+      +- 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
+      +<!-- looptrack:end -->
+      +
+      +<!-- looptrack:loop:begin -->
+（loop 節: kit/loop の rules・skill から組み立てた本文）
+<!-- looptrack:loop:end -->
+  作成         .claude/.looptrack-kit.json
+      --- /dev/null
+      +++ b/.claude/.looptrack-kit.json
+      @@ -0,0 +1,41 @@
+      +{
+      +  "version": 1,
+      +  "url": "http://127.0.0.1:9/im",
+      +  "project": "demo",
+      +  "agent": [
+      +    "copilot"
+      +  ],
+      +  "source": "copy",
+      +  "core": {
+      +    "bundle_sha256": "$SHA256",
+      +    "files": {
+      +      "kit/core/skills/issue/SKILL.md": "$SHA256",
+      +      "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+      +      "kit/core/skills/token-report/SKILL.md": "$SHA256",
+      +      "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+      +    }
+      +  },
+      +  "loop": {
+      +    "installed": true,
+      +    "installed_at": "2026-09-19T12:34:56Z",
+      +    "bundle_sha256": "$SHA256",
+      +    "files": {
+      +      "kit/loop/manifest.json": "$SHA256",
+      +      "kit/loop/rules/background-process.md": "$SHA256",
+      +      "kit/loop/rules/iteration-discipline.md": "$SHA256",
+      +      "kit/loop/rules/output-discipline.md": "$SHA256",
+      +      "kit/loop/rules/secrets-discipline.md": "$SHA256",
+      +      "kit/loop/rules/working-discipline.md": "$SHA256",
+      +      "kit/loop/rules/en/background-process.md": "$SHA256",
+      +      "kit/loop/rules/en/iteration-discipline.md": "$SHA256",
+      +      "kit/loop/rules/en/output-discipline.md": "$SHA256",
+      +      "kit/loop/rules/en/secrets-discipline.md": "$SHA256",
+      +      "kit/loop/rules/en/working-discipline.md": "$SHA256",
+      +      "kit/loop/skills/iterate/SKILL.md": "$SHA256",
+      +      "kit/loop/skills/iterate/en/SKILL.md": "$SHA256",
+      +      "kit/loop/skills/session-handoff/SKILL.md": "$SHA256",
+      +      "kit/loop/skills/session-handoff/en/SKILL.md": "$SHA256"
+      +    },
+      +    "version": 1
+      +  }
+      +}
+dry-run のため何も書いていません。反映は --dry-run を外して再実行
+次に:
+  1. トークンが未登録: looptrack issue login --browser --url http://127.0.0.1:9/im を実行し、開いたブラウザで利用者がログインと承認をする（AI が実行してよい。待ち受けは最長 5 分なので、コマンドのタイムアウトは 5 分より長くする。ブラウザの無い環境は http://127.0.0.1:9/im/account で発行して login --url http://127.0.0.1:9/im に貼る）
+  2. 確認（Copilot）: 新しいセッションで MCP の setup が「導入済み」を返し、guide → next（dry_run）が通る。CLI は MCP に無い操作だけ（AGENTS.md）
+GitHub Copilot の設定（VS Code のエージェントモード・Copilot CLI。Copilot CLI は 2026-09-19 に 1.0.86 の実物で確かめた。VS Code は公式文書で確かめた範囲で、実物では未確認）:
+
+  - AI の操作は MCP のツールが主（AGENTS.md の案内）。MCP の接続は利用者が足す（init は --mcp のときだけ .vscode/mcp.json を書く）:
+      VS Code（.vscode/mcp.json。初回の接続でブラウザの許可）:
+        {"servers": {"looptrack": {"type": "http", "url": "http://127.0.0.1:9/im/mcp", "headers": {"X-Looptrack-Project": "demo"}}}}
+      Copilot CLI（リポジトリの .github/mcp.json か .mcp.json、または ~/.copilot/mcp-config.json。tools は必須。
+      1.0.22 から .vscode/mcp.json は読まない。init は --mcp のときだけ .github/mcp.json を書く。認証は copilot の /mcp auth looptrack）:
+        {"mcpServers": {"looptrack": {"type": "http", "url": "http://127.0.0.1:9/im/mcp", "headers": {"X-Looptrack-Project": "demo"}, "tools": ["*"]}}}
+    Copilot CLI の MCP のツール呼び出しは毎回承認が要る。事前に許すなら copilot --allow-tool='looptrack' で起動する
+  - フック（.github/hooks/looptrack.json）: VS Code は .github/hooks/*.json を既定で読む（Preview の機能。組織の設定で無効のことがある）。
+    Copilot CLI は起動時にこのフォルダを信頼したとき（「今後も信頼」）だけ読む。どちらも新しいセッションから動く。
+    出力は CLI（トップレベル）と VS Code（hookSpecificOutput）の両方の形で出す。VS Code は matcher を無視するので、hook がツール名を見て絞る
+  - Windows: hook は looptrack（PowerShell の powershell / windows のフィールドにも同じ looptrack hook を置いた。Windows の実物では未確認）。
+    導入済みにならなければ looptrack issue installed --agent copilot で知らせる
+  - トークン計測のフック（looptrack hook usage --agent copilot。PostToolUse・Stop・SessionEnd）を入れた。OpenTelemetry のファイル出力を有効にすると計測される
+    （出力先は ${COPILOT_HOME:-~/.copilot}/otel/ の下に置く。Copilot CLI は出力先を hook に渡さない。手順は docs/AI-GUIDE.md §7-3-1）。有効にしていなければ何も送らず、Copilot の操作は未付与に数えない
+  - 鮮度ガード（Stop で止める）は Claude Code だけに配線する
+  - AI が打つ CLI には LOOPTRACK_API_URL / LOOPTRACK_PROJECT が渡らない（Copilot に環境変数の設定が無い）。AGENTS.md で前置を案内した
+
+#### stderr
+
+#### files

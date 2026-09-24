@@ -1,0 +1,34 @@
+{
+  "note": "CLI の sessionEnd（reason）。VS Code に SessionEnd は無い",
+  "args": [
+    "--agent",
+    "copilot",
+    "--event",
+    "sessionEnd"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "sessionId": "cccccccc-dddd-4eee-8fff-000000000001",
+    "timestamp": 1789732800000,
+    "cwd": "/home/dev/work/sample-app",
+    "reason": "complete"
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "SessionEnd",
+    "raw_name": "sessionEnd",
+    "shape": "camelCase",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "reason": "complete"
+  },
+  "result": {},
+  "output": {
+    "stdout": null,
+    "exit_code": 0
+  }
+}

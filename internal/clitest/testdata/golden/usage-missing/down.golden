@@ -1,0 +1,17 @@
+# usage-missing/down
+$ issue usage missing
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: サーバに接続できません（$API）: $REASON
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/coverage?days=30&mine=1
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

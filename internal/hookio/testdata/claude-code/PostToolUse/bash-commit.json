@@ -1,0 +1,68 @@
+{
+  "note": "PostToolUse の Bash（tool_response は stdout・stderr）。handoff-mark の注入",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git commit -m 'IM-0001: 直す'"
+    },
+    "tool_use_id": "toolu_01CCCCCCCCCCCCCCCCCCCCCC",
+    "tool_response": {
+      "stdout": "[main abc1234] IM-0001: 直す\n 1 file changed, 1 insertion(+)",
+      "stderr": "",
+      "interrupted": false,
+      "isImage": false
+    }
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "PostToolUse",
+    "raw_name": "PostToolUse",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Bash",
+      "raw_name": "Bash",
+      "name": "Bash",
+      "use_id": "toolu_01CCCCCCCCCCCCCCCCCCCCCC",
+      "input": {
+        "command": "git commit -m 'IM-0001: 直す'"
+      },
+      "response": {
+        "raw": {
+          "interrupted": false,
+          "isImage": false,
+          "stderr": "",
+          "stdout": "[main abc1234] IM-0001: 直す\n 1 file changed, 1 insertion(+)"
+        },
+        "text": "[main abc1234] IM-0001: 直す\n 1 file changed, 1 insertion(+)"
+      }
+    }
+  },
+  "result": {
+    "context": "作業の完了を検知しました（コミット）。引き継ぎを更新してください"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PostToolUse",
+        "additionalContext": "作業の完了を検知しました（コミット）。引き継ぎを更新してください"
+      }
+    },
+    "exit_code": 0
+  }
+}

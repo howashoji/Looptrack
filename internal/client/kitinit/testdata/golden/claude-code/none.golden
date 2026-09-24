@@ -1,0 +1,158 @@
+# init --project demo --agent claude-code
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI claude-code）
+kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
+配線: looptrack hook <名前> --agent <AI>
+導入セット: core のみ。loop は入れていません（--loop で入る）
+  作成         .claude/settings.json
+  作成         CLAUDE.md
+  作成         .claude/skills/issue/SKILL.md
+  作成         .claude/skills/token-report/SKILL.md
+  作成         .gitignore
+  作成         .claude/.looptrack-kit.json
+verify: 配線 7 件・looptrack dev（headless・test） を確かめました
+次に:
+  1. Claude Code を再起動する（env とフックの反映）。フック・設定の確認を求められたら内容を見て承認する（デスクトップ版は確認を出さずに読み込む）
+  2. トークンが未登録: looptrack issue login --browser --url http://127.0.0.1:9/im を実行し、開いたブラウザで利用者がログインと承認をする（AI が実行してよい。待ち受けは最長 5 分なので、コマンドのタイムアウトは 5 分より長くする。ブラウザの無い環境は http://127.0.0.1:9/im/account で発行して login --url http://127.0.0.1:9/im に貼る）
+  3. 確認: looptrack issue config → guide → next --dry-run
+
+#### stderr
+
+#### files
+.claude/.looptrack-kit.json (0644)
+    {
+      "version": 1,
+      "url": "http://127.0.0.1:9/im",
+      "project": "demo",
+      "agent": [
+        "claude-code"
+      ],
+      "source": "copy",
+      "core": {
+        "bundle_sha256": "$SHA256",
+        "files": {
+          "kit/core/skills/issue/SKILL.md": "$SHA256",
+          "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+        }
+      },
+      "loop": {
+        "installed": false
+      }
+    }
+.claude/settings.json (0644)
+    {
+      "env": {
+        "LOOPTRACK_API_URL": "http://127.0.0.1:9/im",
+        "LOOPTRACK_PROJECT": "demo"
+      },
+      "hooks": {
+        "SessionStart": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook summary --agent claude-code",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-freshness-mark --agent claude-code",
+                "timeout": 5
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Bash|Read|Edit|Write|NotebookEdit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-freshness-mark --agent claude-code",
+                "timeout": 5
+              }
+            ]
+          },
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-freshness-check --agent claude-code",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "SessionEnd": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              }
+            ]
+          }
+        ]
+      },
+      "permissions": {
+        "allow": [
+          "Bash(looptrack issue:*)"
+        ]
+      }
+    }
+.claude/skills/issue/SKILL.md (0644) = kit kit/core/skills/issue/SKILL.md
+.claude/skills/token-report/SKILL.md (0644) = kit kit/core/skills/token-report/SKILL.md
+.gitignore (0644)
+    .claude/.looptrack-freshness/
+CLAUDE.md (0644)
+    <!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
+    ## 課題管理（イシュー管理サーバ）
+
+    **作業はイシュー登録から始める。会話だけで進めない。不具合は発覚と同時に起票する。**
+
+    （この節は Claude Code 向け。GitHub Copilot・Codex はこの節ではなく AGENTS.md の「課題管理」節に従う。AGENTS.md に無ければ MCP の looptrack の `setup` ツールから始める。
+    GitHub Copilot の CLI と VS Code は CLAUDE.md も読むため）
+
+    - 操作: `looptrack issue`（API モード。`.claude/settings.json` の `env` に `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT=demo`）。skill は `/issue`
+    - **使い方とルールは `looptrack issue guide` で読む**（共通規則 + このプロジェクトのルール + 運用文書を 1 回で返す。MCP なら `guide` ツール）
+    - ループ運用の 1 周: `looptrack issue next`（着手）→ 作業 → `looptrack issue comment <ID> "…"`（分かった時点で記録）→ 受け入れ条件を検証 → `looptrack issue close <ID> --comment "検証結果"` → 次の `next`
+    - 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
+
+    イシューはサーバ（DB）が正本で、ローカルにファイルは無い。したがって:
+
+    - **初回だけ** `looptrack issue login --browser --url http://127.0.0.1:9/im`（開いたブラウザで利用者がログインと承認をする。トークンは会話に出ず、以後は自動で更新される。ブラウザの無い環境は http://127.0.0.1:9/im/account で発行して `login --url http://127.0.0.1:9/im` に貼る）
+    - 本文の編集は `looptrack issue edit <ID>` → `.claude/.looptrack-work/<ID>.md` を Read / Edit → `looptrack issue push <ID>`
+    - イシューについて git の pull / commit / push は不要
+    - 採番・クローズ済みの不変・プロジェクト別ルールはサーバが強制する。拒否されたらメッセージの指示に従う
+    - `--traces` はイシュー ID 専用、`--refs` は文書 ID（`FR-`/`NFR-`/`UC-`/`ISS-`/`DEC-`）専用
+    - 本文・コメントをシェル経由で渡すときはクォート付きヒアドキュメント（`<<'EOF'`）で囲む
+    <!-- looptrack:end -->

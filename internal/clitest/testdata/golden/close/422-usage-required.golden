@@ -1,0 +1,24 @@
+# close/422-usage-required
+$ issue close DEMO-0001
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: AI の Done にはトークン情報が要ります（usage attach DEMO-0001）
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/status?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "comment": "",
+      "override_reason": "",
+      "status": "Done"
+    }
+
+#### files (0)

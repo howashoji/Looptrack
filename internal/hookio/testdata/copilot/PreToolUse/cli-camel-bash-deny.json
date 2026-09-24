@@ -1,0 +1,53 @@
+{
+  "note": "CLI の preToolUse（toolArgs は JSON の文字列）。deny はトップレベルと hookSpecificOutput の両方",
+  "args": [
+    "--agent",
+    "copilot",
+    "--event",
+    "preToolUse"
+  ],
+  "env": {
+    "LOOPTRACK_LOOP_AGENT": "copilot"
+  },
+  "git_root": "/home/dev/work/sample-app",
+  "input": {
+    "sessionId": "cccccccc-dddd-4eee-8fff-000000000001",
+    "timestamp": 1789732800000,
+    "cwd": "/home/dev/work/sample-app",
+    "toolName": "bash",
+    "toolArgs": "{\"command\":\"rm -rf build\",\"description\":\"clean\"}"
+  },
+  "event": {
+    "agent": "copilot",
+    "name": "PreToolUse",
+    "raw_name": "preToolUse",
+    "shape": "camelCase",
+    "session_id": "cccccccc-dddd-4eee-8fff-000000000001",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Bash",
+      "raw_name": "bash",
+      "name": "bash",
+      "input": {
+        "command": "rm -rf build",
+        "description": "clean"
+      }
+    }
+  },
+  "result": {
+    "deny": "消す前に確認"
+  },
+  "output": {
+    "stdout": {
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "消す前に確認",
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "消す前に確認"
+      }
+    },
+    "exit_code": 0
+  }
+}

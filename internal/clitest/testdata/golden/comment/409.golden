@@ -1,0 +1,23 @@
+# comment/409
+$ issue comment DEMO-0001 '原因が分かった。
+設定の読み込み順。'
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: DEMO-0001 は他の操作で Done になっています
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/comments?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "text": "原因が分かった。\n設定の読み込み順。"
+    }
+
+#### files (0)

@@ -1,0 +1,18 @@
+# summary/no-api
+$ issue summary
+env LOOPTRACK_API_URL=
+env LOOPTRACK_PROJECT=
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシュー管理サーバの URL（環境変数 LOOPTRACK_API_URL）がありません（CLAUDE_PROJECT_DIR: $TMP/ws）
+全プロジェクトはイシュー管理サーバで管理しています。環境変数 LOOPTRACK_API_URL と LOOPTRACK_PROJECT を付けて実行してください:
+  LOOPTRACK_API_URL=<サーバの URL> LOOPTRACK_PROJECT=<プロジェクト> looptrack issue summary
+（サーバの URL は MCP の接続設定の URL から末尾の /mcp を除いたもの。プロジェクトの slug はプロジェクトの .claude/settings.json の env か CLAUDE.md の「課題管理」節にあります）
+
+#### requests (0)
+
+#### files (0)

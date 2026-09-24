@@ -1,0 +1,23 @@
+# usage-report-period/ok
+$ issue usage report --from 2024-04-01 --to '2024-04-30 09:30'
+
+#### exit 0
+
+#### stdout
+# トークン消費レポート（demo）
+
+期間: 2024-04-01 〜 2024-05-01
+
+| イシュー | トークン |
+| -- | --: |
+| DEMO-0001 | 123,456 |
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/usage/report?format=md&from=2024-04-01&to=2024-04-30+09%3A30
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

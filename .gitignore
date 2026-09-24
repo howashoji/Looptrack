@@ -1,0 +1,16 @@
+.DS_Store
+
+# Go のビルド成果物
+/bin/
+/looptrack
+
+# 鮮度ガードの状態
+.claude/.looptrack-freshness/
+.claude/memories
+
+# セッションの状態・作業ツリー
+.claude/session-scope/
+.claude/task-mode.d/
+.claude/handoff-pending.d/
+.claude/worktrees/
+.claude/.looptrack-work/

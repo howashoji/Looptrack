@@ -1,0 +1,13 @@
+# usage-ledger-add/bad-report
+$ issue usage ledger add 名前 --from-report missing.json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --from-report を読めません（looptrack issue usage report --json の出力を渡してください）: [Errno 2] No such file or directory: 'missing.json'
+
+#### requests (0)
+
+#### files (0)

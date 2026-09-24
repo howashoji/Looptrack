@@ -1,0 +1,35 @@
+# ローカル開発・統合テスト用の MySQL（CI の service と同じ 8.4）。
+#
+#   docker compose -f deploy/dev/compose.yaml up -d
+#   LOOPTRACK_TEST_DSN='root:imdev@tcp(127.0.0.1:13306)/?parseTime=true' go test ./...
+#
+# 127.0.0.1 にだけ公開する。パスワードはこのローカル用コンテナ専用（本番では使わない）。
+name: im-dev
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: im-dev-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${LOOPTRACK_DEV_MYSQL_ROOT_PASSWORD:-imdev}
+      TZ: Asia/Tokyo
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --skip-name-resolve
+      - --performance-schema=OFF
+      - --innodb-buffer-pool-size=128M
+      - --skip-log-bin
+    ports:
+      - "127.0.0.1:13306:3306"
+    volumes:
+      - im-dev-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  im-dev-mysql:

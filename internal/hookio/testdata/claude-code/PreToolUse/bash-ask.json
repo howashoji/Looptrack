@@ -1,0 +1,56 @@
+{
+  "note": "PreToolUse の Bash で利用者に確認（pre-tool-scope-guard の permissionDecision: ask）",
+  "args": [
+    "--agent",
+    "claude-code"
+  ],
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_PROJECT_DIR": "/home/dev/work/sample-app"
+  },
+  "input": {
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git -C /home/dev/work/other-app commit -m x",
+      "description": "commit"
+    },
+    "tool_use_id": "toolu_01BBBBBBBBBBBBBBBBBBBBBB"
+  },
+  "event": {
+    "agent": "claude-code",
+    "name": "PreToolUse",
+    "raw_name": "PreToolUse",
+    "shape": "snake_case",
+    "session_id": "11111111-2222-4333-8444-555555555555",
+    "transcript_path": "/home/dev/.claude/projects/-home-dev-work-sample-app/11111111-2222-4333-8444-555555555555.jsonl",
+    "cwd": "/home/dev/work/sample-app",
+    "project_dir": "/home/dev/work/sample-app",
+    "tool": {
+      "kind": "Bash",
+      "raw_name": "Bash",
+      "name": "Bash",
+      "use_id": "toolu_01BBBBBBBBBBBBBBBBBBBBBB",
+      "input": {
+        "command": "git -C /home/dev/work/other-app commit -m x",
+        "description": "commit"
+      }
+    }
+  },
+  "result": {
+    "ask": "[作業の範囲] 別のプロジェクト（/home/dev/work/other-app）の変更です"
+  },
+  "output": {
+    "stdout": {
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "ask",
+        "permissionDecisionReason": "[作業の範囲] 別のプロジェクト（/home/dev/work/other-app）の変更です"
+      }
+    },
+    "exit_code": 0
+  }
+}

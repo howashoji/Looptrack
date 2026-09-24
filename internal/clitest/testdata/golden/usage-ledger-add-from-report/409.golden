@@ -1,0 +1,50 @@
+# usage-ledger-add-from-report/409
+$ issue usage ledger add '2024-04 月次' --from-report report.json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: DEMO-0001 は他の操作で Done になっています
+
+#### requests (1)
+POST /im/api/v1/projects/demo/usage/ledger
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "data_end": "2024-04-30T12:00:00Z",
+      "excluded_conversations": [
+        "c-1"
+      ],
+      "from": "2024-04-01T00:00:00Z",
+      "name": "2024-04 月次",
+      "request_id": 7,
+      "to": "2024-05-01T00:00:00Z",
+      "total_tokens": 123456
+    }
+
+#### files (1)
+ws/report.json (0644)
+    {
+      "data_end": "2024-04-30T12:00:00Z",
+      "excluded_conversations": [
+        "c-1"
+      ],
+      "from": "2024-04-01T00:00:00Z",
+      "issues": [
+        {
+          "id": "DEMO-0001",
+          "tokens": 123456
+        }
+      ],
+      "project": "demo",
+      "request": {
+        "id": 7
+      },
+      "to": "2024-05-01T00:00:00Z",
+      "total_tokens": 123456
+    }

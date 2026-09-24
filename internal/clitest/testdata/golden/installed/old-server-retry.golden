@@ -1,0 +1,66 @@
+# installed/old-server-retry
+$ issue installed --agent claude-code
+
+#### exit 0
+
+#### stdout
+導入済み（最新）
+
+#### stderr
+
+#### requests (2)
+POST /im/api/v1/projects/demo/install
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "agent": "claude-code",
+      "client": {
+        "arch": "$GOARCH",
+        "os": "$GOOS",
+        "version": "$VERSION"
+      },
+      "core": {
+        "bundle_sha256": "c0ffee"
+      },
+      "files": {},
+      "host": "$HOST",
+      "loop": {
+        "bundle_sha256": "beef",
+        "declined": false,
+        "installed": true,
+        "version": "1.2.0"
+      },
+      "source": "",
+      "trigger": "manual",
+      "workspace": "ws"
+    }
+POST /im/api/v1/projects/demo/install
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "agent": "claude-code",
+      "files": {},
+      "host": "$HOST",
+      "source": "",
+      "trigger": "manual",
+      "workspace": "ws"
+    }
+
+#### files (1)
+ws/.claude/.looptrack-kit.json (0644)
+    {
+      "core": {
+        "bundle_sha256": "c0ffee"
+      },
+      "loop": {
+        "bundle_sha256": "beef",
+        "installed": true,
+        "version": "1.2.0"
+      }
+    }

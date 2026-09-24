@@ -1,0 +1,13 @@
+# push/no-work-copy
+$ issue push DEMO-0001
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: DEMO-0001 の作業コピーがありません。先に looptrack issue edit DEMO-0001 を実行してください
+
+#### requests (0)
+
+#### files (0)

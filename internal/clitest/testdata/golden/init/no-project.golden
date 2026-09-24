@@ -1,0 +1,14 @@
+# init/no-project
+$ issue init
+env LOOPTRACK_PROJECT=
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --project にプロジェクトの slug（英小文字・数字・ハイフン。例 web-app）を指定してください
+
+#### requests (0)
+
+#### files (0)

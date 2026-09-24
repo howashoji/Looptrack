@@ -1,0 +1,20 @@
+# export/ok
+$ issue export --xlsx out/issues.xlsx --status Todo --all
+
+#### exit 0
+
+#### stdout
+書き出し: $TMP/ws/out/issues.xlsx（3 件）
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/projects/demo/issues.xlsx?all=1&sort=priority&status=Todo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (2)
+ws/out/.keep (0644)
+ws/out/issues.xlsx (0644)
+    (バイナリ 18 バイト sha256=20edd8a5f6bc043dc690d51692a2a5d6cb03c66a89267f04c1724ff3bfe14bce)

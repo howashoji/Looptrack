@@ -1,0 +1,85 @@
+# push/rebase-without-conflict
+$ issue push DEMO-0001 --rebase
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --rebase は競合した push の後にだけ使えます（取り込むべき最新版がありません）
+
+#### requests (0)
+
+#### files (3)
+ws/.claude/.looptrack-work/DEMO-0001.base.md (0644)
+    ---
+    id: DEMO-0001
+    title: ログイン画面を作る
+    type: task
+    status: In Progress
+    assignee: alice
+    priority: P1
+    labels: []
+    parent: ""
+    blocked_by: []
+    traces: []
+    refs: []
+    created: 2024-05-01 10:00
+    updated: 2024-05-02 11:30
+    ---
+
+    # DEMO-0001 ログイン画面を作る
+
+    ## 内容
+
+    ログイン画面を作る。
+
+    ## 受け入れ条件
+
+    - [ ] ID とパスワードでログインできる
+
+    ## コメント
+
+    ### 2024-05-02 11:30
+
+    着手。
+ws/.claude/.looptrack-work/DEMO-0001.json (0644)
+    {
+      "id": "DEMO-0001",
+      "project": "demo",
+      "version": 3
+    }
+ws/.claude/.looptrack-work/DEMO-0001.md (0644)
+    ---
+    id: DEMO-0001
+    title: ログイン画面を作る
+    type: task
+    status: In Progress
+    assignee: alice
+    priority: P1
+    labels: []
+    parent: ""
+    blocked_by: []
+    traces: []
+    refs: []
+    created: 2024-05-01 10:00
+    updated: 2024-05-02 11:30
+    ---
+
+    # DEMO-0001 ログイン画面を作る
+
+    ## 内容
+
+    ログイン画面を作る。
+
+    ## 受け入れ条件
+
+    - [ ] ID とパスワードでログインできる
+
+    ## コメント
+
+    ### 2024-05-02 11:30
+
+    着手。
+
+    追記した行。

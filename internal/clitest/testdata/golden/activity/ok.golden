@@ -1,0 +1,18 @@
+# activity/ok
+$ issue activity DEMO-0001 DEMO-0002 --since 1714600000.25
+
+#### exit 0
+
+#### stdout
+DEMO-0001 2024-05-02 11:30:00 comment  以降の更新 2 件
+DEMO-0002 2024-05-01 10:00:00 create   以降の更新 0 件
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/activity?ids=DEMO-0001%2CDEMO-0002&since=1714600000.25
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

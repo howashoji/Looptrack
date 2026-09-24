@@ -1,0 +1,66 @@
+{{define "admin_user.html"}}{{template "head" (headData .Lang (T .Lang "server.web.admin_user.title"))}}
+{{template "nav" .}}
+<main class="wide">
+  <p><a href="{{base}}/admin/users">{{T .Lang "server.web.admin_user.back"}}</a></p>
+  <h1>{{.Target.Login}}{{if .Target.DisplayName}}{{T .Lang "server.web.admin_user.display_name" "name" .Target.DisplayName}}{{end}}</h1>
+  <p class="muted">{{T .Lang "server.web.admin_user.role" "role" .Target.Role}}{{T .Lang "server.web.admin_user.sep"}}{{T .Lang "server.web.admin_user.totp"}}{{if .Target.TOTPEnabled}}{{T .Lang "server.web.admin_users.totp_on"}}{{else}}{{T .Lang "server.web.admin_users.totp_off"}}{{end}}{{T .Lang "server.web.admin_user.sep"}}{{if .Target.Disabled}}<strong>{{T .Lang "server.web.admin_users.state_disabled"}}</strong>{{else}}{{T .Lang "server.web.admin_users.state_enabled"}}{{end}}{{T .Lang "server.web.admin_user.sep"}}{{T .Lang "server.web.admin_user.last_login"}}{{.LastLogin}}</p>
+  {{template "messages" .}}
+  {{template "replacement" .}}
+  {{$act := printf "%s/admin/users/%s" base .Target.Login}}
+
+  <section class="panel">
+    <h2>{{T .Lang "server.web.admin_user.account_h2"}}</h2>
+    {{if .Self}}
+    <p class="muted">{{T .Lang "server.web.admin_user.self_before"}}<a href="{{base}}/account">{{T .Lang "server.web.common.account_settings"}}</a>{{T .Lang "server.web.admin_user.self_after"}}</p>
+    {{else}}
+    <form method="post" action="{{$act}}/role" class="row">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.admin_users.role"}}<select name="role">
+        <option value="member"{{if eq .Target.Role "member"}} selected{{end}}>member</option>
+        <option value="admin"{{if eq .Target.Role "admin"}} selected{{end}}>admin</option>
+      </select></label>
+      <button type="submit">{{T .Lang "server.web.admin_user.role_submit"}}</button>
+    </form>
+    <div class="row">
+      {{if .Target.Disabled}}
+      <form method="post" action="{{$act}}/enable"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit">{{T .Lang "server.web.admin_user.enable"}}</button></form>
+      {{else}}
+      <form method="post" action="{{$act}}/disable"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="danger">{{T .Lang "server.web.admin_user.disable"}}</button></form>
+      {{end}}
+      <form method="post" action="{{$act}}/totp-reset"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="danger">{{T .Lang "server.web.admin_user.totp_reset"}}</button></form>
+    </div>
+    <form method="post" action="{{$act}}/password" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.account.new_password" "n" .MinPassword}}<input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <label>{{T .Lang "server.web.account.new_password_confirm"}}<input type="password" name="confirm" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <button type="submit">{{T .Lang "server.web.admin_user.password_submit"}}</button>
+    </form>
+    {{end}}
+  </section>
+
+  <section class="panel">
+    <h2>{{T .Lang "server.web.admin_user.projects_h2"}}</h2>
+    {{if eq .Target.Role "admin"}}<p class="muted">{{T .Lang "server.web.admin_user.admin_note"}}</p>{{end}}
+    <p class="muted">{{T .Lang "server.web.admin_user.projects_link_before"}}<a href="{{base}}/admin/projects">{{T .Lang "server.web.common.admin_projects"}}</a>{{T .Lang "server.web.admin_user.projects_link_after"}}</p>
+    <table class="list">
+      <thead><tr><th>{{T .Lang "server.web.admin_user.th_project"}}</th><th>{{T .Lang "server.web.admin_user.th_role"}}</th></tr></thead>
+      <tbody>
+      {{range .Projects}}
+      <tr><td>{{.Name}} <span class="muted">{{.Slug}}</span></td>
+        <td><form method="post" action="{{$act}}/member" class="row tight">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.Slug}}">
+          <select name="role"><option value=""{{if eq .Role ""}} selected{{end}}>{{T $.Lang "server.web.admin_user.role_none"}}</option>{{$cur := .Role}}{{range $.MemberRoles}}<option value="{{.}}"{{if eq . $cur}} selected{{end}}>{{.}}</option>{{end}}</select>
+          <button type="submit" class="small">{{T $.Lang "server.web.admin_user.member_submit"}}</button>
+        </form></td></tr>
+      {{end}}
+      </tbody>
+    </table>
+    <p class="muted">{{T .Lang "server.web.admin.roles_note"}}</p>
+  </section>
+
+  <section class="panel">
+    <h2>{{T .Lang "server.web.account.tokens_h2"}}</h2>
+    {{template "tokens" .}}
+  </section>
+</main>
+{{template "foot"}}{{end}}

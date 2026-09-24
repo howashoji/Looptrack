@@ -1,0 +1,86 @@
+# usage-show/ok-json
+$ issue usage show DEMO-0001 --json
+
+#### exit 0
+
+#### stdout
+{
+  "issue": "DEMO-0001",
+  "total_tokens": 123456,
+  "stage_count": 2,
+  "inconsistent": 1,
+  "excluded_total": {
+    "main": {
+      "input": 10,
+      "cache_create": 0,
+      "cache_read": 0,
+      "output": 5
+    },
+    "sub": {
+      "input": 0,
+      "cache_create": 0,
+      "cache_read": 0,
+      "output": 0
+    }
+  },
+  "stages": [
+    {
+      "id": 11,
+      "at": "2024-05-02T02:30:00Z",
+      "trigger": "manual",
+      "op": null,
+      "client": "claude-code",
+      "excluded": true,
+      "inconsistent": false,
+      "delta_total": 100000,
+      "delta": {
+        "main": {
+          "input": 50000,
+          "cache_create": 10000,
+          "cache_read": 30000,
+          "output": 5000
+        },
+        "sub": {
+          "input": 4000,
+          "cache_create": 0,
+          "cache_read": 0,
+          "output": 1000
+        }
+      }
+    },
+    {
+      "id": 12,
+      "at": "2024-05-02T03:00:00.5Z",
+      "trigger": "issue_op",
+      "op": "status",
+      "client": "codex",
+      "excluded": false,
+      "inconsistent": true,
+      "delta_total": 23456,
+      "delta": {
+        "main": {
+          "input": 20000,
+          "cache_create": 0,
+          "cache_read": 3000,
+          "output": 456
+        },
+        "sub": {
+          "input": 0,
+          "cache_create": 0,
+          "cache_read": 0,
+          "output": 0
+        }
+      }
+    }
+  ]
+}
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001/usage?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

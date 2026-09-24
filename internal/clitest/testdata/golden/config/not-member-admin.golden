@@ -1,0 +1,26 @@
+# config/not-member-admin
+$ issue config
+
+#### exit 0
+
+#### stdout
+モード: API（$API）
+プロジェクト: demo（デモ・DEMO-0000・権限 admin）
+注意: このプロジェクトには参加していません（管理者権限で操作します。参加は画面のプロジェクト管理で）
+利用者: alice
+トークン: 環境変数 LOOPTRACK_TOKEN
+導入セット: 不明（.claude/.looptrack-kit.json がありません。looptrack issue init で作られます）
+
+#### stderr
+
+#### requests (2)
+GET /im/api/v1/projects/demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+GET /im/api/v1/me
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

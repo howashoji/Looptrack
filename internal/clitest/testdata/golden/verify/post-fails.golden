@@ -1,0 +1,41 @@
+# verify/post-fails
+$ issue verify DEMO-0001
+
+#### exit 1
+
+#### stdout
+DEMO-0001 の検証コマンド 1 件を実行します（場所: $TMP/ws・本文 01234567）
+[1/1] $ echo ok
+[1/1] ok      echo ok（$SEC 秒）
+結果: 1/1 成功（$SEC 秒）
+
+#### stderr
+エラー: verify の記録を送れませんでした: DEMO-0001 の本文が変わりました。verify をやり直してください（looptrack issue verify DEMO-0001）
+
+#### requests (2)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+POST /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "body_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "host": "$HOST",
+      "results": [
+        {
+          "command": "echo ok",
+          "duration_ms": 0,
+          "exit_code": 0,
+          "output_tail": "ok\n",
+          "status": "ok"
+        }
+      ],
+      "workspace": "ws"
+    }
+
+#### files (0)

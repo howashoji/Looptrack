@@ -1,0 +1,364 @@
+# init --project demo --agent codex --loop の後に init --remove-loop --dry-run
+
+#### exit 0
+
+#### stdout
+init --remove-loop: $TMP/ws（dry-run）
+  削除         .claude/rules/looptrack-loop/background-process.md
+  削除         .claude/rules/looptrack-loop/en/background-process.md
+  削除         .claude/rules/looptrack-loop/en/iteration-discipline.md
+  削除         .claude/rules/looptrack-loop/en/output-discipline.md
+  削除         .claude/rules/looptrack-loop/en/secrets-discipline.md
+  削除         .claude/rules/looptrack-loop/en/working-discipline.md
+  削除         .claude/rules/looptrack-loop/iteration-discipline.md
+  削除         .claude/rules/looptrack-loop/output-discipline.md
+  削除         .claude/rules/looptrack-loop/secrets-discipline.md
+  削除         .claude/rules/looptrack-loop/working-discipline.md
+  削除         .claude/skills/iterate/SKILL.md
+  削除         .claude/skills/session-handoff/SKILL.md
+  更新         .codex/hooks.json
+      --- a/.codex/hooks.json
+      +++ b/.codex/hooks.json
+      @@ -6,26 +6,6 @@
+                 {
+                   "type": "command",
+                   "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent codex",
+      -            "timeout": 10
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook session-start-rules --agent codex",
+      -            "timeout": 5
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook session-start-memories --agent codex",
+      -            "timeout": 5
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook session-start-iteration --agent codex",
+      -            "timeout": 10
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook session-start-worktrees --agent codex",
+                   "timeout": 10
+                 }
+               ]
+      @@ -41,15 +21,6 @@
+                   "timeout": 10
+                 }
+               ]
+      -      },
+      -      {
+      -        "hooks": [
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook post-work-complete-handoff-mark --agent codex",
+      -            "timeout": 5
+      -          }
+      -        ]
+             }
+           ],
+           "Stop": [
+      @@ -59,16 +30,6 @@
+                   "type": "command",
+                   "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                   "timeout": 10
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook stop-handoff-freshness --agent codex --no-block",
+      -            "timeout": 10
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook stop-runaway-background-process --agent codex --no-block",
+      -            "timeout": 5
+                 }
+               ]
+             }
+      @@ -83,32 +44,6 @@
+                 }
+               ]
+             }
+      -    ],
+      -    "UserPromptSubmit": [
+      -      {
+      -        "hooks": [
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook user-prompt-rules --agent codex",
+      -            "timeout": 5
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook user-prompt-task-mode --agent codex",
+      -            "timeout": 5
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook session-scope-guard --agent codex",
+      -            "timeout": 10
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook user-prompt-stale-base --agent codex",
+      -            "timeout": 5
+      -          }
+      -        ]
+      -      }
+           ]
+         }
+       }
+  更新         AGENTS.md
+      --- a/AGENTS.md
+      +++ b/AGENTS.md
+      @@ -21,195 +21,3 @@
+         利用者に `~/.codex/config.toml` への `[mcp_servers.looptrack]` の追加を勧める）。本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡す
+       - 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
+       <!-- looptrack:end -->
+      -
+      -<!-- looptrack:loop:begin -->
+（loop 節: kit/loop の rules・skill から組み立てた本文）
+<!-- looptrack:loop:end -->
+  更新         .claude/.looptrack-kit.json
+      --- a/.claude/.looptrack-kit.json
+      +++ b/.claude/.looptrack-kit.json
+      @@ -16,26 +16,8 @@
+           }
+         },
+         "loop": {
+      -    "installed": true,
+      -    "installed_at": "2026-09-19T12:34:56Z",
+      -    "bundle_sha256": "$SHA256",
+      -    "files": {
+      -      "kit/loop/manifest.json": "$SHA256",
+      -      "kit/loop/rules/background-process.md": "$SHA256",
+      -      "kit/loop/rules/iteration-discipline.md": "$SHA256",
+      -      "kit/loop/rules/output-discipline.md": "$SHA256",
+      -      "kit/loop/rules/secrets-discipline.md": "$SHA256",
+      -      "kit/loop/rules/working-discipline.md": "$SHA256",
+      -      "kit/loop/rules/en/background-process.md": "$SHA256",
+      -      "kit/loop/rules/en/iteration-discipline.md": "$SHA256",
+      -      "kit/loop/rules/en/output-discipline.md": "$SHA256",
+      -      "kit/loop/rules/en/secrets-discipline.md": "$SHA256",
+      -      "kit/loop/rules/en/working-discipline.md": "$SHA256",
+      -      "kit/loop/skills/iterate/SKILL.md": "$SHA256",
+      -      "kit/loop/skills/iterate/en/SKILL.md": "$SHA256",
+      -      "kit/loop/skills/session-handoff/SKILL.md": "$SHA256",
+      -      "kit/loop/skills/session-handoff/en/SKILL.md": "$SHA256"
+      -    },
+      -    "version": 1
+      +    "installed": false,
+      +    "removed_at": "2026-09-19T12:34:56Z",
+      +    "declined_at": "2026-09-19T12:34:56Z"
+         }
+       }
+dry-run のため何も書いていません。反映は --dry-run を外して再実行
+
+#### stderr
+
+#### files
+.claude/.looptrack-kit.json (0644)
+    {
+      "version": 1,
+      "url": "http://127.0.0.1:9/im",
+      "project": "demo",
+      "agent": [
+        "codex"
+      ],
+      "source": "copy",
+      "core": {
+        "bundle_sha256": "$SHA256",
+        "files": {
+          "kit/core/skills/issue/SKILL.md": "$SHA256",
+          "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+        }
+      },
+      "loop": {
+        "installed": true,
+        "installed_at": "2026-09-19T12:34:56Z",
+        "bundle_sha256": "$SHA256",
+        "files": {
+          "kit/loop/manifest.json": "$SHA256",
+          "kit/loop/rules/background-process.md": "$SHA256",
+          "kit/loop/rules/iteration-discipline.md": "$SHA256",
+          "kit/loop/rules/output-discipline.md": "$SHA256",
+          "kit/loop/rules/secrets-discipline.md": "$SHA256",
+          "kit/loop/rules/working-discipline.md": "$SHA256",
+          "kit/loop/rules/en/background-process.md": "$SHA256",
+          "kit/loop/rules/en/iteration-discipline.md": "$SHA256",
+          "kit/loop/rules/en/output-discipline.md": "$SHA256",
+          "kit/loop/rules/en/secrets-discipline.md": "$SHA256",
+          "kit/loop/rules/en/working-discipline.md": "$SHA256",
+          "kit/loop/skills/iterate/SKILL.md": "$SHA256",
+          "kit/loop/skills/iterate/en/SKILL.md": "$SHA256",
+          "kit/loop/skills/session-handoff/SKILL.md": "$SHA256",
+          "kit/loop/skills/session-handoff/en/SKILL.md": "$SHA256"
+        },
+        "version": 1
+      }
+    }
+.claude/rules/looptrack-loop/background-process.md (0644) = kit kit/loop/rules/background-process.md
+.claude/rules/looptrack-loop/en/background-process.md (0644) = kit kit/loop/rules/en/background-process.md
+.claude/rules/looptrack-loop/en/iteration-discipline.md (0644) = kit kit/loop/rules/en/iteration-discipline.md
+.claude/rules/looptrack-loop/en/output-discipline.md (0644) = kit kit/loop/rules/en/output-discipline.md
+.claude/rules/looptrack-loop/en/secrets-discipline.md (0644) = kit kit/loop/rules/en/secrets-discipline.md
+.claude/rules/looptrack-loop/en/working-discipline.md (0644) = kit kit/loop/rules/en/working-discipline.md
+.claude/rules/looptrack-loop/iteration-discipline.md (0644) = kit kit/loop/rules/iteration-discipline.md
+.claude/rules/looptrack-loop/output-discipline.md (0644) = kit kit/loop/rules/output-discipline.md
+.claude/rules/looptrack-loop/secrets-discipline.md (0644) = kit kit/loop/rules/secrets-discipline.md
+.claude/rules/looptrack-loop/working-discipline.md (0644) = kit kit/loop/rules/working-discipline.md
+.claude/skills/iterate/SKILL.md (0644) = kit kit/loop/skills/iterate/SKILL.md
+.claude/skills/session-handoff/SKILL.md (0644) = kit kit/loop/skills/session-handoff/SKILL.md
+.codex/config.toml (0644)
+    # looptrack issue init が足した: AI が打つ looptrack issue にイシュー管理サーバの場所を渡す（サンドボックスのネットワークの許可ではない）
+    [shell_environment_policy]
+    set = { LOOPTRACK_API_URL = "http://127.0.0.1:9/im", LOOPTRACK_PROJECT = "demo" }
+.codex/hooks.json (0644)
+    {
+      "hooks": {
+        "SessionStart": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook session-start-rules --agent codex",
+                "timeout": 5
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook session-start-memories --agent codex",
+                "timeout": 5
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook session-start-iteration --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook session-start-worktrees --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              }
+            ]
+          },
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook post-work-complete-handoff-mark --agent codex",
+                "timeout": 5
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook stop-handoff-freshness --agent codex --no-block",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook stop-runaway-background-process --agent codex --no-block",
+                "timeout": 5
+              }
+            ]
+          }
+        ],
+        "SessionEnd": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook user-prompt-rules --agent codex",
+                "timeout": 5
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook user-prompt-task-mode --agent codex",
+                "timeout": 5
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook session-scope-guard --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook user-prompt-stale-base --agent codex",
+                "timeout": 5
+              }
+            ]
+          }
+        ]
+      }
+    }
+AGENTS.md (0644)
+    <!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
+    ## 課題管理（イシュー管理サーバ）
+
+    **作業はイシュー登録から始める。会話だけで進めない。不具合は発覚と同時に起票する。**
+
+    - **操作は MCP のツール（サーバ名 looptrack）で行う。** Codex のサンドボックスはシェルのコマンドの外部通信を止めるので、
+      CLI（`looptrack issue`）は実行のたびに権限の昇格（利用者の承認）が要る。MCP のツールの通信はサンドボックスに止められない
+    - **使い方とルールは最初に `guide` ツールで読む**（共通規則 + このプロジェクトのルール + 運用文書を 1 回で返す）
+    - ループ運用の 1 周: `next`（着手）→ 作業 → `add_comment`（分かった時点で記録）→ 受け入れ条件を検証 → `set_status` で Done（`comment` に検証結果）→ 次の `next`。
+      起票は `create_issue`、本文の編集は `get_issue` で version と全文を取り `update_issue` に直した全文を渡す。拒否されたらメッセージの指示に従う
+    - 検証コマンド（本文の「## 検証コマンド」節）: `verify_issue` で一覧を取り、手元のシェルで順に全部実行して、結果を `report_verify` で送る
+    - トークン情報: MCP で起票・コメント・状態変更をすると、フック（`.codex/hooks.json` の `looptrack hook usage`）が数秒後にイシューへ付ける。
+      Done の前に `add_comment` で経過を残しておけば、規則 usage（AI の Done にトークン情報を求める）に拒否されない
+    - CLI は MCP に無い操作だけに使う。権限を上げて実行し、利用者の承認を得る（環境変数 `LOOPTRACK_API_URL=http://127.0.0.1:9/im` / `LOOPTRACK_PROJECT=demo` は init が `.codex/config.toml` に書いた。
+      `looptrack issue config` がサーバの URL が無いというエラーで止まるなら、コマンドの前に `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` を付ける）:
+      - `looptrack issue usage attach <ID>`: ツールの結果にこのコマンドが示されたとき（目印は文面ではなくコマンド。サーバの文面は利用者の言語で変わる）。`set_status` が規則 usage で拒否されたときは、
+        数秒おいて 1 回やり直し（フックの送信が間に合っていないことがある）、それでも拒否されたら付けてからやり直す
+      - `looptrack issue login --browser --url http://127.0.0.1:9/im`: 初回だけ（フックが使うトークン。開いたブラウザで利用者がログインと承認をする。トークンは会話に出ない）
+      - 導入・更新（`init`・`installed`）: `setup` ツールが返す手順どおり
+    - MCP の looptrack が接続されていないときは、CLI の `next` / `comment` / `verify` / `close --comment` で同じ 1 周を回す（毎回承認が要る。
+      利用者に `~/.codex/config.toml` への `[mcp_servers.looptrack]` の追加を勧める）。本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡す
+    - 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
+    <!-- looptrack:end -->
+
+    <!-- looptrack:loop:begin -->
+    （loop 節: kit/loop の rules・skill から組み立てた本文）
+    <!-- looptrack:loop:end -->
