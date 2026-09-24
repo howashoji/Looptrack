@@ -580,7 +580,18 @@ jobs:
           path: signed
       - name: 署名済みの darwin の実行ファイルと dmg で置き換える
         if: ${{ needs.meta.outputs.sign == 'true' }}
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
         run: |
+          # 期待する名前は RELEASE_CMDS から組み立てる（コマンドの数を決め打ちすると、コマンドを減らしたときに数が合わなくなる）。
+          # 数だけでなく名前でも確かめ、署名前のまま残る darwin の実行ファイルが無いことを示す
+          want=("Looptrack_${VERSION}_macos_universal.dmg")
+          for cmd in $RELEASE_CMDS; do
+            want+=("${cmd}_${VERSION}_darwin_amd64" "${cmd}_${VERSION}_darwin_arm64")
+          done
+          for b in "${want[@]}"; do
+            [ -f "signed/$b" ] || { echo "::error::署名済みのファイルがありません: $b"; exit 1; }
+          done
           n=0
           for f in signed/*; do
             b=$(basename "$f")
@@ -588,7 +599,7 @@ jobs:
             cp -f "$f" "dist/$b"
             n=$((n + 1))
           done
-          [ "$n" -eq 5 ] || { echo "::error::署名済みのファイルが $n 個（darwin の実行ファイル 4 個と dmg 1 個のはず）"; exit 1; }
+          [ "$n" -eq "${#want[@]}" ] || { echo "::error::署名済みのファイルが $n 個（darwin の実行ファイルと dmg で ${#want[@]} 個のはず）"; exit 1; }
           echo "darwin の実行ファイルと dmg の $n 個を署名済みのものに置き換えた"
       - name: デスクトップ版がそろっていることを確かめる
         env:
