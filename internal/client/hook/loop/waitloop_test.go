@@ -4,6 +4,7 @@ package loop
 // 「当たらないこと」のケースは、当たるべきケースと同数以上そろえる（誤検知で deny が常時バイパスされるのを避ける）。
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -141,9 +142,14 @@ func TestWaitLoopMissingDir(t *testing.T) {
 		name:  "待つ先の置き場が無いときは、止めずに注意する",
 		setup: func(s *sandbox) { s.mkdir("proj", "tasks") },
 		steps: []step{
+			// 絶対パスはその OS の形で渡す（Windows ではドライブ付き。`/` 区切りでも IsAbs になる）。
+			// `; do` の `;` はパスに含めない（文面の「待つ先」が `marker;` にならない）。
 			{name: "親ディレクトリが無い（絶対パス）",
-				mk:   mk("n=0; until test -f /tmp/looptrack-no-such-dir-0302/marker; do n=$((n+1)); [ $n -ge 60 ] && break; sleep 5; done"),
-				want: wantContext("PreToolUse", []string{"looptrack-no-such-dir-0302", "親ディレクトリ"}, nil)},
+				mk: func(s *sandbox) call {
+					p := filepath.ToSlash(s.p("looptrack-no-such-dir-0302", "marker"))
+					return mk("n=0; until test -f " + p + "; do n=$((n+1)); [ $n -ge 60 ] && break; sleep 5; done")(s)
+				},
+				want: wantContext("PreToolUse", []string{"looptrack-no-such-dir-0302/marker の親ディレクトリ"}, []string{"marker;"})},
 			{name: "親ディレクトリが無い（相対パス・cwd から解く）",
 				mk:   mk(bounded("out/tasks/x.output")),
 				want: wantContext("PreToolUse", []string{"out/tasks/x.output"}, nil)},
@@ -151,6 +157,9 @@ func TestWaitLoopMissingDir(t *testing.T) {
 			{name: "親ディレクトリがある（まだ無いファイルを待つのは正しい使い方）",
 				mk: mk(bounded("tasks/x.output")), want: wantQuiet},
 			{name: "パスが変数で、実在を確かめられない", mk: mk(bounded("$OUT/x.output")), want: wantQuiet},
+			// Windows ではドライブの無い `/tmp/x` の行き先はシェルのマウントしだいで hook からは分からない。
+			// 以前は cwd に継いで `<cwd>\tmp` を調べ、無いと注意していた。POSIX では /tmp は実在するので注意しない。
+			{name: "ドライブの無い / 始まりのパス（/tmp の直下）", mk: mk(bounded("/tmp/x")), want: wantQuiet},
 			{name: "待ちループではない（sleep が無い）",
 				mk: mk("test -f /tmp/looptrack-no-such-dir-0302/marker && echo yes"), want: wantQuiet},
 			{name: "上限が無いほうが先（注意ではなく deny）",

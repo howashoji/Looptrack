@@ -137,7 +137,7 @@ appimage_licenses() {
   [ -f "$APPIMAGE_COMPONENTS" ] || die "部品の一覧がありません: $APPIMAGE_COMPONENTS"
   mtag=$(manifest_tag)
   [ "$mtag" = "$APPIMAGE_RUNTIME_TAG" ] ||
-    die "$APPIMAGE_COMPONENTS の runtime.tag（$mtag）が APPIMAGE_RUNTIME_TAG（$APPIMAGE_RUNTIME_TAG）と違います。runtime の版を上げたら部品の一覧も取り直してください（docs/server/RELEASE.md「2-2. NOTICE」）"
+    die "$APPIMAGE_COMPONENTS の runtime.tag（${mtag}）が APPIMAGE_RUNTIME_TAG（${APPIMAGE_RUNTIME_TAG}）と違います。runtime の版を上げたら部品の一覧も取り直してください（docs/server/RELEASE.md「2-2. NOTICE」）"
   mkdir -p "$licdir"
   cp "$APPIMAGE_COMPONENTS" "$licdir/runtime-components.json"
   [ -f "$APPIMAGE_LICENSES_DIR/$APPIMAGE_RELINKING" ] || die "作り直しの手順がありません: $APPIMAGE_LICENSES_DIR/$APPIMAGE_RELINKING"
@@ -275,7 +275,7 @@ appimage() {
   work=$(mkwork)
   appdir="$work/$APP_NAME.AppDir"
   mkdir -p "$appdir/usr/bin" "$appdir/usr/share/applications" "$appdir/usr/share/icons/hicolor/256x256/apps" "$appdir/usr/share/doc/looptrack"
-  echo "build linux/$goarch（desktop・cgo なし）" >&2
+  echo "build linux/${goarch}（desktop・cgo なし）" >&2
   CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go build -trimpath -tags desktop \
     -ldflags "$(ldflags "$version")" -o "$appdir/usr/bin/looptrack" ./cmd/looptrack
   # AppRun は中の実行ファイルへのリンク（引数なし＝ダブルクリックはデスクトップ版。引数ありは CLI）
@@ -302,16 +302,16 @@ EOF
   # runtime は版と SHA-256 で固定する（違えば止める）
   rt="$work/runtime-$arch"
   curl -fsSL --retry 3 -o "$rt" "https://github.com/AppImage/type2-runtime/releases/download/$APPIMAGE_RUNTIME_TAG/runtime-$arch"
-  [ "$(sha256_of "$rt")" = "$want" ] || die "runtime-$arch の SHA-256 が違います（$APPIMAGE_RUNTIME_TAG）"
+  [ "$(sha256_of "$rt")" = "$want" ] || die "runtime-$arch の SHA-256 が違います（${APPIMAGE_RUNTIME_TAG}）"
   # runtime（MIT）のライセンス文も同じ版から取る。取れなければリポジトリの写しを使う（どちらも SHA-256 で確かめる）
   rtlic="$work/runtime-LICENSE"
   if ! curl -fsSL --retry 3 -o "$rtlic" \
     "https://raw.githubusercontent.com/AppImage/type2-runtime/$APPIMAGE_RUNTIME_TAG/LICENSE" 2>/dev/null; then
-    echo "desktop.sh: runtime のライセンス文を取れないので、リポジトリの写しを使います（$APPIMAGE_RUNTIME_LICENSE_SRC）" >&2
+    echo "desktop.sh: runtime のライセンス文を取れないので、リポジトリの写しを使います（${APPIMAGE_RUNTIME_LICENSE_SRC}）" >&2
     cp "$APPIMAGE_RUNTIME_LICENSE_SRC" "$rtlic"
   fi
   [ "$(sha256_of "$rtlic")" = "$APPIMAGE_RUNTIME_LICENSE_SHA256" ] ||
-    die "runtime のライセンス文の SHA-256 が違います（$APPIMAGE_RUNTIME_TAG）。版を上げたなら $APPIMAGE_RUNTIME_LICENSE_SRC と APPIMAGE_RUNTIME_LICENSE_SHA256 を取り直し、go run ./internal/tools/notice で NOTICE を作り直してください"
+    die "runtime のライセンス文の SHA-256 が違います（${APPIMAGE_RUNTIME_TAG}）。版を上げたなら $APPIMAGE_RUNTIME_LICENSE_SRC と APPIMAGE_RUNTIME_LICENSE_SHA256 を取り直し、go run ./internal/tools/notice で NOTICE を作り直してください"
   cp "$rtlic" "$appdir/usr/share/doc/looptrack/$APPIMAGE_RUNTIME_LICENSE_NAME"
   # runtime に静的リンクされた部品（libfuse は LGPL-2.1）の全文・一覧・作り直しの手順
   appimage_licenses "$appdir/usr/share/doc/looptrack/licenses"
@@ -335,10 +335,10 @@ windows_zip() {
   mkdir -p "$top/cli"
   # アイコンを .exe に埋め込む（.syso はこのビルドの間だけ置く。headless の dist.sh のビルドには入れない）
   go run "$RSRC" -arch "$goarch" -ico "$ICON_DIR/app.ico" -o "$syso"
-  echo "build windows/$goarch（desktop・GUI）" >&2
+  echo "build windows/${goarch}（desktop・GUI）" >&2
   CGO_ENABLED=0 GOOS=windows GOARCH="$goarch" go build -trimpath -tags desktop \
     -ldflags "$(ldflags "$version" "-H=windowsgui")" -o "$top/$APP_NAME.exe" ./cmd/looptrack
-  echo "build windows/$goarch（CLI・headless）" >&2
+  echo "build windows/${goarch}（CLI・headless）" >&2
   CGO_ENABLED=0 GOOS=windows GOARCH="$goarch" go build -trimpath \
     -ldflags "$(ldflags "$version")" -o "$top/cli/looptrack.exe" ./cmd/looptrack
   rm -f "$syso"

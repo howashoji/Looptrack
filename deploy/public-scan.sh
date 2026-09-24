@@ -84,14 +84,14 @@ if [ "$overlay" = 1 ]; then
 fi
 git -C "$root" archive --format=tar "$scanrev" | tar -x -C "$work"
 
-scanned="$rev（$(git -C "$root" rev-parse --short "$rev")）だけ。作業ツリーの未コミットの変更は見ていません"
+scanned="${rev}（$(git -C "$root" rev-parse --short "$rev")）だけ。作業ツリーの未コミットの変更は見ていません"
 if [ "$overlay" = 1 ]; then
   scanned="HEAD（$(git -C "$root" rev-parse --short HEAD)）+ 作業ツリーの変更 $changed 件"
   if [ "$untracked" -gt 0 ]; then
     # 赤になったときに原因を切り分けられるように、未追跡のファイル名も出す（多いときは先頭だけ）。
     list=$(tr '\0' '\n' < "$tmp/untracked" | sort | sed -n '1,10p' | paste -sd, -)
     if [ "$untracked" -gt 10 ]; then list="$list ほか"; fi
-    scanned="$scanned（未追跡 $untracked 件を含む: $list）"
+    scanned="${scanned}（未追跡 $untracked 件を含む: ${list}）"
   fi
 fi
 echo "== 調べた対象: $scanned"

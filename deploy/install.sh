@@ -216,7 +216,7 @@ parse_args() {
 
 detect_platform() {
   os=$(uname -s)
-  [ "$os" = Linux ] || die "Linux 専用です（この OS: $os）"
+  [ "$os" = Linux ] || die "Linux 専用です（この OS: ${os}）"
   case $(uname -m) in
     x86_64 | amd64) ARCH=amd64 ;;
     aarch64 | arm64) ARCH=arm64 ;;
@@ -285,7 +285,7 @@ get_binary() {
       ;;
   esac
   detect_platform
-  step "実行ファイルを取得します（$SRC・linux/$ARCH）"
+  step "実行ファイルを取得します（${SRC}・linux/${ARCH}）"
   fetch SHA256SUMS "$TMP/SHA256SUMS"
   verify_sums_signature
   # SHA256SUMS から looptrack_<版>_linux_<arch> を選ぶ（名前の前の * は二進の印）
@@ -311,25 +311,25 @@ get_binary() {
   fi
   read -r NEW_SHA name NEW_VERSION <"$TMP/candidates"
   if [ -n "$WANT_SHA" ] && [ "$WANT_SHA" != "$NEW_SHA" ]; then
-    die "--sha256 と SHA256SUMS が合いません（指定 $WANT_SHA・SHA256SUMS $NEW_SHA）"
+    die "--sha256 と SHA256SUMS が合いません（指定 ${WANT_SHA}・SHA256SUMS ${NEW_SHA}）"
   fi
   fetch "$name" "$TMP/looptrack"
   got=$(sha256_of "$TMP/looptrack")
-  [ "$got" = "$NEW_SHA" ] || die "SHA-256 が合いません: $name（期待 $NEW_SHA・実際 $got）。何も入れ替えていません"
+  [ "$got" = "$NEW_SHA" ] || die "SHA-256 が合いません: ${name}（期待 ${NEW_SHA}・実際 ${got}）。何も入れ替えていません"
   chmod 0755 "$TMP/looptrack"
-  v=$("$TMP/looptrack" version 2>/dev/null) || die "取得した実行ファイルがこのサーバで動きません（$name）"
+  v=$("$TMP/looptrack" version 2>/dev/null) || die "取得した実行ファイルがこのサーバで動きません（${name}）"
   # looptrack version は「looptrack <版>（headless・linux/<arch>）」（英語は "looptrack <版> (headless, linux/<arch>)"）
   case $v in
-    "looptrack $NEW_VERSION（"* | "looptrack $NEW_VERSION "*) ;;
-    *) warn "実行ファイルの版（$v）が名前の版（$NEW_VERSION）と違います" ;;
+    "looptrack ${NEW_VERSION}（"* | "looptrack $NEW_VERSION "*) ;;
+    *) warn "実行ファイルの版（${v}）が名前の版（${NEW_VERSION}）と違います" ;;
   esac
-  say "  $name（SHA-256 一致: $NEW_SHA）"
+  say "  ${name}（SHA-256 一致: ${NEW_SHA}）"
 }
 
 # place_binary — $TMP/looptrack を $BIN に置く（同じ中身なら何もしない。置き換えは rename で一度に）
 place_binary() {
   if [ -f "$BIN" ] && [ "$(sha256_of "$BIN")" = "$NEW_SHA" ]; then
-    say "  $BIN は同じ版です（$NEW_VERSION）"
+    say "  $BIN は同じ版です（${NEW_VERSION}）"
     return
   fi
   if [ -f "$BIN" ]; then
@@ -337,7 +337,7 @@ place_binary() {
   fi
   install -m 0755 "$TMP/looptrack" "$BIN.install-$$"
   mv -f "$BIN.install-$$" "$BIN"
-  say "  置いた: $BIN（$NEW_VERSION）"
+  say "  置いた: ${BIN}（${NEW_VERSION}）"
 }
 
 # ---------------------------------------------------------------- 状態
@@ -478,8 +478,8 @@ show_configured() {
   METHOD=$S_METHOD
   DIR=$S_DIR
   [ -n "$PROJECT" ] || PROJECT=$S_PROJECT
-  say "設定済みです（$STATE）。何も変えていません。"
-  say "  動かし方: $S_METHOD・版: $S_VERSION・設定: $DIR/.env"
+  say "設定済みです（${STATE}）。何も変えていません。"
+  say "  動かし方: ${S_METHOD}・版: ${S_VERSION}・設定: $DIR/.env"
   if [ "$S_METHOD" = systemd ] && have_systemd; then
     say "  サービス: $(systemctl is-active looptrack 2>/dev/null || true)（systemctl status looptrack）"
   elif [ "$S_METHOD" = compose ] && command -v docker >/dev/null 2>&1; then
@@ -652,7 +652,7 @@ install_systemd() {
 # ---------------------------------------------------------------- compose
 
 build_image() {
-  step "イメージ $IMAGE:$NEW_VERSION（scratch に取得した実行ファイルを載せる）"
+  step "イメージ $IMAGE:${NEW_VERSION}（scratch に取得した実行ファイルを載せる）"
   mkdir -p "$TMP/ctx"
   cp "$TMP/looptrack" "$TMP/ctx/looptrack"
   # 第三者のライセンス文（/NOTICE）。取得元の NOTICE ではなく、入れる実行ファイル自身が埋め込んでいるものを書き出す
@@ -671,7 +671,7 @@ CMD ["serve"]
 EOF
   docker build -q -t "$IMAGE:$NEW_VERSION" "$TMP/ctx" >/dev/null
   docker tag "$IMAGE:$NEW_VERSION" "$IMAGE:latest"
-  say "  作成: $IMAGE:$NEW_VERSION（$IMAGE:latest）"
+  say "  作成: $IMAGE:${NEW_VERSION}（$IMAGE:latest）"
 }
 
 check_docker() {
@@ -829,11 +829,11 @@ backup_sqlite() { # <SQLite のファイル>
       cp -p "$f" "$b/"
     fi
   done
-  say "  控え: $b（止めた状態で写した SQLite）"
+  say "  控え: ${b}（止めた状態で写した SQLite）"
 }
 
 upgrade() {
-  load_state || die "install.sh で入れた印（$STATE）がありません。先に install.sh で入れてください"
+  load_state || die "install.sh で入れた印（${STATE}）がありません。先に install.sh で入れてください"
   METHOD=$S_METHOD
   DIR=$S_DIR
   PROJECT=$S_PROJECT # 印に書き戻すため（更新では変わらない）
@@ -889,7 +889,7 @@ upgrade() {
       )
     else
       compose run --rm --no-deps looptrack migrate
-    fi || die "マイグレーションに失敗しました（前のイメージは $IMAGE:$S_VERSION。compose.yaml の image を戻して up -d）"
+    fi || die "マイグレーションに失敗しました（前のイメージは $IMAGE:${S_VERSION}。compose.yaml の image を戻して up -d）"
     check_store_access # 表が増えた更新では grants.sql を流し直すまで読めない
     if [ -n "$db" ]; then restrict_sqlite "$db"; fi
     step "起動"
@@ -899,13 +899,13 @@ upgrade() {
   NO_START=0
   write_state
   say ""
-  say "更新しました: $S_VERSION → $NEW_VERSION（データはそのままです）"
+  say "更新しました: $S_VERSION → ${NEW_VERSION}（データはそのままです）"
 }
 
 # ---------------------------------------------------------------- 外す
 
 uninstall() {
-  load_state || die "install.sh で入れた印（$STATE）がありません"
+  load_state || die "install.sh で入れた印（${STATE}）がありません"
   METHOD=$S_METHOD
   DIR=$S_DIR
   if [ "$PURGE" = 1 ] && [ "$YES" = 0 ]; then
@@ -941,9 +941,9 @@ uninstall() {
   else
     say "外しました。設定とデータは残しています:"
     if [ "$METHOD" = systemd ]; then
-      say "  $CONF_DIR/.env・$DATA_DIR（利用者 $SVC_USER も残しています）"
+      say "  $CONF_DIR/.env・${DATA_DIR}（利用者 $SVC_USER も残しています）"
     else
-      say "  $DIR（.env・compose.yaml・data）とイメージ $IMAGE:*"
+      say "  ${DIR}（.env・compose.yaml・data）とイメージ $IMAGE:*"
     fi
     say "  もう一度 install.sh を実行すると、残した設定で入れ直します。消すときは --uninstall --purge。"
   fi
@@ -953,7 +953,7 @@ uninstall() {
 
 install_main() {
   if load_state; then
-    [ -z "$METHOD" ] || [ "$METHOD" = "$S_METHOD" ] || die "すでに $S_METHOD で入っています（$STATE）。変えるときは --uninstall してから"
+    [ -z "$METHOD" ] || [ "$METHOD" = "$S_METHOD" ] || die "すでに $S_METHOD で入っています（${STATE}）。変えるときは --uninstall してから"
     show_configured
     return
   fi
@@ -994,7 +994,7 @@ install_main() {
   if [ "$NO_START" = 1 ]; then
     say "設定まで終わりました（起動はしていません。起動: $(start_hint)）。"
   else
-    say "インストールが終わりました（$METHOD・$NEW_VERSION）。"
+    say "インストールが終わりました（${METHOD}・${NEW_VERSION}）。"
   fi
   print_access
   if [ "$LOCAL_MODE" != 1 ]; then

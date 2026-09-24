@@ -67,7 +67,7 @@ if [ "${1:-}" = --in-container ]; then
   PERM_WARN="本人以外も読めます" # looptrack serve が SQLite の DB の権限が広いときに出す警告
 
   # ---- ブラウザと同じ手順のログイン（curl と openssl がある場面だけ。受け入れ条件「公開 URL にログインできる」）
-  # 二段階認証の状態は $TOTP_STATE（「<Base32 の秘密> <最後に使ったステップ>」）に持ち越す（同じステップの確認コードは再利用できないため）
+  # 二段階認証の状態は ${TOTP_STATE}（「<Base32 の秘密> <最後に使ったステップ>」）に持ち越す（同じステップの確認コードは再利用できないため）
   TOTP_STATE=${TOTP_STATE:-/root/totp.state}
   totp() { # <Base32 の秘密> <ステップ> — RFC 6238（SHA-1・30 秒・6 桁。internal/auth/totp.go と同じ）
     local key mac off
@@ -121,12 +121,12 @@ if [ "${1:-}" = --in-container ]; then
     code=$(curl -s "$@" -D $h -o /dev/null -w '%{http_code}' -H "Cookie: looptrack_session=$sess" --data-urlencode "code=$(totp "$secret" "$step")" \
       --data-urlencode "csrf=$csrf" "$u$path") || true
     sess=$(cookie_of looptrack_session $h)
-    [ "$code" = 303 ] && [ -n "$sess" ] || { echo "確認コードの送信（$path）: $code"; return 1; }
+    [ "$code" = 303 ] && [ -n "$sess" ] || { echo "確認コードの送信（${path}）: $code"; return 1; }
     echo "$secret $step" >"$TOTP_STATE"
     code=$(curl -s "$@" -o $b -w '%{http_code}' -H "Cookie: looptrack_session=$sess" "$u/") || true
     [ "$code" = 200 ] || { echo "ログイン後の GET /: $code"; return 1; }
     code=$(curl -s "$@" -o /dev/null -w '%{http_code}' "$u/") || true
-    [ "$code" = 303 ] || { echo "ログインしていない GET / が $code（ログイン画面に送らない）"; return 1; }
+    [ "$code" = 303 ] || { echo "ログインしていない GET / が ${code}（ログイン画面に送らない）"; return 1; }
     [ $path = /login/totp/setup ] && echo "（二段階認証を登録してログイン）" || echo "（確認コードでログイン）"
   }
 
@@ -389,7 +389,7 @@ if [ "${1:-}" = --in-container ]; then
       sleep 2
       journalctl -u looptrack -o cat --no-pager | grep -q "$PERM_WARN" && ok "権限の警告が出る（確認の仕組みが効いている）" || ng "644 でも警告が出ない"
 
-      echo "== --upgrade（URL の接頭辞から取る: $UPGRADE_URL）"
+      echo "== --upgrade（URL の接頭辞から取る: ${UPGRADE_URL}）"
       out=$($I --upgrade --from "$UPGRADE_URL" 2>&1) && ng "http:// を黙って使った" || true
       contains "$out" "https:// を使うか" && ok "http:// は断る" || ng "http:// の表示: $out"
       since=$(date +%s)
@@ -490,10 +490,10 @@ if [ "${1:-}" = --in-container ]; then
       ;;
   esac
   if [ "$fails" -gt 0 ]; then
-    echo "失敗: $fails 件（$scenario）" >&2
+    echo "失敗: $fails 件（${scenario}）" >&2
     exit 1
   fi
-  echo "すべて通りました（$scenario）"
+  echo "すべて通りました（${scenario}）"
   exit 0
 fi
 
@@ -528,7 +528,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "== 材料: dist.sh で looptrack（linux/$ARCH）を 2 版作る"
+echo "== 材料: dist.sh で looptrack（linux/${ARCH}）を 2 版作る"
 for n in 1 2; do
   RELEASE_CMDS=looptrack RELEASE_TARGETS="linux/$ARCH" bash deploy/release/dist.sh build "v0.0.0-installtest$n" "$WORK/dist$n" 2>/dev/null
   bash deploy/release/dist.sh sums "$WORK/dist$n" 2>/dev/null

@@ -12,6 +12,8 @@
 //   - removedids_test.go: 撤去した ID（ルールのキー・エラーコード・対訳キー・サブコマンド名）の残骸が無いこと
 //   - mcptoolsets_test.go: 「イシューを変える MCP のツール」の一覧が 4 か所（サーバの登録・付与の hook・
 //     loop の PreToolUse・DESIGN.md）でずれていないこと。実物を読み取って 1 つの宣言表と突き合わせる
+//   - shellvar_test.go: シェルスクリプト（*.sh）で、波かっこの無い変数展開の直後に ASCII 以外の文字が無いこと
+//     （macOS の bash はその先頭のバイトを変数名の続きとして読む。Linux では再現しないので、字面で見る）
 //   - doclist_test.go: この一覧と、実在する *_test.go が一致すること
 //
 // 実行: go test ./internal/docscheck/

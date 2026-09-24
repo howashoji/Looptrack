@@ -132,7 +132,7 @@ sign_sums() {
   command -v minisign >/dev/null 2>&1 || { echo "minisign がありません（brew install minisign / apt-get install minisign）" >&2; exit 1; }
   [ -f "$out/SHA256SUMS" ] || { echo "$out/SHA256SUMS がありません（先に sums を流す）" >&2; exit 1; }
   key="${MINISIGN_SECRET_KEY_FILE:-$HOME/.minisign/minisign.key}"
-  [ -f "$key" ] || { echo "minisign の秘密鍵がありません: $key（MINISIGN_SECRET_KEY_FILE で渡す）" >&2; exit 1; }
+  [ -f "$key" ] || { echo "minisign の秘密鍵がありません: ${key}（MINISIGN_SECRET_KEY_FILE で渡す）" >&2; exit 1; }
   pub=$(pub_file)
   [ -n "$comment" ] || comment="looptrack SHA256SUMS $(basename "$(cd "$out" && pwd)")"
   rm -f "$out/SHA256SUMS.minisig"

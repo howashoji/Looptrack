@@ -61,7 +61,8 @@ var (
 	// waitLoopTimeoutRe はループの外から丸ごと打ち切る形（`timeout 600 bash -c '…'`）。
 	waitLoopTimeoutRe = regexp.MustCompile(`\btimeout\b`)
 	// waitLoopTargetRe は待っている先のパス（`until [ -s PATH ]`・`until test -f PATH`・`while [ ! -f PATH ]`）。
-	waitLoopTargetRe = regexp.MustCompile(`^(?:until|while)\s+(?:!\s+)?(?:\[\[?|test)\s+(?:!\s+)?-[a-zA-Z]\s+([^\s\]]+)`)
+	// `until test -f PATH; do` の `;` のような区切りはパスに含めない。
+	waitLoopTargetRe = regexp.MustCompile(`^(?:until|while)\s+(?:!\s+)?(?:\[\[?|test)\s+(?:!\s+)?-[a-zA-Z]\s+([^\s\];&|)]+)`)
 )
 
 // waitLoop は見つかった待ちループ 1 つ。
@@ -170,6 +171,12 @@ func PreToolWaitLoopGuard(ctx context.Context, ev hookio.Event) (hookio.Result, 
 		}
 		p := w.target
 		if !filepath.IsAbs(p) {
+			// Windows では `/tmp/x` のようにドライブの無い `/` 始まりは IsAbs にならない。これを cwd に継ぐと
+			// `<cwd>\tmp\x` という別の場所を調べてしまう。シェル（Git Bash など）がそれをどこに対応させるかは
+			// hook からは分からない（マウントの表しだい）ので、確かめられないものとして注意を出さない。
+			if strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) {
+				continue
+			}
 			p = filepath.Join(cwd, p)
 		}
 		if dir := filepath.Dir(p); !isDir(dir) {

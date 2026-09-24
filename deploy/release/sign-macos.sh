@@ -102,7 +102,7 @@ if [ "$ADHOC" = 0 ] && [[ ! "$IDENTITY" =~ ^[0-9A-Fa-f]{40}$ ]]; then
   [ -z "$KEYCHAIN" ] || kc=("$KEYCHAIN")
   n=$(security find-identity -v -p codesigning ${kc[@]+"${kc[@]}"} | grep -cF "\"$IDENTITY" || true)
   [ "$n" -ge 1 ] || die "署名の身元がキーチェーンにありません: $IDENTITY"
-  [ "$n" -eq 1 ] || die "「$IDENTITY」に合う証明書が $n 個あります。使う証明書の SHA-1（40 桁）を --identity に渡してください（RELEASE.md「署名」）"
+  [ "$n" -eq 1 ] || die "「${IDENTITY}」に合う証明書が $n 個あります。使う証明書の SHA-1（40 桁）を --identity に渡してください（RELEASE.md「署名」）"
 fi
 
 sign_args=(--force --sign "$IDENTITY")
@@ -152,7 +152,7 @@ done
 for f in ${bins[@]+"${bins[@]}"}; do
   base=$(basename "$f")
   cmd=${base%%_*}
-  echo "==> 署名: $f（識別子 ${ID_PREFIX}${cmd}）"
+  echo "==> 署名: ${f}（識別子 ${ID_PREFIX}${cmd}）"
   args=("${sign_args[@]}" --options runtime --identifier "${ID_PREFIX}${cmd}")
   [ -z "$ENTITLEMENTS" ] || args+=(--entitlements "$ENTITLEMENTS")
   codesign "${args[@]}" "$f"
@@ -185,15 +185,15 @@ notarize() {
   out="$WORK/submit.plist"
   if ! xcrun notarytool submit "$sub" "${notary_auth[@]}" --wait --output-format plist >"$out"; then
     cat "$out" >&2 || true
-    die "notarytool submit が失敗しました（$what）"
+    die "notarytool submit が失敗しました（${what}）"
   fi
   status=$(plutil -extract status raw -o - "$out" 2>/dev/null || echo "?")
   id=$(plutil -extract id raw -o - "$out" 2>/dev/null || echo "?")
-  echo "    提出 ID: $id・結果: $status"
+  echo "    提出 ID: ${id}・結果: $status"
   if [ "$status" != Accepted ]; then
     # ログには秘密は含まれない（どのファイルのどの問題かが JSON で返る）
     xcrun notarytool log "$id" "${notary_auth[@]}" >&2 || true
-    die "公証が通りませんでした（$what・$status）"
+    die "公証が通りませんでした（${what}・${status}）"
   fi
 }
 

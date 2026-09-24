@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -21,6 +22,9 @@ func TestHandoffMarkCommitWhere(t *testing.T) {
 	needGit(t)
 	R := func(s *sandbox, parts ...string) string { return s.p(append([]string{"repo"}, parts...)...) }
 	W := func(s *sandbox) string { return s.p("wt") } // 別の作業ツリー（ブランチ feat）
+	// Wsh はコマンドの文字列に書く形。引用符の無い `\` はシェルが打ち消しとして食う（`D:\a\wt` は `D:awt` になる）ので、
+	// Windows では git が受け取れる `/` 区切りにする（利用者が Git Bash で打つ形。POSIX では W と同じ）。
+	Wsh := func(s *sandbox) string { return filepath.ToSlash(W(s)) }
 	pend := func(s *sandbox) string { return R(s, ".claude", "handoff-pending.d", "s1") }
 	var sha, detachedSHA, commitOut string
 	setup := func(s *sandbox) {
@@ -79,18 +83,18 @@ func TestHandoffMarkCommitWhere(t *testing.T) {
 
 	scenario{name: "別の作業ツリー（main に未マージ）でのコミット", setup: setup, steps: []step{
 		{name: "git -C <作業ツリー> commit: 出力の [ブランチ SHA] と作業ツリーを記録する", do: clear,
-			mk:   func(s *sandbox) call { return mark("git -C "+W(s)+" commit -m x", out)(s) },
+			mk:   func(s *sandbox) call { return mark("git -C "+Wsh(s)+" commit -m x", out)(s) },
 			want: all(wantMark("OUT"), wantRecord(featLine))},
 		{name: "出力が無ければ、コミットした作業ツリーに問うて SHA とブランチを埋める", do: clear,
-			mk:   func(s *sandbox) call { return mark("git -C "+W(s)+" commit -m x", none)(s) },
+			mk:   func(s *sandbox) call { return mark("git -C "+Wsh(s)+" commit -m x", none)(s) },
 			want: all(wantMark("OUT"), wantRecord(featLine))},
 		{name: "cd <作業ツリー> && git commit も同じ", do: clear,
-			mk:   func(s *sandbox) call { return mark("cd "+W(s)+" && git add b.txt && git commit -m x", none)(s) },
+			mk:   func(s *sandbox) call { return mark("cd "+Wsh(s)+" && git add b.txt && git commit -m x", none)(s) },
 			want: all(wantMark("OUT"), wantRecord(featLine))},
 		{name: "相対の -C は cwd（本体）から継ぐ", do: clear,
 			mk: mark("git -C ../wt commit -m x", none), want: all(wantMark("OUT"), wantRecord(featLine))},
 		{name: "知らせの文面にも SHA とブランチが出る", do: clear,
-			mk: func(s *sandbox) call { return mark("git -C "+W(s)+" commit -m x", out)(s) },
+			mk: func(s *sandbox) call { return mark("git -C "+Wsh(s)+" commit -m x", out)(s) },
 			want: func(t *testing.T, s *sandbox, g got) {
 				t.Helper()
 				if !strings.Contains(g.ctx(), sha) || !strings.Contains(g.ctx(), "feat") {
@@ -105,11 +109,11 @@ func TestHandoffMarkCommitWhere(t *testing.T) {
 			mk:   mark("git -C $WT commit -m x", out),
 			want: all(wantMark("OUT"), wantRecord(func(*sandbox) string { return "commit\t" + sha + "\tfeat\t?" }))},
 		{name: "git の作業ツリーでない場所でも記録は落とさない（欄は ?）", do: clear,
-			mk:   func(s *sandbox) call { return mark("git -C "+s.root+" commit -m x", none)(s) },
+			mk:   func(s *sandbox) call { return mark("git -C "+filepath.ToSlash(s.root)+" commit -m x", none)(s) },
 			want: all(wantMark("OUT"), wantRecord(lit("commit\t?\t?\t?")))},
 		{name: "失敗したコミット（nothing to commit）は従来どおり積まない", do: clear,
 			mk: func(s *sandbox) call {
-				return mark("git -C "+W(s)+" commit -m x", func() string { return "nothing to commit, working tree clean" })(s)
+				return mark("git -C "+Wsh(s)+" commit -m x", func() string { return "nothing to commit, working tree clean" })(s)
 			},
 			want: all(wantMark("QUIET"), wantExists(pend, false))},
 	}}.run(t)
@@ -123,10 +127,10 @@ func TestHandoffMarkCommitWhere(t *testing.T) {
 		detachedSHA = s.git("-C", W(s), "rev-parse", "--short", "HEAD")
 	}, steps: []step{
 		{name: "出力の [detached HEAD SHA] はブランチ HEAD として記録する", do: clear,
-			mk:   func(s *sandbox) call { return mark("git -C "+W(s)+" commit -m x", out)(s) },
+			mk:   func(s *sandbox) call { return mark("git -C "+Wsh(s)+" commit -m x", out)(s) },
 			want: all(wantMark("OUT"), wantRecord(func(s *sandbox) string { return "commit\t" + detachedSHA + "\tHEAD\t" + wtTop(s) }))},
 		{name: "出力が無くても git に問うて HEAD になる", do: clear,
-			mk:   func(s *sandbox) call { return mark("git -C "+W(s)+" commit -m x", none)(s) },
+			mk:   func(s *sandbox) call { return mark("git -C "+Wsh(s)+" commit -m x", none)(s) },
 			want: all(wantMark("OUT"), wantRecord(func(s *sandbox) string { return "commit\t" + detachedSHA + "\tHEAD\t" + wtTop(s) }))},
 		{name: "差し戻しには detached HEAD と出る", mk: stop("ja"),
 			want: all(wantStop("BLOCK"), wantBlockHas(func(*sandbox) string { return detachedSHA }, lit("detached HEAD"), wtTop))},
