@@ -210,6 +210,34 @@ func compoundKeyStem(stem string, demoteBareKey bool) bool {
 	return false
 }
 
+// globTailRe は basename の末尾に連続するグロブの文字（* ・ ? ・ […]）。
+var globTailRe = regexp.MustCompile(`(?:\*|\?|\[[^\]]*\])+$`)
+
+// secretGlobPath は p の basename が、末尾のグロブ（*・?・[…]）を落とした残りで
+// 名前だけで秘密と分かるもの（secretFileRe）に丸ごと一致するか。
+//
+// 利用者の決定（2026-09-21）: **名前が見えているグロブ**（`.env*`・`id_rsa*`）だけを拾う。
+// **名前を伏せるグロブ**（`.e*`・`*`）は捕まえない（rules の secrets-discipline.md に明記）。
+// `.env*` は `.env.example` も含むので確認する側へ倒れるが、これは許容する（同じ決定）。
+//
+// .pem・.key・.asc の条件つきの拡張子（condSecretExtRe）と、拡張子の無い credentials
+// （credsBareRe。置き場が要る）には広げない。誤発火が増えるため（同じ決定）。
+func secretGlobPath(p string) bool {
+	p = fileURLRe.ReplaceAllString(p, "")
+	b := p
+	if i := strings.LastIndexAny(b, `/\`); i >= 0 {
+		b = b[i+1:]
+	}
+	if !globTailRe.MatchString(b) {
+		return false
+	}
+	head := globTailRe.ReplaceAllString(b, "")
+	if head == "" || secretFileAllowRe.MatchString(head) {
+		return false
+	}
+	return secretFileRe.MatchString(head)
+}
+
 // fileURLRe は file:// の前置。手元のパスの別の書き方なので、外してから同じように判定する
 // （file:///p/.ssh/id_rsa は /p/.ssh/id_rsa として見る。curl file:///etc/passwd は中身を出す）。
 //
@@ -229,6 +257,9 @@ var fileURLRe = regexp.MustCompile(`(?i)^file://`)
 // .pem・.key・.asc は、置き場（inSecretDir）か名前（keyStemRe）で秘密と分かるときだけ秘密扱いする。
 // 名前は秘密の語（keyStemRe）で見る。公開の語（pubStemRe）は、.key では秘密の側に数え、
 // .pem / .asc では ca と key の 2 語だけを降ろすのに使う（pubStemRe の注釈を見よ）。
+// 末尾にグロブ（*・?・[…]）が付いていても、それを落とした残りが名前だけで秘密と分かれば秘密扱いする
+// （secretGlobPath。`.env*`・`id_rsa*` のように名前が丸ごと見えているときだけで、`.e*`・`*` のように
+// 名前を伏せる形は拾わない）。
 // **限界**: 慣習から外れた名前の秘密鍵を慣習から外れた置き場に置くと（例: backup/2026.pem）拾えない。
 // 名前で見分ける方式の限界なので、rules の secrets-discipline.md に明記してある。
 func secretPath(p string) bool {
@@ -241,6 +272,9 @@ func secretPath(p string) bool {
 		return false
 	}
 	if secretFileRe.MatchString(b) {
+		return true
+	}
+	if secretGlobPath(p) {
 		return true
 	}
 	if credsBareRe.MatchString(b) {
@@ -362,16 +396,30 @@ var lineContRe = regexp.MustCompile(`\\(?:\r?\n|$)`)
 //
 // 雛形からの複写を通す判断（templateCopy）は、**この単位ごと**に行う。行の全体で判断すると、
 // `cp .env.example /tmp/t && cat ~/.ssh/id_rsa` のように、複写と無関係な秘密の読み出しまで一緒に通ってしまう。
+//
+// 行末のコメント（語の先頭の # から行末まで）は、引用符の数えに入れない。`cp .env.example .env  # don't …`
+// のようにコメントの中に ' があると、閉じていない引用符と誤認して雛形の例外が使われず、日常の複写が確認に
+// 倒れていた（引用符の外で # が語の先頭に来たときだけコメントとして飛ばす。引用符の中の # はそのまま数える
+// ので `echo '# don't'` のような形を誤って特別扱いしない）。
 func runSegments(raw string) ([]string, bool) {
 	var out []string
 	var q byte
 	start := 0
-	for i := 0; i < len(raw); i++ {
+	for i := 0; i < len(raw); {
 		c := raw[i]
+		if q == 0 && c == '#' && (i == 0 || isRunWordBreak(raw[i-1])) {
+			nl := strings.IndexByte(raw[i:], '\n')
+			if nl < 0 {
+				break // コメントが文字列の終わりまで続く。その後ろに区切りは無い
+			}
+			i += nl // 次に読む位置は改行そのもの（改行は区切りとしてふだんどおり扱う）
+			continue
+		}
 		if q != 0 {
 			if c == q {
 				q = 0
 			}
+			i++
 			continue
 		}
 		switch c {
@@ -381,11 +429,22 @@ func runSegments(raw string) ([]string, bool) {
 			out = append(out, raw[start:i])
 			start = i + 1
 		}
+		i++
 	}
 	if q != 0 {
 		return []string{raw}, false
 	}
 	return append(out, raw[start:]), true
+}
+
+// isRunWordBreak は、その直後に # が来たときにコメントの始まりと認めてよい文字（空白と区切り）。
+// runSegments でだけ使う（skipInert の isWordBreak と同じ考え方だが、対象の区切りの並びが違うので別に持つ）。
+func isRunWordBreak(c byte) bool {
+	switch c {
+	case ' ', '\t', '\r', '\n', ';', '&', '|', '(', ')':
+		return true
+	}
+	return false
 }
 
 // templateCopy は「雛形から秘密のファイルを作る」複写か（利用者の決定 2026-09-21。cp .env.example .env は通す）。

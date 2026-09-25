@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -157,7 +158,7 @@ func TestMCPTools(t *testing.T) {
 		}
 	}
 	sort.Strings(names)
-	if got := strings.Join(names, ","); got != "add_comment,add_usage_ledger,assign_issue,create_issue,get_issue,get_matrix,guide,issue_activity,issue_usage,list_issues,list_projects,list_usage_ledger,list_usage_requests,next,project_summary,ready_issues,report_verify,set_status,setup,update_issue,usage_missing,usage_report,verify_issue" {
+	if got := strings.Join(names, ","); got != "add_comment,add_usage_ledger,assign_issue,create_issue,create_project,get_issue,get_matrix,guide,issue_activity,issue_usage,list_issues,list_projects,list_usage_ledger,list_usage_requests,next,project_summary,ready_issues,report_verify,set_status,setup,update_issue,usage_missing,usage_report,verify_issue" {
 		t.Errorf("ツール: %s", got)
 	}
 
@@ -477,5 +478,86 @@ WHERE i.display_id = 'REQ-0001' AND e.kind = 'status' ORDER BY e.id DESC LIMIT 1
 	}
 	if text, _ := m2.call("project_summary", map[string]any{}, false); !strings.Contains(text, "REQ-0001") {
 		t.Errorf("project_summary:\n%s", text)
+	}
+}
+
+// headerRecorder は応答の見出し（Content-Type と X-Accel-Buffering）を記録する。
+type headerRecorder struct {
+	next http.RoundTripper
+	mu   sync.Mutex
+	seen []http.Header
+}
+
+func (h *headerRecorder) RoundTrip(r *http.Request) (*http.Response, error) {
+	res, err := h.next.RoundTrip(r)
+	if err == nil {
+		h.mu.Lock()
+		h.seen = append(h.seen, res.Header.Clone())
+		h.mu.Unlock()
+	}
+	return res, err
+}
+
+// TestMCPNoProxyBuffering は /mcp の応答がリバースプロキシ（nginx）に溜められないよう
+// X-Accel-Buffering: no を付けることを確かめる。購読（subscriptions/listen）の SSE は接続を開いたまま
+// 通知を流すので、nginx が既定の proxy_buffering で溜めると最初の通知がクライアントに届かない。
+func TestMCPNoProxyBuffering(t *testing.T) {
+	e, _, ed := newAPIEnv(t)
+	c := e.client()
+	post := func(auth string) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest("POST", e.srv.URL+"/im/mcp", strings.NewReader(mcpInitBody))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		if auth != "" {
+			req.Header.Set("Authorization", auth)
+		}
+		res, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res
+	}
+
+	// 401（認証の前に SDK の外で返る応答）にも付く
+	if res := post(""); res.StatusCode != http.StatusUnauthorized || res.Header.Get("X-Accel-Buffering") != "no" {
+		t.Errorf("401: status=%d X-Accel-Buffering=%q", res.StatusCode, res.Header.Get("X-Accel-Buffering"))
+	}
+	// initialize の JSON の応答に付く
+	res := post("Bearer " + ed.token)
+	if res.StatusCode != http.StatusOK || !strings.HasPrefix(res.Header.Get("Content-Type"), "application/json") {
+		t.Fatalf("initialize の前提が崩れている: status=%d Content-Type=%q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+	if got := res.Header.Get("X-Accel-Buffering"); got != "no" {
+		t.Errorf("initialize（JSON）: X-Accel-Buffering=%q, want no", got)
+	}
+
+	// 購読（SSE）の応答に付く。SDK のクライアントは一覧の変更を受け取る関数を渡すと購読を開く
+	rec := &headerRecorder{next: headerTransport{map[string]string{"Authorization": "Bearer " + ed.token}}}
+	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, &mcp.ClientOptions{
+		ToolListChangedHandler: func(context.Context, *mcp.ToolListChangedRequest) {},
+	})
+	cs, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{
+		Endpoint: e.srv.URL + "/im/mcp", HTTPClient: &http.Client{Transport: rec}, MaxRetries: -1, DisableStandaloneSSE: true,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	sse := 0
+	for _, h := range rec.seen {
+		if !strings.HasPrefix(h.Get("Content-Type"), "text/event-stream") {
+			continue
+		}
+		sse++
+		if got := h.Get("X-Accel-Buffering"); got != "no" {
+			t.Errorf("購読（SSE）: X-Accel-Buffering=%q, want no", got)
+		}
+	}
+	if sse == 0 {
+		t.Fatalf("購読の SSE の応答が無い（前提が崩れている。クライアントが購読を開いていない）: %d 件の応答", len(rec.seen))
 	}
 }

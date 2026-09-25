@@ -62,7 +62,7 @@ Claude Code（各プロジェクト）                         example.com（ホ
 | 担当者（§9-2） | 担当が付いたイシューは出力が増えます。`show` の frontmatter の `assignee:` 行、`list` / `ready` / `summary` の `ASSIGNEE` 列（担当が 1 件でもある表だけ）、`status` の `担当: <ID>: <旧> → <新>` 行です。最後の行は明示の変更と引き継ぎのときだけ出し、In Progress で本人が担当になる R1 では出しません。担当の無いイシューだけの表には列を出しません |
 | サブコマンド | `list` / `ready` / `show`（`--json`）、`edit` / `push [--rebase]`、`activity <ID…> [--since] [--json]`、`summary [--limit] [--json]`、`config [--json]`（利用者名も出す）、`login [--url] [--browser]`、`guide` / `next` / `init`（§5-2） |
 | 鮮度ガード | Stop のときに `/activity`（`since` = セッション開始時刻）を 1 回呼びます。`events_since` が 0 のイシューは「参照したのに更新していない」とみなします。クローズ済みと存在しない ID は対象外です。ID の見分けに使う prefix / width は `.claude/.looptrack-freshness/project.json` に控えます（mark は毎回のツール実行で走るので、そこでは HTTP を出しません）。サーバに聞けないときは黙って通します（fail-open） |
-| MCP | `/looptrack/mcp` です。公式 Go SDK の streamable HTTP を **Stateless・JSON 応答**で使い、セッションを持たないので常駐メモリが増えません。GET は 405 です。認証は Bearer のアクセストークンだけで、Cookie のセッションは使えません（401 には `WWW-Authenticate: Bearer`）。ツールは `list_projects` `list_issues` `ready_issues` `get_issue` `create_issue` `add_comment` `set_status` `update_issue` `get_matrix` `project_summary` `issue_activity` `guide` `next`（guide / next は §5-2）`assign_issue`（担当者・§9-2・`create_issue` / `set_status` / `update_issue` / `next` にも `assignee` 引数）、トークンの `issue_usage` `usage_missing` `usage_report` `list_usage_ledger` `add_usage_ledger`（§9-5）`list_usage_requests` です。REST と同じ internal/service を呼ぶので、ルール・楽観ロック・権限・記録も同じです（`via=mcp`）。project は引数 → ヘッダ `X-Looptrack-Project` → 利用できるプロジェクトが 1 つならそれ、の順に決めます。エラーはツールの実行エラー（isError）で、文言は REST と同じです。`.mcp.json` の例: `{"mcpServers": {"looptrack": {"type": "http", "url": "https://example.com/looptrack/mcp", "headers": {"Authorization": "Bearer ${LOOPTRACK_TOKEN}", "X-Looptrack-Project": "<slug>"}}}}`。実際の Claude Code での確認は `deploy/dev/mcp-e2e.sh` で行います |
+| MCP | `/looptrack/mcp` です。公式 Go SDK の streamable HTTP を **Stateless・JSON 応答**で使い、セッションを持たないので常駐メモリが増えません。GET は 405 です。認証は Bearer のアクセストークンだけで、Cookie のセッションは使えません（401 には `WWW-Authenticate: Bearer`）。ツールは `list_projects` `create_project`（プロジェクトの作成。管理者だけ。「setup の直後にブラウザだけで起票できるようにする」の (c) と同じ `service.CreateProject`）`list_issues` `ready_issues` `get_issue` `create_issue` `add_comment` `set_status` `update_issue` `get_matrix` `project_summary` `issue_activity` `guide` `next`（guide / next は §5-2）`assign_issue`（担当者・§9-2・`create_issue` / `set_status` / `update_issue` / `next` にも `assignee` 引数）、トークンの `issue_usage` `usage_missing` `usage_report` `list_usage_ledger` `add_usage_ledger`（§9-5）`list_usage_requests` です。REST と同じ internal/service を呼ぶので、ルール・楽観ロック・権限・記録も同じです（`via=mcp`）。project は引数 → ヘッダ `X-Looptrack-Project` → 利用できるプロジェクトが 1 つならそれ、の順に決めます。エラーはツールの実行エラー（isError）で、文言は REST と同じです。`.mcp.json` の例: `{"mcpServers": {"looptrack": {"type": "http", "url": "https://example.com/looptrack/mcp", "headers": {"Authorization": "Bearer ${LOOPTRACK_TOKEN}", "X-Looptrack-Project": "<slug>"}}}}`。実際の Claude Code での確認は `deploy/dev/mcp-e2e.sh` で行います |
 | edit / push | `edit` は `.claude/.looptrack-work/`（中に `.gitignore`）へ `<ID>.md`・`<ID>.base.md`・版番号を書きます。反映していない変更があれば、`--force` なしでは取り直しません。`push` は変更が無ければ何もせず、作業コピーを消します。409 のときは edit した時点からサーバの最新への差分を stderr に出し、最新版を `<ID>.server.md` に保存して exit 1 で終わります。差分を取り込んだら `push --rebase` で最新版に対して反映します。**作業コピーを取った後に付いたコメントはサーバ側が保持します**（全文更新のコメント節は、現在のコメントの先頭部分であればかまいません） |
 
 ### 1-4. リポジトリ構成
@@ -87,7 +87,7 @@ Markdown で書いたイシューを取り込んでも、下のように分け�
 
 | テーブル | 主な列 | 備考 |
 | -- | -- | -- |
-| `projects` | slug（一意）, prefix（一意）, width, name, description, sort_order, next_number, rules（JSON） | prefix / width は作成後に変更できません |
+| `projects` | slug（一意）, prefix（一意）, width, name, description, sort_order, next_number, rules（JSON）, **archived_at**（NULL 可・`migrations/0004_projects_archived.sql`） | prefix / width は作成後に変更できません。表示名（name）だけは `looptrack project rename <slug> <表示名>` か管理画面（§3-1「プロジェクト管理」）で変えられます（管理者・`LOOPTRACK_DSN` の経路で `project create` と同じ。規則は `service.RenameProject` に置き、名前の検査は作成と同じ `store.ValidateProjectName`（空・空白だけ・255 文字超を拒否）。slug・prefix・width・採番には触れません）。`archived_at` はアーカイブ（画面の「削除」）の印で、**論理削除**です。行もイシュー・コメント・イベントも消さず（`deploy/grants.sql` は projects・issues に DELETE を与えず、comments・issue_events は追記だけのまま）、slug と prefix は一意のまま残るので使い回されません。値があると一覧と解決から外し（§3-1「一覧用と解決用」）、起票・更新・コメントを拒みます。管理者が NULL に戻せます（`looptrack project archive|unarchive <slug>`・管理画面。規則は `service.SetProjectArchived`） |
 | `issues` | project_id, number, display_id（一意）, file_name（VARBINARY）, front_keys（JSON: 出現したキーの順序）, title, type, status, priority, parent（`''` 可・NULL と区別）, created / updated（CHAR(16)）, body_main（MEDIUMTEXT）, gap_nl, preamble（NULL 可）, trail_nl, version, closed_at, **assignee_user_id**（NULL 可・users への FK・マイグレーション 0008・§9-2） | 列挙値は CHECK 制約で縛ります。`version` は楽観ロックに使います。`assignee_user_id` は**サーバだけの項目**で、front_keys には入りません。取り込み・往復一致・ファイルモードには影響せず、表示のときだけ frontmatter に `assignee:` を差し込みます |
 | `issue_values` | issue_id, field（labels / blocked_by / traces / refs）, pos, value | 順序を保ちます。**取り込みでは空白を含む値を分割しません**（書いてあるとおりに保つため）。キー自体が無いことは front_keys で表します。ID の項目（blocked_by / traces / refs）に空白区切りの値を新しく入れることはできません。取り込んだ既存の分は `looptrack repair-lists` で分割します（§2-3） |
 | `issue_extra` | issue_id, key, value | `origin` など、モデルに無い frontmatter のキーです。位置は front_keys で持ちます |
@@ -208,7 +208,7 @@ ID は空白を含みません（採番 ID・文書 ID ともに英数字とハ�
 | 記録 | 管理操作とトークンの発行・失効は、サーバのログ（JSON）に操作者・対象・操作を出します。秘密は出しません |
 | 初回 | 最初の管理者だけは、サーバ上で `looptrack user add … --admin --two-factor required\|optional` を実行して作ります。二段階認証を必須にするか任意にするかもここで決めます（§2-1「二段階認証の設定」・DEPLOY.md） |
 | 二段階認証 | `/looptrack/account` に登録の状態と、任意のときの登録・解除があります。`/looptrack/admin/security`（管理者のみ・ほかは 403）で必須 / 任意の切り替えと変更の記録を扱います。詳しくは §2-1「二段階認証の設定」を見てください |
-| プロジェクト管理 | `/looptrack/admin/projects` です（管理者のみ・ほかは 404・メニューの「プロジェクト管理」から開く）。全プロジェクトを並べ、各プロジェクトの参加者と役割・自分が参加しているか・「開く」（`/looptrack/p/<slug>/`）を出します。付与・変更・解除は `POST /looptrack/admin/projects/<slug>/member` で行います。項目は `login`・`role`（空なら解除）と、代わりの担当者を示す `replacement` です（§9-2「参加を外すときの担当」）。利用者の画面の「プロジェクト権限」（`POST /looptrack/admin/users/<login>/member`）と同じ関数（`setProjectMember`）を通るので、結果は同じです。画面はサーバ側で描きます（JS なし・CSP） |
+| プロジェクト管理 | `/looptrack/admin/projects` です（管理者のみ・ほかは 404・メニューの「プロジェクト管理」から開く）。全プロジェクトを並べ、各プロジェクトの参加者と役割・自分が参加しているか・「開く」（`/looptrack/p/<slug>/`）を出します。付与・変更・解除は `POST /looptrack/admin/projects/<slug>/member` で行います。項目は `login`・`role`（空なら解除）と、代わりの担当者を示す `replacement` です（§9-2「参加を外すときの担当」）。利用者の画面の「プロジェクト権限」（`POST /looptrack/admin/users/<login>/member`）と同じ関数（`setProjectMember`）を通るので、結果は同じです。表示名の変更は `POST …/projects/<slug>/rename`（`name`。`service.RenameProject`）、アーカイブ（画面の「削除」）は `POST …/projects/<slug>/archive`（確認のため `confirm` に slug をそのまま入れさせ、違えば 400）、戻すのは `POST …/projects/<slug>/unarchive` です（どれも `service.SetProjectArchived` / `RenameProject` を呼ぶだけで、規則は service に置きます。管理者以外は 403）。アーカイブ済みのプロジェクトは参加者の欄を出さず、下の「アーカイブしたプロジェクト」に名前・slug・接頭辞と「戻す」だけを並べます。画面はサーバ側で描きます（JS なし・CSP） |
 | プロジェクト権限と自己防衛 | プロジェクト権限は、一覧に出るプロジェクトとそこでの役割を決めます。**管理者も、参加している（行がある）プロジェクトではその役割で動きます**（viewer なら読むだけ）。**行が無いプロジェクトは閲覧のみ**です（役割 viewer 扱い）。プロジェクトの役割によらず管理者に書かせると、viewer で参加している管理者が自分の参加を外すだけで書けてしまうからです。書きたいときは、自分をここで editor / admin として参加させます（自分自身の参加・役割も変えられます）。`/looptrack/admin/*` の管理操作はプロジェクト権限に左右されません（利用者の役割 admin だけで判定します）。利用者の役割（admin / member）と無効化には自己防衛があります（自分には使えず、有効な管理者を 0 人にしません） |
 
 #### 一覧用と解決用
@@ -225,6 +225,13 @@ ID は空白を含みません（採番 ID・文書 ID ともに英数字とハ�
 | -- | -- | -- | -- |
 | 一覧（ハブ・`GET /api/v1/projects`・MCP `list_projects`・MCP の既定プロジェクト） | `store.MemberProjects` | 参加分・役割は `project_members` の値 | 参加分 |
 | 解決（slug・ID を指定した操作: `/looptrack/p/<slug>/`・`/api/v1/projects/<slug>/…`・`/api/v1/issues/<id>`・`activity`・CLI の `LOOPTRACK_PROJECT`・MCP の `project` 引数と ID） | `store.AccessibleProjects` | 全件です。役割は `project_members` に行があればその値、無ければ viewer です（`store.NonMemberAdminRole`） | 参加分 |
+
+**アーカイブ済みのプロジェクト（`projects.archived_at` が NULL でない）は、どちらにも出しません**（`store.UserMemberships` と `store.AccessibleProjects` の 1 か所で外す。
+利用者の役割にかかわらず、管理者の `?all=1` も同じ）。そのため一覧（ハブ・REST・MCP・ログイン済みの CLI）に出ず、slug・ID を指定した
+閲覧・書き込みは「見つからない」（404）になります。書き込みは service の入口（起票の `Create` と、既存イシューを変える `mutate`。
+コメント・状態・担当・編集・検証の記録・補正がここを通る）でも、DB から読み直した `archived_at` で拒みます（`Rejected`・`project_archived`）。
+一覧の解決を通らない呼び出し（サーバ側の管理コマンド）にも効かせるためです。全件を見るのは管理画面（`store.ListProjects`）と、
+書き出し・補正の全件指定だけです（補正の全件指定はアーカイブ済みを外します）。
 
 - **`GET /api/v1/projects?all=1`**（`true` も可・`0` / `false` / 無しは既定）: 管理者だけが使えます。全プロジェクトを返し、参加していないものは
   `role: "viewer"`・`member: false` です（解決の役割と同じ）。**管理者以外が付けると 403 `forbidden`** になります。黙って参加分を返すと、呼び出し側が「全件」と取り違えるからです。
@@ -373,7 +380,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | -- | -- |
 | (a) setup の⑥「最初のプロジェクト」 | slug・接頭辞・表示名を聞き、作ったら最初の管理者を admin で参加させます。対話の既定は、ローカルなら `main`（接頭辞 `MAIN`・表示名 `main`）、チームなら `-`（作らない）です。`--yes` では、`--project <slug>`（`--project-prefix`・`--project-name`）があるときだけ作ります。後の 2 つの既定は、slug を英大文字にしたものと slug です |
 | (b) ローカルモードの全プロジェクトへの参加 | 要求ごとに（利用者を引いた直後）、参加の行が無いすべてのプロジェクトへローカルの利用者を admin で参加させます（`store.ProjectsWithoutMember`・`AddMemberIfAbsent`）。役割を要求ごとに計算するのではなく、**行を作ります**。担当者の候補（`AssignableMembers`）と一覧（`MemberProjects`）も参加の行で決まるからです。**既存の行は変えません**。画面で自分を viewer・editor にしたものはそのままで、外した参加は次の要求で admin に戻ります。チームのサーバ（通常モード）では行いません |
-| (c) 画面からプロジェクトを作る | `POST /looptrack/admin/projects`（slug・prefix・name）です。管理者だけが使え、管理者以外には 404 を返します。CSRF の検査もあります。プロジェクトの作成と作った人の admin での参加を 1 つのトランザクションで行い、そのプロジェクトのボードへ移ります。プロジェクト管理の画面に「プロジェクトを作る」を置き、ハブの空の表示と案内からそこへリンクします。チームのサーバでも使えます。権限の規則は同じです。作った人は明示的に参加し、ほかの管理者は参加するまで閲覧のみです |
+| (c) 画面からプロジェクトを作る | `POST /looptrack/admin/projects`（slug・prefix・name）です。MCP の `create_project`（slug・name・description・prefix・width）も同じ処理（`service.CreateProject`。管理者でなければ Forbidden）を呼びます。setup がプロジェクトを見つけられないときは、管理者には `create_project` で作れること（prefix と width は後から変えられないので、AI が値を利用者に確かめる）を、管理者でない利用者には管理者に頼むことを、エラーの文面に添えます。管理者だけが使え、管理者以外には 404 を返します。CSRF の検査もあります。プロジェクトの作成と作った人の admin での参加を 1 つのトランザクションで行い、そのプロジェクトのボードへ移ります。プロジェクト管理の画面に「プロジェクトを作る」を置き、ハブの空の表示と案内からそこへリンクします。チームのサーバでも使えます。権限の規則は同じです。作った人は明示的に参加し、ほかの管理者は参加するまで閲覧のみです |
 
 最初の管理者・二段階認証の設定・最初のプロジェクト・参加の行は、`setupwiz.Provision` が 1 つのトランザクションで作ります。`looptrack setup` と画面版の初回設定が同じ関数を呼び、失敗したら何も残しません。そのため `store.SetTwoFactorPolicy` とは別に、呼び出し元のトランザクションで行う `SetTwoFactorPolicyTx` があります。
 `looptrack user add` はこの流れを通らず、単独で利用者を作ります（`addUser`）。
@@ -739,8 +746,8 @@ BLOCKED は 26 文字（ID 3 つ弱）を上限とし、超える値は 25 文�
 | 部品 | **fyne.io/systray v1.12.2** です（Apache-2.0。getlantern/systray のフォークで保守が続いています）。OS ごとの仕組みは表の下にまとめました |
 | cgo | macOS だけで要ります。macOS の desktop ビルドは macOS の runner で arm64・amd64 を cgo でビルドし、`lipo` でまとめます。Linux・Windows の desktop ビルドは cgo なしのクロスビルドです（ubuntu の runner）。headless は従来どおり cgo なしです |
 | クリップボード | github.com/atotto/clipboard v0.1.4（BSD-3-Clause。macOS は pbcopy / Linux は xclip / xsel / wl-copy / Windows は Win32 API） |
-| メニュー | 画面を開く / AI の接続設定をコピー ▸（`setupwiz.MCPConfigs` の各項目＝画面の `/first-run/done` と同じ文字列。X-Looptrack-Project は最初のプロジェクト）・接続設定の画面を開く / CLI を使えるようにする / ログイン時に起動する（チェック）/ 終了 |
-| クリック | **Windows だけ、左クリックで画面を開きます**（OS の慣例です。メニューは右クリック。`systray.SetOnTapped`）。macOS・Linux は左クリックでもメニューを出します（既定のまま） |
+| メニュー | 画面を開く / 設定（ブラウザでアカウント設定の画面 `/account` を開く。`App.OpenSettings`）/ AI の接続設定をコピー ▸（`setupwiz.MCPConfigs` の各項目＝画面の `/first-run/done` と同じ文字列。X-Looptrack-Project は最初のプロジェクト）・接続設定の画面を開く / CLI を使えるようにする / ログイン時に起動する（チェック）/ 終了 |
+| クリック | **どの OS でも左クリックでメニューを出します**（systray の既定の動き。`SetOnTapped` は使いません。以前は Windows だけ左クリックで画面を開き、メニューは右クリックにしていましたが、どの OS でも同じ操作にする利用者の判断で改めました） |
 | 終了 | 「終了」・シグナル・サーバの異常で `App.Quit` を呼びます → トレイを閉じ、サーバを `Shutdown`（15 秒）→ `desktop.json` にはポートだけを残します |
 | トレイが出ない環境 | Linux でセッションの D-Bus に接続できなければトレイを出さずに動きます（systray は接続が無いまま終了の処理で止まるためです）。GNOME は拡張（AppIndicator）が無いとアイコンが見えません。どちらも `looptrack desktop --quit` で止めます（利用者ガイドに書きます） |
 | アイコン | **仮のもの**です（角の丸い藍色の四角に白い輪と矢じり）。置き場は `internal/client/desktop/icon/`（`app.png`・`app_256.png`・`app.icns`・`app.ico`・`tray.png`・`tray.ico`・`tray_template.png`）で、`go run ./internal/client/desktop/icon/gen` が作ります。差し替えるときは同じ名前・形式のファイルを置くだけです（トレイは埋め込み、配布物は desktop.sh がここから取ります） |
@@ -1129,7 +1136,7 @@ prompt review の手順:
 | 項目 | 内容 |
 | -- | -- |
 | 画面 | `/looptrack/`（プロジェクト選択）と `/looptrack/p/<slug>/`（ボード / 一覧 / トレース + 詳細ドロワー）です。どちらもログイン必須で、権限の無いプロジェクトは 404 です |
-| 一覧に出るプロジェクト | **管理者も含め、参加している（`project_members` に行がある）プロジェクトだけ**です。役割は `project_members` の値をそのまま出します。管理者にはハブにプロジェクト管理（§3-1）への導線を出します（`data-admin`・参加 0 件のときの案内）。参加していないプロジェクトも `/looptrack/p/<slug>/` を直接開けば見られますが、**閲覧のみ**です。**管理者もプロジェクトの中では `project_members` の役割で動きます**。viewer で参加しているときや参加していないときは、担当の変更・レポート作成依頼のフォームを出しません（§3-1「一覧用と解決用」） |
+| 一覧に出るプロジェクト | **管理者も含め、参加している（`project_members` に行がある）プロジェクトだけ**です。役割は `project_members` の値をそのまま出します。管理者にはハブにプロジェクト管理（§3-1）への導線を出します（`data-admin`・参加 0 件のときの案内）。参加していないプロジェクトも `/looptrack/p/<slug>/` を直接開けば見られますが、**閲覧のみ**です。アーカイブ済みのプロジェクトは一覧にも出ず、直接開いても 404 です（戻すのはプロジェクト管理から。§3-1）。**管理者もプロジェクトの中では `project_members` の役割で動きます**。viewer で参加しているときや参加していないときは、担当の変更・レポート作成依頼のフォームを出しません（§3-1「一覧用と解決用」） |
 | データ | 画面は骨組みだけを返します。詳細は表の下の「ボードのデータの取り方」です |
 | 本文を載せない理由 | 全件の本文を載せると数百件のプロジェクトで応答が数 MB になりました（大半はクローズ済みの本文）。4 秒ごとの見直しで遅い回線が埋まりました。画面が本文を使うのは詳細と検索だけなので、どちらも必要なときだけ取ります |
 | 詳細の本文 | 詳細を開いたときに既存の 1 件取得 `GET …/issues/{id}?project=<slug>` を呼び、`markdown` から frontmatter を除いて描きます（ボードの `body` と同じ範囲）。ボードの各イシューの `version`（コメントや状態の変更でも進みます）ごとに覚え、版が同じなら取り直しません |

@@ -84,7 +84,7 @@ func shlexSplit(s string) ([]string, error) {
 				quoted = true
 				switch {
 				case !ok:
-					return nil, errors.New("shlex: 引用符が閉じていません") // 呼び出し元が握りつぶす内部のエラー。利用者に出ないので 2 言語化しない
+					return nil, errors.New("shlex: unclosed quote") // 呼び出し元が握りつぶす内部のエラー。利用者に出ないので対訳にしない
 				case r == state:
 					state = 'a'
 				case r == '\\' && state == '"':
@@ -94,7 +94,7 @@ func shlexSplit(s string) ([]string, error) {
 				}
 			case state == '\\':
 				if !ok {
-					return nil, errors.New("shlex: 末尾が \\ です") // 同上（内部のエラー）
+					return nil, errors.New("shlex: trailing backslash") // 同上（内部のエラー）
 				}
 				if isQuote(escaped) && r != '\\' && r != escaped {
 					tok.WriteRune('\\')

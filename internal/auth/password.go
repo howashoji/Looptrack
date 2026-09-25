@@ -6,11 +6,12 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // argon2id のパラメータ（OWASP Password Storage Cheat Sheet の下限: m=19MiB, t=2, p=1）。
@@ -27,7 +28,7 @@ const (
 const MinPasswordLen = 12
 
 // ErrPasswordPolicy はパスワードが規則を満たさないことを表す。
-var ErrPasswordPolicy = fmt.Errorf("パスワードは %d 文字以上にしてください", MinPasswordLen)
+var ErrPasswordPolicy = i18n.Errorf("auth.err.password_policy", "min", MinPasswordLen)
 
 // HashPassword は argon2id の PHC 形式文字列を返す。
 func HashPassword(password string) (string, error) {
@@ -48,11 +49,11 @@ func HashPassword(password string) (string, error) {
 func VerifyPassword(encoded, password string) (bool, error) {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {
-		return false, errors.New("argon2id のハッシュではありません")
+		return false, i18n.Errorf("auth.err.not_argon2id")
 	}
 	var version int
 	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
-		return false, errors.New("argon2 のバージョンが対応外です")
+		return false, i18n.Errorf("auth.err.argon2_version")
 	}
 	var m uint32
 	var t uint32

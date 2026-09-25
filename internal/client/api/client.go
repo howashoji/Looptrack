@@ -87,11 +87,11 @@ type ConnError struct {
 }
 
 func (e *ConnError) Error() string {
-	return fmt.Sprintf("サーバに接続できません（%s）: %s", e.URL, e.Reason)
+	return i18n.Text(i18n.JA, e.Unwrap())
 }
 
 // Unwrap は ID を持つ文面を返す（i18n.Text が errors.As でこれを見つけて訳す）。
-// Error() の日本語はログと、まだ i18n を通していない表示のために残してある。
+// Error() はログと、まだ i18n を通していない表示のために、同じ ID の日本語（対訳表の正本）を返す。
 func (e *ConnError) Unwrap() error {
 	return i18n.Errorf("api.err.connect", "url", e.URL, "reason", e.Reason)
 }
@@ -100,7 +100,7 @@ func (e *ConnError) Unwrap() error {
 type NoTokenError struct{ URL string }
 
 func (e *NoTokenError) Error() string {
-	return fmt.Sprintf("アクセストークンがありません。%s login --browser でログインしてください（%s）", EntryCommand(), e.URL)
+	return i18n.Text(i18n.JA, e.Unwrap())
 }
 
 // Unwrap は ID を持つ文面を返す（ConnError と同じ）。
@@ -112,7 +112,7 @@ func (e *NoTokenError) Unwrap() error {
 type TimeoutError struct{ Var, Value string }
 
 func (e *TimeoutError) Error() string {
-	return fmt.Sprintf("%s は秒数で指定してください（指定値: %s）", e.Var, e.Value)
+	return i18n.Text(i18n.JA, e.Unwrap())
 }
 
 // Unwrap は ID を持つ文面を返す（ConnError と同じ）。

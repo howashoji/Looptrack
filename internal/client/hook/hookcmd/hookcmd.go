@@ -120,6 +120,24 @@ func SimpleCommands(cmd string) ([][]string, bool) {
 	if err != nil {
 		return nil, false
 	}
+	return simpleCommandsFrom(toks), true
+}
+
+// SimpleCommandsWin は SimpleCommands と同じだが、`\` をエスケープとして扱わない（winEscape）。
+// PowerShell / cmd に渡された引用符なしの Windows の絶対パス（`C:\tools\git.exe`）が、posix の規則
+// （`\` は次の 1 文字を打ち消す）では区切りを失って 1 語のまま読めない（`C:\tools\git.exe` →
+// `C:toolsgit.exe`）。git ガードが posix の判定と**両方**に掛けて二重に見るときだけ使う
+// （利用者・監督の決定「案 1」）。
+func SimpleCommandsWin(cmd string) ([][]string, bool) {
+	toks, _, err := shlexTokens(StripHeredocs(cmd), winEscape)
+	if err != nil {
+		return nil, false
+	}
+	return simpleCommandsFrom(toks), true
+}
+
+// simpleCommandsFrom は SimpleCommands / SimpleCommandsWin の共通部分（語の並びを単純コマンドごとに分ける）。
+func simpleCommandsFrom(toks []string) [][]string {
 	out := [][]string{}
 	var cur []string
 	for _, t := range toks {
@@ -135,7 +153,7 @@ func SimpleCommands(cmd string) ([][]string, bool) {
 	if len(cur) > 0 {
 		out = append(out, cur)
 	}
-	return out, true
+	return out
 }
 
 // redirectOps はリダイレクトの演算子（区切りの文字だけでできた語のうち、単純コマンドを終わらせないもの）。
@@ -157,7 +175,19 @@ var redirectOps = map[string]bool{
 //
 // 引数の並びで判定する hook（git ガード）が使う。SimpleCommands の結果は以前の hook の記録と突き合わせてあるので変えない。
 func CommandWords(cmd string) ([][]string, bool) {
-	toks, infos, err := shlexTokens(StripHeredocs(cmd))
+	return commandWordsFrom(StripHeredocs(cmd), posixEscape)
+}
+
+// CommandWordsWin は CommandWords と同じだが、`\` をエスケープとして扱わない（winEscape）。
+// SimpleCommandsWin と同じ理由で、git ガードが posix の判定と**両方**に掛けて二重に見るときだけ使う
+// （利用者・監督の決定「案 1」）。
+func CommandWordsWin(cmd string) ([][]string, bool) {
+	return commandWordsFrom(StripHeredocs(cmd), winEscape)
+}
+
+// commandWordsFrom は CommandWords / CommandWordsWin の共通部分。
+func commandWordsFrom(strippedCmd string, escapeChar rune) ([][]string, bool) {
+	toks, infos, err := shlexTokens(strippedCmd, escapeChar)
 	if err != nil {
 		return nil, false
 	}

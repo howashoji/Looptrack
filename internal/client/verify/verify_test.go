@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // 不正な UTF-8 を U+FFFD に置き換えた結果の golden（以前の CLI の置き換えと同じ単位）。
@@ -129,7 +130,7 @@ func TestLine(t *testing.T) {
 		{Result{Command: "sleep 9", Status: StatusTimeout, DurationMS: 500}, "[1/2] timeout sleep 9（時間切れ・0.5 秒）"},
 		{Skipped("make"), "[1/2] skipped make（全体の上限を超えたため実行しない）"},
 	} {
-		if got := Line(1, 2, c.r); got != c.want {
+		if got := Line(i18n.JA, 1, 2, c.r); got != c.want {
 			t.Errorf("Line = %q, want %q", got, c.want)
 		}
 	}

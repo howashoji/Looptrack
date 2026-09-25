@@ -292,7 +292,7 @@ func TestVerifyNextAndMCP(t *testing.T) {
 	// MCP verify_issue: GET と同じ文言 + report_verify の使い方。節なしは isError で GET の message と同じ
 	m := v.mcpAs(v.ed.token, map[string]string{"X-Looptrack-Project": "vn"})
 	text, data := m.call("verify_issue", map[string]any{"id": id}, false)
-	if p := v.plan(id); text != p.Text+"\n"+reportVerifyHint(p.BodySHA256) || data["body_sha256"] != p.BodySHA256 {
+	if p := v.plan(id); text != p.Text+"\n"+reportVerifyHint(i18n.JA, p.BodySHA256) || data["body_sha256"] != p.BodySHA256 {
 		t.Errorf("verify_issue:\n%s\nGET:\n%s", text, p.Text)
 	}
 	text, _ = m.call("verify_issue", map[string]any{"id": none}, true)

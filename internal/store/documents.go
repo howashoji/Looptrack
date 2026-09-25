@@ -43,6 +43,9 @@ type Project struct {
 	SortOrder   int
 	Counter     int
 	Rules       json.RawMessage // プロジェクト別ルール（NULL は nil）
+	// Archived はアーカイブ済み（projects.archived_at が NULL でない）。管理画面の「削除」は論理削除で、
+	// 一覧と操作の解決（AccessibleProjects・UserMemberships）から外し、書き込みは service が拒む。
+	Archived bool
 }
 
 // StoredIssue は DB から復元した 1 イシュー。
@@ -657,12 +660,79 @@ func ValidateNewProject(p Project) error {
 		return i18n.Errorf("store.err.project.prefix", "prefix", fmt.Sprintf("%q", p.Prefix))
 	case p.Width < 1 || p.Width > 9:
 		return i18n.Errorf("store.err.project.width", "width", p.Width)
-	case strings.TrimSpace(p.Name) == "" || len([]rune(p.Name)) > 255:
-		return i18n.Errorf("store.err.project.name")
+	case ValidateProjectName(p.Name) != nil:
+		return ValidateProjectName(p.Name)
 	case len([]rune(p.Description)) > 1024:
 		return i18n.Errorf("store.err.project.description")
 	}
 	return nil
+}
+
+// ValidateProjectName はプロジェクトの表示名を検査する（空・空白だけ・255 文字を超えるものは拒否）。
+// 作成と表示名の変更で同じ規則を使う。
+func ValidateProjectName(name string) error {
+	if strings.TrimSpace(name) == "" || len([]rune(name)) > 255 {
+		return i18n.Errorf("store.err.project.name")
+	}
+	return nil
+}
+
+// SetProjectName はプロジェクトの表示名だけを書き換える（slug・prefix・width には触れない）。
+// 規則の検査は呼ぶ側（service.RenameProject）が行う。
+func SetProjectName(ctx context.Context, q execQuerier, projectID int64, name string) error {
+	res, err := q.ExecContext(ctx, "UPDATE projects SET name = ? WHERE id = ?", name, projectID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		var one int
+		if err := q.QueryRowContext(ctx, "SELECT 1 FROM projects WHERE id = ?", projectID).Scan(&one); errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+	}
+	return nil
+}
+
+// DefaultProjectWidth はプロジェクトの番号の桁数の既定（looptrack project create・setup の最初のプロジェクト・
+// 管理画面と MCP の作成で同じ）。作成後は変えられない。
+const DefaultProjectWidth = 4
+
+// SetProjectArchived はプロジェクトをアーカイブする（archived が true）か、使用中に戻す。
+// 変わったら true を返す（すでにその状態なら false）。行も、イシュー・コメント・イベントも消さない。
+// 規則と権限は呼ぶ側（service.SetProjectArchived と、その呼び出し側）が持つ。
+func SetProjectArchived(ctx context.Context, q execQuerier, projectID int64, archived bool) (bool, error) {
+	query := "UPDATE projects SET archived_at = CURRENT_TIMESTAMP(6) WHERE id = ? AND archived_at IS NULL"
+	if !archived {
+		query = "UPDATE projects SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL"
+	}
+	res, err := q.ExecContext(ctx, query, projectID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if n > 0 {
+		return true, nil
+	}
+	var one int
+	if err := q.QueryRowContext(ctx, "SELECT 1 FROM projects WHERE id = ?", projectID).Scan(&one); errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	} else if err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+// ProjectArchived はプロジェクトがアーカイブ済みかを DB から読む（書き込みの直前の判定用。無ければ ErrNotFound）。
+func ProjectArchived(ctx context.Context, q execQuerier, projectID int64) (bool, error) {
+	var archived bool
+	err := q.QueryRowContext(ctx, "SELECT archived_at IS NOT NULL FROM projects WHERE id = ?", projectID).Scan(&archived)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	return archived, err
 }
 
 // ErrProjectExists は slug か prefix がすでに使われていることを表す。
@@ -688,12 +758,12 @@ func CreateProject(ctx context.Context, q execQuerier, p Project) (int64, error)
 	return res.LastInsertId()
 }
 
-const projectColumns = "id, slug, prefix, width, name, description, sort_order, counter, rules"
+const projectColumns = "id, slug, prefix, width, name, description, sort_order, counter, rules, archived_at IS NOT NULL"
 
 func scanProject(row interface{ Scan(...any) error }) (Project, error) {
 	var p Project
 	var rules []byte
-	err := row.Scan(&p.ID, &p.Slug, &p.Prefix, &p.Width, &p.Name, &p.Description, &p.SortOrder, &p.Counter, &rules)
+	err := row.Scan(&p.ID, &p.Slug, &p.Prefix, &p.Width, &p.Name, &p.Description, &p.SortOrder, &p.Counter, &rules, &p.Archived)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNotFound
 	}
@@ -703,7 +773,8 @@ func scanProject(row interface{ Scan(...any) error }) (Project, error) {
 	return p, err
 }
 
-// ListProjects は全プロジェクトを並び順（sort_order, slug）で返す。
+// ListProjects は全プロジェクトを並び順（sort_order, slug）で返す。アーカイブ済みも含む
+// （管理画面・書き出し・補正用。利用者に見せる一覧と操作の解決は AccessibleProjects / MemberProjects を使う）。
 func ListProjects(ctx context.Context, q execQuerier) ([]Project, error) {
 	rows, err := q.QueryContext(ctx, "SELECT "+projectColumns+" FROM projects ORDER BY sort_order, slug")
 	if err != nil {

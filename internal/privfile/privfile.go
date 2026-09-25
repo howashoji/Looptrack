@@ -7,17 +7,21 @@ package privfile
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // PermError は本人以外が読める（または権限を書き換えられる）ファイルであること。
 type PermError struct{ Path string }
 
-func (e *PermError) Error() string {
-	return fmt.Sprintf("%s は本人以外も読めます（unix はパーミッション 600、Windows は本人だけの ACL にしてください）", e.Path)
-}
+// Error はログと、i18n を通していない表示のための日本語（対訳表の正本）。利用者の言語の文面は
+// i18n.Text が Unwrap の ID から作る。
+func (e *PermError) Error() string { return i18n.Text(i18n.JA, e.Unwrap()) }
+
+// Unwrap は ID を持つ文面を返す（i18n.Text が errors.As でこれを見つけて訳す）。
+func (e *PermError) Unwrap() error { return i18n.Errorf("privfile.err.too_open", "path", e.Path) }
 
 // CreateTemp は dir に本人だけが読み書きできる一時ファイルを作る（os.CreateTemp と同じ pattern）。
 // 中身を書く前に保護するので、書きかけの秘密が他の利用者に読まれない。
@@ -103,7 +107,7 @@ func ProtectDir(dir string) error { return protectDir(dir) }
 func MkdirAll(dir string) error {
 	if st, err := os.Stat(dir); err == nil {
 		if !st.IsDir() {
-			return fmt.Errorf("%s はディレクトリではありません", dir)
+			return i18n.Errorf("privfile.err.not_dir", "path", dir)
 		}
 		return nil
 	}

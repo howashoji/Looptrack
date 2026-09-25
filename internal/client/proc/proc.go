@@ -15,11 +15,12 @@ package proc
 import (
 	"bytes"
 	"context"
-	"errors"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // Proc は 1 つのプロセス。
@@ -36,8 +37,9 @@ type Proc struct {
 // Minutes は経過時間の分（端数は切り捨て。ps の etime の秒を捨てる bash 版と同じ）。
 func (p Proc) Minutes() int { return int(p.Elapsed / time.Minute) }
 
-// ErrUnsupported はこの OS ではプロセスの一覧を取れないとき。
-var ErrUnsupported = errors.New("proc: この OS ではプロセスの一覧を取れません")
+// ErrUnsupported はこの OS ではプロセスの一覧を取れないとき（呼び出し側は fail-open で黙るので利用者には出ない。
+// 文面は ID で持ち、出すときは i18n.Text で利用者の言語にする）。
+var ErrUnsupported = i18n.Errorf("proc.err.unsupported")
 
 // List は今のプロセスの一覧を返す（順不同）。取れなければ error（呼び出し側は fail-open で何もしない）。
 func List(ctx context.Context) ([]Proc, error) { return list(ctx) }

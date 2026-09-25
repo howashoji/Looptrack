@@ -6,7 +6,7 @@
 init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI copilot）
 kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
 配線: looptrack hook <名前> --agent <AI>
-導入セット: core + loop（hook 19 本を配線）
+導入セット: core + loop（hook 20 本を配線）
   作成         .claude/rules/looptrack-loop/background-process.md
   作成         .claude/rules/looptrack-loop/en/background-process.md
   作成         .claude/rules/looptrack-loop/en/iteration-discipline.md

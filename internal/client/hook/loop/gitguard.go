@@ -439,21 +439,28 @@ func PreToolGitGuard(ctx context.Context, ev hookio.Event) (hookio.Result, error
 	}
 	// 判定に掛ける文字列は hookcmd の共通の段で作る（秘密のガードと同じものを呼ぶ）。
 	// リダイレクト（`2>&1`・`>/dev/null`）は語から外す（記述子の `2` をパス指定の引数と数えない）。
-	cmds, ok := hookcmd.CommandWords(hookcmd.Normalize(cmd, hookcmd.HeadOnly))
-	if !ok {
-		return hookio.Result{}, nil // 分解できないものは通す（fail-open）
-	}
+	normalized := hookcmd.Normalize(cmd, hookcmd.HeadOnly)
 	cwd := ev.CWD
 	if cwd == "" {
 		cwd = e.Getwd()
 	}
 	lang := e.lang()
-	for _, words := range cmds {
-		if reason, deny := gitGuardReason(lang, cwd, words); reason != "" {
-			if deny {
-				return hookio.Result{Deny: i18n.T(lang, "loop.gitguard.deny", "reason", reason)}, nil
+	// posix の分け方（Git Bash も含む）と、Windows 規則の第 2 の分け方（PowerShell / cmd。`\` を
+	// エスケープとして扱わないので、引用符で囲まない `C:\tools\git.exe` が区切りを失わず 1 語のまま読める）
+	// の両方に掛け、どちらかが当たれば発火する（利用者・監督の決定「案 1」）。posix 側の結果は
+	// 1 ビットも変わらないので Git Bash はこれまでどおり無傷。どちらも分解できなければ通す（fail-open）。
+	for _, split := range []func(string) ([][]string, bool){hookcmd.CommandWords, hookcmd.CommandWordsWin} {
+		cmds, ok := split(normalized)
+		if !ok {
+			continue
+		}
+		for _, words := range cmds {
+			if reason, deny := gitGuardReason(lang, cwd, words); reason != "" {
+				if deny {
+					return hookio.Result{Deny: i18n.T(lang, "loop.gitguard.deny", "reason", reason)}, nil
+				}
+				return hookio.Result{Ask: i18n.T(lang, "loop.gitguard.ask", "reason", reason)}, nil
 			}
-			return hookio.Result{Ask: i18n.T(lang, "loop.gitguard.ask", "reason", reason)}, nil
 		}
 	}
 	return hookio.Result{}, nil

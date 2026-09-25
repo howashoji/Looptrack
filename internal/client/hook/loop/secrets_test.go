@@ -173,6 +173,11 @@ func TestPreToolSecrets(t *testing.T) {
 		{name: "雛形の複写の前に移動がある", mk: bash("cd app && cp .env.example .env"), want: quiet},
 		{name: "雛形の複写の後ろに echo", mk: bash("cp .env.example .env; echo done"), want: quiet},
 		{name: "雛形の複写に || が続く", mk: bash("cp .env.example .env || true"), want: quiet},
+		// 行末のコメントの中の '（アポストロフィ）で、閉じていない引用符と誤認しないこと。
+		// 対照: 引用符が本当に閉じていない（コメントの外で開いたまま終わる）ときは従来どおり確認のまま
+		{name: "行末コメントの中の ' があっても雛形の複写は通る", mk: bash("cp .env.example .env  # memo: don't touch"), want: quiet},
+		{name: "対照: コメントの外で開いた引用符は閉じていないまま（雛形の例外を使わない）",
+			mk: bash("cp .env.example .env 'unterminated # not a comment"), want: ask},
 
 		// 通るようになった形（公開の署名・証明書・書類）
 		{name: "リリース物の署名を写す", mk: bash("cp dist/looptrack.tar.gz.asc /tmp/out/"), want: quiet},
@@ -547,6 +552,15 @@ func TestPreToolSecrets(t *testing.T) {
 		{name: "仮想環境の有効化は通す", mk: bash("source /tmp/lt-s41/venv/bin/activate"), want: quiet},
 		{name: "シェルの設定の読み込みは通す", mk: bash("source /tmp/lt-s41/.bashrc"), want: quiet},
 		{name: "引用符の中の source は通す", mk: bash(`echo 'source .env'`), want: quiet},
+
+		// グロブ（利用者の決定 2026-09-21）: 名前が見えているグロブ（.env*・id_rsa*）だけを塞ぐ。
+		// 名前を伏せるグロブ（.e*・*）は塞がない。読むコマンドに限る（ls のような中身を出さないコマンドでは鳴らない）
+		{name: "名前が見えているグロブ（.env*）", mk: bash("cat /nonexistent/x/.env*"), want: ask},
+		{name: "名前が見えているグロブ（id_rsa*）", mk: bash("cat /nonexistent/x/id_rsa*"), want: ask},
+		{name: "名前を伏せるグロブ（.e*）は塞がない", mk: bash("cat /nonexistent/x/.e*"), want: quiet},
+		{name: "名前を伏せるグロブ（*）は塞がない", mk: bash("cat /nonexistent/x/*"), want: quiet},
+		{name: "読まないコマンド + 名前が見えているグロブは塞がない", mk: bash("ls /nonexistent/x/.env*"), want: quiet},
+		{name: "グロブでも雛形は通す（.env.example*）", mk: bash("cat /nonexistent/x/.env.example*"), want: quiet},
 
 		// ⑦ 前置の語（sudo・env・xargs…）の直後はコマンドの位置。
 		// macOS では CAT が /bin/cat として実際に実行され、中身が出る（実測）

@@ -484,7 +484,7 @@ func (in *installer) decideLoop(prevLoop *jsonorder.Object, loopFiles map[string
 		return false, false
 	}
 	ans := strings.ToLower(trimSpace(line))
-	yes := ans == "y" || ans == "yes" || ans == "はい"
+	yes := ans == "y" || ans == "yes" || ans == "はい" // 受け付ける答えの綴り（判定に使うので訳さない）
 	return yes, !yes
 }
 

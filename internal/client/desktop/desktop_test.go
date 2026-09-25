@@ -59,7 +59,7 @@ func TestAutostartContent(t *testing.T) {
 		t.Error("KeepAlive を付けると終了しても再起動される")
 	}
 
-	entry := autostartDesktopEntry([]string{"/home/a/Apps/Looptrack v1.AppImage", "desktop", "--background"})
+	entry := autostartDesktopEntry([]string{"/home/a/Apps/Looptrack v1.AppImage", "desktop", "--background"}, i18n.JA)
 	if !strings.Contains(entry, "\nExec=\"/home/a/Apps/Looptrack v1.AppImage\" desktop --background\n") {
 		t.Errorf(".desktop の Exec:\n%s", entry)
 	}
@@ -541,5 +541,17 @@ func TestMainQuit(t *testing.T) {
 	case <-done:
 	case <-time.After(20 * time.Second):
 		t.Fatal("止まらない")
+	}
+}
+
+// トレイの「設定」（App.OpenSettings）が開く URL を確かめる（トレイの実物は -tags desktop・cgo が要るため、
+// ここでは URL の組み立てだけを見る。実物での確認は tray パッケージの責務の外）。
+func TestOpenSettings(t *testing.T) {
+	rec := &recorder{}
+	a := &App{opts: &Options{Open: rec.open}, port: 18090}
+	a.OpenSettings()
+	want := "http://127.0.0.1:18090" + BasePath + SettingsPath
+	if got := rec.openedURLs(); len(got) != 1 || got[0] != want {
+		t.Errorf("OpenSettings が開いた URL = %v, want [%s]", got, want)
 	}
 }

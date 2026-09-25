@@ -240,6 +240,8 @@ sudo sh install.sh --uninstall                   # 外す（設定とデータ�
 サーバ（looptrack serve）は TLS を持たず、`127.0.0.1:<port>` だけで待ち受けます。
 install.sh は nginx と Caddy の設定例を表示し、`/etc/looptrack/proxy-examples.txt` にも置きます。
 設定例では接頭辞（`LOOPTRACK_BASE_PATH`）を剥がさずに渡し、`X-Real-IP` を付けます。サーバは既定で 127.0.0.1 と Docker のネットワークからの `X-Real-IP` を信用します。
+nginx の設定を手で書くときも `proxy_buffering off;` を入れてください。MCP の購読は SSE で接続を開いたまま通知を流すので、nginx が溜めるとクライアントに届かず、クライアントが待ちきれずに切ります。
+サーバは `/mcp` の応答に `X-Accel-Buffering: no` を付けるので、nginx はこの見出しを無視する設定（`proxy_ignore_headers X-Accel-Buffering`）でない限り、`/mcp` の応答を溜めません。
 TLS をプロキシに任せる理由は次の 3 つです。
 
 - 証明書の取得・更新（ACME）はプロキシの役目です（Caddy は自動、nginx は certbot）。

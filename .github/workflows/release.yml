@@ -12,7 +12,7 @@
 #   sign-macos（macOS の runner）: darwin の実行ファイルに Developer ID で署名し公証する（deploy/release/sign-macos.sh）
 #   sums     : 署名の後の最終ファイルから SHA256SUMS を作る（署名しないときも、このジョブが作る）
 #   sign-sums: SHA256SUMS を minisign で署名する（SHA256SUMS.minisig。公開鍵は deploy/release/minisign.pub）
-# 署名と公開のジョブは Environment「release」（タグ v* のみ・承認つき）の Secrets を使う。Secrets が無ければ、そのジョブは何もせずにエラーで止まる。
+# 署名と公開のジョブは Environment「release」（タグ v* のみ。承認者は置かない）の Secrets を使う。Secrets が無ければ、そのジョブは何もせずにエラーで止まる。
 # 公開（publish）は署名を必須にする（RELEASE_SIGN が "true" でないと meta で止まる。self-update は署名の無い配布から更新しないため）。
 # Windows は当面署名しない（公開後に SignPath Foundation）。
 #

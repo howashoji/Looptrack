@@ -7,9 +7,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"strings"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // Box は DB に置く秘密情報（TOTP シークレット）を AES-256-GCM で暗号化する。
@@ -20,10 +20,10 @@ type Box struct{ aead cipher.AEAD }
 func NewBox(keyB64 string) (*Box, error) {
 	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(keyB64))
 	if err != nil {
-		return nil, fmt.Errorf("LOOPTRACK_SECRET_KEY を base64 として読めません: %w", err)
+		return nil, i18n.Wrapf(err, "auth.err.secret_key_base64")
 	}
 	if len(key) != 32 {
-		return nil, fmt.Errorf("LOOPTRACK_SECRET_KEY は 32 バイトにしてください（現在 %d バイト）", len(key))
+		return nil, i18n.Errorf("auth.err.secret_key_length", "bytes", len(key))
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -58,7 +58,7 @@ func (b *Box) Seal(plain []byte) ([]byte, error) {
 func (b *Box) Open(sealed []byte) ([]byte, error) {
 	n := b.aead.NonceSize()
 	if len(sealed) < n {
-		return nil, errors.New("暗号文が短すぎます")
+		return nil, i18n.Errorf("auth.err.sealed_too_short")
 	}
 	return b.aead.Open(nil, sealed[:n], sealed[n:], nil)
 }

@@ -135,7 +135,7 @@ func TestServeSecretKeyRequired(t *testing.T) {
 	} {
 		t.Setenv("LOOPTRACK_LOCAL_MODE", tc.local)
 		t.Setenv("LOOPTRACK_DSN", tc.dsn)
-		if _, _, err := serveConfig(logger); err == nil || !strings.Contains(err.Error(), "LOOPTRACK_SECRET_KEY") {
+		if _, _, err := serveConfig(logger); err == nil || !strings.Contains(i18n.Text(i18n.JA, err), "LOOPTRACK_SECRET_KEY") {
 			t.Errorf("local=%q dsn=%q: err = %v, want LOOPTRACK_SECRET_KEY のエラー", tc.local, tc.dsn, err)
 		}
 	}

@@ -713,7 +713,7 @@ func (q *prompter) password() (string, error) {
 			return "", err
 		}
 		if len([]rune(a)) < auth.MinPasswordLen {
-			fmt.Fprintf(q.w, "  → %v\n", auth.ErrPasswordPolicy)
+			fmt.Fprintf(q.w, "  → %s\n", i18n.Text(q.lang, auth.ErrPasswordPolicy))
 			continue
 		}
 		b, err := q.readSecret(i18n.T(q.lang, "setupwiz.ask.password_again"))

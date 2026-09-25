@@ -17,7 +17,8 @@ Server design and deployment details live in separate documents for developers a
 | 5 | [Agent-specific notes](ai-agents.md) | Claude Code, Codex, GitHub Copilot, and other agents |
 | 6 | [Administration](admin.md) | Users, permissions, two-factor auth, project rules, token reports |
 | 7 | [FAQ / Troubleshooting](faq.md) | Common messages and what to do about them |
-| 8 | [Desktop app](desktop.md) | Using it alone on one PC without a terminal: download, first launch, tray, update, uninstall |
+| 8 | [Desktop app](desktop.md) | Using it alone on one PC without a terminal: download, first launch, tray, connect an AI agent by chat, update, uninstall |
+| 9 | [Updating](updating.md) | Updating the CLI, the desktop app, and the server: what is automatic and what is manual, `self-update`, `install.sh --upgrade`, the looptrack you distribute to users |
 
 If you are new, read 1 → 3 → 4.
 To use it by yourself on one PC without a terminal, start with 8.

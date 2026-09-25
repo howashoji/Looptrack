@@ -172,6 +172,18 @@ func TestPreToolGitGuard(t *testing.T) {
 			{name: "git -C <実在しないディレクトリ> commit（確かめられないので外として扱う）",
 				mk: b(`git -C no-such-dir commit -m "x"`), want: deny},
 
+			// ── 引用符で囲まない Windows の絶対パスで git を呼ぶ。posix の分け方（Git Bash）
+			// では `\` がエスケープとして食われ、実行ファイル名が git と一致しなかった（fail-open）。
+			// Windows 規則の第 2 の分け方（`\` をエスケープとして扱わない）を posix と両方に掛けて直す。
+			// 空白を含むパスはどの規則でもシェルが語を割るので対象外（引用符で囲めば従来どおり ask）。
+			{name: "Windows: 引用符なしの絶対パスの git.exe（add -A）", mk: b(`C:\tools\git.exe add -A`), want: ask},
+			{name: "Windows: 引用符ありの絶対パスの git.exe は従来どおり ask（posix 側で読める）",
+				mk: b(`'C:\tools\git.exe' add -A`), want: ask},
+			{name: "Windows: 引用符なしの絶対パスの git.exe（読むだけの status は通す）",
+				mk: b(`C:\tools\git.exe status`), want: quiet},
+			{name: "Windows: git を名乗らない実行ファイルは素通りする（notgit.exe）",
+				mk: b(`C:\tools\notgit.exe add -A`), want: quiet},
+
 			// ── 末尾の欄が空になる形（区切りで分ける実装の落とし穴）──────────────
 			{name: "空欄: git checkout --（`--` の後ろに何も無い）", mk: b("git checkout --"), want: quiet},
 			{name: "空欄: git checkout HEAD --（`--` の後ろに何も無い）", mk: b("git checkout HEAD --"), want: quiet},

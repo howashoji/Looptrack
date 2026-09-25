@@ -20,8 +20,8 @@ type FirstProject struct {
 	Name   string
 }
 
-// DefaultProjectWidth は最初のプロジェクトの番号の桁数（looptrack project create の既定と同じ）。
-const DefaultProjectWidth = 4
+// DefaultProjectWidth は最初のプロジェクトの番号の桁数（looptrack project create の既定と同じ。値は store に置く）。
+const DefaultProjectWidth = store.DefaultProjectWidth
 
 // ProvisionOptions は Provision の呼び出し元ごとの違い（記録の経路と、既存の利用者の扱い）。
 type ProvisionOptions struct {

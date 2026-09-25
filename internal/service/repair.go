@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/howashoji/looptrack/internal/domain"
+	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/mdformat"
 	"github.com/howashoji/looptrack/internal/store"
 )
@@ -51,7 +52,7 @@ func planRepair(doc *mdformat.Document, fields []string) []FieldRepair {
 // ValidateRepairFields は補正対象の項目名を検査する（labels / blocked_by / traces / refs のいずれか）。
 func ValidateRepairFields(fields []string) error {
 	if len(fields) == 0 {
-		return fmt.Errorf("補正する項目がありません")
+		return i18n.Errorf("service.err.repair.no_fields")
 	}
 	for _, f := range fields {
 		if err := domain.ValidateValue("--fields", f, domain.ListFields); err != nil {
@@ -80,7 +81,8 @@ func (s *Service) SpacedLists(ctx context.Context, p store.Project, fields []str
 	return out, nil
 }
 
-var errNothingToRepair = errors.New("補正する値がありません")
+// errNothingToRepair は「補正する値が無い」ことを RepairLists の中で伝える目印（利用者には出さない）。
+var errNothingToRepair = errors.New("nothing to repair")
 
 // RepairLists は SpacedLists の対象を補正し、補正したものを返す。1 イシューずつ別のトランザクションで行い、
 // 行をロックしてから補正内容を計算し直す（一覧を取った後に直されたものは飛ばす）。

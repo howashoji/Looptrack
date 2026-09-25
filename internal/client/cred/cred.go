@@ -16,7 +16,6 @@ package cred
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/privfile"
 )
 
@@ -56,7 +56,7 @@ func pathsFor(e env.Env, goos string) (Paths, error) {
 	if home == "" {
 		h, err := os.UserHomeDir()
 		if err != nil {
-			return Paths{}, fmt.Errorf("ホームディレクトリが分かりません: %w", err)
+			return Paths{}, i18n.Wrapf(err, "cred.err.no_home")
 		}
 		home = h
 	}
@@ -100,18 +100,26 @@ func joinWindows(elem ...string) string {
 // PermError は資格情報のファイルを他の利用者が読める。
 type PermError struct{ Path string }
 
-func (e *PermError) Error() string {
+// Error はログと、i18n を通していない表示のための日本語（対訳表の正本）。利用者の言語の文面は
+// i18n.Text が Unwrap の ID から作る。
+func (e *PermError) Error() string { return i18n.Text(i18n.JA, e.Unwrap()) }
+
+// Unwrap は ID を持つ文面を返す（i18n.Text が errors.As でこれを見つけて訳す）。
+func (e *PermError) Unwrap() error {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("%s のアクセス権が広すぎます（他の利用者が読めます）。削除して %s をやり直してください", e.Path, ReloginCommand)
+		return i18n.Errorf("cred.err.too_open_windows", "path", e.Path, "command", ReloginCommand)
 	}
-	return fmt.Sprintf("%s の権限が広すぎます（他の利用者が読めます）。chmod 600 %s を実行してください", e.Path, e.Path)
+	return i18n.Errorf("cred.err.too_open", "path", e.Path)
 }
 
 // BrokenError は資格情報のファイルが JSON のオブジェクトとして読めない。
 type BrokenError struct{ Path string }
 
-func (e *BrokenError) Error() string {
-	return fmt.Sprintf("%s を読めません（JSON の形式が壊れています）。削除して %s をやり直してください", e.Path, ReloginCommand)
+func (e *BrokenError) Error() string { return i18n.Text(i18n.JA, e.Unwrap()) }
+
+// Unwrap は ID を持つ文面を返す（PermError と同じ）。
+func (e *BrokenError) Unwrap() error {
+	return i18n.Errorf("cred.err.broken", "path", e.Path, "command", ReloginCommand)
 }
 
 // Store は資格情報のファイル。
@@ -193,7 +201,7 @@ func (s *Store) Lock() (unlock func(), err error) {
 	}
 	u, err := lockFile(p)
 	if err != nil {
-		return nil, fmt.Errorf("%s をロックできません: %w", p, err)
+		return nil, i18n.Wrapf(err, "cred.err.lock", "path", p)
 	}
 	return u, nil
 }

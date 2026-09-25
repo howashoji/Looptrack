@@ -179,7 +179,7 @@ func verifyCmd(args []string) int {
 		bad += len(r.Problems)
 		fmt.Println(i18n.T(lang, "cmd.verify.mismatch", "slug", r.Slug, "files", r.Files, "problems", len(r.Problems)))
 		for _, p := range r.Problems {
-			fmt.Printf("  - %s\n", p)
+			fmt.Printf("  - %s\n", p.In(lang))
 		}
 	}
 	if bad > 0 {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/domain"
@@ -61,7 +60,7 @@ func (s *Service) SetUsageSendPrompts(ctx context.Context, a Actor, u store.User
 		}
 		m, err := rulesMap([]byte(raw.String))
 		if err != nil {
-			return fmt.Errorf("プロジェクト %s のルール設定を読めません: %w", p.Slug, err)
+			return i18n.Wrapf(err, "service.err.rules_read", "slug", p.Slug)
 		}
 		cur, err := domain.ParseRules([]byte(raw.String))
 		if err != nil {
@@ -73,7 +72,7 @@ func (s *Service) SetUsageSendPrompts(ctx context.Context, a Actor, u store.User
 		}
 		usageKeys, err := rulesMap(m["usage"])
 		if err != nil {
-			return fmt.Errorf("プロジェクト %s のルール usage を読めません: %w", p.Slug, err)
+			return i18n.Wrapf(err, "service.err.rules_usage_read", "slug", p.Slug)
 		}
 		if enabled {
 			usageKeys["send_prompts"] = json.RawMessage("true")
@@ -113,13 +112,13 @@ func (s *Service) SetUsageSendPrompts(ctx context.Context, a Actor, u store.User
 	}
 	switch {
 	case enabled && res.Changed:
-		res.Message = fmt.Sprintf("プロジェクト %s で指示文の作業名（先頭 44 文字）を送るようにしました（利用者は LOOPTRACK_USAGE_SEND_PROMPTS=0 で止められる）", p.Slug)
+		res.Message = i18n.T(a.Lang, "service.usage.send_prompts.enabled", "slug", p.Slug)
 	case enabled:
-		res.Message = fmt.Sprintf("プロジェクト %s は既に指示文の作業名を送る設定です（変更なし）", p.Slug)
+		res.Message = i18n.T(a.Lang, "service.usage.send_prompts.already_enabled", "slug", p.Slug)
 	case res.Changed:
-		res.Message = fmt.Sprintf("プロジェクト %s で指示文を送らないようにしました", p.Slug)
+		res.Message = i18n.T(a.Lang, "service.usage.send_prompts.disabled", "slug", p.Slug)
 	default:
-		res.Message = fmt.Sprintf("プロジェクト %s は既に指示文を送らない設定です（変更なし）", p.Slug)
+		res.Message = i18n.T(a.Lang, "service.usage.send_prompts.already_disabled", "slug", p.Slug)
 	}
 	return res, nil
 }

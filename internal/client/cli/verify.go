@@ -95,7 +95,7 @@ func cmdVerify(c *Ctx, v *Values) error {
 	if !asJSON {
 		opts.Before = func(i, n int, command string) { c.Printf("[%d/%d] $ %s\n", i, n, command) }
 		opts.After = func(i, n int, r verify.Result) {
-			c.Println(verify.Line(i, n, r))
+			c.Println(verify.Line(c.Lang, i, n, r))
 			if r.Status == verify.StatusFail || r.Status == verify.StatusTimeout {
 				if t := verify.IndentTail(r.OutputTail, verify.ShowLines); t != "" {
 					c.Println(t)
@@ -277,7 +277,7 @@ func (c *Ctx) printVerifyLast(plan *jsonorder.Object) {
 	list, _ := rv.([]any)
 	for i, x := range list {
 		r := verify.ResultFromJSON(x)
-		c.Println(verify.Line(i+1, len(list), r))
+		c.Println(verify.Line(c.Lang, i+1, len(list), r))
 		if r.Status != verify.StatusSkipped {
 			if t := verify.IndentTail(r.OutputTail, math.MaxInt); t != "" {
 				c.Println(t)

@@ -135,7 +135,7 @@ func TestLoopCountsIgnoresTranslations(t *testing.T) {
 		t.Fatal("訳が配布物に入っていない（導入では日英の両方を配る）")
 	}
 	hooks, rules, skills := LoopCounts(files)
-	if hooks != 19 || rules != 5 || skills != 2 {
-		t.Errorf("hook %d 本・rules %d 本・skill %d 本（期待 19 / 5 / 2）", hooks, rules, skills)
+	if hooks != 20 || rules != 5 || skills != 2 {
+		t.Errorf("hook %d 本・rules %d 本・skill %d 本（期待 20 / 5 / 2）", hooks, rules, skills)
 	}
 }

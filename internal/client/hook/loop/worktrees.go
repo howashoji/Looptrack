@@ -11,7 +11,7 @@ package loop
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 
@@ -51,7 +51,7 @@ func SessionStartWorktrees(ctx context.Context, ev hookio.Event) (hookio.Result,
 				return string(out), err
 			}
 			if code != 0 {
-				return string(out), fmt.Errorf("git %s: 終了コード %d", strings.Join(args, " "), code)
+				return string(out), errors.New(i18n.T(e.lang(), "loop.worktrees.err.git_exit", "args", strings.Join(args, " "), "code", code))
 			}
 			return string(out), nil
 		},

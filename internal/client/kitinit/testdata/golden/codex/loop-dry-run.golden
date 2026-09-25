@@ -6,7 +6,7 @@
 init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI codex・dry-run）
 kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
 配線: looptrack hook <名前> --agent <AI>
-導入セット: core + loop（hook 19 本を配線）
+導入セット: core + loop（hook 20 本を配線）
   作成         .claude/rules/looptrack-loop/background-process.md
       （kit kit/loop/rules/background-process.md の全文を作成する差分。省略）
   作成         .claude/rules/looptrack-loop/en/background-process.md
@@ -159,7 +159,7 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
   作成         AGENTS.md
       --- /dev/null
       +++ b/AGENTS.md
-      @@ -0,0 +1,215 @@
+      @@ -0,0 +1,217 @@
       +<!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
       +## 課題管理（イシュー管理サーバ）
       +

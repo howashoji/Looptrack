@@ -274,6 +274,11 @@ init --remove-loop: $TMP/ws
                 "type": "command",
                 "command": "looptrack hook pre-tool-subagent-bound --agent claude-code",
                 "timeout": 5
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook pre-tool-subagent-model --agent claude-code",
+                "timeout": 5
               }
             ]
           }

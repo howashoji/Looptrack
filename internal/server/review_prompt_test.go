@@ -120,7 +120,7 @@ func TestReviewPromptViaMCP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if text := res.Messages[0].Content.(*mcp.TextContent).Text; text != fmt.Sprintf(reviewPromptText, projectSuffix("web")) {
+	if text := res.Messages[0].Content.(*mcp.TextContent).Text; text != fmt.Sprintf(reviewPromptText, projectSuffix(i18n.JA, "web")) {
 		t.Errorf("review prompt: %s", text)
 	}
 

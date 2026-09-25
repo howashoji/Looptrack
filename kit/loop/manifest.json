@@ -30,6 +30,8 @@
      "codex": null, "copilot": {"event": "PreToolUse", "matcher": null}},
     {"name": "hooks/pre-tool-subagent-bound", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Task|Agent", "timeout": 5, "order": 50,
      "codex": null, "copilot": null},
+    {"name": "hooks/pre-tool-subagent-model", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Task|Agent", "timeout": 5, "order": 55,
+     "codex": null, "copilot": null},
     {"name": "hooks/pre-tool-wait-loop-guard", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Bash", "timeout": 5, "order": 60,
      "codex": null, "copilot": {"event": "PreToolUse", "matcher": null}},
 

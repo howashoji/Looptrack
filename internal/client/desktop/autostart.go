@@ -25,6 +25,7 @@ type Autostart struct {
 	ConfigHome string // XDG_CONFIG_HOME（空なら ~/.config）
 	Label      string // macOS の LaunchAgent の Label（BundleID）
 	Argv       []string
+	Lang       i18n.Lang // Linux の .desktop の Comment の言語（空なら対訳表の正本の日本語）
 }
 
 // runKey・runValue は Windows の登録先。
@@ -56,7 +57,7 @@ func (a Autostart) Content() []byte {
 	case "windows":
 		return []byte(windowsCommandLine(a.Argv))
 	}
-	return []byte(autostartDesktopEntry(a.Argv))
+	return []byte(autostartDesktopEntry(a.Argv, a.Lang))
 }
 
 // Enabled は登録があるか。中身が今の Argv と違っても（.app・AppImage を動かした）登録があれば true。
@@ -185,7 +186,7 @@ func launchAgentPlist(label string, argv []string) []byte {
 }
 
 // autostartDesktopEntry は XDG Autostart の .desktop。
-func autostartDesktopEntry(argv []string) string {
+func autostartDesktopEntry(argv []string, lang i18n.Lang) string {
 	q := make([]string, len(argv))
 	for i, a := range argv {
 		q[i] = desktopExecQuote(a)
@@ -193,12 +194,12 @@ func autostartDesktopEntry(argv []string) string {
 	return fmt.Sprintf(`[Desktop Entry]
 Type=Application
 Name=%s
-Comment=%s をログイン時に起動する
+Comment=%s
 Exec=%s
 Icon=looptrack
 Terminal=false
 X-GNOME-Autostart-enabled=true
-`, AppName, AppName, strings.Join(q, " "))
+`, AppName, i18n.T(lang, "desktop.autostart.comment", "app", AppName), strings.Join(q, " "))
 }
 
 // desktopExecQuote は Desktop Entry の Exec の 1 引数（空白・予約文字があれば二重引用符。中の " ` $ \ は \ を前に置く。

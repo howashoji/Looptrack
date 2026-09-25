@@ -45,7 +45,7 @@ func mustVerify(t *testing.T, db any, reports []VerifyReport, err error) int {
 		files += r.Files
 		for i, p := range r.Problems {
 			if i < 10 {
-				t.Errorf("%s: %s", r.Slug, p)
+				t.Errorf("%s: %s", r.Slug, p.In(i18n.JA))
 			}
 		}
 		if len(r.Problems) > 10 {
@@ -189,7 +189,11 @@ func TestVerifyDetectsDifference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	joined := strings.Join(reports[0].Problems, "\n")
+	var lines []string
+	for _, p := range reports[0].Problems {
+		lines = append(lines, p.In(i18n.JA))
+	}
+	joined := strings.Join(lines, "\n")
 	if !strings.Contains(joined, "内容が違います") || !strings.Contains(joined, "counter が違います") {
 		t.Fatalf("差分を検出しなかった: %q", joined)
 	}

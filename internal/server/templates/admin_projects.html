@@ -42,9 +42,38 @@
       {{else}}<input type="hidden" name="enabled" value="on"><button type="submit" class="small">{{T $.Lang "server.web.admin_projects.prompts_set_on"}}</button>{{end}}
       {{if .SendPrompts.Last}}<span class="muted">{{T $.Lang "server.web.admin_projects.last_change"}}{{.SendPrompts.Last}}</span>{{end}}
     </form>
+    <h3 id="manage-{{.Slug}}">{{T $.Lang "server.web.admin_projects.manage"}}</h3>
+    <form method="post" action="{{base}}/admin/projects/{{.Slug}}/rename" class="row">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <label>{{T $.Lang "server.web.admin_projects.rename_label"}}<input name="name" value="{{.Name}}" maxlength="255" required></label>
+      <button type="submit" class="small">{{T $.Lang "server.web.admin_projects.rename_submit"}}</button>
+    </form>
+    <form method="post" action="{{base}}/admin/projects/{{.Slug}}/archive" class="row">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}">
+      <label>{{T $.Lang "server.web.admin_projects.archive_confirm" "slug" .Slug}}<input name="confirm" autocomplete="off" required></label>
+      <button type="submit" class="danger small">{{T $.Lang "server.web.admin_projects.archive_submit"}}</button>
+    </form>
+    <p class="muted">{{T $.Lang "server.web.admin_projects.archive_note"}}</p>
   </section>
   {{else}}
   <p class="muted">{{T .Lang "server.web.admin_projects.no_projects"}}</p>
+  {{end}}
+  {{if .Archived}}
+  <section class="panel" id="archived">
+    <h2>{{T .Lang "server.web.admin_projects.archived_h2"}}</h2>
+    <p class="muted">{{T .Lang "server.web.admin_projects.archived_intro"}}</p>
+    <table class="list">
+      <thead><tr><th>{{T .Lang "server.web.admin_projects.th_name"}}</th><th>slug</th><th>{{T .Lang "server.web.admin_projects.th_prefix"}}</th><th></th></tr></thead>
+      <tbody>
+      {{range .Archived}}
+      <tr class="inactive" id="archived-{{.Slug}}">
+        <td>{{.Name}} <span class="muted">{{T $.Lang "server.web.admin_projects.archived_state"}}</span></td><td>{{.Slug}}</td><td>{{.Prefix}}-nnnn</td>
+        <td><form method="post" action="{{base}}/admin/projects/{{.Slug}}/unarchive"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button type="submit" class="small">{{T $.Lang "server.web.admin_projects.unarchive_submit"}}</button></form></td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
   {{end}}
   <section class="panel" id="new">
     <h2>{{T .Lang "server.web.project.new_h2"}}</h2>

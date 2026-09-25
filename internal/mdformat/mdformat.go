@@ -11,14 +11,16 @@
 package mdformat
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// CommentSection はコメント節の見出し行。
+// CommentSection はコメント節の見出し行。本文を節に分ける判定に使う綴りそのもので、DB に入っている本文と
+// 突き合わせるので訳さない。
 const CommentSection = "## コメント"
 
 var tsHeading = regexp.MustCompile(`^### (\d{4}-\d{2}-\d{2} \d{2}:\d{2})$`)
@@ -55,12 +57,16 @@ type RoundTripError struct {
 	Rendered string // 差分付近の復元テキスト
 }
 
-func (e *RoundTripError) Error() string {
-	return fmt.Sprintf("往復一致しません（%d バイト目）: 元=%q 復元=%q", e.Offset, e.Original, e.Rendered)
+// Error はログと、i18n を通していない表示のための日本語（対訳表の正本）。
+func (e *RoundTripError) Error() string { return i18n.Text(i18n.JA, e.Unwrap()) }
+
+// Unwrap は ID を持つ文面を返す（i18n.Text が errors.As でこれを見つけて訳す）。
+func (e *RoundTripError) Unwrap() error {
+	return i18n.Errorf("mdformat.err.round_trip", "offset", e.Offset, "original", fmt.Sprintf("%q", e.Original), "rendered", fmt.Sprintf("%q", e.Rendered))
 }
 
 // ErrFormat はイシューの Markdown 形式として解釈できないことを表す。
-var ErrFormat = errors.New("イシューの Markdown 形式ではありません")
+var ErrFormat = i18n.Errorf("mdformat.err.format")
 
 // Field を名前で引く（無ければ nil）。
 func (d *Document) Field(key string) *Field {
@@ -86,11 +92,11 @@ func Parse(text string) (*Document, error) {
 
 func split(text string) (*Document, error) {
 	if !strings.HasPrefix(text, "---\n") {
-		return nil, fmt.Errorf("%w: 先頭が frontmatter（---）ではありません", ErrFormat)
+		return nil, i18n.Wrapf(ErrFormat, "mdformat.err.no_frontmatter")
 	}
 	end := strings.Index(text[3:], "\n---")
 	if end < 0 {
-		return nil, fmt.Errorf("%w: frontmatter の終わり（---）がありません", ErrFormat)
+		return nil, i18n.Wrapf(ErrFormat, "mdformat.err.frontmatter_unclosed")
 	}
 	end += 3
 	doc := &Document{}
@@ -101,7 +107,7 @@ func split(text string) (*Document, error) {
 	}
 	rest := text[end+len("\n---"):]
 	if !strings.HasPrefix(rest, "\n\n") {
-		return nil, fmt.Errorf("%w: frontmatter の後に空行 1 行がありません", ErrFormat)
+		return nil, i18n.Wrapf(ErrFormat, "mdformat.err.no_blank_after_frontmatter")
 	}
 	body := rest[2:]
 	doc.TrailNL = len(body) - len(strings.TrimRight(body, "\n"))

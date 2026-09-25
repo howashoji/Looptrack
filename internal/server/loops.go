@@ -164,7 +164,7 @@ func feedbackHeading(lang i18n.Lang, fb feedbackJSON) string {
 
 // selfReportedNote は ② の行末に付ける印（直近の verify が MCP の自己申告のとき。以前の CLI と同じ文言）。
 func selfReportedNote(lang i18n.Lang) string {
-	return i18n.T(lang, "server.api.summary.self_reported_note", "label", service.SelfReportedLabel)
+	return i18n.T(lang, "server.api.summary.self_reported_note", "label", i18n.M("service.verify.last.self_reported"))
 }
 
 // reviewLayerText は ② の見出しと行（以前の CLI と同じ）。

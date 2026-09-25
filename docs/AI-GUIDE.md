@@ -398,7 +398,7 @@ EOF
 ## 7. MCP（任意）
 
 Claude Code・Codex・GitHub Copilot などからは、MCP のツールとしても使えます。ツールは `setup` `guide` `next` `list_issues` `get_issue` `create_issue` `add_comment`
-`set_status` `update_issue` `assign_issue` `ready_issues` `project_summary` `get_matrix` `issue_activity` `list_projects` `verify_issue` `report_verify`、
+`set_status` `update_issue` `assign_issue` `ready_issues` `project_summary` `get_matrix` `issue_activity` `list_projects` `create_project`（管理者だけ） `verify_issue` `report_verify`、
 トークンの `issue_usage` `usage_missing` `usage_report` `list_usage_ledger` `add_usage_ledger` `list_usage_requests` です。
 接続すると「最初に `setup` で導入状態を確かめ、`guide` を読み、`next` からループを回す」という指示が AI に渡ります。
 ループの定型は prompt `loop`、人の判断待ちと外からの反応を利用者に持ちかけるのは prompt `review`、導入は prompt `setup` です（Claude Code では `/mcp__looptrack__loop`・`/mcp__looptrack__review` など）。

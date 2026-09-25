@@ -16,6 +16,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/store"
 )
 
@@ -378,7 +379,7 @@ func TestPromptLoopSwitch(t *testing.T) {
 		}
 	}
 	minimal := get(nil)
-	if minimal != fmt.Sprintf(loopPromptText, projectSuffix("req")) {
+	if minimal != fmt.Sprintf(loopPromptText, projectSuffix(i18n.JA, "req")) {
 		t.Errorf("未導入の loop は最小ループ:\n%s", minimal)
 	}
 	latest, _ := latestDist()

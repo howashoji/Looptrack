@@ -57,10 +57,18 @@ looptrack member remove demo alice --reassign -    # 担当のイシューは未
 ```bash
 looptrack project create demo --prefix DEMO --name "Demo" --description "1 行の説明" --order 100
 looptrack project list
+looptrack project rename demo "Demo（新しい名前）"   # 表示名だけを変える
+looptrack project archive demo                      # アーカイブ（画面の「削除」）
+looptrack project list --archived                   # アーカイブしたものだけを出す
+looptrack project unarchive demo                    # 戻す
 ```
 
 - slug は英小文字・数字・ハイフンです。
-- `--prefix` と `--width` は後から変えられません。発番済みの ID が壊れるからです。
+- `--prefix` と `--width` は後から変えられません。発番済みの ID が壊れるからです。slug も変えられません。変えられるのは表示名だけです（`project rename`）。
+- 画面 `<サーバの URL>/admin/projects` でも、各プロジェクトの「表示名とアーカイブ」から表示名を変え、アーカイブできます。管理者だけが使えます。
+- **アーカイブは消去ではありません。** ハブ・API・MCP・CLI の一覧から消え、起票・更新・コメントを受け付けなくなりますが、イシュー・コメント・経緯は残ります。
+  画面ではアーカイブの前に確認のため slug の入力を求めます。戻すと元どおり一覧に出て、参加者と役割もそのまま使えます。
+  画面の下の「アーカイブしたプロジェクト」から「戻す」を押すか、`project unarchive` を使ってください。slug と接頭辞は使い回されません。
 - プロジェクトごとの運用の文書を登録しておくと、CLI・MCP の `guide` が共通の規則と一緒に AI へ返します。
 
 ```bash
