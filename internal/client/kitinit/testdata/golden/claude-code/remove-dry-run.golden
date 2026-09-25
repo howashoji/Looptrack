@@ -112,7 +112,7 @@ init --remove-loop: $TMP/ws（dry-run）
                  }
                ]
              }
-      @@ -139,74 +74,6 @@
+      @@ -139,79 +74,6 @@
                  }
                ]
              }
@@ -169,6 +169,11 @@ init --remove-loop: $TMP/ws（dry-run）
       -          {
       -            "type": "command",
       -            "command": "looptrack hook pre-tool-subagent-bound --agent claude-code",
+      -            "timeout": 5
+      -          },
+      -          {
+      -            "type": "command",
+      -            "command": "looptrack hook pre-tool-subagent-model --agent claude-code",
       -            "timeout": 5
       -          }
       -        ]
@@ -472,6 +477,11 @@ dry-run のため何も書いていません。反映は --dry-run を外して�
               {
                 "type": "command",
                 "command": "looptrack hook pre-tool-subagent-bound --agent claude-code",
+                "timeout": 5
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook pre-tool-subagent-model --agent claude-code",
                 "timeout": 5
               }
             ]

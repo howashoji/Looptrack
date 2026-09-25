@@ -44,23 +44,17 @@ func renderEnv(p *Plan, now time.Time, lang i18n.Lang) string {
 }
 
 // renderCompose はチームのサーバ用の compose.yaml の雛形を作る（deploy/compose.yaml を元にする）。
-func renderCompose(p *Plan, now time.Time) string {
+// 注釈は setup を動かした人の言語で書く（.env と同じ）。設定の行は言語に依らない。
+func renderCompose(p *Plan, now time.Time, lang i18n.Lang) string {
 	port := strconv.Itoa(p.Port)
 	var b strings.Builder
-	fmt.Fprintf(&b, `# looptrack setup が作成（%s）。deploy/compose.yaml を元にした雛形。
-#
-#   docker compose up -d           起動（イメージが無ければ隣の Dockerfile から作る）
-#   docker compose up -d --build   実行ファイルを入れ替えた後の作り直し
-#   docker compose logs -f         ログ
-#
-# - 公開は 127.0.0.1:%s だけ。外からはリバースプロキシ（Nginx など）で %s/ を受けて渡す（接頭辞は剥がさない）。
-# - 設定は .env（600・git 管理外）。
-services:
+	writeComment(&b, "", i18n.T(lang, "files.compose.header", "time", now.Format("2006-01-02 15:04"), "port", port, "url", p.URL()))
+	b.WriteString(`services:
   looptrack:
     image: ${LOOPTRACK_IMAGE:-looptrack:latest}
-    # イメージはこのディレクトリの Dockerfile から作る（scratch に looptrack を載せるだけ）。
-    # build があるので、外から同じ名前のイメージを引いてくることはない。
-    build:
+`)
+	writeComment(&b, "    ", i18n.T(lang, "files.compose.image"))
+	fmt.Fprintf(&b, `    build:
       context: .
       dockerfile: Dockerfile
     container_name: looptrack
@@ -69,22 +63,17 @@ services:
       GOMEMLIMIT: 64MiB
     ports:
       - "127.0.0.1:%s:%s"
-`, now.Format("2006-01-02 15:04"), port, p.URL(), port, port)
+`, port, port)
 	if p.Store == StoreSQLite {
-		b.WriteString(`    # SQLite のファイルは ./data に置く（コンテナは uid 65534 で動くので、書けるようにしておく。
-    #   im.db は本人だけ（600）で作るので、中のファイルごと渡す: sudo chown -R 65534:65534 data）
-    volumes:
+		writeComment(&b, "    ", i18n.T(lang, "files.compose.sqlite"))
+		b.WriteString(`    volumes:
       - ./data:/data
 `)
 	} else {
-		b.WriteString(`    # MySQL がコンテナのときは、同じ Docker ネットワークに入れる（例: networks: [mysql] と下の networks を足す）
-`)
+		writeComment(&b, "    ", i18n.T(lang, "files.compose.mysql"))
 	}
-	b.WriteString(`    # サーバ（GOMEMLIMIT 64MiB）と、healthcheck が起動する 2 つ目の looptrack が同じ枠に入る大きさ。
-    # scratch のイメージにはシェルも curl も無く、健全性の確認は自分自身をもう 1 つ動かすしかない。
-    # 96m・112m・128m では 2 つ目が cgroup の上限に当たって SIGKILL され、/healthz が 200 でも
-    # コンテナは unhealthy のまま再起動を繰り返す（実測 2026-09-20）。
-    mem_limit: 160m
+	writeComment(&b, "    ", i18n.T(lang, "files.compose.mem_limit"))
+	b.WriteString(`    mem_limit: 160m
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -109,20 +98,24 @@ services:
 // renderDockerfile は compose が使うイメージの Dockerfile を作る（deploy/Dockerfile と同じ形）。
 // ここではビルドをしない。同じディレクトリに置いた linux の実行ファイルを scratch に載せるだけ
 // （シェルも curl も無い。健全性確認は looptrack healthcheck が自分自身の /healthz を叩く）。
-func renderDockerfile(now time.Time) string {
-	return fmt.Sprintf(`# looptrack setup が作成（%s）。docker compose up -d が使う。
-# 隣の looptrack（linux の実行ファイル）を scratch に載せるだけで、ここではビルドしない。
-# 実行ファイルを入れ替えたら docker compose up -d --build で作り直す。
-# 管理コマンドは docker exec looptrack /looptrack <サブコマンド>（user・project・migrate など）。
-FROM scratch
-COPY looptrack /looptrack
-# 第三者のライセンス文（looptrack licenses と同じ内容）
-COPY NOTICE /NOTICE
-USER 65534:65534
-EXPOSE %d
-ENTRYPOINT ["/looptrack"]
-CMD ["serve"]
-`, now.Format("2006-01-02 15:04"), DefaultPort)
+func renderDockerfile(now time.Time, lang i18n.Lang) string {
+	var b strings.Builder
+	writeComment(&b, "", i18n.T(lang, "files.dockerfile.header", "time", now.Format("2006-01-02 15:04")))
+	b.WriteString("FROM scratch\nCOPY looptrack /looptrack\n")
+	writeComment(&b, "", i18n.T(lang, "files.dockerfile.notice"))
+	fmt.Fprintf(&b, "COPY NOTICE /NOTICE\nUSER 65534:65534\nEXPOSE %d\nENTRYPOINT [\"/looptrack\"]\nCMD [\"serve\"]\n", DefaultPort)
+	return b.String()
+}
+
+// writeComment は text の各行を indent + "# " の注釈にして書く（空の行は indent + "#"）。
+func writeComment(b *strings.Builder, indent, text string) {
+	for _, line := range strings.Split(text, "\n") {
+		if line == "" {
+			b.WriteString(indent + "#\n")
+			continue
+		}
+		b.WriteString(indent + "# " + line + "\n")
+	}
 }
 
 // readEnvFile は .env を読む（KEY=VALUE。# の行と空行は飛ばす。値の前後の引用符は外す）。

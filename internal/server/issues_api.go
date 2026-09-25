@@ -352,8 +352,17 @@ func (s *Server) listedProjects(ctx context.Context, u store.User, all bool) ([]
 	if err != nil || !all {
 		return projects, roles, err
 	}
-	projects, err = store.ListProjects(ctx, s.db)
-	return projects, roles, err
+	everything, err := store.ListProjects(ctx, s.db)
+	if err != nil {
+		return nil, nil, err
+	}
+	projects = projects[:0:0]
+	for _, pr := range everything {
+		if !pr.Archived { // アーカイブ済みは一覧に出さない（AccessibleProjects と同じ扱い）
+			projects = append(projects, pr)
+		}
+	}
+	return projects, roles, nil
 }
 
 func (s *Server) apiProject(w http.ResponseWriter, r *http.Request) {
@@ -877,7 +886,7 @@ func statusMessages(lang i18n.Lang, res *service.StatusResult, comment string) [
 	it := res.Issue
 	messages := []string{it.Item.ID + ": " + res.From + " → " + it.Item.Status}
 	if res.AssigneeChanged && !res.AssigneeAuto {
-		messages = append(messages, (&service.AssignResult{Issue: it, From: res.AssigneeFrom, To: it.Row.Assignee.Login, Changed: true}).Message())
+		messages = append(messages, (&service.AssignResult{Issue: it, From: res.AssigneeFrom, To: it.Row.Assignee.Login, Changed: true}).Message(lang))
 	}
 	if comment != "" {
 		messages = append(messages, i18n.T(lang, "server.api.issue.comment_added", "id", it.Item.ID))
@@ -911,7 +920,7 @@ func (s *Server) apiAssign(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("ETag", etag(res.Issue.Row.Version))
 	writeJSON(w, http.StatusOK, map[string]any{"issue": toIssueJSON(res.Issue), "from": res.From, "to": res.To, "changed": res.Changed,
-		"message": res.Message()})
+		"message": res.Message(reqLang(r))})
 }
 
 // --- 鮮度ガード

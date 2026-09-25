@@ -57,10 +57,18 @@ looptrack member remove demo alice --reassign -    # leave their issues unassign
 ```bash
 looptrack project create demo --prefix DEMO --name "Demo" --description "One-line description" --order 100
 looptrack project list
+looptrack project rename demo "Demo (new name)"   # change the display name only
+looptrack project archive demo                    # archive ("delete" on the page)
+looptrack project list --archived                 # list only the archived ones
+looptrack project unarchive demo                  # restore
 ```
 
 - A slug is lowercase letters, digits, and hyphens.
-- `--prefix` and `--width` cannot be changed later, because issued IDs would break.
+- `--prefix` and `--width` cannot be changed later, because issued IDs would break. The slug cannot be changed either; only the display name can (`project rename`).
+- `<server URL>/admin/projects` also lets you rename and archive each project, under "Display name and archiving". Only administrators can use it.
+- **Archiving does not erase anything.** The project disappears from the listings of the hub, the API, MCP and the CLI, and new issues, updates and comments are refused, but the issues, comments and history are kept.
+  On the page you are asked to type the slug to confirm before archiving. Restoring lists it again, with its members and roles as they were.
+  Press "Restore" under "Archived projects" at the bottom of the page, or use `project unarchive`. The slug and the prefix are never reused.
 - If you register a per-project operating document, `guide` (CLI and MCP) returns it to agents together with the common rules.
 
 ```bash

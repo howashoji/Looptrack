@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // CopilotOtelEnv は OTel の JSONL の場所を足す環境変数の設定名（LOOPTRACK_USAGE_COPILOT_OTEL）。
@@ -50,18 +51,14 @@ func CopilotOtelDir(o Options) string {
 
 // CopilotMissHint は Copilot のセッションのスパンが見つからなかったときの案内（usage attach のエラー文・hook のログ用）。
 // 探した結果（ファイルが無い／あるがそのセッションのスパンが無い）と、出力先を既定の置き場の下にする理由を 1 文にする。
-func CopilotMissHint(sessionID string, o Options) string {
+func CopilotMissHint(lang i18n.Lang, sessionID string, o Options) string {
 	dir := CopilotOtelDir(o)
 	files := CopilotOtelFiles(o)
-	var found string
-	if len(files) == 0 {
-		found = "OpenTelemetry のファイル出力（*.jsonl）が " + dir + " の下にありません"
-	} else {
-		found = strconv.Itoa(len(files)) + " 個の OpenTelemetry のファイル出力に gen_ai.conversation.id = " + sessionID + " のスパンがありません"
+	found := i18n.M("usagesnap.copilot.miss.no_files", "dir", dir)
+	if len(files) > 0 {
+		found = i18n.M("usagesnap.copilot.miss.no_span", "count", len(files), "session", sessionID)
 	}
-	return found + "。Copilot CLI は OTel の出力先（COPILOT_OTEL_FILE_EXPORTER_PATH）を hook にもシェルにも渡さないので、" +
-		"出力先は $COPILOT_HOME/otel/ の下（COPILOT_HOME が無ければ ~/.copilot/otel/。例: COPILOT_OTEL_FILE_EXPORTER_PATH=" +
-		joinPath(dir, "copilot-otel.jsonl") + "）にしてください。VS Code の outfile も同じ置き場にします"
+	return i18n.T(lang, "usagesnap.copilot.miss.hint", "found", found, "example", joinPath(dir, "copilot-otel.jsonl"))
 }
 
 // CopilotOtelFiles は読む OTel の JSONL の一覧（存在するものだけ・重複なし）。

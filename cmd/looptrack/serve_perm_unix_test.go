@@ -17,6 +17,7 @@ import (
 // 既にある SQLite の DB が本人以外も読める（0644）なら起動時に警告し、直すコマンド（chmod 600）を添える。
 // 新しく作った DB（本人だけ）では警告しない。MySQL の DSN では何もしない。
 func TestWarnSQLitePerms(t *testing.T) {
+	t.Setenv("LOOPTRACK_LANG", "ja") // 下の検査は日本語の文面を見る（警告はサーバを起動した人の言語で出る）
 	old := syscall.Umask(0o022)
 	defer syscall.Umask(old)
 	dir := t.TempDir()

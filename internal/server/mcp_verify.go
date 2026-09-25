@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -37,11 +36,8 @@ type reportVerifyIn struct {
 }
 
 // reportVerifyHint は verify_issue の本文の末尾に足す report_verify の使い方。
-func reportVerifyHint(bodySHA256 string) string {
-	return fmt.Sprintf("CLI で記録できないとき（MCP だけの環境）は report_verify で送れる: 上のコマンドを手元のシェルで順に全部実行し（失敗しても止めない）、"+
-		"id・body_sha256（%s）・results（コマンドごとに command（一覧の文字列そのまま・同じ順）・status（ok / fail / timeout / skipped）・exit_code・duration_ms・output_tail（出力の末尾））を渡す。"+
-		"この記録には「%s」の印が付き、コメント・show・summary・next で見分けられる（検証の規則では数える）",
-		bodySHA256, service.SelfReportedLabel)
+func reportVerifyHint(lang i18n.Lang, bodySHA256 string) string {
+	return i18n.T(lang, "server.mcp.verify.report_hint", "sha", bodySHA256, "label", i18n.M("service.verify.last.self_reported"))
 }
 
 func (s *Server) addVerifyMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.ToolAnnotations) {
@@ -67,7 +63,7 @@ func (s *Server) addVerifyMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.Tool
 			if len(plan.Commands) == 0 || plan.Problem != nil {
 				return nil, nil, errors.New(plan.Message) // 節なし・上限超過は isError（CLI の exit 2 / 400 と同じ文言）
 			}
-			return result(plan.Text+"\n"+reportVerifyHint(plan.BodySHA256), verifyPlanView(plan, s.svc.Loc)), nil, nil
+			return result(plan.Text+"\n"+reportVerifyHint(c.lang, plan.BodySHA256), verifyPlanView(plan, s.svc.Loc)), nil, nil
 		})
 
 	notDestructive := false
@@ -89,7 +85,7 @@ func (s *Server) addVerifyMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.Tool
 			it, d := rec.Issue, rec.Detail
 			comment := it.Row.Doc.Comments[len(it.Row.Doc.Comments)-1].Content
 			notice := s.usageNotice(ctx, c.lang, c.actor, pr, it, false)
-			text := i18n.T(c.lang, "server.mcp.verify.recorded", "label", service.SelfReportedLabel, "id", it.Item.ID, "comment", comment)
+			text := i18n.T(c.lang, "server.mcp.verify.recorded", "label", i18n.M("service.verify.last.self_reported"), "id", it.Item.ID, "comment", comment)
 			return result(withNotice(text, notice), map[string]any{"issue": toIssueJSON(it), "seq": d.CommentSeq, "ok": d.OK, "passed": d.Passed,
 				"failed": d.Failed, "body_sha256": d.BodySHA256, "self_reported": d.SelfReported, "comment": comment, "usage_notice": notice}), nil, nil
 		})

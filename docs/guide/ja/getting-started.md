@@ -237,7 +237,7 @@ sudo sh install.sh --from "https://github.com/howashoji/looptrack/releases/downl
 
 インストーラは起動の前に、サービスと同じ利用者で保存先を読めるかを試します。読めなければ、起動しないサーバを待たずにこの順番を案内して止まります。
 
-更新は `sudo sh install.sh --upgrade --from <取得元>` です。アンインストールは `--uninstall` で、`--purge` を付けると設定とデータも消えます。
+更新は `sudo sh install.sh --upgrade --from <取得元>` です（詳しくは[更新](updating.md)）。アンインストールは `--uninstall` で、`--purge` を付けると設定とデータも消えます。
 
 ## 4. プロジェクトを作り、自分を参加させる
 

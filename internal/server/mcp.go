@@ -77,6 +77,19 @@ const reviewPromptText = `イシュー管理（looptrack）の「人の判断待
 5. 未応答のフィードバック（先頭「フィードバック:」のコメント）を 1 件ずつ利用者に示し、対応を決める: 既存イシューで直す（方針を add_comment）・新しく起票する（create_issue。元のイシューに起票した ID を add_comment）・対応しない（理由を add_comment）。どれも先頭語を付けないコメントで応答を残す（これで未応答から外れる）
 6. 扱った件数（Done・Todo へ戻した・残した・フィードバックへの応答）を報告して止まる。この prompt の中では next を呼ばない`
 
+// reviewPromptTextEN は prompt「review」の英語版（日本語の reviewPromptText が正本。項目の並びと数をそろえる）。
+const reviewPromptTextEN = `Put the issue management (looptrack) items "waiting for a human decision" and "feedback from outside" to the user%s.
+
+1. Call project_summary and get the lists "waiting for a human decision (In Review)" and "feedback from outside (unanswered feedback)". If both are empty, tell the user there is nothing waiting for a decision and stop
+2. Take the In Review issues one at a time, longest-waiting first: read the body and the comments with get_issue and show the user:
+   - what was built (the gist of the change, and where)
+   - the verification result (the verify record, the result per acceptance criterion and how it was confirmed)
+   - what they need to decide (the comment left when it was set In Review)
+3. Record the user's answer with add_comment. Start an approval or an instruction with "Decision: " and a redo with "Changes requested: ", and write the user's words and the next step
+4. For "Decision:", set_status to Done (with the verification result in comment). For "Changes requested:", set_status to Todo (with the approach in comment). Leave anything the user did not decide In Review and move on
+5. Show the user the unanswered feedback (comments starting with "Feedback:") one at a time and decide what to do: fix it in an existing issue (add_comment with the approach), file a new issue (create_issue, then add_comment on the original issue with the new ID), or not act on it (add_comment with the reason). Each response goes into a comment with no leading word (that takes it off the unanswered list)
+6. Report how many you handled (Done, sent back to Todo, left, feedback answered) and stop. Do not call next inside this prompt`
+
 // mcpHandler は認証付きの MCP ハンドラを作る。
 func (s *Server) mcpHandler() http.Handler {
 	// instructions は mcp.NewServer のときに固まる（SDK は initialize / server/discover の応答に
@@ -117,6 +130,11 @@ func (s *Server) mcpHandler() http.Handler {
 			r = r.Clone(r.Context())
 			r.Header.Set("Authorization", "Bearer local")
 		}
+		// リバースプロキシ（nginx）に応答を溜めさせない。購読（subscriptions/listen）は SDK が SSE で返し、
+		// 接続を開いたまま通知を流すので、proxy_buffering が既定で有効な nginx の後ろでは最初の通知が
+		// クライアントに届かず、クライアントが待ちきれずに切る。SDK が書き始める前に効くよう、ここで付ける
+		// （JSON の応答に付いても害は無いので、401 を含む /mcp の応答すべてに付ける）。
+		w.Header().Set("X-Accel-Buffering", "no")
 		// 401 には保護リソースのメタデータの場所を添える（クライアントが OAuth の入口を見つけられる）
 		protected.ServeHTTP(&challengeWriter{ResponseWriter: w, resourceMetadata: s.resourceMetadataURL(r)}, r)
 	})
@@ -441,6 +459,14 @@ type (
 		Types          []string `json:"types,omitempty" jsonschema:"server.mcp.arg.next.types"`
 		Assignee       string   `json:"assignee,omitempty" jsonschema:"server.mcp.arg.next.assignee"`
 	}
+	// プロジェクトの作成（管理者だけ）。値の規則は looptrack project create と同じ（service.CreateProject）
+	createProjectIn struct {
+		Slug        string `json:"slug" jsonschema:"server.mcp.arg.create_project.slug"`
+		Name        string `json:"name,omitempty" jsonschema:"server.mcp.arg.create_project.name"`
+		Description string `json:"description,omitempty" jsonschema:"server.mcp.arg.create_project.description"`
+		Prefix      string `json:"prefix,omitempty" jsonschema:"server.mcp.arg.create_project.prefix"`
+		Width       int    `json:"width,omitempty" jsonschema:"server.mcp.arg.create_project.width"`
+	}
 	noArgs struct{}
 )
 
@@ -473,6 +499,24 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 					"ready", sum.Counts.Ready, "bugs", sum.Counts.OpenBugs) + "\n")
 			}
 			return result(strings.TrimSpace(b.String()), map[string]any{"projects": out}), nil, nil
+		})
+
+	// create_project は管理者だけ（判定と作成・作った人の admin での参加は service.CreateProject。Web の管理画面と同じ処理）。
+	// prefix と width は後から変えられないので、ツールの説明で実行前に利用者へ値を確かめさせる。読み取り専用の注釈は付けない。
+	addTool(srv, lang, &mcp.Tool{Name: "create_project", Description: i18n.T(lang, "server.mcp.tool.create_project"), Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive}},
+		func(ctx context.Context, req *mcp.CallToolRequest, in createProjectIn) (*mcp.CallToolResult, any, error) {
+			c, err := mcpCallOf(req)
+			if err != nil {
+				return nil, nil, err
+			}
+			pr, err := s.svc.CreateProject(ctx, c.p.User, store.Project{Slug: in.Slug, Name: in.Name, Description: in.Description, Prefix: in.Prefix, Width: in.Width})
+			if err != nil {
+				return nil, nil, s.toolError(c.lang, "create_project", err)
+			}
+			s.cfg.Logger.Info("mcp", "action", "project_create", "actor", c.p.User.Login, "project", pr.Slug, "prefix", pr.Prefix)
+			first := fmt.Sprintf("%s-%0*d", pr.Prefix, pr.Width, 1)
+			return result(i18n.T(c.lang, "server.mcp.project.created", "slug", pr.Slug, "name", pr.Name, "prefix", pr.Prefix, "width", pr.Width, "first", first),
+				map[string]any{"project": summaryOf(pr, "admin"), "first_id": first}), nil, nil
 		})
 
 	addTool(srv, lang, &mcp.Tool{Name: "list_issues", Description: i18n.T(lang, "server.mcp.tool.list_issues"), Annotations: ro},
@@ -610,7 +654,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 						"reason", s.toolError(c.lang, "update_issue", err).Error(), "version", it.Row.Version))
 				}
 				it = res.Issue
-				text += "\n" + res.Message()
+				text += "\n" + res.Message(c.lang)
 			}
 			d := toDetailJSON(it)
 			d.UsageNotice = s.usageNotice(ctx, c.lang, c.actor, pr, it, false)
@@ -865,7 +909,7 @@ func (s *Server) mcpAssign(ctx context.Context, c *mcpCall, pr store.Project, ro
 	if err != nil {
 		return nil, nil, s.toolError(c.lang, "assign_issue", err)
 	}
-	return result(res.Message(), map[string]any{"issue": toIssueJSON(res.Issue), "from": res.From, "to": res.To, "changed": res.Changed}), nil, nil
+	return result(res.Message(c.lang), map[string]any{"issue": toIssueJSON(res.Issue), "from": res.From, "to": res.To, "changed": res.Changed}), nil, nil
 }
 
 // withNotice はツールの結果の文に付与の指示を足す。

@@ -9,7 +9,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -20,6 +19,7 @@ import (
 	"time"
 
 	"github.com/howashoji/looptrack/internal/auth"
+	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/privfile"
 	"github.com/howashoji/looptrack/internal/server"
 	"github.com/howashoji/looptrack/internal/setupwiz"
@@ -40,14 +40,14 @@ func SecretKey(dbPath string, logger *slog.Logger) (string, error) {
 	case err == nil:
 		key := strings.TrimSpace(string(raw))
 		if _, err := auth.NewBox(key); err != nil {
-			return "", fmt.Errorf("鍵のファイル %s: %w", path, err)
+			return "", i18n.Wrapf(err, "localserve.err.key_invalid", "path", path)
 		}
 		if err := privfile.Check(path); err != nil {
-			logger.Warn("鍵のファイルを本人以外も読めます", "path", path, "err", err)
+			logger.Warn(i18n.T(i18n.FromEnv(os.Getenv), "localserve.log.key_too_open"), "path", path, "err", err)
 		}
 		return key, nil
 	case !errors.Is(err, os.ErrNotExist):
-		return "", fmt.Errorf("鍵のファイル %s を読めません: %w", path, err)
+		return "", i18n.Wrapf(err, "localserve.err.key_read", "path", path)
 	}
 	// 新しく作るディレクトリは本人だけ（unix 0700・Windows は中のファイルに継承させる本人だけの ACL。
 	// Windows の SQLite の -wal・-shm はディレクトリの ACL を継承するため）
@@ -59,9 +59,9 @@ func SecretKey(dbPath string, logger *slog.Logger) (string, error) {
 		return "", err
 	}
 	if err := privfile.WriteFile(path, []byte(key+"\n")); err != nil {
-		return "", fmt.Errorf("鍵のファイル %s を作れません: %w", path, err)
+		return "", i18n.Wrapf(err, "localserve.err.key_write", "path", path)
 	}
-	logger.Info("LOOPTRACK_SECRET_KEY が無いため鍵を作りました（失うと二段階認証の登録が使えなくなります。控えてください）", "path", path)
+	logger.Info(i18n.T(i18n.FromEnv(os.Getenv), "localserve.log.key_created"), "path", path)
 	return key, nil
 }
 
@@ -77,12 +77,12 @@ func WarnSQLitePerms(dsn string, logger *slog.Logger) {
 	if len(broad) == 0 {
 		return
 	}
+	lang := i18n.FromEnv(os.Getenv) // サーバを起動した人（ログを読む人）の言語
 	fix := "chmod 600 " + shellQuoteAll(broad)
 	if runtime.GOOS == "windows" {
-		fix = `icacls <ファイル> /inheritance:r /grant:r "%USERNAME%:F"（DB のフォルダも本人だけにすると、作り直される -wal・-shm も本人だけになる）`
+		fix = i18n.T(lang, "localserve.log.sqlite_fix_windows")
 	}
-	logger.Warn("SQLite の DB のファイルを本人以外も読めます（パスワードのハッシュやイシューの本文が入っています）。本人だけにしてください",
-		"files", broad, "fix", fix)
+	logger.Warn(i18n.T(lang, "localserve.log.sqlite_too_open"), "files", broad, "fix", fix)
 }
 
 // shellQuoteAll はパスを sh に渡せる形（単引用符）で空白区切りに並べる。
@@ -98,7 +98,7 @@ func shellQuoteAll(paths []string) string {
 func Migrate(ctx context.Context, db *sql.DB, logger *slog.Logger) error {
 	applied, err := store.Migrate(ctx, db, migrations.FS)
 	if err != nil {
-		return fmt.Errorf("マイグレーション: %w", err)
+		return i18n.Wrapf(err, "localserve.err.migrate")
 	}
 	if len(applied) > 0 {
 		logger.Info("migrated", "applied", len(applied), "last", applied[len(applied)-1])
@@ -133,7 +133,7 @@ func Start(ctx context.Context, o Options) (*Instance, error) {
 		o.Logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	if o.Listener == nil {
-		return nil, errors.New("localserve: Listener がありません")
+		return nil, i18n.Errorf("localserve.err.no_listener")
 	}
 	if err := server.CheckLocalListen(o.Listener.Addr().String()); err != nil {
 		return nil, err

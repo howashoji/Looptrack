@@ -50,6 +50,7 @@
 | `hooks/stop-runaway-background-process` + `hooks/subagent-stop-runaway-background-process` + `rules/background-process.md` | Stop・SubagentStop・rules | セッションが起こした終わらない子プロセス（長時間のポーリング等）を検知して差し戻す。**上限の無い待ちループの形**（`until` / `while` + `sleep` で上限の式が無い）のシェルだけは短い閾値（既定 10 分）で見る。子が終わった直後にも見る（SubagentStop） | 背景プロセスの放置はコーディング AI 共通の失敗 | 許可する正規表現は `LOOPTRACK_LOOP_RUNAWAY_ALLOW`（既定は MCP・docker・エディタ・dev サーバ・`--watch`）。閾値は `_THRESHOLD_MIN`（既定 30 分）、形別の閾値は `_LOOP_THRESHOLD_MIN`（既定 10 分） | ① |
 | `hooks/pre-tool-wait-loop-guard`（rules は `background-process.md`） | PreToolUse（`Bash`） | 上限の無い待ちループ（`until` / `while` のループ本体に `sleep` があり、上限の式が無い）を**起動前に** `deny` で止める。`break`・`timeout`・`seq`・`SECONDS`・`date +%s`・数の比較・`--max` 等があれば通す。上限のある待ちで、待つ先の**親ディレクトリ**が無いときは止めずに注意する | Stop の検知は経過時間でしか見られず、閾値より前に作られたものは原理的に見えない（実測で 1 日に作られた 3 本は、いずれも閾値の前に人が `ps` で見つけた）。形は起動前に分かる | 例外は `LOOPTRACK_LOOP_WAITLOOP_ALLOW`（空白区切り。コマンドの文字列に含まれれば通す）。`ask` ではなく `deny`（bypass permissions では `ask` が素通りする）で、そのかわり**文面に上限つきへの書き直し方**を必ず入れる。前置の語や `eval` で包んだ待ちループ（`sudo sh -c '…'`・`nohup bash -c '…' &`・`setsid sh -c '…'`・`eval "while true; …"`）も止める（前置の語は秘密のガードと同じ一覧）。入れ子のシェルは git ガード・秘密のガードと同じ処理でほどく（コマンドの位置だけ。`sudo -u deploy sh -c '…'`・`/bin/bash -c '…'` も止める）。**それでも「うっかり」を捕まえるだけ**で、一覧に無い前置の語（`caffeinate bash -c '…'`）と引数の位置（`ssh host bash -c '…'`・`docker run img bash -c '…'`）は素通りする（残るのは Stop の経過時間による検知） | ① |
 | `hooks/pre-tool-subagent-bound`（rules は `background-process.md`） | PreToolUse（`Task`\|`Agent`） | サブエージェントの起動の指示文に、背景で待つループの上限の規律を**そのまま追記する**（`updatedInput`）。**止めない**（追記だけ）。既に固定の印 `[looptrack:background-bound]` が入っていれば足さない。追記したことは `systemMessage` で利用者にも見せる | rules は親セッションにしか注入されないので、親が毎回書き写さないと子へ降りない。降りないまま同じ違反が繰り返し作られるのは、どのプロジェクトでも起きる | **ツールの入力を書き換えられると実物で確かめた AI（Claude Code）にだけ配線する**。Codex・Copilot に `updatedInput` 相当があるかは未確認なので、そこでは何も起きない（下の「Codex での対応」「Copilot での対応」） | ① |
+| `hooks/pre-tool-subagent-model`（rules は `working-discipline.md` の「サブエージェント」節） | PreToolUse（`Task`\|`Agent`） | サブエージェントの起動で `model` が未指定なら `deny` で止め、理由に難しさに応じたモデルの選び方（haiku / sonnet / opus の 3 段）を示す。`model` を付けて呼び直せば通る。`subagent_type` が `fork`（モデルは親を継ぐ）・定義ファイル（作業ディレクトリの `.claude/agents/<名>.md` か `~/.claude/agents/<名>.md`）の frontmatter に `model:` がある型は確認の対象外 | 規律（working-discipline.md）は「難しさに応じてモデルを切り替える」と求めているが、文章だけでは守られない（実例: 要約だけの調査が model 未指定のまま親と同じ重いモデルで走った） | 例外は `LOOPTRACK_LOOP_SUBAGENT_MODEL_ALLOW`（空白区切りの `subagent_type` 名。`*` で全部）。`ask` でなく `deny`（bypass permissions では `ask` が素通りする）。見るのはツールの入力・環境変数・ローカルの定義ファイルだけで、サーバへは出ない（プロジェクトの設定・サーバ接続が無いディレクトリでも同じに動く） | ① |
 
 ## 対象外（配らない）
 
@@ -191,6 +192,7 @@ kit/
 | -- | -- |
 | hook（SessionStart・UserPromptSubmit・PreToolUse・PostToolUse・Stop・SessionEnd） | `.codex/hooks.json` に同じイベントで配線する。**Stop のブロックの挙動は実物で未確認**なので、Stop 系（引き継ぎ鮮度・runaway）は「注入のみ」で入れる |
 | `pre-tool-subagent-bound`（PreToolUse） | **配線しない**: ツールの入力を書き換える `updatedInput` 相当が Codex にあるかは**未確認**。したがって **Codex では上限の規律はサブエージェントへ自動では降りない**。親が `background-process.md` の 3 行を指示文に書き写すこと |
+| `pre-tool-subagent-model`（PreToolUse） | **配線しない**: Codex にサブエージェントを起動するツール（Claude Code の `Task`\|`Agent` に当たるもの）があるかは**未確認**。対象外（manifest の `codex` は `null`）。親が working-discipline.md の「サブエージェント」節（難しさに応じてモデルを切り替える）を守ること |
 | rules | Codex に rules の仕組みは無い → `AGENTS.md` に `<!-- looptrack:loop:begin -->` 〜 `<!-- looptrack:loop:end -->` で節として追記（init が管理。手で直した部分は触らない） |
 | skills | 無い → 案内文だけ（`/iterate` の手順は AGENTS.md の節に短く入れる） |
 | `task-mode.d` 等の状態ファイル | `.claude/` ではなく `.codex/` 配下に置く（`CODEX_THREAD_ID` をセッション ID に使う） |
@@ -230,6 +232,7 @@ init が書く 1 件の形（`.github/hooks/looptrack.json`）は次のとおり
 | `subagent-stop-runaway-background-process`（SubagentStop） | **null**: 上と同じ理由 |
 | `pre-tool-wait-loop-guard`（PreToolUse） | 配線（matcher なし）。判定はコマンドの構文だけなので AI に依らない。CLI の PreToolUse は fail closed だが looptrack は常に exit 0 |
 | `pre-tool-subagent-bound`（PreToolUse） | **null**: ツールの入力を書き換える `updatedInput` 相当が Copilot にあるかは**未確認**。確かめられるまで配線しない（配線しても何も起きないのではなく、何が起きるか分からないため）。したがって **Copilot では上限の規律はサブエージェントへ自動では降りない**。親が `background-process.md` の 3 行を指示文に書き写すこと |
+| `pre-tool-subagent-model`（PreToolUse） | **null**: Copilot にサブエージェントを起動するツール（Claude Code の `Task`\|`Agent` に当たるもの）があるかは**未確認**。対象外。親が working-discipline.md の「サブエージェント」節（難しさに応じてモデルを切り替える）を守ること |
 | rules | `.claude/rules` の仕組みは無い → Codex と同じく AGENTS.md の loop 節（Copilot CLI・VS Code とも AGENTS.md を読む）。`.github/instructions/*.instructions.md` は使わない（AGENTS.md に一本化） |
 | skills | 無い → 案内文だけ（AGENTS.md の loop 節に description の 1 行と手順のパス） |
 | トークン計測（core） | 配線（`PostToolUse`・`Stop`・`SessionEnd`（CLI だけ）に `looptrack hook usage --agent copilot --event <イベント>`。matcher なし＝hook の中で MCP のツール名を絞る）。OTel の出力先は `$COPILOT_HOME/otel/` の下に限る（Copilot CLI は出力先を hook に渡さない）。OpenTelemetry のファイル出力を有効にした利用者だけ送る（手順は [docs/AI-GUIDE.md](../docs/AI-GUIDE.md)） |

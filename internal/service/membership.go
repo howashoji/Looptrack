@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/domain"
@@ -22,7 +21,8 @@ import (
 // MemberRoles はプロジェクトの役割。
 var MemberRoles = []string{"viewer", "editor", "admin"}
 
-// 担当の付け替えの理由（assign イベントの reason）。
+// 担当の付け替えの理由（assign イベントの reason）。DB の記録に残る語なので訳さない
+// （要求した人の言語で記録が変わると、同じ操作の記録が言語ごとに割れる）。
 const (
 	ReasonMemberRemoved = "参加の解除"
 	ReasonMemberViewer  = "役割の変更（viewer）"
@@ -88,9 +88,9 @@ func (s *Service) SetMembership(ctx context.Context, a Actor, p store.Project, t
 				}
 			}
 			if replacement == "" {
-				return &ReplacementError{Need: ReplacementNeeded{Issues: ids, Candidates: cands}, Err: &Error{Kind: Rejected, Code: "replacement_required",
-					Message: fmt.Sprintf("%s は %s で未クローズのイシュー %d 件（%s）の担当です。%sには代わりの担当者（担当にできる参加者か、- で未設定）を指定してください",
-						target.Login, p.Slug, len(ids), strings.Join(ids, ", "), membershipWhat(role))}}
+				return &ReplacementError{Need: ReplacementNeeded{Issues: ids, Candidates: cands}, Err: errm(Rejected, "replacement_required",
+					i18n.M("service.member.err.replacement_required", "login", target.Login, "slug", p.Slug, "count", len(ids),
+						"ids", strings.Join(ids, ", "), "what", membershipWhat(role)))}
 			}
 			if replacement != Unassign {
 				found := false
@@ -104,9 +104,9 @@ func (s *Service) SetMembership(ctx context.Context, a Actor, p store.Project, t
 					for _, c := range cands {
 						logins = append(logins, c.Login)
 					}
-					list := strings.Join(logins, ", ")
-					if list == "" {
-						list = "なし"
+					var list any = strings.Join(logins, ", ")
+					if len(logins) == 0 {
+						list = i18n.M("service.word.none")
 					}
 					return errm(Invalid, "invalid_argument", i18n.M("service.err.invalid.replacement_not_member", "slug", p.Slug, "target", target.Login, "replacement", replacement, "list", list))
 				}
@@ -153,26 +153,28 @@ func (s *Service) SetMembership(ctx context.Context, a Actor, p store.Project, t
 		return nil, err
 	}
 	if role == "" {
-		res.Message = p.Slug + " の " + target.Login + " の権限を外しました。"
+		res.Message = i18n.T(a.Lang, "service.member.removed", "slug", p.Slug, "login", target.Login)
 	} else {
-		res.Message = p.Slug + " の " + target.Login + " の権限を " + role + " にしました。"
+		res.Message = i18n.T(a.Lang, "service.member.role_set", "slug", p.Slug, "login", target.Login, "role", role)
 	}
 	if len(res.Reassigned) > 0 {
-		res.Message += fmt.Sprintf("担当していた %d 件（%s）の担当を %s にしました。", len(res.Reassigned), strings.Join(res.Reassigned, ", "), orUnset(res.To))
+		res.Message += i18n.T(a.Lang, "service.member.reassigned", "count", len(res.Reassigned), "ids", strings.Join(res.Reassigned, ", "), "to", orUnset(res.To))
 	}
 	return res, nil
 }
 
-func membershipWhat(role string) string {
+// membershipWhat は拒否の文面に入れる「何をしようとしたか」（言語は表示する側が決める）。
+func membershipWhat(role string) i18n.Msg {
 	if role == "" {
-		return "参加を外す"
+		return i18n.M("service.member.what.remove")
 	}
-	return "役割を viewer にする"
+	return i18n.M("service.member.what.viewer")
 }
 
-func orUnset(login string) string {
+// orUnset は付け替え先の login（未設定なら「未設定」の文面）。
+func orUnset(login string) any {
 	if login == "" {
-		return "未設定"
+		return i18n.M("service.word.unset")
 	}
 	return login
 }

@@ -1,15 +1,16 @@
 package verify
 
 import (
-	"errors"
 	"strings"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // Windows のシェルの選び方（build tag を付けず、どの OS でも単体テストできるようにパスは文字列で扱う）。
 
 // ErrNoShell は Windows で bash も sh も見つからないとき。
-var ErrNoShell = errors.New("bash が見つかりません（検証コマンドは bash -c で実行します）。Git for Windows を入れると直ります: " +
-	"winget install --id Git.Git -e（https://gitforwindows.org/ ）。すでにあるなら bash.exe を PATH に置いてください")
+// 文面は ID で持ち、出すときは i18n.Text で利用者の言語にする（errors.Is で見分けられる）。
+var ErrNoShell = i18n.Errorf("verify.err.no_shell")
 
 // WindowsShell は Windows で検証コマンドを渡すシェル。以前の CLI の規則（PATH の bash、無ければ sh）に次を足した:
 //

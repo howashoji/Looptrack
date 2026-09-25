@@ -1,12 +1,15 @@
 package hookio
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // MaxInput は読む入力の上限（これを超えた分は読み捨てる。Copilot の toolResult などに大きな本文が入ることがある）。
@@ -33,8 +36,14 @@ type RunOptions struct {
 //
 //	func main() { os.Exit(hookio.Run(os.Stdin, os.Stdout, os.Stderr, opts, handler)) }
 func Run(stdin io.Reader, stdout, stderr io.Writer, opts RunOptions, h Handler) (code int) {
+	lang := i18n.FromEnv(opts.Parse.getenv) // 調べる人（LOOPTRACK_HOOK_DEBUG=1 を付けた人）の言語
 	logf := func(format string, a ...any) {
 		if opts.Debug && stderr != nil {
+			for i, v := range a {
+				if err, ok := v.(error); ok {
+					a[i] = i18n.Text(lang, err) // ID を持つ error は文面にする（%v だと ID が出る）
+				}
+			}
 			fmt.Fprintf(stderr, "hookio: "+format+"\n", a...)
 		}
 	}
@@ -44,7 +53,7 @@ func Run(stdin io.Reader, stdout, stderr io.Writer, opts RunOptions, h Handler) 
 	if stdin != nil {
 		b, err := io.ReadAll(io.LimitReader(stdin, MaxInput))
 		if err != nil {
-			logf("入力を読めません: %v", err)
+			logf("%s", i18n.T(lang, "hookio.debug.read_failed", "reason", err))
 			return 0
 		}
 		input = b
@@ -93,7 +102,7 @@ func call(ev Event, h Handler, timeout time.Duration, logf func(string, ...any))
 	case out := <-ch:
 		return out.r, out.ok
 	case <-t.C:
-		logf("時間切れ（%s）", timeout)
+		logf("%v", i18n.Errorf("hookio.debug.timeout", "timeout", timeout.String())) // logf が要求の言語の文面にする
 		return Result{}, false
 	}
 }
@@ -133,6 +142,7 @@ func ParseArgs(args []string, getenv Getenv) (opts RunOptions, rest []string, er
 		getenv = os.Getenv
 	}
 	opts.Parse.Getenv = getenv
+	lang := i18n.FromEnv(getenv)
 	opts.Render.NoBlock = getenv("LOOPTRACK_LOOP_NO_BLOCK") == "1"
 	opts.Debug = getenv("LOOPTRACK_HOOK_DEBUG") == "1"
 	for i := 0; i < len(args); i++ {
@@ -142,7 +152,7 @@ func ParseArgs(args []string, getenv Getenv) (opts RunOptions, rest []string, er
 		case "--agent", "--event":
 			if !hasEq {
 				if i+1 >= len(args) {
-					return opts, rest, fmt.Errorf("hookio: %s に値がありません", name)
+					return opts, rest, errors.New(i18n.T(lang, "hookio.err.no_value", "name", name))
 				}
 				i++
 				v = args[i]
@@ -153,7 +163,7 @@ func ParseArgs(args []string, getenv Getenv) (opts RunOptions, rest []string, er
 			}
 			ag, ok := ParseAgent(v)
 			if !ok {
-				return opts, rest, fmt.Errorf("hookio: --agent %q は知らない AI です（claude-code・codex・copilot）", v)
+				return opts, rest, errors.New(i18n.T(lang, "hookio.err.unknown_agent", "value", fmt.Sprintf("%q", v)))
 			}
 			opts.Parse.Agent = ag
 		case "--no-block":

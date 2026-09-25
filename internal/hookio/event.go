@@ -3,10 +3,10 @@ package hookio
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"os"
 	"strings"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // ParseOptions は Parse の条件（配線の引数と環境）。
@@ -31,8 +31,8 @@ func (o ParseOptions) getenv(k string) string {
 	return o.Getenv(k)
 }
 
-// ErrNotObject は入力が JSON のオブジェクトでないとき。
-var ErrNotObject = errors.New("hookio: hook の入力が JSON のオブジェクトではありません")
+// ErrNotObject は入力が JSON のオブジェクトでないとき（文面は ID。利用者の言語の文面は i18n.Text で作る）。
+var ErrNotObject = i18n.Errorf("hookio.err.not_object")
 
 // イベント名の対応（入力の名前 → 共通の名前）。PascalCase は Claude Code・Codex・Copilot の PascalCase の配線・VS Code、
 // camelCase は Copilot CLI（userPromptSubmitted・agentStop が Claude Code と違う）。
@@ -62,7 +62,7 @@ func Parse(input []byte, opts ParseOptions) (Event, error) {
 		dec := json.NewDecoder(bytes.NewReader(input))
 		var v any
 		if err := dec.Decode(&v); err != nil {
-			return Event{}, fmt.Errorf("hookio: hook の入力を JSON として読めません: %w", err)
+			return Event{}, i18n.Wrapf(err, "hookio.err.bad_json")
 		}
 		m, ok := v.(map[string]any)
 		if !ok {

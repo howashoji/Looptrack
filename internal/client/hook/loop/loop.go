@@ -63,6 +63,7 @@ func init() {
 		{"pre-tool-secrets-guard", hookio.PreToolUse, 4 * time.Second, PreToolSecretsGuard},
 		{"pre-tool-git-guard", hookio.PreToolUse, 4 * time.Second, PreToolGitGuard},
 		{"pre-tool-subagent-bound", hookio.PreToolUse, 4 * time.Second, PreToolSubagentBound},
+		{"pre-tool-subagent-model", hookio.PreToolUse, 4 * time.Second, PreToolSubagentModel},
 		{"pre-tool-wait-loop-guard", hookio.PreToolUse, 4 * time.Second, PreToolWaitLoopGuard},
 		{"post-work-complete-handoff-mark", hookio.PostToolUse, 4 * time.Second, PostWorkCompleteHandoffMark},
 		{"stop-tool-markup-guard", hookio.Stop, 4 * time.Second, StopToolMarkupGuard},

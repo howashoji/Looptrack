@@ -194,7 +194,7 @@ func (c *Ctx) copilotMissHint() string {
 	if client != usagesnap.ClientCopilot {
 		return ""
 	}
-	return usagesnap.CopilotMissHint(sid, o)
+	return usagesnap.CopilotMissHint(c.Lang, sid, o)
 }
 
 // cmdUsageLedgerAdd は usage ledger add（作ったレポートを台帳に 1 行登録する。追記のみ）。

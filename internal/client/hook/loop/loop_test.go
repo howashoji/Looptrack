@@ -11,8 +11,8 @@ import (
 )
 
 func TestRegistry(t *testing.T) {
-	if n := len(Names()); n != 19 {
-		t.Errorf("hook は 19 本: %d %v", n, Names())
+	if n := len(Names()); n != 20 {
+		t.Errorf("hook は 20 本: %d %v", n, Names())
 	}
 	reg := Registry()
 	for _, n := range Names() {

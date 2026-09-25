@@ -75,6 +75,9 @@ var mcpWriteTools = []mcpWriteTool{
 	{tool: "add_usage_ledger", serverWrite: true, inPretool: true,
 		why: "台帳（usage_ledger）だけを書き、issue_events を書かないので付与の対象ではない。" +
 			"loop の PreToolUse は「取り消せない書き込み」として確認の対象に入れている"},
+	{tool: "create_project", serverWrite: true,
+		why: "プロジェクトを作るだけで、イシューも issue_events も書かないので付与の対象ではない。" +
+			"引数に project を持たない（作る先は slug）ので、loop の PreToolUse の他プロジェクトへの誤爆の確認にも当たらない"},
 	{tool: "verify_issue", inPretool: true,
 		why: "読み取り専用（ReadOnlyHint）で何も書かないが、loop の PreToolUse は" +
 			"他プロジェクトのイシューを読み違えないように確認の対象に入れている"},

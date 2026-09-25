@@ -12,6 +12,7 @@ import (
 
 	"github.com/howashoji/looptrack/internal/client/api"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // Fetch は検証の節を取る（GET /issues/{id}/verify。path は ?project= まで付けたもの）。
@@ -146,9 +147,9 @@ func Send(cl *api.Client, path string, body *jsonorder.Object) (any, error) {
 	return res.Value, nil
 }
 
-// Line は 1 件の結果の行。
-func Line(i, n int, r Result) string {
-	secs := fmt.Sprintf("%.1f 秒", float64(r.DurationMS)/1000)
+// Line は 1 件の結果の行（lang は表示する利用者の言語）。
+func Line(lang i18n.Lang, i, n int, r Result) string {
+	secs := i18n.T(lang, "verify.line.seconds", "secs", fmt.Sprintf("%.1f", float64(r.DurationMS)/1000))
 	var detail string
 	switch r.Status {
 	case StatusOK:
@@ -158,13 +159,13 @@ func Line(i, n int, r Result) string {
 		if r.ExitCode != nil {
 			code = strconv.Itoa(*r.ExitCode)
 		}
-		detail = "exit " + code + "・" + secs
+		detail = i18n.T(lang, "verify.line.exit", "code", code, "secs", secs)
 	case StatusTimeout:
-		detail = "時間切れ・" + secs
+		detail = i18n.T(lang, "verify.line.timeout", "secs", secs)
 	case StatusSkipped:
-		detail = "全体の上限を超えたため実行しない"
+		detail = i18n.T(lang, "verify.line.skipped")
 	}
-	return fmt.Sprintf("[%d/%d] %-7s %s（%s）", i, n, r.Status, r.Command, detail)
+	return i18n.T(lang, "verify.line", "i", i, "n", n, "status", fmt.Sprintf("%-7s", r.Status), "command", r.Command, "detail", detail)
 }
 
 // ResultFromJSON はサーバの記録（last.results の 1 件）を Result にする。

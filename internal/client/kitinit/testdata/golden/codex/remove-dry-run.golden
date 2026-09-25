@@ -115,7 +115,7 @@ init --remove-loop: $TMP/ws（dry-run）
   更新         AGENTS.md
       --- a/AGENTS.md
       +++ b/AGENTS.md
-      @@ -21,195 +21,3 @@
+      @@ -21,197 +21,3 @@
          利用者に `~/.codex/config.toml` への `[mcp_servers.looptrack]` の追加を勧める）。本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡す
        - 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
        <!-- looptrack:end -->

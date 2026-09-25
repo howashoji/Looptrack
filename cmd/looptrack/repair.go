@@ -60,7 +60,11 @@ func repairLists(ctx context.Context, db *sql.DB, lang i18n.Lang, w io.Writer, s
 		if err != nil {
 			return err
 		}
-		projects = ps
+		for _, p := range ps {
+			if !p.Archived { // アーカイブ済みは書き込みを拒むので、全件の補正からは外す
+				projects = append(projects, p)
+			}
+		}
 	} else {
 		for _, s := range slugs {
 			p, err := store.ProjectBySlug(ctx, db, s)

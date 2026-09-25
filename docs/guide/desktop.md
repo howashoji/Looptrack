@@ -5,7 +5,7 @@
 The desktop app is the easiest way to use Looptrack by yourself on one machine, without opening a terminal.
 Double-click the icon and it starts a local server (listening on 127.0.0.1 only, storing data in a single SQLite file) and opens the web UI in your default browser.
 The first time, the browser shows the first-run setup (administrator, two-factor auth, first project).
-A tray icon (menu bar on macOS) lets you open the UI again, copy the MCP settings for your agent, make the CLI available, start at login, and quit.
+A tray icon (menu bar on macOS) lets you open the UI again, open settings, copy the MCP settings for your agent, make the CLI available, start at login, and quit.
 On Windows there is an installer: it adds Looptrack to the Start menu and you can remove it from the list of installed apps.
 
 No administrator rights are needed on any OS.
@@ -44,7 +44,7 @@ Two options are offered; both can be changed later from the tray menu:
 
 When the installer finishes, leave "Launch Looptrack" checked, or start Looptrack from the Start menu.
 The icon appears in the notification area. Windows 11 hides new icons under the "^" (hidden icons) button: click "^", then drag the Looptrack icon onto the taskbar to keep it visible (or turn it on in Settings → Personalization → Taskbar → Other system tray icons).
-Left-click the icon to open the UI; right-click it for the menu.
+Left-click the icon for the menu.
 
 If you would rather not install anything, use the zip instead: extract it to a folder in your user profile (for example `%USERPROFILE%\Apps`, which gives `%USERPROFILE%\Apps\Looptrack\Looptrack.exe`) and double-click `Looptrack.exe`.
 Do not extract it into `%LOCALAPPDATA%\Programs\looptrack`; that folder is where the CLI goes.
@@ -59,18 +59,44 @@ Without a tray the app still runs; stop it with `looptrack desktop --quit` (see 
 
 Double-clicking again while the app is running does not start a second copy; it just opens the UI in the browser.
 
+## Get started without the CLI
+
+Finishing setup and connecting an AI agent both happen through the app's own screens and a chat with your agent — you never need to open a terminal or type a `looptrack` command yourself.
+
+### Finish setup in the browser
+
+The first time the browser opens (from double-clicking the app, from "Open the app" in the tray, or from the URL `looptrack desktop --status` prints), it shows a one-time setup form instead of the normal screen.
+
+| Section | What to enter |
+| -- | -- |
+| Administrator | Login (letters, digits, `.` `_` `-`), display name (optional), a password (12+ characters, entered twice) |
+| Two-factor auth | Required or optional. Local mode skips sign-in either way, so this only matters if you later point other people at this same server |
+| First project | Slug, ID prefix, and name — all optional. Leave them blank and create one later, from `/admin/projects` or by asking your agent |
+
+Submit the form. The page that follows shows a link to your project (if you created one) and the MCP connection settings for Claude Code, Codex, and GitHub Copilot — the same ones "Copy AI connection settings" puts on your clipboard. This form appears only while no administrator exists yet; once you finish it, the app goes straight to the normal screen from then on. You can still open the connection settings again at any time, from the tray's "Open the connection settings page".
+
+### Connect your AI agent by chat
+
+1. Open your agent (Claude Code, Codex, GitHub Copilot, …) in the repository you want to track issues for.
+2. From the tray menu, choose "Copy AI connection settings" (or "Open the connection settings page" to copy it from the browser instead).
+3. Paste it into a prompt together with what you want, for example: "Add this MCP connection, then set up issue management for this repository" — with the copied block pasted below that sentence.
+4. Approve what the agent proposes as it goes: adding the MCP connection, then the install command it gets back from the `setup` tool. [Agent-specific notes](ai-agents.md) walks through exactly what happens at each step, under "Installing through MCP only" — none of it is something you type yourself. (Signing in only comes up if you point the connection at a server other people share, not at this local app.)
+5. Restart the agent when it asks you to, and approve its hooks.
+
+From here, everything is a prompt: ask the agent to file an issue, or to take the next one and run a full loop.
+
 ## Tray / menu bar
 
 | Item | What it does |
 | -- | -- |
 | Open the app | Opens the web UI (`http://127.0.0.1:18090/looptrack/` by default) |
+| Settings | Opens the account settings page (`/account`) in the browser |
 | Copy AI connection settings | Copies the MCP settings for Claude Code, Codex, or GitHub Copilot to the clipboard, ready to paste. "Open the connection settings page" shows them all in the browser |
 | Make the CLI available | Makes `looptrack` callable from terminals and agents (see [Use the CLI](#use-the-cli)) |
 | Start at login | When checked, the app starts in the background when you log in (it does not open the browser then) |
 | Quit | Stops the server and the app |
 
-On Windows, left-clicking the tray icon opens the UI and right-clicking shows the menu.
-On macOS and Linux, either button shows the menu.
+On every OS, left-clicking the tray icon shows the menu.
 
 The port stays the same between launches, so the MCP settings you copied keep working.
 If another program is already using the port, the app picks a free one and remembers it; copy the MCP settings again in that case.
@@ -128,6 +154,7 @@ If you move the app, the registration follows it the next time you start the app
 Your data stays in the data folder above and is upgraded automatically on the first start.
 The desktop app does not use `looptrack self-update`; update the whole app instead.
 The CLI link (macOS / Linux) keeps pointing at the app, and the Windows CLI copy is refreshed on the next start.
+Nothing in the desktop app tells you about a new version. [Updating](updating.md) sums up what is automatic and what is manual.
 
 ## Uninstall
 

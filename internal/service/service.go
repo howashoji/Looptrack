@@ -286,6 +286,18 @@ func (s *Service) Create(ctx context.Context, a Actor, p store.Project, in Creat
 	now := s.Now()
 	var out *Issue
 	err = s.inTx(ctx, func(tx *sql.Tx) error {
+		// 採番で projects の行をロックしてから、アーカイブ済みかを判定する（起票させない。project_archive.go）。
+		// REPEATABLE READ では最初の普通の SELECT でスナップショットが決まるので、ロックより前に普通の SELECT を置かない。
+		n, err := store.NextNumber(ctx, tx, p.ID)
+		if errors.Is(err, sql.ErrNoRows) { // 行が無ければ checkProjectActive と同じ NotFound にする
+			return errm(NotFound, "not_found", i18n.M("service.err.not_found.project", "slug", p.Slug))
+		}
+		if err != nil {
+			return err
+		}
+		if err := checkProjectActive(ctx, tx, p); err != nil {
+			return err
+		}
 		var verifyOverride *domain.Override
 		if rules != nil {
 			if v := rules.CheckTransition(lang, domain.Transition{Type: in.Type, To: in.Status, Creating: true}); v != nil {
@@ -299,10 +311,6 @@ func (s *Service) Create(ctx context.Context, a Actor, p store.Project, in Creat
 				}
 				verifyOverride = vo
 			}
-		}
-		n, err := store.NextNumber(ctx, tx, p.ID)
-		if err != nil {
-			return err
 		}
 		id := domain.FormatID(p.Prefix, p.Width, n)
 		doc := domain.NewDocument(id, in, s.stamp(now), lang)
@@ -392,6 +400,11 @@ func (s *Service) mutate(ctx context.Context, a Actor, p store.Project, issueID 
 			return errm(NotFound, "not_found", i18n.M("service.err.not_found.issue"))
 		}
 		if err != nil {
+			return err
+		}
+		// アーカイブ済みのイシューは変えさせない（project_archive.go）。判定は行のロックの後に置く。
+		// REPEATABLE READ では最初の普通の SELECT でスナップショットが決まるので、ロックの前に読むと、待った後も古い版を読む。
+		if err := checkProjectActive(ctx, tx, p); err != nil {
 			return err
 		}
 		if version != 0 && row.Version != version {

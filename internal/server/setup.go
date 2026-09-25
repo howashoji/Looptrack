@@ -23,6 +23,7 @@ import (
 
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/relver"
+	"github.com/howashoji/looptrack/internal/service"
 	"github.com/howashoji/looptrack/internal/store"
 	"github.com/howashoji/looptrack/kit"
 )
@@ -698,7 +699,7 @@ func (s *Server) apiGetInstall(w http.ResponseWriter, r *http.Request) {
 // MCP の接続（OAuth）はあるが CLI のトークンがまだ無い端末が、setup の手順で配布物を取るために使う。
 func (s *Server) newSetupTicket(userID int64) (string, time.Time, error) {
 	if s.cfg.Box == nil {
-		return "", time.Time{}, errors.New("LOOPTRACK_SECRET_KEY が設定されていません")
+		return "", time.Time{}, i18n.Errorf("server.setup.err.no_secret_key")
 	}
 	exp := s.cfg.Now().Add(setupTicketTTL)
 	sealed, err := s.cfg.Box.Seal([]byte(fmt.Sprintf("%s|%d|%d", setupTicketKind, userID, exp.Unix())))
@@ -1155,11 +1156,69 @@ const setupPromptText = `イシュー管理（looptrack）をこの作業環境�
 4. [利用者] の手順（トークンの登録・再起動とフックの承認）は利用者に依頼する。トークンは AI が扱わない
 5. 利用者が再起動したら setup ツールをもう一度呼び、「導入済み」になったことを確かめる。続けて guide → next（prompt「loop」）`
 
-func projectSuffix(slug string) string {
+// loopPromptTextEN・loopIteratePromptTextEN・setupPromptTextEN は prompt の英語版（日本語の定数が正本。
+// 項目の並びと数をそろえる。instructions と同じく、言語ごとの *mcp.Server にその言語で登録する）。
+const loopPromptTextEN = `Run one round of the issue management (looptrack) loop%s.
+
+0. If you have not done so in this session, call the guide tool once and read the common rules, this project's rules and its operating document (if the tool result carries a note that the installation is incomplete (a separate line urging you to call the setup tool; the wording changes with the user's language), first offer the user the steps of the setup tool)
+0'. If project_summary lists items under "waiting for a human decision" or "feedback from outside" and the user is in this conversation, follow the prompt "review" first (skip it when they are not)
+1. Start with the next tool (if you already have an issue in progress, that one comes back). If it says there is no issue ready to start, stop and consult the user
+2. Work along the body, the acceptance criteria and the related issues that came back. Record the cause, a decision or the approach with add_comment as soon as you know it (do not move on in the conversation alone. File a defect with create_issue the moment you find it. When the user tells you how participants or testers reacted, add_comment on the issue in question starting with "Feedback: ")
+3. Verify the acceptance criteria one by one (confirm them with tests and real output). If a criterion cannot be met, do not close; stop and consult the user
+4. Set it to Done with set_status and write the verification result in comment (the result per criterion and how you confirmed it). When a per-project rule rejects it, do what the message tells you. When the user has to decide something (how to read the specification, how it looks, the direction), do not set Done: set In Review and write in comment what they need to decide (waiting on a human decision). When the result ends with a line urging you to verify and close a requirement (it holds looptrack issue show <requirement-ID> and the close command; decide from that command, not from the wording), check that requirement's acceptance criteria with get_issue before moving on, and set it to Done with set_status when they are met (with the verification result in comment)
+5. If the user has told you to keep going, go on to the next next. Otherwise report the result of this round (issue IDs, changes, verification) and stop`
+
+const loopIteratePromptTextEN = `Run one round of the issue management (looptrack) loop%s. This working environment has the loop engineering set (loop) installed, so run it with the steps of the skill /iterate.
+
+0. If you have not done so in this session, call the guide tool once and read the common rules, this project's rules and its operating document (if the tool result carries a note that the installation is incomplete (a separate line urging you to call the setup tool; the wording changes with the user's language), first offer the user the steps of the setup tool)
+0'. If project_summary lists items under "waiting for a human decision" or "feedback from outside" and the user is in this conversation, follow the prompt "review" first (skip it when they are not)
+1. Check the open bugs: look at the open bugs with list_issues (type: bug). Do not pile new implementation on top of open bugs; fix what you can first (next also picks bugs first)
+2. Start with the next tool (if you already have an issue in progress, that one comes back). If it says there is no issue ready to start, stop and consult the user. Read the requirement and the design in question before you implement
+3. Implement, and write tests from the acceptance criteria. Run the gates (looptrack gates) in your local shell. File every failure with create_issue (type: bug), one issue per problem; fix it, add a test that catches the same problem, and run the gates again. Record the cause, a decision or the approach with add_comment as soon as you know it (when the user tells you how participants or testers reacted, add_comment on the issue in question starting with "Feedback: ")
+4. Verify the acceptance criteria one by one (every gate green; the problems found in this round filed, and the ones you fixed closed). If a criterion cannot be met, do not close; stop and consult the user
+5. Set it to Done with set_status and write the gate results and the result per acceptance criterion in comment. When a per-project rule rejects it, do what the message tells you. When the user has to decide something (how to read the specification, how it looks, the direction), do not set Done: set In Review and write in comment what they need to decide (waiting on a human decision). When the result ends with a line urging you to verify and close a requirement (it holds looptrack issue show <requirement-ID> and the close command; decide from that command, not from the wording), check that requirement's acceptance criteria with get_issue before moving on, and set it to Done with set_status when they are met (with the verification result in comment)
+6. You may go back to 1 and move on to the next issue. Stop and put it to the user only when the work goes beyond the parent issue, the design has to change, the requirement can be read more than one way, or the fix for the same bug has failed three times. When you stop, report the result of this round (issue IDs, changes, verification)`
+
+const setupPromptTextEN = `Install issue management (looptrack) in this working environment%s.
+
+1. Call the setup tool. Pass the absolute path of the git root of your working directory (or the working directory itself when it is not a git repository) in the workspace argument (it returns the steps for the AI that connected and for this working directory, the SHA-256 of the files and the URL to fetch them from)
+2. If the result is nothing but the question of whether to install the loop engineering set (loop) (no command comes back), show the user that question as it is and get their answer (install it / do not).
+   The AI does not decide the answer. Once you have it, call the setup tool again with the loop argument (yes / no) and the same workspace (exactly one command that matches the answer comes back)
+3. For the steps marked [AI], show the user what the command does, get their approval, and run it at the root of the project. Stop if the SHA-256 does not match
+4. Ask the user to do the steps marked [user] (registering the token, restarting and approving the hooks). The AI never handles the token
+5. Once the user has restarted, call the setup tool again and confirm that it reports the installation as complete. Then guide → next (the prompt "loop")`
+
+// promptText は prompt の本文を lang で選ぶ（日本語のときだけ日本語の正本、それ以外は英語）。
+func promptText(lang i18n.Lang, ja, en string) string {
+	if lang == i18n.JA {
+		return ja
+	}
+	return en
+}
+
+// projectSuffix は prompt の本文の先頭の文に足す、対象のプロジェクトの指定（slug が無ければ空）。
+func projectSuffix(lang i18n.Lang, slug string) string {
 	if slug == "" {
 		return ""
 	}
-	return "（プロジェクト " + slug + "。ツールの project 引数に指定する）"
+	return i18n.T(lang, "server.mcp.prompt.project_suffix", "slug", slug)
+}
+
+// setupProjectError は setup の対象のプロジェクトが引けないときのエラー。「見つかりません」には次の手を足す:
+// 管理者なら create_project で作れること（prefix と width は後から変えられないので、値を利用者に確かめてから）、
+// 管理者でなければ管理者に作ってもらう（か参加させてもらう）こと。管理者は全プロジェクトを引けるので、
+// 管理者に NotFound が返るのはプロジェクトが無いときだけ。
+func (s *Server) setupProjectError(c *mcpCall, slug string, err error) error {
+	var se *service.Error
+	if !errors.As(err, &se) || se.Kind != service.NotFound {
+		return s.toolError(c.lang, "setup", err)
+	}
+	hint := i18n.T(c.lang, "server.mcp.setup.project_missing_member", "slug", slug)
+	if c.p.User.Role == "admin" {
+		d := service.NewProjectDefaults(store.Project{Slug: slug}) // 省略したときに使われる値（create_project と同じ既定）
+		hint = i18n.T(c.lang, "server.mcp.setup.project_missing_admin", "slug", d.Slug, "prefix", d.Prefix, "width", d.Width)
+	}
+	return errors.New(i18n.Text(c.lang, se) + "\n" + hint)
 }
 
 func (s *Server) addSetupMCP(srv *mcp.Server, lang i18n.Lang) {
@@ -1177,7 +1236,7 @@ func (s *Server) addSetupMCP(srv *mcp.Server, lang i18n.Lang) {
 			}
 			pr, _, err := s.resolveProject(ctx, c.lang, c.p.User, slug)
 			if err != nil {
-				return nil, nil, s.toolError(c.lang, "setup", err)
+				return nil, nil, s.setupProjectError(c, slug, err)
 			}
 			client := s.mcpClient(ctx, req.GetExtra(), req.ClientInfo(), c.p.User.ID)
 			ua := ""
@@ -1195,11 +1254,12 @@ func (s *Server) addSetupMCP(srv *mcp.Server, lang i18n.Lang) {
 			return result(out.Text, out), nil, nil
 		})
 
-	projectArgDef := []*mcp.PromptArgument{{Name: "project", Title: "プロジェクト", Description: "プロジェクトの slug（省略時は接続設定の X-Looptrack-Project）"}}
+	projectArgDef := []*mcp.PromptArgument{{Name: "project", Title: i18n.T(lang, "server.mcp.prompt.arg.project.title"),
+		Description: i18n.T(lang, "server.mcp.prompt.arg.project.description")}}
 	prompt := func(text string) mcp.PromptHandler {
 		return func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 			if principalOfExtra(req.GetExtra()) == nil {
-				return nil, errors.New("認証が必要です")
+				return nil, errors.New(i18n.T(lang, "server.mcp.err.auth_required"))
 			}
 			slug := ""
 			if req.Params != nil {
@@ -1208,23 +1268,24 @@ func (s *Server) addSetupMCP(srv *mcp.Server, lang i18n.Lang) {
 			if slug == "" && req.GetExtra() != nil && req.GetExtra().Header != nil {
 				slug = strings.TrimSpace(req.GetExtra().Header.Get("X-Looptrack-Project"))
 			}
-			return &mcp.GetPromptResult{Messages: []*mcp.PromptMessage{{Role: "user", Content: &mcp.TextContent{Text: fmt.Sprintf(text, projectSuffix(slug))}}}}, nil
+			return &mcp.GetPromptResult{Messages: []*mcp.PromptMessage{{Role: "user", Content: &mcp.TextContent{Text: fmt.Sprintf(text, projectSuffix(lang, slug))}}}}, nil
 		}
 	}
-	srv.AddPrompt(&mcp.Prompt{Name: "loop", Title: "イシューのループを 1 周回す",
-		Description: "next（着手）→ 作業 → add_comment → 受け入れ条件の検証 → set_status Done（検証結果つき）→ 次の next。" +
-			"ループエンジニアリング一式（loop）が入っている作業環境では /iterate の手順（next → 実装 → ゲート → close → next）",
-		Arguments: projectArgDef}, func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		text := loopPromptText
+	srv.AddPrompt(&mcp.Prompt{Name: "loop", Title: i18n.T(lang, "server.mcp.prompt.loop.title"),
+		Description: i18n.T(lang, "server.mcp.prompt.loop.description"),
+		Arguments:   projectArgDef}, func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		text := promptText(lang, loopPromptText, loopPromptTextEN)
 		if s.promptLoopState(ctx, req) == "installed" {
-			text = loopIteratePromptText
+			text = promptText(lang, loopIteratePromptText, loopIteratePromptTextEN)
 		}
 		return prompt(text)(ctx, req)
 	})
-	srv.AddPrompt(&mcp.Prompt{Name: "review", Title: "人の判断待ちと外からの反応を利用者に持ちかける",
-		Description: "In Review（人の判断待ち）と未応答のフィードバックを利用者に示し、返答を先頭「判断:」「差し戻し:」のコメントに残して Done / Todo へ動かす", Arguments: projectArgDef}, prompt(reviewPromptText))
-	srv.AddPrompt(&mcp.Prompt{Name: "setup", Title: "この作業環境に導入する",
-		Description: "setup ツールの手順（配布物の取得・init・トークン登録・フックの承認）を利用者の承認を得て進める", Arguments: projectArgDef}, prompt(setupPromptText))
+	srv.AddPrompt(&mcp.Prompt{Name: "review", Title: i18n.T(lang, "server.mcp.prompt.review.title"),
+		Description: i18n.T(lang, "server.mcp.prompt.review.description"), Arguments: projectArgDef},
+		prompt(promptText(lang, reviewPromptText, reviewPromptTextEN)))
+	srv.AddPrompt(&mcp.Prompt{Name: "setup", Title: i18n.T(lang, "server.mcp.prompt.setup.title"),
+		Description: i18n.T(lang, "server.mcp.prompt.setup.description"), Arguments: projectArgDef},
+		prompt(promptText(lang, setupPromptText, setupPromptTextEN)))
 
 	srv.AddReceivingMiddleware(s.setupNoticeMiddleware)
 }

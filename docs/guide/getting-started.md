@@ -234,7 +234,7 @@ If you choose MySQL and give the application's database user only the privileges
 So it is: run the installer (setup creates the tables) → load the grants file with an administrative account → run the installer again, which only starts the service and checks it.
 Before starting, the installer tries to read the storage as the service user; if it cannot, it stops and prints this order instead of waiting for a server that will never come up.
 
-To update, run `sudo sh install.sh --upgrade --from <source>`; to remove it, `--uninstall` (`--purge` also deletes the settings and the data).
+To update, run `sudo sh install.sh --upgrade --from <source>` (details in [Updating](updating.md)); to remove it, `--uninstall` (`--purge` also deletes the settings and the data).
 
 ## 4. Create a project and join it
 

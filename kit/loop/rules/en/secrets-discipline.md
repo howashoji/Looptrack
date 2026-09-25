@@ -123,8 +123,10 @@ Examples — **confirmed**: `cert.key` (the most common name for a TLS private k
 **The limit**: with neither a secret word nor `key` in the name and an unconventional location (`notes/2026.pem`, say), it **is not caught**.
 Compounds like `privatekey.pem` and `pubkey-sshkey.pem` are picked up by the rule above. **That does not mean the limit of telling secrets
 apart by name is gone**: the forms listed here are ones that were actually checked, not a guarantee of coverage.
-Two things fall the other way, to the confirming side — false positives, but the safer side of the trade:
-a public name carrying both `public` and `ca` (`public-ca-bundle.pem`), and a word that just happens to contain `key` (`monkey.pem`).
+Three things fall the other way, to the confirming side — false positives, but the safer side of the trade:
+a public name carrying both `public` and `ca` (`public-ca-bundle.pem`), a word that just happens to contain `key` (`monkey.pem`),
+and **a glob whose name is visible** (`cat /tmp/x/.env*` also matches a template like `.env.example`, but is confirmed anyway
+because what is left after stripping the trailing glob, `.env`, is itself the name of a secret).
 That is the limit of telling secrets apart by name, and it stays within the hook's remit of catching nothing but slips.
 Things that merely look like secrets by name (`.env.example`, `*.pub`) go through.
 **Copying from a template goes through** (`cp .env.example .env`). The judgment is made **per simple command**, split on `;`, `&`, `&&`, `||`, `|`, newlines, `(` and `)`:
@@ -201,7 +203,10 @@ Every one below **was measured** (it does not become a confirmation). None of th
   worse than the hole.
 - **Building the path out of a variable**: `D=/tmp/x/; cat $D.env`. The string after expansion is invisible to the hook.
 - **A glob that hides the name**: `cat /tmp/x/*`, `cat /tmp/x/.en?`. The literal part names no secret.
-  **`cat /tmp/x/.env*` and `cat /tmp/x/id_rsa*` are not caught either** (`.env*` and `id_rsa*` do not match the name test).
+  **A glob whose name is visible (`cat /tmp/x/.env*`, `cat /tmp/x/id_rsa*`) is caught** (what is left after stripping
+  the trailing glob — `*`, `?`, `[…]` — is matched whole against the names that give a secret away on their own,
+  such as `.env` or the `id_rsa` family. Limited to a command that reads contents or copies them elsewhere, so a
+  listing-only command such as `ls /tmp/x/.env*` does not fire).
 - **Archiving a whole directory**: `tar czf /tmp/o.tgz .`. The secret file name never appears in the arguments,
   so telling secrets apart by name cannot reach it by construction.
 - **Loading with `.` (dot)**: `. /tmp/x/.env`. `.` is a single character, so treating it as a word in a regular

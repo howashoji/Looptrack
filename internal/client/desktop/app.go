@@ -382,7 +382,7 @@ func (o *Options) primary(paths Paths, background, noTray bool) int {
 	}
 	defer closeLog()
 	st := readState(paths.State())
-	ln, err := listen(o.Env, st.Port, logger)
+	ln, err := listen(o.Env, st.Port, logger, o.Lang)
 	if err != nil {
 		return o.fail(i18n.T(o.Lang, "desktop.err.listen"), err)
 	}
@@ -414,7 +414,7 @@ func (o *Options) primary(paths Paths, background, noTray bool) int {
 	if err := writeState(paths.State(), state{
 		PID: os.Getpid(), Port: port, URL: a.URL(), Version: o.Version, Started: time.Now().Format(time.RFC3339),
 	}); err != nil {
-		logger.Warn("desktop.json を書けません", "err", err)
+		logger.Warn(i18n.T(o.Lang, "desktop.log.state_write_failed"), "err", err)
 	}
 	logger.Info("desktop", "action", "start", "url", a.URL(), "version", o.Version, "data", paths.DataDir, "launcher", launcher)
 	fmt.Fprintln(o.Stdout, i18n.T(o.Lang, "desktop.msg.started", "app", AppName, "url", a.URL(), "data", paths.DataDir, "log", paths.Log()))
@@ -453,7 +453,7 @@ func (o *Options) primary(paths Paths, background, noTray bool) int {
 	}
 	// 次の起動で同じポートを使うため、ポートだけ残す
 	if err := writeState(paths.State(), state{Port: port}); err != nil {
-		logger.Warn("desktop.json を書けません", "err", err)
+		logger.Warn(i18n.T(o.Lang, "desktop.log.state_write_failed"), "err", err)
 	}
 	logger.Info("desktop", "action", "stop")
 	return 0
@@ -469,7 +469,7 @@ func (a *App) Done() <-chan struct{} { return a.quit }
 
 // listen は 127.0.0.1 の待ち受けを開く。LOOPTRACK_DESKTOP_PORT（0 は OS に選ばせる）→ 前回のポート → DefaultPort の順。
 // 環境変数で決めたポートが使えなければエラー、それ以外は OS に選ばせて続ける（ログに残す。AI の接続設定の URL が変わる）。
-func listen(e env.Env, last int, logger *slog.Logger) (net.Listener, error) {
+func listen(e env.Env, last int, logger *slog.Logger, lang i18n.Lang) (net.Listener, error) {
 	if v := e.Get("LOOPTRACK_DESKTOP_PORT"); v != "" {
 		p, err := strconv.Atoi(v)
 		if err != nil || p < 0 || p > 65535 {
@@ -485,7 +485,7 @@ func listen(e env.Env, last int, logger *slog.Logger) (net.Listener, error) {
 	if err == nil {
 		return ln, nil
 	}
-	logger.Warn("ポートが使えないため、別のポートで待ち受けます（AI の接続設定をコピーし直してください）", "port", want, "err", err)
+	logger.Warn(i18n.T(lang, "desktop.log.port_in_use"), "port", want, "err", err)
 	return net.Listen("tcp", "127.0.0.1:0")
 }
 
@@ -526,14 +526,14 @@ func (a *App) refresh() {
 	if as := a.autostart(); as != nil {
 		if on, _ := as.Enabled(); on && !as.Current() {
 			if err := as.Enable(); err != nil {
-				a.logger.Warn("自動起動の登録を直せません", "err", err)
+				a.logger.Warn(i18n.T(a.opts.Lang, "desktop.log.autostart_refresh_failed"), "err", err)
 			} else {
 				a.logger.Info("desktop", "action", "autostart-refresh")
 			}
 		}
 	}
 	if fixed, err := a.cli().Refresh(); err != nil {
-		a.logger.Warn("CLI の置き場を直せません", "err", err)
+		a.logger.Warn(i18n.T(a.opts.Lang, "desktop.log.cli_refresh_failed"), "err", err)
 	} else if fixed {
 		a.logger.Info("desktop", "action", "cli-refresh", "target", a.cli().Target())
 	}
@@ -546,7 +546,7 @@ func (o *Options) autostartFor(launcher string) *Autostart {
 	}
 	return &Autostart{
 		GOOS: o.GOOS, Home: o.Home, ConfigHome: o.Env.Get("XDG_CONFIG_HOME"), Label: BundleID,
-		Argv: []string{launcher, "desktop", "--background"},
+		Argv: []string{launcher, "desktop", "--background"}, Lang: o.Lang,
 	}
 }
 
@@ -554,7 +554,7 @@ func (o *Options) autostartFor(launcher string) *Autostart {
 func (o *Options) cliFor(launcher string) CLIInstall {
 	c := CLIInstall{
 		GOOS: o.GOOS, Home: o.Home, LocalAppData: o.Env.Get("LOCALAPPDATA"),
-		Launcher: launcher, PathEnv: o.Env.Get("PATH"),
+		Launcher: launcher, PathEnv: o.Env.Get("PATH"), Lang: o.Lang,
 	}
 	if launcher != "" {
 		c.BundledCLI = filepath.Join(filepath.Dir(launcher), "cli", "looptrack.exe")
@@ -568,6 +568,14 @@ func (a *App) cli() CLIInstall { return a.opts.cliFor(a.launcher) }
 
 // OpenUI は画面をブラウザで開く。
 func (a *App) OpenUI() { a.OpenPath("/") }
+
+// SettingsPath は「設定」（OpenSettings）が開く画面の中の経路。ローカルモードは常に最初の管理者として
+// 自動ログインするので、管理者権限を要る /admin/* ではなく誰でも開ける /account を選ぶ
+// （画面自身の利用者メニューでも「アカウント設定」として案内されている経路。internal/server/templates/layout.html）。
+const SettingsPath = "/account"
+
+// OpenSettings はアカウント設定の画面（SettingsPath）をブラウザで開く（トレイの「設定」）。
+func (a *App) OpenSettings() { a.OpenPath(SettingsPath) }
 
 // OpenPath は画面の中の経路（BasePath より後）をブラウザで開く。
 func (a *App) OpenPath(p string) {

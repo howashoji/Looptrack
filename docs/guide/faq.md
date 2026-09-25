@@ -30,6 +30,7 @@ looptrack issue init --project <slug> --url <server URL> --agent <agent>   # ref
 `self-update` downloads the `looptrack` the server distributes and replaces the running binary.
 Inside a project, `--url` can be taken from the `LOOPTRACK_API_URL` environment variable.
 If the server does not distribute `looptrack` (no distribution directory configured), download the new version again as in step 1 of [Getting started](getting-started.md).
+How the notice works, and how to update the desktop app and the server, is summed up in [Updating](updating.md).
 
 ## "Token usage has not been attached yet" appears
 

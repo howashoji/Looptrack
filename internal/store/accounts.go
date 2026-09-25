@@ -415,6 +415,9 @@ func UserMemberships(ctx context.Context, q execQuerier, userID int64) ([]Member
 	}
 	var out []Membership
 	for _, p := range all {
+		if p.Archived { // アーカイブ済みは一覧にも操作の解決にも出さない（管理画面は ListProjects で全件を見る）
+			continue
+		}
 		if role, ok := roles[p.ID]; ok {
 			out = append(out, Membership{Project: p, Role: role})
 		}
@@ -432,6 +435,8 @@ const NonMemberAdminRole = "viewer"
 // 以前は常に admin、その次は行が無いプロジェクトだけ admin だったが、それでは viewer で参加している
 // 管理者が自分の参加を外すだけで書けてしまうため、書くには必ず参加させる（/im/admin/projects で自分の役割を変える）。
 // /im/admin/* の管理操作はこの役割を見ない（利用者の役割 admin だけで判定）。一覧の表示には MemberProjects を使う。
+// アーカイブ済みのプロジェクトは返さない（利用者の役割にかかわらず。UserMemberships も同じ）。そのため
+// slug を指定した閲覧・書き込みも「存在しない」になる。書き込みは service の入口でも拒む（ProjectArchived）。
 func AccessibleProjects(ctx context.Context, q execQuerier, u User) ([]Project, map[int64]string, error) {
 	if u.Role == "admin" {
 		all, err := ListProjects(ctx, q)
@@ -443,13 +448,18 @@ func AccessibleProjects(ctx context.Context, q execQuerier, u User) ([]Project, 
 			return nil, nil, err
 		}
 		roles := map[int64]string{}
+		active := make([]Project, 0, len(all))
 		for _, p := range all {
+			if p.Archived { // 管理者にもアーカイブ済みは解決させない（戻すのは /admin/projects から）
+				continue
+			}
+			active = append(active, p)
 			roles[p.ID] = NonMemberAdminRole
 			if r, ok := memberRoles[p.ID]; ok {
 				roles[p.ID] = r
 			}
 		}
-		return all, roles, nil
+		return active, roles, nil
 	}
 	return MemberProjects(ctx, q, u.ID)
 }

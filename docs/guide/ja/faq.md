@@ -30,6 +30,7 @@ looptrack issue init --project <slug> --url <サーバの URL> --agent <AI>   # 
 `self-update` はサーバが配っている `looptrack` を取得し、今の実行ファイルと置き換えます。
 プロジェクトの中で実行すれば、`--url` は環境変数 `LOOPTRACK_API_URL` から取れます。
 配布のディレクトリを設定していないサーバは `looptrack` を配っていません。その場合は[始め方](getting-started.md)の手順 1 で新しい版を取り直してください。
+案内が出る仕組みと、デスクトップ版・サーバの更新は[更新](updating.md)にまとめています。
 
 ## トークン情報が未付与と出る
 

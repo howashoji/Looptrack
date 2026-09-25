@@ -6,7 +6,7 @@
 init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI claude-code）
 kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
 配線: looptrack hook <名前> --agent <AI>
-導入セット: core + loop（hook 19 本を配線）
+導入セット: core + loop（hook 20 本を配線）
   作成         .claude/rules/looptrack-loop/background-process.md
   作成         .claude/rules/looptrack-loop/en/background-process.md
   作成         .claude/rules/looptrack-loop/en/iteration-discipline.md
@@ -25,7 +25,7 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
   作成         .claude/skills/token-report/SKILL.md
   作成         .gitignore
   作成         .claude/.looptrack-kit.json
-verify: 配線 26 件・looptrack dev（headless・test）・rules の注入 3 節 を確かめました
+verify: 配線 27 件・looptrack dev（headless・test）・rules の注入 3 節 を確かめました
 次に:
   1. Claude Code を再起動する（env とフックの反映）。フック・設定の確認を求められたら内容を見て承認する（デスクトップ版は確認を出さずに読み込む）
   2. トークンが未登録: looptrack issue login --browser --url http://127.0.0.1:9/im を実行し、開いたブラウザで利用者がログインと承認をする（AI が実行してよい。待ち受けは最長 5 分なので、コマンドのタイムアウトは 5 分より長くする。ブラウザの無い環境は http://127.0.0.1:9/im/account で発行して login --url http://127.0.0.1:9/im に貼る）
@@ -281,6 +281,11 @@ verify: 配線 26 件・looptrack dev（headless・test）・rules の注入 3 �
               {
                 "type": "command",
                 "command": "looptrack hook pre-tool-subagent-bound --agent claude-code",
+                "timeout": 5
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook pre-tool-subagent-model --agent claude-code",
                 "timeout": 5
               }
             ]

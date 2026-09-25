@@ -40,10 +40,13 @@ type VerifyPlan struct {
 	SectionDriftNote string
 }
 
-// SelfReportedLabel は MCP（report_verify）から送られた記録に付ける印（コメント・表示で共通）。
+// SelfReportedLabel は MCP（report_verify）から送られた記録のコメントに付ける印。
+// コメントは DB に残る記録なので訳さない（記録した人の言語で変えない）。画面・MCP・summary に出す印は
+// 対訳の service.verify.last.self_reported で、要求の言語で出す。
 const SelfReportedLabel = "MCP の自己申告"
 
-// CachedLabel は出力に結果キャッシュの印（(cached)）があった記録に付ける注記（コメント・表示で共通）。
+// CachedLabel は出力に結果キャッシュの印（(cached)）があった記録のコメントに付ける注記
+// （SelfReportedLabel と同じく記録なので訳さない。表示は service.verify.last.cached）。
 // 失敗にはしない（キャッシュが返っても、そのコマンド自体は走って 0 で終わっているため）。
 const CachedLabel = "結果キャッシュあり"
 
@@ -316,7 +319,7 @@ func inlineCode(s string) string {
 	return "`" + s + "`"
 }
 
-// verifyComment はコメントの文面（§5-8-3）。出力はコメントに入れない（verify --last と GET …/verify で見る）。
+// verifyComment はコメントの文面（§5-8-3）。DB に残る記録なので、記録した人の言語に依らず同じ文面で書く。出力はコメントに入れない（verify --last と GET …/verify で見る）。
 // MCP の自己申告は見出しに印を付ける（「検証コマンド（MCP の自己申告）: …」）。
 // 結果キャッシュの印があった記録も同じ形で注記する（「検証コマンド（結果キャッシュあり）: …」）。
 func verifyComment(d store.VerifyDetail) string {

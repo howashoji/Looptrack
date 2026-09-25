@@ -3,10 +3,13 @@
 package verify
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // Windows: 一時停止のまま起動し（CREATE_SUSPENDED）、Job Object に入れてから再開する。子孫は Job を引き継ぐので、
@@ -48,21 +51,21 @@ type job struct{ h syscall.Handle }
 func attach(cmd *exec.Cmd) (tree, error) {
 	h, _, e := procCreateJobObjectW.Call(0, 0)
 	if h == 0 {
-		return nil, fmt.Errorf("Job Object を作れません: %v", e)
+		return nil, errors.New(i18n.T(i18n.FromEnv(os.Getenv), "verify.run.job_create", "reason", e))
 	}
 	j := job{syscall.Handle(h)}
 	var aerr error
 	herr := cmd.Process.WithHandle(func(ph uintptr) {
 		if r, _, e := procAssignProcessToJobObject.Call(uintptr(j.h), ph); r == 0 {
-			aerr = fmt.Errorf("Job Object に入れられません: %v", e)
+			aerr = errors.New(i18n.T(i18n.FromEnv(os.Getenv), "verify.run.job_assign", "reason", e))
 			return
 		}
 		if st, _, _ := procNtResumeProcess.Call(ph); st != 0 {
-			aerr = fmt.Errorf("プロセスを再開できません（NTSTATUS 0x%08X）", uint32(st))
+			aerr = errors.New(i18n.T(i18n.FromEnv(os.Getenv), "verify.run.resume", "status", fmt.Sprintf("0x%08X", uint32(st))))
 		}
 	})
 	if herr != nil {
-		aerr = fmt.Errorf("プロセスのハンドルを取れません: %v", herr)
+		aerr = errors.New(i18n.T(i18n.FromEnv(os.Getenv), "verify.run.handle", "reason", herr))
 	}
 	if aerr != nil {
 		j.kill()

@@ -143,8 +143,10 @@ The highest-priority code of conduct, distilled from the instructions and correc
 - **When you run jobs in parallel, give each one its own worktree.** Never put two into the same worktree
   (what actually happened: two went into the same worktree, and uncommitted changes were really lost). Give each worktree its own branch, and stage only the paths you touched.
 - **Match the model to how hard the task is. The axis is whether a mistake would be noticed.**
+  **State the model explicitly on every call** (on Claude Code, `pre-tool-subagent-model` stops a launch with no model set).
   - **A lighter model is fine** for work a check can mechanically reject (mechanical merges and conflict resolution, running the checks and transcribing the results,
     filing issues, document formatting, updating records). If it breaks, a test or a check goes red, so nothing slips through and stays.
+  - **A medium model is fine** for implementation, research and summaries whose procedure is settled. A mistake there turns a test or a check red.
   - **Use a heavier model** for work that **quietly gets worse without ever failing** (the quality of a translation, consistency with how things are already written, isolating a cause,
     deciding what to drop and what to keep). The checks pass, so the mistakes stay in, unreviewed.
 - **When you hand out work that waits on something in the background, copy the bound into the instruction verbatim**
@@ -188,6 +190,16 @@ So `git checkout main 2>&1 | tail -20` goes through as a branch switch, while `g
 2. **Drop the prefix words** (`sudo`, `doas`, `env`, `xargs`, `nohup`, `time`, `command`, `nice`, `stdbuf`, `timeout`,
    `setsid`, `flock`, `script`). One at the head of what was unwrapped (`bash -c 'sudo git …'`) is dropped too.
 
+**The git guard alone carries one more stage, when it splits into the words of a simple command.** It runs against
+**both** the posix rule (`\` cancels the next character — Git Bash included) and a **Windows rule** (`\` is not
+treated as an escape at all), and fires when either one reads the first word as `git` / `git.exe`. An unquoted
+Windows absolute path (`C:\tools\git.exe`) loses its separators under the posix rule and comes out as
+`C:toolsgit.exe`, which no longer matches — but the Windows rule keeps `C:\tools\git.exe` as one word, unbroken.
+The posix side does not change by a single bit, so Git Bash stays untouched (the author decided on this design,
+"option 1"). **A path with a space that is not quoted** (`C:\Program Files\Git\cmd\git.exe`) is not rescued by
+this doubling either way, because the shell itself splits on the space regardless of which rule is used (quote it
+and it still stops as before).
+
 When it pairs up quotes, an escaped `'` (`echo don\'t ; bash -c '…'`) and a `\"` inside double quotes do not count as quotes.
 When it unwraps in command position, a comment (from a `#` at the start of a word to the end of the line) is skipped too.
 
@@ -217,8 +229,10 @@ mode, so stopping a form that runs nothing would stop the very work of writing a
 **Forms measured as `deny`**: `git push origin +main`, `sudo git push origin +HEAD:main`, `sudo git reset --hard`, `xargs git reset --hard`, `env git clean -fd`,
 `setsid git reset --hard`, `bash -c 'git reset --hard'`, `eval "git clean -fd"`, `BASH -c 'git reset --hard'`,
 `BASH.EXE -c '…'`, `/usr/bin/sudo bash -c '…'`, `sudo bash -c '…'`, `x=1 bash -c '…'`,
-`if bash -c 'git reset --hard'; then …`, `find . -exec bash -c 'git clean -fd' \;`, `echo don\'t ; bash -c 'git reset --hard'`, and
-`case a in a) git clean -fd;; esac` (that one stops without any nesting, because `)` is a separator).
+`if bash -c 'git reset --hard'; then …`, `find . -exec bash -c 'git clean -fd' \;`, `echo don\'t ; bash -c 'git reset --hard'`,
+`case a in a) git clean -fd;; esac` (that one stops without any nesting, because `)` is a separator), and
+`C:\tools\git.exe add -A` (an unquoted Windows absolute path, spaces excluded — caught by the second, Windows-rule
+tokenizer; a program that does not call itself `git`, such as `C:\tools\notgit.exe add -A`, still goes through as before).
 
 ### What it does not stop (ruled out, or out of reach — all measured)
 
@@ -249,8 +263,10 @@ mode, so stopping a form that runs nothing would stop the very work of writing a
 - **What follows a quote inside a comment** (`git status # don't` + newline + `bash -c 'git reset --hard'`). The unwrapping
   stage skips the comment, but the stage that splits simple commands counts the `'` in it as an opening quote and takes
   the next line for quoted text.
-- **An unquoted Windows absolute path** (`C:\git\git.exe clean -fd`). Splitting into words eats the backslashes as
-  escapes, and the command name no longer matches `git.exe`. Quoted, it is stopped.
+- **An unquoted Windows absolute path that contains a space** (`C:\Program Files\Git\cmd\git.exe clean -fd`).
+  Even with the Windows-rule tokenizer added, a space still splits into a separate word under either rule, so
+  `words[0]` ends at `C:\Program` and never reaches `git.exe` (**goes through at the base too**). A space-free
+  absolute path (`C:\tools\git.exe clean -fd`) is caught — see "Forms measured as `deny`" above. Quoted, it is stopped.
 - **Destruction that does not go through `git`** (`rm -rf .git`, `find … -delete`). **The git guard is a hook that looks
   at git commands**; an arbitrary deletion is not what this hook is for (it is a separate problem).
 

@@ -87,9 +87,10 @@ EOF
 ```sh
 docker run -d --name ltcheck-a --network ltcheck-net -v "$S/dist:/dist:ro" ltcheck-base:v1 sleep infinity
 docker exec ltcheck-a sh -c 'env | grep -E "LOOPTRACK|^IM_" || echo "(none) OK"'
+docker exec ltcheck-a grep PRETTY_NAME /etc/os-release
 ```
 
-期待する結果: `(none) OK`・`Ubuntu 24.04 LTS`。
+期待する結果: `(none) OK`・`PRETTY_NAME="Ubuntu 24.04…LTS"`（点リリースの番号は変わってよい）。
 
 ## 3. ローカル + SQLite（ウィザード） 【CI 可】
 
@@ -361,7 +362,7 @@ docker inspect looptrack --format '{{.State.Health.Status}} restarts={{.RestartC
 ## 10. 片付け
 
 ```sh
-docker rm -f ltcheck-a ltcheck-b ltcheck-c ltcheck-mysql
+docker rm -f ltcheck-a ltcheck-b ltcheck-mysql
 docker rmi ltcheck-base:v1 ltcheck-systemd:v1
 docker network rm ltcheck-net
 rm -rf "$S"          # tarball・配布物・トークンの控え

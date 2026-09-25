@@ -478,6 +478,9 @@ func (s *Server) renderAdminUser(w http.ResponseWriter, r *http.Request, p *prin
 	}
 	projects := make([]projRow, 0, len(all))
 	for _, pr := range all {
+		if pr.Archived { // アーカイブ済みは参加の付け外しの対象に出さない（戻すのはプロジェクト管理から）
+			continue
+		}
 		projects = append(projects, projRow{Slug: pr.Slug, Name: pr.Name, Role: roles[pr.ID]})
 	}
 	status := res.status
@@ -703,7 +706,12 @@ func (s *Server) renderAdminProjects(w http.ResponseWriter, r *http.Request, p *
 		SendPrompts                gateRow   // 指示文の作業名を送るか（usage.send_prompts）と直近の変更
 	}
 	rows := make([]projRow, 0, len(projects))
+	var archived []projRow // アーカイブ済み（名前と slug と「戻す」だけを出す）
 	for _, pr := range projects {
+		if pr.Archived {
+			archived = append(archived, projRow{Slug: pr.Slug, Name: pr.Name, Prefix: pr.Prefix})
+			continue
+		}
 		row := projRow{Slug: pr.Slug, Name: pr.Name, Prefix: pr.Prefix, Members: members[pr.ID]}
 		if row.SendPrompts, err = s.sendPromptsRowOf(ctx, reqLang(r), pr); err != nil {
 			s.internalError(w, r, err)
@@ -728,53 +736,32 @@ func (s *Server) renderAdminProjects(w http.ResponseWriter, r *http.Request, p *
 		status = http.StatusOK
 	}
 	s.render(w, r, status, "admin_projects.html", map[string]any{
-		"User": p.User, "CSRF": p.Session.CSRFToken, "Projects": rows, "MemberRoles": memberRoles,
+		"User": p.User, "CSRF": p.Session.CSRFToken, "Projects": rows, "Archived": archived, "MemberRoles": memberRoles,
 		"Notice": res.Notice, "Error": res.Error, "Pending": res.pending, "Form": res.form,
 	})
 }
 
 // adminCreateProject は POST /im/admin/projects（slug・prefix・name。管理者だけ・CSRF は s.web が検査）。
-// プロジェクトを作り、作った人を admin で参加させる（1 つのトランザクション。参加しないと管理者でも閲覧のみのため）。
+// プロジェクトを作り、作った人を admin で参加させる（1 つのトランザクション。service.CreateProject。MCP の create_project と同じ処理）。
 // 作ったらそのプロジェクトの画面へ移る。
 func (s *Server) adminCreateProject(w http.ResponseWriter, r *http.Request, p *principal) {
 	ctx := r.Context()
-	pr := store.Project{
-		Slug:   strings.TrimSpace(r.PostFormValue("slug")),
-		Prefix: strings.TrimSpace(r.PostFormValue("prefix")),
-		Name:   strings.TrimSpace(r.PostFormValue("name")),
-		Width:  4,
-	}
-	if pr.Prefix == "" {
-		pr.Prefix = strings.ToUpper(pr.Slug)
-	}
-	if pr.Name == "" {
-		pr.Name = pr.Slug
-	}
+	pr := service.NewProjectDefaults(store.Project{
+		Slug:   r.PostFormValue("slug"),
+		Prefix: r.PostFormValue("prefix"),
+		Name:   r.PostFormValue("name"),
+	})
 	form := map[string]string{"slug": pr.Slug, "prefix": pr.Prefix, "name": pr.Name}
 	fail := func(status int, msg string) {
 		s.renderAdminProjects(w, r, p, adminResult{Error: msg, status: status, form: form})
 	}
-	if err := store.ValidateNewProject(pr); err != nil {
-		fail(http.StatusBadRequest, i18n.Text(reqLang(r), err))
-		return
-	}
-	err := func() error {
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback() //nolint:errcheck
-		id, err := store.CreateProject(ctx, tx, pr)
-		if err != nil {
-			return err
-		}
-		if err := store.SetMember(ctx, tx, id, p.User.ID, "admin"); err != nil {
-			return err
-		}
-		return tx.Commit()
-	}()
+	_, err := s.svc.CreateProject(ctx, p.User, pr)
+	var se *service.Error
 	switch {
-	case errors.Is(err, store.ErrProjectExists) || store.IsDuplicateKey(err):
+	case errors.As(err, &se) && se.Kind == service.Invalid:
+		fail(http.StatusBadRequest, i18n.Text(reqLang(r), se))
+		return
+	case errors.As(err, &se) && se.Kind == service.Conflict:
 		fail(http.StatusConflict, i18n.T(reqLang(r), "server.web.admin.err_project_exists", "slug", pr.Slug, "prefix", pr.Prefix))
 		return
 	case err != nil:

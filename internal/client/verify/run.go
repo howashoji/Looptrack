@@ -2,11 +2,12 @@ package verify
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // tree は起動したコマンドとその子孫をまとめて止める仕掛け（POSIX はプロセスグループ、Windows は Job Object）。
@@ -32,8 +33,11 @@ func RunCommand(command, dir string, env []string, timeout time.Duration) Result
 	return runWith(shell, command, dir, env, timeout)
 }
 
+// launchFailed は起動できなかった結果。出力の末尾に足す文面は、コマンドを走らせた人の言語で書く
+// （コマンド自身の出力と同じく、手元の端末の言語）。
 func launchFailed(command string, err error) Result {
-	return Result{Command: command, Status: StatusFail, OutputTail: Output([]byte(fmt.Sprintf("起動できません: %v", err)))}
+	lang := i18n.FromEnv(os.Getenv)
+	return Result{Command: command, Status: StatusFail, OutputTail: Output([]byte(i18n.T(lang, "verify.run.launch_failed", "reason", i18n.Text(lang, err))))}
 }
 
 func runWith(shell, command, dir string, env []string, timeout time.Duration) Result {
@@ -112,7 +116,7 @@ func runWith(shell, command, dir string, env []string, timeout time.Duration) Re
 		var ee *exec.ExitError
 		if !errors.As(werr, &ee) {
 			res.Status = StatusFail
-			res.OutputTail = Output(append(raw, []byte(fmt.Sprintf("\n終了を待てません: %v", werr))...))
+			res.OutputTail = Output(append(raw, []byte("\n"+i18n.T(i18n.FromEnv(os.Getenv), "verify.run.wait_failed", "reason", werr))...))
 			return res
 		}
 		code = exitCode(ee.ProcessState)

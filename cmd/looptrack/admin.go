@@ -141,14 +141,14 @@ func memberCmd(args []string) int {
 	// イシューを持つなら --reassign で代わりの担当者（login か - で未設定）が要る。付け替えは assign として記録する）
 	change := func(u store.User, role, reassign string) int {
 		svc := service.New(db, nil)
-		res, err := svc.SetMembership(ctx, service.Actor{Via: "admin"}, p, u, role, reassign)
+		res, err := svc.SetMembership(ctx, service.Actor{Via: "admin", Lang: lang}, p, u, role, reassign)
 		var need *service.ReplacementError
 		if errors.As(err, &need) {
 			var logins []string
 			for _, c := range need.Need.Candidates {
 				logins = append(logins, c.Login)
 			}
-			fmt.Fprintln(os.Stderr, i18n.T(lang, "cmd.member.need_reassign", "message", need.Err.Message, "candidates", strings.Join(append(logins, "-"), ", ")))
+			fmt.Fprintln(os.Stderr, i18n.T(lang, "cmd.member.need_reassign", "message", i18n.Text(lang, need.Err), "candidates", strings.Join(append(logins, "-"), ", ")))
 			return 1
 		}
 		if err != nil {
@@ -357,6 +357,7 @@ func readNewPassword(lang i18n.Lang) (string, error) {
 //
 //	project create <slug> --prefix <PREFIX> --name <表示名> [--width 4] [--description …] [--order 100]
 //	project list
+//	project rename <slug> <表示名>    表示名だけを変える（slug・prefix・width は変えない）
 //	project rules set <slug> <file>   ルールを検査して保存する（file が - なら標準入力。例: deploy/rules/example.json）
 //	project rules show <slug>         保存されているルールを表示する
 //	project rules clear <slug>        ルールを解除する
@@ -368,6 +369,36 @@ func projectCmd(args []string) int {
 	u := i18n.T(lang, "cmd.usage.project")
 	if len(args) >= 1 && (args[0] == "create" || args[0] == "list") {
 		return projectAdminCmd(args, lang, u)
+	}
+	if len(args) >= 1 && args[0] == "rename" {
+		if len(args) != 3 {
+			return usageErr(u)
+		}
+		ctx := context.Background()
+		db, err := openDB()
+		if err != nil {
+			return fail(err)
+		}
+		defer db.Close()
+		if err := projectRename(ctx, db, lang, os.Stdout, args[1], args[2]); err != nil {
+			return fail(err)
+		}
+		return 0
+	}
+	if len(args) >= 1 && (args[0] == "archive" || args[0] == "unarchive") {
+		if len(args) != 2 {
+			return usageErr(u)
+		}
+		ctx := context.Background()
+		db, err := openDB()
+		if err != nil {
+			return fail(err)
+		}
+		defer db.Close()
+		if err := projectArchive(ctx, db, lang, os.Stdout, args[1], args[0] == "archive"); err != nil {
+			return fail(err)
+		}
+		return 0
 	}
 	if len(args) >= 3 && args[0] == "guide" {
 		return projectGuideCmd(args[1:], lang, u)
@@ -442,6 +473,54 @@ func projectCmd(args []string) int {
 	return 0
 }
 
+// projectRename は project rename（表示名だけを変える。規則は service.RenameProject）。
+func projectRename(ctx context.Context, db *sql.DB, lang i18n.Lang, out io.Writer, slug, name string) error {
+	p, err := store.ProjectBySlug(ctx, db, slug)
+	if err != nil {
+		return i18n.Wrapf(err, "cmd.err.project", "slug", slug)
+	}
+	res, err := service.New(db, nil).RenameProject(ctx, p, name)
+	if err != nil {
+		return err
+	}
+	if !res.Changed {
+		fmt.Fprintln(out, i18n.T(lang, "cmd.project.rename_unchanged", "slug", p.Slug, "new", res.NewName))
+		return nil
+	}
+	fmt.Fprintln(out, i18n.T(lang, "cmd.project.renamed", "slug", p.Slug, "old", res.OldName, "new", res.NewName))
+	return nil
+}
+
+// projectArchive は project archive / unarchive（論理削除と戻す。規則は service.SetProjectArchived）。
+func projectArchive(ctx context.Context, db *sql.DB, lang i18n.Lang, out io.Writer, slug string, archived bool) error {
+	p, err := store.ProjectBySlug(ctx, db, slug)
+	if err != nil {
+		return i18n.Wrapf(err, "cmd.err.project", "slug", slug)
+	}
+	res, err := service.New(db, nil).SetProjectArchived(ctx, p, archived)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(out, res.Message().In(lang))
+	return nil
+}
+
+// projectList は project list。既定は使用中のプロジェクトだけ、archived ならアーカイブ済みだけを出す。
+func projectList(ctx context.Context, db *sql.DB, out io.Writer, archived bool) error {
+	ps, err := store.ListProjects(ctx, db)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "%-16s %-10s %-5s %-6s %-5s %s\n", "SLUG", "PREFIX", "WIDTH", "ORDER", "LAST", "NAME")
+	for _, p := range ps {
+		if p.Archived != archived {
+			continue
+		}
+		fmt.Fprintf(out, "%-16s %-10s %-5d %-6d %-5d %s\n", p.Slug, p.Prefix, p.Width, p.SortOrder, p.Counter, p.Name)
+	}
+	return nil
+}
+
 // projectAdminCmd は project create / list（ADD-PROJECT.md の手順で使う）。
 func projectAdminCmd(args []string, lang i18n.Lang, u string) int {
 	ctx := context.Background()
@@ -451,22 +530,19 @@ func projectAdminCmd(args []string, lang i18n.Lang, u string) int {
 	}
 	defer db.Close()
 	if args[0] == "list" {
-		if len(args) != 1 {
+		fs := flag.NewFlagSet("project list", flag.ExitOnError)
+		archived := fs.Bool("archived", false, i18n.T(lang, "cmd.arg.project.archived"))
+		if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 {
 			return usageErr(u)
 		}
-		ps, err := store.ListProjects(ctx, db)
-		if err != nil {
+		if err := projectList(ctx, db, os.Stdout, *archived); err != nil {
 			return fail(err)
-		}
-		fmt.Printf("%-16s %-10s %-5s %-6s %-5s %s\n", "SLUG", "PREFIX", "WIDTH", "ORDER", "LAST", "NAME")
-		for _, p := range ps {
-			fmt.Printf("%-16s %-10s %-5d %-6d %-5d %s\n", p.Slug, p.Prefix, p.Width, p.SortOrder, p.Counter, p.Name)
 		}
 		return 0
 	}
 	fs := flag.NewFlagSet("project create", flag.ExitOnError)
 	prefix := fs.String("prefix", "", i18n.T(lang, "cmd.arg.project.prefix"))
-	width := fs.Int("width", 4, i18n.T(lang, "cmd.arg.project.width"))
+	width := fs.Int("width", store.DefaultProjectWidth, i18n.T(lang, "cmd.arg.project.width"))
 	name := fs.String("name", "", i18n.T(lang, "cmd.arg.display_name"))
 	desc := fs.String("description", "", i18n.T(lang, "cmd.arg.project.description"))
 	order := fs.Int("order", 100, i18n.T(lang, "cmd.arg.project.order"))

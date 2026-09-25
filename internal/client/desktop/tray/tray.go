@@ -5,12 +5,12 @@
 // macOS は cgo（Cocoa）、Windows・Linux は cgo なし（Windows は Win32 API、Linux は D-Bus の StatusNotifierItem）。
 // -tags desktop のときだけビルドする（headless のビルド・CI の cgo なしのクロスビルドには入らない）。
 //
-// Windows は通知領域のアイコンの**左クリックで画面を開く**（OS の慣例。メニューは右クリック）。
-// macOS・Linux は左クリックでもメニューを出す。
+// どの OS でも通知領域のアイコンの**左クリックでメニューを出す**（systray の既定の動き。SetOnTapped は使わない）。
 //
 // メニュー:
 //
 //	画面を開く
+//	設定
 //	AI の接続設定をコピー ▸ Claude Code（ターミナルで実行）… / 接続設定の画面を開く
 //	CLI を使えるようにする
 //	ログイン時に起動する（チェック）
@@ -24,6 +24,7 @@ import (
 
 	"github.com/howashoji/looptrack/internal/client/desktop"
 	"github.com/howashoji/looptrack/internal/client/desktop/icon"
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // Tray は desktop.UI の実装。
@@ -38,7 +39,7 @@ func New() *Tray { return &Tray{} }
 func (t *Tray) Run(a *desktop.App) {
 	if ok, why := available(); !ok {
 		// トレイを出せない環境: サーバだけ動かす（止めるのは looptrack desktop --quit かシグナル）
-		a.Logf("トレイを出せないため、トレイなしで動きます（止めるときは looptrack desktop --quit）: %s", why)
+		a.Logf("%s", i18n.T(a.Lang(), "desktop.tray.unavailable", "reason", why))
 		<-a.Done()
 		return
 	}
@@ -63,15 +64,12 @@ func onReady(a *desktop.App) {
 	}
 	systray.SetTooltip(desktop.AppName + " " + a.Version())
 	installReopen(a.OpenUI) // macOS: 起動中の .app をもう一度開いたら（Dock・Finder・open）画面を開く
-	if runtime.GOOS == "windows" {
-		// Windows の慣例: 左クリックで画面を開き、メニューは右クリックで出す（利用者の判断）。
-		// macOS・Linux は左クリックでもメニューを出す（既定のまま）
-		systray.SetOnTapped(a.OpenUI)
-	}
 
 	// 項目と並びは menu.go（menuOrder がテストで固定されている）
 	lang := a.Lang()
 	open := systray.AddMenuItem(miOpen(lang).Label, a.URL())
+	se := miSettings(lang)
+	settings := systray.AddMenuItem(se.Label, se.Tip)
 	cp := miCopy(lang)
 	copyMenu := systray.AddMenuItem(cp.Label, cp.Tip)
 	var copies []*systray.MenuItem
@@ -85,6 +83,10 @@ func onReady(a *desktop.App) {
 	cli := systray.AddMenuItem(ci.Label, ci.Tip)
 	au := miAuto(lang)
 	auto := systray.AddMenuItemCheckbox(au.Label, au.Tip, a.AutostartEnabled())
+	// 版の表示（クリックできない）。rc を含む版をホバーのツールチップだけでなく、開かなくても
+	// 見える項目としても出す（利用者の決定: 画面にも rc を含む版を出す）。
+	ver := systray.AddMenuItem(miVersion(lang, a.Version()).Label, "")
+	ver.Disable()
 	systray.AddSeparator()
 	quit := systray.AddMenuItem(miQuit(lang).Label, quitTip(lang))
 
@@ -100,6 +102,8 @@ func onReady(a *desktop.App) {
 			select {
 			case <-open.ClickedCh:
 				a.OpenUI()
+			case <-settings.ClickedCh:
+				a.OpenSettings()
 			case <-showMCP.ClickedCh:
 				a.OpenPath("/first-run/done")
 			case <-cli.ClickedCh:
