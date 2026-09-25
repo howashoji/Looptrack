@@ -361,7 +361,7 @@ func (c *Call) work(ctx context.Context, job usageJob) {
 		if job.Client == usagesnap.ClientCopilot {
 			// Copilot は OTel の置き場の外に書くと読めない（出力先が hook に渡らない）。探した結果と置き場を案内する
 			c.debug("%s", i18n.T(c.lang(), "core.usage.debug.no_transcript_hint", "client", job.Client, "path", job.TranscriptPath,
-				"hint", usagesnap.CopilotMissHint(job.SessionID, o)))
+				"hint", usagesnap.CopilotMissHint(c.lang(), job.SessionID, o)))
 		} else {
 			c.debug("%s", i18n.T(c.lang(), "core.usage.debug.no_transcript", "client", job.Client, "path", job.TranscriptPath))
 		}

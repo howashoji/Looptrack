@@ -70,7 +70,7 @@ func ReadSource(root string, slugs []string) ([]SourceProject, error) {
 			return nil, i18n.Wrapf(err, "transfer.err.at", "at", name+"/config.json")
 		}
 		if cfg.Prefix == "" || cfg.Width <= 0 {
-			return nil, fmt.Errorf("%s/config.json に prefix / width がありません", name)
+			return nil, i18n.Errorf("transfer.err.no_prefix_width", "at", name+"/config.json")
 		}
 		p := SourceProject{Dir: dir, Project: store.Project{Slug: name, Prefix: cfg.Prefix, Width: cfg.Width, Name: cfg.Name, Description: cfg.Description, SortOrder: 100}}
 		if cfg.Order != nil {
@@ -105,7 +105,7 @@ func ReadSource(root string, slugs []string) ([]SourceProject, error) {
 		out = append(out, p)
 	}
 	if len(want) > 0 && len(out) != len(want) {
-		return nil, fmt.Errorf("指定したプロジェクトの一部が見つかりません: %v", slugs)
+		return nil, i18n.Errorf("transfer.err.projects_missing", "slugs", strings.Join(slugs, " "))
 	}
 	return out, nil
 }
@@ -150,7 +150,7 @@ func importProject(ctx context.Context, db *sql.DB, sp SourceProject) (ImportRes
 			return res, i18n.Wrapf(err, "transfer.err.at", "at", f.Rel)
 		}
 		if wantDir := map[bool]string{true: "closed", false: "open"}[it.IsClosed()]; !strings.HasPrefix(f.Rel, wantDir+"/") {
-			return res, fmt.Errorf("%s: status %q なのに %s/ にありません（取り込むと書き出し先が変わるため拒否）", f.Rel, it.Status, wantDir)
+			return res, i18n.Errorf("transfer.err.wrong_dir", "file", f.Rel, "status", fmt.Sprintf("%q", it.Status), "dir", wantDir+"/")
 		}
 		docs = append(docs, parsed{f, doc, num})
 	}
@@ -170,7 +170,7 @@ func importProject(ctx context.Context, db *sql.DB, sp SourceProject) (ImportRes
 		return res, err
 	}
 	if live > 0 {
-		return res, fmt.Errorf("DB 上で %d 件の変更（import 以外）があるため置き換えを拒否しました（運用中のデータを消さないため）", live)
+		return res, i18n.Errorf("transfer.err.live_changes", "count", live)
 	}
 	relock, err := store.UnlockAppendOnly(ctx, db, tx) // SQLite の追記専用のトリガを、この置き換えの間だけ外す
 	if err != nil {
@@ -234,7 +234,7 @@ func RenderProject(ctx context.Context, db *sql.DB, p store.Project) ([]Rendered
 type VerifyReport struct {
 	Slug     string
 	Files    int
-	Problems []string
+	Problems []i18n.Msg // 言語は表示する側が決める
 }
 
 // Verify は DB から再生成したファイルが旧形式のファイルとバイト一致するかを確認する。
@@ -252,16 +252,16 @@ func Verify(ctx context.Context, db *sql.DB, src []SourceProject) ([]VerifyRepor
 		r := VerifyReport{Slug: sp.Project.Slug, Files: len(sp.Files)}
 		p, ok := bySlug[sp.Project.Slug]
 		if !ok {
-			r.Problems = append(r.Problems, "DB にプロジェクトがありません")
+			r.Problems = append(r.Problems, i18n.M("transfer.verify.no_project"))
 			reports = append(reports, r)
 			continue
 		}
 		if p.Prefix != sp.Project.Prefix || p.Width != sp.Project.Width || p.Name != sp.Project.Name ||
 			p.Description != sp.Project.Description || p.SortOrder != sp.Project.SortOrder {
-			r.Problems = append(r.Problems, fmt.Sprintf("config.json と DB の設定が違います: DB=%+v ファイル=%+v", p, sp.Project))
+			r.Problems = append(r.Problems, i18n.M("transfer.verify.config_differs", "db", fmt.Sprintf("%+v", p), "file", fmt.Sprintf("%+v", sp.Project)))
 		}
 		if p.Counter != sp.Project.Counter {
-			r.Problems = append(r.Problems, fmt.Sprintf("counter が違います: DB=%d ファイル=%d", p.Counter, sp.Project.Counter))
+			r.Problems = append(r.Problems, i18n.M("transfer.verify.counter_differs", "db", p.Counter, "file", sp.Project.Counter))
 		}
 		rendered, err := RenderProject(ctx, db, p)
 		if err != nil {
@@ -275,10 +275,10 @@ func Verify(ctx context.Context, db *sql.DB, src []SourceProject) ([]VerifyRepor
 			g, ok := got[f.Rel]
 			switch {
 			case !ok:
-				r.Problems = append(r.Problems, "DB から再生成されないファイル: "+f.Rel)
+				r.Problems = append(r.Problems, i18n.M("transfer.verify.not_rendered", "file", f.Rel))
 			case !bytes.Equal(g, f.Raw):
 				e := diffAt(f.Raw, g)
-				r.Problems = append(r.Problems, fmt.Sprintf("内容が違います: %s（%d バイト目）", f.Rel, e))
+				r.Problems = append(r.Problems, i18n.M("transfer.verify.content_differs", "file", f.Rel, "offset", e))
 			}
 			delete(got, f.Rel)
 		}
@@ -288,7 +288,7 @@ func Verify(ctx context.Context, db *sql.DB, src []SourceProject) ([]VerifyRepor
 		}
 		sort.Strings(extra)
 		for _, rel := range extra {
-			r.Problems = append(r.Problems, "ファイルに無いが DB にある: "+rel)
+			r.Problems = append(r.Problems, i18n.M("transfer.verify.only_in_db", "file", rel))
 		}
 		reports = append(reports, r)
 	}

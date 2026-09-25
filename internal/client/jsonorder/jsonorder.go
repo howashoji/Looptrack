@@ -11,13 +11,14 @@ package jsonorder
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // Number は JSON の数の字面。
@@ -147,7 +148,7 @@ func Decode(data []byte) (any, error) {
 		return nil, err
 	}
 	if _, err := dec.Token(); err != io.EOF {
-		return nil, errors.New("JSON の後ろに余分なデータがあります")
+		return nil, i18n.Errorf("jsonorder.err.trailing_data")
 	}
 	return v, nil
 }
@@ -160,7 +161,7 @@ func DecodeObject(data []byte) (*Object, error) {
 	}
 	o, ok := v.(*Object)
 	if !ok {
-		return nil, errors.New("JSON のオブジェクトではありません")
+		return nil, i18n.Errorf("jsonorder.err.not_object")
 	}
 	return o, nil
 }
@@ -185,7 +186,7 @@ func decodeValue(dec *json.Decoder) (any, error) {
 				}
 				k, ok := kt.(string)
 				if !ok {
-					return nil, fmt.Errorf("オブジェクトのキーが文字列ではありません: %v", kt)
+					return nil, i18n.Errorf("jsonorder.err.key_not_string", "key", fmt.Sprint(kt))
 				}
 				v, err := decodeValue(dec)
 				if err != nil {
@@ -211,13 +212,13 @@ func decodeValue(dec *json.Decoder) (any, error) {
 			}
 			return a, nil
 		}
-		return nil, fmt.Errorf("想定しない区切り: %v", x)
+		return nil, i18n.Errorf("jsonorder.err.unexpected_delim", "delim", fmt.Sprint(x))
 	case json.Number:
 		return Number(x), nil
 	case string, bool, nil:
 		return x, nil
 	}
-	return nil, fmt.Errorf("想定しない値: %v", t)
+	return nil, i18n.Errorf("jsonorder.err.unexpected_value", "value", fmt.Sprint(t))
 }
 
 // Indent は json.dumps(v, ensure_ascii=False, indent=n) と同じ文字列（末尾の改行なし）。

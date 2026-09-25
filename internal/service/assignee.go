@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/domain"
@@ -53,18 +52,18 @@ const (
 
 // assignedToOther は R2 / R3 の拒否。文面は操作ごとに、override を付けたときに起きること（担当が替わるか）を示す。
 func assignedToOther(id string, cur store.Assignee, op int) *Error {
-	var what, how string
+	var what, how i18n.Msg
 	switch op {
 	case opEdit:
-		what, how = "本文や項目を編集する", "担当者に代わって直すなら --override \"理由\"（MCP は override_reason）を付けてください（担当は替わりません）"
+		what, how = i18n.M("service.assignee.what.edit"), i18n.M("service.assignee.how.edit")
 	case opChange:
-		what, how = "担当を替える・外す", "引き継ぐなら --override \"理由\"（MCP は override_reason）を付けてください"
+		what, how = i18n.M("service.assignee.what.change"), i18n.M("service.assignee.how.change")
 	default:
-		what, how = "In Progress にする", "引き継ぐなら --override \"理由\"（MCP は override_reason）を付けてください（担当が自分に替わります）"
+		what, how = i18n.M("service.assignee.what.start"), i18n.M("service.assignee.how.start")
 	}
-	return &Error{Kind: Rejected, Code: "assigned_to_other", Rule: AssigneeRule, Overridable: true,
-		Message: fmt.Sprintf("%s の担当は %s です（他の利用者が担当のイシューは、%sことができません）。%s。依頼や確認はコメント（comment / add_comment）で伝えてください",
-			id, cur.Login, what, how)}
+	e := errm(Rejected, "assigned_to_other", i18n.M("service.err.assigned_to_other", "id", id, "login", cur.Login, "what", what, "how", how))
+	e.Rule, e.Overridable = AssigneeRule, true
+	return e
 }
 
 // resolveAssignee は担当の指定（me / login / -）を利用者にする。空文字は呼び出し側で「変えない」とする。
@@ -91,9 +90,9 @@ func (s *Service) resolveAssignee(ctx context.Context, q store.Queryer, a Actor,
 	if self, err := s.actorAssignee(ctx, q, a); err == nil && self.Login == spec {
 		return self, nil
 	}
-	list := strings.Join(logins, ", ")
-	if list == "" {
-		list = "なし"
+	var list any = strings.Join(logins, ", ")
+	if len(logins) == 0 {
+		list = i18n.M("service.word.none")
 	}
 	return store.Assignee{}, errm(Invalid, "invalid_argument", i18n.M("service.err.invalid.assignee_not_member", "slug", p.Slug, "spec", spec, "list", list))
 }
@@ -230,12 +229,12 @@ type AssignResult struct {
 	Changed bool
 }
 
-// Message は CLI・MCP・画面が出す 1 行。
-func (r *AssignResult) Message() string {
+// Message は CLI・MCP・画面が出す 1 行（lang は要求の言語）。
+func (r *AssignResult) Message(lang i18n.Lang) string {
 	if !r.Changed {
-		return fmt.Sprintf("担当は変わりません: %s（%s）", r.Issue.Item.ID, orDash(r.To))
+		return i18n.T(lang, "service.assignee.unchanged", "id", r.Issue.Item.ID, "to", orDash(r.To))
 	}
-	return fmt.Sprintf("担当: %s: %s → %s", r.Issue.Item.ID, orDash(r.From), orDash(r.To))
+	return i18n.T(lang, "service.assignee.changed", "id", r.Issue.Item.ID, "from", orDash(r.From), "to", orDash(r.To))
 }
 
 // Assign は担当を変える（R3）。spec は me / login / -（解除）。クローズ済みは変えられない。

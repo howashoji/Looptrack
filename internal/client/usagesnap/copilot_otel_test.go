@@ -18,6 +18,7 @@ import (
 
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 const cp186Trace = "0a1b2c3d4e5f60718293a4b5c6d7e8f9"
@@ -161,7 +162,7 @@ func TestCopilotDefaultDirWithoutExporterEnv(t *testing.T) {
 			t.Fatal("既定の外のファイルを読んだ（前提が崩れた）")
 		}
 		o := Options{Env: env.FromMap(e), Home: home}
-		hint := CopilotMissHint(copilotSID, o)
+		hint := CopilotMissHint(i18n.JA, copilotSID, o)
 		for _, want := range []string{filepath.Join(ch, "otel") + " の下にありません", "hook にもシェルにも渡さない", "$COPILOT_HOME/otel/ の下",
 			"COPILOT_OTEL_FILE_EXPORTER_PATH=" + filepath.Join(ch, "otel", "copilot-otel.jsonl")} {
 			if !strings.Contains(hint, want) {
@@ -170,7 +171,7 @@ func TestCopilotDefaultDirWithoutExporterEnv(t *testing.T) {
 		}
 		// 置き場にファイルはあるが、このセッションのスパンが無い
 		writeLines(t, filepath.Join(ch, "otel", "old.jsonl"), lines[:1])
-		hint = CopilotMissHint("other-session", o)
+		hint = CopilotMissHint(i18n.JA, "other-session", o)
 		if !strings.Contains(hint, "1 個の OpenTelemetry のファイル出力に gen_ai.conversation.id = other-session のスパンがありません") {
 			t.Errorf("案内: %s", hint)
 		}

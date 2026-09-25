@@ -12,7 +12,7 @@ import (
 // 改行は空白から外して区切りにしている。空の引用（""）は空の語になる。
 // 引用符が閉じていない・末尾が \ のときは error。
 func shlex(s string) ([]string, error) {
-	toks, _, err := shlexTokens(s)
+	toks, _, err := shlexTokens(s, posixEscape)
 	return toks, err
 }
 
@@ -22,12 +22,30 @@ type tokInfo struct {
 	quoted bool // 引用符を含む（`'2'>x` の `2` は記述子ではなく引数）
 }
 
+// posixEscape / winEscape は shlexTokens に渡すエスケープ文字（0 なら「エスケープ無し」）。
+//
+//   - posixEscape（\）: posix のシェル（Git Bash も含む）と同じ規則。`\` は次の 1 文字を打ち消す
+//     （`C:\Users\x` は区切りを失って `C:Usersx` になる。引用符で囲まない Windows の絶対パスで
+//     git ガードが素通りしていた原因そのもの）。
+//   - winEscape（0）: PowerShell / cmd に渡された Windows の絶対パス（`C:\tools\git.exe`）を
+//     1 語のまま保つための第 2 の規則（利用者・監督の決定「案 1」）。`\` を特別扱いせず、
+//     ふつうの語の文字として読む。posix 側の判定は 1 ビットも変えず、この規則は git ガードが
+//     posix の判定と**両方**に掛けて二重に見るときだけ使う（SimpleCommandsWin・CommandWordsWin）。
+const (
+	posixEscape rune = '\\'
+	winEscape   rune = 0
+)
+
 // shlexTokens は shlex と同じ語の並びに、語ごとの tokInfo を添えて返す。
-func shlexTokens(s string) ([]string, []tokInfo, error) {
+// escapeChar が 0 なら `\` をエスケープとして扱わない（winEscape。呼ぶ側は posixEscape / winEscape を渡す）。
+func shlexTokens(s string, escapeChar rune) ([]string, []tokInfo, error) {
+	escape := ""
+	if escapeChar != 0 {
+		escape = string(escapeChar)
+	}
 	const (
 		whitespace = " \t\r"
 		quotes     = `'"`
-		escape     = `\`
 		escQuotes  = `"`
 	)
 	in := func(r rune, set string) bool { return r != 0 && strings.ContainsRune(set, r) }

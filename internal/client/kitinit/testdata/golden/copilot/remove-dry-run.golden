@@ -120,7 +120,7 @@ init --remove-loop: $TMP/ws（dry-run）
   更新         AGENTS.md
       --- a/AGENTS.md
       +++ b/AGENTS.md
-      @@ -20,195 +20,3 @@
+      @@ -20,197 +20,3 @@
          本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡す。利用者に MCP の接続設定を勧める
        - 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
        <!-- looptrack:end -->

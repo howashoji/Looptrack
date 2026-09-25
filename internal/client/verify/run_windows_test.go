@@ -133,6 +133,7 @@ func TestRunCommandBasicsBash(t *testing.T) {
 }
 
 func TestRunCommandLaunchFailure(t *testing.T) {
+	t.Setenv("LOOPTRACK_LANG", "ja") // 下の検査は日本語の文面を見る（足す文面はコマンドを走らせた人の言語）
 	r := runWith(filepath.Join(t.TempDir(), "no-such-shell.exe"), "echo x", t.TempDir(), os.Environ(), time.Second)
 	if r.Status != StatusFail || r.ExitCode != nil || !strings.HasPrefix(r.OutputTail, "起動できません: ") {
 		t.Errorf("%+v", r)

@@ -82,7 +82,7 @@ Releases は**下書き**で作ります。中身を確かめてから人が公�
 - darwin の単体の実行ファイルと zip には staple できません。初回の起動時に Gatekeeper がオンラインで公証を確かめます。
   デスクトップ版の `.app` / dmg は、sign-macos ジョブが同じ `sign-macos.sh` に渡します。署名・公証の後に `stapler staple` まで行います（.app → dmg の順に 2 回呼ぶ。下の「デスクトップ版」）。
 - 秘密の扱い: `set -x` は使わず、秘密を echo しません。復号したファイルは `$RUNNER_TEMP` に置いて最後に消します。
-  Secrets は Environment `release`（タグ `v*` だけ・承認つき）に置くので、`ci.yml`（手動・週次）からは読めません。
+  Secrets は Environment `release`（タグ `v*` だけ。承認者は置かない）に置くので、`ci.yml`（手動・週次）からは読めません。
   サードパーティの action を足すときは、コミット SHA で固定してください。
 
 #### 公開鍵（minisign）
@@ -110,7 +110,7 @@ Releases は**下書き**で作ります。中身を確かめてから人が公�
 - 手元で署名・公証する: `bash deploy/release/sign-macos.sh --identity <証明書の SHA-1> --team-id <Team ID> --notary-profile <notarytool のプロファイル> <darwin の実行ファイル…>`
   同じ名前の Developer ID がキーチェーンに複数あると codesign が選べないので、SHA-1 で渡します。動作確認だけなら `--identity - --skip-notarize` を使います。
   続けて `dist.sh sums` → `MINISIGN_SECRET_KEY_FILE=<秘密鍵> dist.sh sign-sums` → `dist.sh verify` の順に実行します。
-- CI（`release.yml`）で署名する: Environment `release`（Required reviewers・タグ `v*` だけ）に次を置きます。`gh secret set` では値を引数に書かないでください。
+- CI（`release.yml`）で署名する: Environment `release`（保護はタグ `v*` だけ。Required reviewers は置かず、タグを打つことが公開の承認になる）に次を置きます。`gh secret set` では値を引数に書かないでください。
 
 | 種類 | 名前 |
 | -- | -- |

@@ -238,7 +238,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+b+"/admin/projects", s.admin(s.adminProjectsPage))   // プロジェクト管理
 	s.mux.HandleFunc("POST "+b+"/admin/projects", s.admin(s.adminCreateProject)) // プロジェクトの作成
 	s.mux.HandleFunc("POST "+b+"/admin/projects/{slug}/member", s.admin(s.adminProjectMember))
-	s.mux.HandleFunc("POST "+b+"/admin/projects/{slug}/send-prompts", s.adminForbidden(s.adminSendPrompts)) // 指示文の作業名を送るかの切り替え（管理者以外は 403）
+	s.mux.HandleFunc("POST "+b+"/admin/projects/{slug}/send-prompts", s.adminForbidden(s.adminSendPrompts))   // 指示文の作業名を送るかの切り替え（管理者以外は 403）
+	s.mux.HandleFunc("POST "+b+"/admin/projects/{slug}/rename", s.adminForbidden(s.adminProjectRename))       // 表示名の変更（管理者以外は 403）
+	s.mux.HandleFunc("POST "+b+"/admin/projects/{slug}/archive", s.adminForbidden(s.adminProjectArchive))     // アーカイブ（画面の「削除」。論理削除）
+	s.mux.HandleFunc("POST "+b+"/admin/projects/{slug}/unarchive", s.adminForbidden(s.adminProjectUnarchive)) // アーカイブから戻す
 
 	s.mux.HandleFunc("GET "+b+firstRunPath+"/done", s.web(s.firstRunDone)) // 初回設定の最後の画面（ローカルモードだけ）
 	s.mux.HandleFunc("GET "+b+"/{$}", s.web(s.hub))

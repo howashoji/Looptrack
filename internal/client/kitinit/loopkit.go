@@ -2,7 +2,6 @@ package kitinit
 
 import (
 	"encoding/json"
-	"fmt"
 	"path"
 	"regexp"
 	"sort"
@@ -386,8 +385,7 @@ func pickLang(files map[string]string, name string, lang i18n.Lang) (string, boo
 // （AGENTS.md は生成物なので、言語を変えたら `looptrack issue init --loop` を打ち直す。
 // Claude Code の経路は hook が実行時に選ぶので打ち直しは要らない）。
 func loopAgentsText(files map[string]string, entries []loopEntry, agent string, lang i18n.Lang) string {
-	parts := []string{"## ループエンジニアリング（loop）\n\n`looptrack issue init --loop` が入れた節。外すときは `looptrack issue init --remove-loop`。" +
-		"rules は要点だけを載せる（全文は「全文:」のファイル。作業の前に読む）。\n"}
+	parts := []string{i18n.T(lang, "kitinit.loop.agents.header") + "\n"}
 	var skills []string
 	for _, e := range sortedEntries(entries) {
 		full := "kit/loop/" + e.Name
@@ -412,7 +410,7 @@ func loopAgentsText(files map[string]string, entries []loopEntry, agent string, 
 			if dest == "" {
 				dest = full
 			}
-			block := []string{"### " + title, "", "全文: `" + dest + "`"}
+			block := []string{"### " + title, "", i18n.T(lang, "kitinit.loop.agents.full", "path", dest)}
 			for _, s := range injectSections(text, "session", agent) {
 				block = append(block, "", "#### "+s.heading, "")
 				block = append(block, shiftHeadings(s.body, 4-s.level)...)
@@ -433,11 +431,11 @@ func loopAgentsText(files map[string]string, entries []loopEntry, agent string, 
 			if dest == "" {
 				dest = p
 			}
-			skills = append(skills, fmt.Sprintf("- %s（手順: `%s`）: %s", name, dest, desc))
+			skills = append(skills, i18n.T(lang, "kitinit.loop.agents.skill", "name", name, "path", dest, "description", desc))
 		}
 	}
 	if len(skills) > 0 {
-		parts = append(parts, "### 手順（skill）\n\n"+strings.Join(skills, "\n")+"\n")
+		parts = append(parts, "### "+i18n.T(lang, "kitinit.loop.agents.skills_heading")+"\n\n"+strings.Join(skills, "\n")+"\n")
 	}
 	return strings.Join(parts, "\n")
 }

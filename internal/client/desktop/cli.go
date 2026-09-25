@@ -29,10 +29,11 @@ import (
 type CLIInstall struct {
 	GOOS         string
 	Home         string
-	LocalAppData string // Windows の %LOCALAPPDATA%
-	Launcher     string // macOS・Linux のリンクの先
-	BundledCLI   string // Windows の同梱の CLI（Looptrack.exe の隣の cli\looptrack.exe）
-	PathEnv      string // PATH（案内のため）
+	LocalAppData string    // Windows の %LOCALAPPDATA%
+	Launcher     string    // macOS・Linux のリンクの先
+	BundledCLI   string    // Windows の同梱の CLI（Looptrack.exe の隣の cli\looptrack.exe）
+	PathEnv      string    // PATH（案内のため）
+	Lang         i18n.Lang // 印のファイルの注釈の言語（空なら対訳表の正本の日本語）
 }
 
 // CLIState は置き場の状態。
@@ -231,8 +232,8 @@ func (c CLIInstall) copyWindows() error {
 	if err != nil {
 		return err
 	}
-	mark := fmt.Sprintf("sha256 %x\r\n# Looptrack のデスクトップ版が置いた looptrack.exe（起動のたびに同梱のものと比べて置き換える。"+
-		"中身がこの SHA-256 と違えば self-update などで新しくしたものとみなし、触らない）\r\n", h)
+	// 1 行目（sha256 <16 進>）だけを markedHash が読む。2 行目は人が読む注釈
+	mark := fmt.Sprintf("sha256 %x\r\n# %s\r\n", h, i18n.T(c.Lang, "desktop.cli.marker_comment"))
 	return os.WriteFile(filepath.Join(c.Dir(), markerName), []byte(mark), 0o644)
 }
 

@@ -163,7 +163,7 @@ func (p *Plan) URL() string { return strings.TrimRight(p.PublicURL, "/") + p.Bas
 // 確定の段（ファイルの rename と管理者作成）に入った後は取り消しを待たずに最後まで行う。
 func Run(ctx context.Context, o Options) (*Result, error) {
 	if o.Backend == nil {
-		return nil, errors.New("setupwiz: Backend が未設定です")
+		return nil, i18n.Errorf("setupwiz.err.no_backend")
 	}
 	if o.Now == nil {
 		o.Now = time.Now
@@ -295,11 +295,11 @@ func apply(ctx context.Context, o Options, plan *Plan, replacing bool) (res *Res
 		return nil, err
 	}
 	if plan.compose() {
-		if err := stage(ComposeFile, renderCompose(plan, now), false); err != nil {
+		if err := stage(ComposeFile, renderCompose(plan, now, o.Lang), false); err != nil {
 			return nil, err
 		}
 		// compose.yaml の build が使う材料。3 つそろって初めて docker compose up -d でイメージができる。
-		if err := stage(DockerfileName, renderDockerfile(now), false); err != nil {
+		if err := stage(DockerfileName, renderDockerfile(now, o.Lang), false); err != nil {
 			return nil, err
 		}
 		if err := stage(NoticeFile, looptrack.Notice, false); err != nil {

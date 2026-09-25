@@ -125,7 +125,7 @@ func serveConfig(logger *slog.Logger) (server.Config, string, error) {
 	}
 	if v := os.Getenv("LOOPTRACK_REQUIRE_TOTP"); v != "" {
 		// 二段階認証の必須 / 任意は DB の設定になった（looptrack settings two-factor・<base path>/admin/security）
-		logger.Warn("LOOPTRACK_REQUIRE_TOTP は使われなくなりました（二段階認証の設定は DB に持ちます: looptrack settings two-factor）", "value", v)
+		logger.Warn(i18n.T(cmdLang(), "cmd.serve.require_totp_obsolete"), "value", v)
 	}
 	if v := strings.TrimSpace(os.Getenv("LOOPTRACK_CLIENT_MIN_VERSION")); v != "" {
 		if !relver.Valid(v) {
