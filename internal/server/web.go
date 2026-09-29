@@ -72,7 +72,7 @@ func (s *Server) apiBoard(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	pending, _, err := s.pendingByIssue(r.Context(), pr) // 4 秒ごとの見直しで同じ SQL を 1 回引く（§5-8-6）
+	pending, _, err := s.pendingByIssue(r.Context(), pr) // 4 秒ごとの見直しで同じ SQL を 1 回引く（DESIGN.md §9-3-6）
 	if err != nil {
 		s.internalError(w, r, err)
 		return
@@ -189,7 +189,7 @@ func (s *Server) apiBoardSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // assignSubmit は詳細ドロワーの担当変更フォーム（POST /im/p/{slug}/issues/{id}/assign）。
-// 画面は閲覧のみの原則の例外（DESIGN.md §5-2）。JS を使わない通常の POST で、web() が CSRF を検査する。
+// 画面は閲覧のみの原則の例外（DESIGN.md §7）。JS を使わない通常の POST で、web() が CSRF を検査する。
 // CLI / MCP と同じ service.Assign を通り、成功はボードの同じイシューへ 303 で戻す。失敗は同じ文言を assign.html に出す。
 func (s *Server) assignSubmit(w http.ResponseWriter, r *http.Request, p *principal) {
 	slug := r.PathValue("slug")

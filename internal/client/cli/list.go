@@ -8,7 +8,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// 一覧の表（列の幅・行・見出しの組み立て。API モードの幅の規則。DESIGN.md §6-2）。
+// 一覧の表（列の幅・行・見出しの組み立て。API モードの幅の規則。DESIGN.md §5-3）。
 
 var (
 	dateKeys      = []string{"updated", "created"}

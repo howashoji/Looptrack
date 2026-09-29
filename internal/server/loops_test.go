@@ -14,7 +14,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 3 層のループの ②（In Review の滞留）と ③（未応答のフィードバック）。DESIGN.md §5-8-6・§5-8-7。
+// 3 層のループの ②（In Review の滞留）と ③（未応答のフィードバック）。DESIGN.md §9-3-6・§9-3-7。
 
 type leadSequence struct {
 	Name  string `json:"name"`
@@ -27,7 +27,7 @@ type leadSequence struct {
 
 type leadSequences struct {
 	Sequences   []leadSequence `json:"sequences"`
-	SequencesEn []leadSequence `json:"sequences_en"` // 英語の別名 Feedback:（§5-13。Go だけが読む）
+	SequencesEn []leadSequence `json:"sequences_en"` // 英語の別名 Feedback:（DESIGN.md §9-6。Go だけが読む）
 }
 
 func loadLeadSequences(t *testing.T) leadSequences {
@@ -41,7 +41,7 @@ func loadLeadSequences(t *testing.T) leadSequences {
 		t.Fatal(err)
 	}
 	if len(ex.Sequences) != 6 {
-		t.Fatalf("判定の例は 6 つ（§5-8-6）: %d", len(ex.Sequences))
+		t.Fatalf("判定の例は 6 つ（DESIGN.md §9-3-6）: %d", len(ex.Sequences))
 	}
 	return ex
 }
@@ -257,7 +257,7 @@ func TestPendingFeedbackExamples(t *testing.T) {
 		t.Errorf("応答したのに has_feedback に残る: %s", ids(l.list("has_feedback=1")))
 	}
 
-	// viewer はフィードバックを登録できない（通常のコメントと同じく 403。§5-8-6）
+	// viewer はフィードバックを登録できない（通常のコメントと同じく 403。DESIGN.md §9-3-6）
 	l.viewer.fail(403, "POST", "/issues/"+all[0]+"/comments", map[string]any{"text": "フィードバック: viewer から"})
 
 	// MCP list_issues の has_feedback

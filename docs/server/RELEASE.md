@@ -19,9 +19,9 @@ GitHub Actions の CI（`.github/workflows/ci.yml`）とリリース物の作成
 | ジョブ | いつ | 中身 |
 | -- | -- | -- |
 | `go-lint` | 毎回 | `gofmt -l`（差分があれば失敗）・`go vet ./...`・`go mod tidy -diff`・`govulncheck ./...` |
-| `go-test-linux` | 毎回 | MySQL 8.4 の service コンテナに `LOOPTRACK_TEST_DSN` を向けて `go test -count=1 -v ./...`。**DB を使うテストが省略されたら失敗**にする（省略の文言 `LOOPTRACK_TEST_DSN が未設定` を探す）。失敗時は全文を artifact `go-test-log` に残す。Go 以外の処理系は入れない |
-| `go-test-windows` | 毎回 | Windows で `go test -count=1 ./...`（DB なし。DB のテストは SQLite で走り、省略しない）。落ちたら全体を赤にする（2026-09-19 に continue-on-error を外した）。一時ディレクトリは checkout と同じドライブに置く |
-| `go-test-macos` | 週次・手動の `full` | macOS で `go test -count=1 ./...`（DB なし）。重いので毎回は回さない |
+| `go-test-linux` | 毎回 | MySQL 8.4 の service コンテナに `LOOPTRACK_TEST_DSN` を向けて `go test -count=1 -v ./...`。**DB を使うテストが省略されたら失敗**にする（省略の文言 `LOOPTRACK_TEST_DSN が未設定` を探す）。run の成否に関わらず全文を artifact `go-test-log` に残す（保持 7 日）。省略された主なテストの集計は全件のうち先頭 20 件を出し、21 件目以降があれば「ほか N 件」を添える。Go 以外の処理系は入れない |
+| `go-test-windows` | 毎回 | Windows で `go test -count=1 -v ./...`（DB なし。DB のテストは SQLite で走り、省略しない）。落ちたら全体を赤にする（2026-09-19 に continue-on-error を外した）。go-test-linux と同じ形で、全文を `go-test.log` に置き画面には `ok`/`FAIL`/`panic:` だけを出す・省略された主なテストの集計を出す（参考。全件のうち先頭 20 件 + 「ほか N 件」）・失敗時は前後を出して exit する。run の成否に関わらず全文を artifact `go-test-log-windows` に残す（保持 7 日）。一時ディレクトリは checkout と同じドライブに置く |
+| `go-test-macos` | 週次・手動の `full` | macOS で `go test -count=1 -v ./...`（DB なし）。重いので毎回は回さない。go-test-linux と同じ形で、全文を `go-test.log` に置き画面には `ok`/`FAIL`/`panic:` だけを出す・省略された主なテストの集計を出す（参考。全件のうち先頭 20 件 + 「ほか N 件」）・失敗時は前後を出して exit する。run の成否に関わらず全文を artifact `go-test-log-macos` に残す（保持 7 日） |
 | `desktop-build` | 毎回 | デスクトップ版（`-tags desktop`）の linux/amd64 のビルドと vet、`internal/client/desktop/...` のテスト（通常のビルドに入らないコードの回帰を拾う） |
 | `desktop-cross` | 週次・手動の `full` | デスクトップ版を linux / windows × amd64 / arm64 でビルドと vet（cgo なし） |
 | `desktop-macos` | 週次・手動の `full` | デスクトップ版を macOS の runner で arm64・amd64 ともビルド（cgo。`fyne.io/systray` の Cocoa） |
@@ -40,14 +40,16 @@ Go の版: ci.yml・release.yml の `GO_VERSION` で決めます。今は `1.27.
 
 | 物 | 中身 |
 | -- | -- |
-| 実行ファイル | `<コマンド>_<版>_<os>_<arch>[.exe]`（6 対象。darwin は署名・公証済み。Windows は署名なし）。`CGO_ENABLED=0`・`-trimpath`・`-s -w`・`-X main.version=<版>`（deploy/build.sh と同じ形）。対象のコマンドは `RELEASE_CMDS`（既定 `looptrack`。サーバは looptrack に統合した） |
+| サーバ版の書庫 | `looptrack_<版>_<os>_<arch>_server.tar.gz`（linux・darwin）/ `looptrack_<版>_windows_<arch>_server.zip`（windows）の 6 つ。展開すると最上位のディレクトリ `looptrack_<版>_<os>_<arch>_server/` が 1 つでき、その下に `looptrack`（windows は `looptrack.exe`）・`NOTICE`・`OFL-BIZUDGothic.txt`・`LICENSE` だけがある（`install.sh`・`grants.sql` は入れない）。`dist.sh archive` が作り、`dist.sh check-archives` が中身（名前と、ライセンス文はリポジトリのもの・実行ファイルは下の素の実行ファイルとバイト列で一致）を確かめる。darwin は署名・公証の**後に**書庫にする |
+| 素の実行ファイル（中間物・Releases には上げない） | `<コマンド>_<版>_<os>_<arch>[.exe]`（6 対象。`dist.sh build`。darwin は署名・公証済み。Windows は署名なし）。`CGO_ENABLED=0`・`-trimpath`・`-s -w`・`-X main.version=<版>`（deploy/build.sh と同じ形）。対象のコマンドは `RELEASE_CMDS`（既定 `looptrack`。サーバは looptrack に統合した）。macOS の署名・コンテナイメージの材料・書庫の中身に使う。サーバの配布ディレクトリ（下の「2-1」）もこの形 |
 | `NOTICE` | 第三者のライセンス文（依存モジュール・Go・BIZ UDGothic の OFL。リポジトリのルートの NOTICE の写し。下の「2-2. NOTICE」）。実行ファイルからも `looptrack licenses` で読める。デスクトップ版（.app の `Contents/Resources`・AppImage の `usr/share/doc/looptrack`・Windows の zip の `Looptrack\`・Windows のインストーラの `{app}\NOTICE.txt`）とコンテナイメージ（`/NOTICE`）にも入る |
 | `OFL-BIZUDGothic.txt` | looptrack に埋め込んだ日本語フォント（BIZ UDGothic・SIL OFL 1.1）のライセンス文（`internal/client/report/pdf/fonts/OFL.txt` の写し）。OFL はフォントを配るときにライセンス文を添えることを求める（NOTICE にも入っている） |
-| `install.sh` | まっさらな Linux サーバに入れるインストーラ（`deploy/install.sh` の写し）。**「1 行で取得して実行する」入口**なので、名前を変えない（下の「2-3. install.sh と grants.sql」）。Releases から取った後に `SHA256SUMS` で照合できる |
-| `grants.sql` | MySQL のアプリ用の利用者に与える最小権限（`deploy/grants.sql` の写し）。install.sh が「setup（表を作る）→ grants.sql → 起動」の順番を案内するときに使う。DEPLOY.md「保存先に MySQL を選ぶとき」 |
-| `SHA256SUMS` | 上の実行ファイル（と NOTICE・OFL-BIZUDGothic.txt・install.sh・grants.sql・デスクトップ版）の SHA-256（`sha256sum -c SHA256SUMS` で照合できる形）。**署名の後に作る** |
+| `SHA256SUMS` | Releases に上げるもの（書庫 6・デスクトップ版 7・NOTICE・OFL-BIZUDGothic.txt）の SHA-256 に、**書庫の中の実行ファイルを従来の名前 `looptrack_<版>_<os>_<arch>[.exe]` にした行 6 つ**を足したもの（計 21 行。`dist.sh sums` が書庫を開いて足す）。書庫から出した実行ファイルを配布ディレクトリに置いても、公式のビルドの self-update が署名つきのこの一覧で確かめられるようにするため。Releases に並ばない名前の行があるので、照合は `dist.sh verify <dir>`（その行は書庫の中身で照合する）か、`sha256sum -c --ignore-missing SHA256SUMS`・`grep` で 1 行を選ぶ形で行う。**署名の後に作る** |
 | `SHA256SUMS.minisig` | SHA256SUMS の minisign の署名（`RELEASE_SIGN` のとき。公開では必須）。下の「署名」 |
-| コンテナイメージ | `deploy/Dockerfile`（scratch）に、同じリリースの linux/amd64・arm64 の `looptrack` を置いたもの（ENTRYPOINT `/looptrack`・CMD `serve`）（deploy/build.sh と同じ内容。中の実行ファイルは SHA256SUMS のものと同じバイト列）。名前は `ghcr.io/<owner>/looptrack:<版>`（arch 別に `<版>-amd64` / `<版>-arm64`、正式版は `latest` も） |
+| コンテナイメージ | `deploy/Dockerfile`（scratch）に、同じリリースの linux/amd64・arm64 の `looptrack` を置いたもの（ENTRYPOINT `/looptrack`・CMD `serve`）（deploy/build.sh と同じ内容。中の実行ファイルは同じ arch の書庫の中のもの・SHA256SUMS の従来の名前の行と同じバイト列。`image` ジョブが書庫の中身と突き合わせる）。名前は `ghcr.io/<owner>/looptrack:<版>`（arch 別に `<版>-amd64` / `<版>-arm64`。Releases を Latest にする版には `latest` も付ける。下の「起動と公開の条件」） |
+
+Releases に上げないもの: 素の実行ファイル・`install.sh`・`grants.sql`（`publish` の前に `dist.sh check-release` が名前で確かめる）。
+`install.sh`・`grants.sql` は `dist.sh build` の出力先に写すだけです（下の「2-3」）。
 
 起動と公開の条件は次のとおりです。
 
@@ -57,8 +59,19 @@ Go の版: ci.yml・release.yml の `GO_VERSION` で決めます。今は `1.27.
 | 手動・`version` 空 | 「日付-コミット ID」で試しに作る | しない |
 | 手動・`version` 指定 | そのタグの内容から作る | `publish` にチェックしたとき |
 
+**artifact の保持日数**（private リポジトリの Actions の保存容量は artifact の積み上げで数えられ、無料枠が小さい。公開側は対象外）:
+同じ run の後のジョブが読むだけのもの（`build-<版>`・`unsigned-macos-app-<版>`・`signed-macos-<版>`・`desktop-*-<版>`・`binaries-<版>`）は **1 日**、
+人が手元で確かめに取りに行くもの（`release-<版>`・`sums-signature-<版>`・公開しないときの `image-<版>-<arch>`。下の「4. リリースの手順」の 4）は **3 日**、
+失敗のときだけ読む `installer-log-*` は 7 日、CI の `go-test-log*` は 7 日です。
+`publish` は同じ run の `release-<版>` と `sums-signature-<版>` を読みます（手動で `publish` にチェックして起動し直すと run が新しくなり、作り直した artifact を読みます）。
+失敗したジョブを 1 日より後に再実行すると、1 日の artifact が無く落ちるので、その場合は新しく run を起こします。
+
 公開する版は `vX.Y.Z` / `vX.Y.Z-<pre>` の形に限ります。それ以外は meta ジョブで止まります。
-`-` を含む版はプレリリースとして扱い、`latest` を付けません。Releases でもプレリリースになります。
+
+**利用者の決定（2026-09-28）**: rc（`-` を含む版）も、同じリポジトリに正式版のタグ（`vX.Y.Z`、`-` を含まない）が
+まだ無い間は Latest として扱います（Releases は Pre-release にせず、GHCR にも `latest` タグを付けます）。
+正式版のタグが一度でも付けば、以後に出す rc は Pre-release に戻します（`latest` は付けず、Releases の
+Latest は正式版のままです）。meta ジョブがタグの一覧（`gh api repos/<owner>/<repo>/tags`）を見て機械的に判定します。
 Releases は**下書き**で作ります。中身を確かめてから人が公開します。
 
 ### 署名
@@ -72,13 +85,14 @@ Releases は**下書き**で作ります。中身を確かめてから人が公�
 | -- | -- |
 | `binaries`（ubuntu） | `dist.sh build` で 6 対象を作り、署名前のファイルを artifact `build-<版>` に置く（SHA256SUMS はまだ作らない） |
 | `sign-macos`（macos-15・Environment `release`） | Secrets の有無を確かめる（無ければ名前を示してエラー）→ `$RUNNER_TEMP` に一時キーチェーンを作って .p12 を入れる → `deploy/release/sign-macos.sh` で darwin の 2 つ（looptrack × amd64・arm64）に署名（hardened runtime・安全なタイムスタンプ・TeamIdentifier の確認）→ まとめて zip で `notarytool submit --wait`（API キー）→ 署名後も `version` が動くことを確かめる → artifact `signed-macos-<版>`。最後に `if: always()` で一時キーチェーン・.p12・.p8 を消す |
-| `sums`（ubuntu） | `build-<版>` に署名済みの darwin の 2 つを上書きし（数と名前を確かめる）、`dist.sh sums` で SHA256SUMS を作る → artifact `binaries-<版>`（最終ファイル） |
-| `sign-sums`（ubuntu・Environment `release`） | `apt-get install minisign` → 秘密鍵を `$RUNNER_TEMP` に書き、パスワードを標準入力で渡して `dist.sh sign-sums` → `dist.sh verify`（リポジトリの公開鍵 `deploy/release/minisign.pub` で確かめる）→ artifact `sums-signature-<版>`（`SHA256SUMS.minisig`） |
-| `image` | `binaries-<版>` の linux の looptrack から作る（署名とは独立。中の実行ファイルは SHA256SUMS に載っているものと同じバイト列） |
-| `publish`（Environment `release`） | `binaries-<版>` と `SHA256SUMS.minisig` を取り、`dist.sh verify` で照合と署名を確かめてから GHCR・Releases の下書き |
+| `sums`（ubuntu） | `build-<版>` に署名済みの darwin の 2 つを上書きし（数と名前を確かめる）、`dist.sh archive` で書庫 6 つを `release/` に作る → `dist.sh check-archives`（中身）・darwin の書庫の実行ファイルと `signed-macos-<版>` の突き合わせ・linux/amd64 の書庫から出した `looptrack version` → デスクトップ版 7・NOTICE・OFL を `release/` に写す → `dist.sh sums release` → `dist.sh check-release`（上げるものの名前と SHA256SUMS の行）・`dist.sh verify` → artifact `binaries-<版>`（素の実行ファイル。イメージの材料）と `release-<版>`（Releases に上げるもの） |
+| `sign-sums`（ubuntu・Environment `release`） | `release-<版>` を取り、`apt-get install minisign` → 秘密鍵を `$RUNNER_TEMP` に書き、パスワードを標準入力で渡して `dist.sh sign-sums` → `dist.sh verify`（リポジトリの公開鍵 `deploy/release/minisign.pub` で確かめる）→ artifact `sums-signature-<版>`（`SHA256SUMS.minisig`） |
+| `image` | `binaries-<版>` の linux の looptrack から作る（署名とは独立）。材料の looptrack が `release-<版>` の同じ arch の書庫の中のものとバイト列で一致することを確かめる |
+| `publish`（Environment `release`） | `release-<版>` と `SHA256SUMS.minisig` を取り、`dist.sh verify` で照合と署名を、`dist.sh check-release` で上げるものの名前（素の実行ファイル・install.sh・grants.sql が無い）を確かめてから GHCR・Releases の下書き（`gh release create … release/*`） |
 
 - リポジトリ変数 `RELEASE_SIGN` が `true` でないと、`sign-macos`・`sign-sums` は飛ばされます。SHA256SUMS は署名なしで作られます（private の間の試しのビルド）。
   **公開（publish）には署名が必須です。** `RELEASE_SIGN` が `true` でないと meta ジョブで止まります。looptrack の self-update が署名の無い配布からは更新しないためです。
+  `sign-sums` の trusted comment（`looptrack <版> SHA256SUMS`）と実行ファイルの名前（`looptrack_<版>_<os>_<arch>`）の形は変えないでください。self-update はこの 2 つから署名された版を読み、配布の一覧の version と同じでなければ置き換えません（一覧は署名されていないので、version の偽装で古い版へ戻されないため）。
 - darwin の単体の実行ファイルと zip には staple できません。初回の起動時に Gatekeeper がオンラインで公証を確かめます。
   デスクトップ版の `.app` / dmg は、sign-macos ジョブが同じ `sign-macos.sh` に渡します。署名・公証の後に `stapler staple` まで行います（.app → dmg の順に 2 回呼ぶ。下の「デスクトップ版」）。
 - 秘密の扱い: `set -x` は使わず、秘密を echo しません。復号したファイルは `$RUNNER_TEMP` に置いて最後に消します。
@@ -129,7 +143,7 @@ Releases は**下書き**で作ります。中身を確かめてから人が公�
 .app と dmg は `stapler staple` → `stapler validate` で確かめます。
 ブラウザで取得した（検疫の付いた）実行ファイルで、Gatekeeper の警告が出ないことも確かめてください。
 
-### デスクトップ版（DESIGN.md §5-14）
+### デスクトップ版（DESIGN.md §5-4）
 
 desktop ビルド（`-tags desktop`・トレイつき）は `dist.sh` では作りません。`deploy/release/desktop.sh` で OS ごとの配布物に組み立てます。
 
@@ -156,7 +170,7 @@ bash deploy/release/desktop.sh macos-dmg v0.0.0-test out/Looptrack.app out
 
 #### Windows のインストーラ
 
-`deploy/release/windows/Looptrack.iss`（Inno Setup 7）で作ります。決定と中身は DESIGN.md §5-14「Windows のインストーラ」にあります。
+`deploy/release/windows/Looptrack.iss`（Inno Setup 7）で作ります。決定と中身は DESIGN.md §5-4「Windows のインストーラ」にあります。
 ISCC は Windows でしか動かないので、手元（macOS・Linux）では組み立てられません。**CI で確かめます。**
 
 ```
@@ -208,11 +222,11 @@ pwsh -File deploy/release/desktop_smoke.ps1 -Exe <展開先>\Looptrack\Looptrack
 
 ## 2-1. サーバの配布ディレクトリから配る（LOOPTRACK_DIST_DIR）
 
-GitHub Releases を使わずに、looptrack を自分のサーバから配ることもできます（DESIGN.md §5-11「配布と更新」）。
+GitHub Releases を使わずに、looptrack を自分のサーバから配ることもできます（DESIGN.md §5-1「配布と更新」）。
 
 | 物 | 中身 |
 | -- | -- |
-| 置き方 | `dist.sh build`（署名しないなら `RELEASE_MINISIGN_PUBKEY=` を付け、self-update はハッシュだけを確かめる）と `dist.sh sums` の出力を、サーバの配布ディレクトリに置く（実行ファイル → SHA256SUMS の順に置き、前の版を消す）。出力に入る `install.sh`・`grants.sql` は置いても置かなくてもよい（配布口が配るのは実行ファイルと SHA256SUMS・NOTICE・OFL-BIZUDGothic.txt だけで、ほかの名前は配らない） |
+| 置き方 | `dist.sh build`（署名しないなら `RELEASE_MINISIGN_PUBKEY=` を付け、self-update はハッシュだけを確かめる）と `dist.sh sums` の出力を、サーバの配布ディレクトリに置く（実行ファイル → SHA256SUMS の順に置き、前の版を消す）。出力に入る `install.sh`・`grants.sql` は置いても置かなくてもよい（配布口が配るのは実行ファイルと SHA256SUMS・NOTICE・OFL-BIZUDGothic.txt だけで、ほかの名前は配らない）。**配布ディレクトリは素の実行ファイルの形のまま**で、GitHub Releases の書庫は置かない（置いても一覧に出ず、`/api/v1/dist/bin/<書庫の名前>` は 404）。公式のリリースから置くときは、書庫から `looptrack` を取り出して従来の名前で置き、リリースの `SHA256SUMS`・`SHA256SUMS.minisig` をそのまま置く（SHA256SUMS に従来の名前の行があるので、公式のビルドの self-update が署名で確かめられる。手順は利用者ガイドの updating.md） |
 | 版 | 公開の版（`vX.Y.Z`）か、`v0.0.0-<UTC の年月日時分秒>-<コミット ID>`（Go の擬似版の形。semver のプレリリースとして時刻の順に並ぶ） |
 | サーバ（looptrack serve） | `LOOPTRACK_DIST_DIR=<配布ディレクトリ>`（コンテナなら読み取り専用で入れる）。`GET /api/v1/dist`（と setup の券の一覧）の `binaries: [{name, os, arch, version, sha256, size, url}]` に (os, arch) ごとの最新を出し、`/api/v1/dist/bin/<名前>` で本体を返す。SHA256SUMS に載っていない・ハッシュが違うファイルは配らない。配布ディレクトリが無い・空なら `binaries` は空の一覧 |
 | 最低の対応版 | `.env` に `LOOPTRACK_CLIENT_MIN_VERSION=v…` を書くと、それより古い looptrack の導入に【配布スクリプトの更新】が出る（空なら判定しない） |
@@ -244,7 +258,7 @@ go run ./internal/tools/notice -check   # 書き換えずに、今の依存と�
   ライセンス文の写しは `deploy/release/licenses/AppImage-type2-runtime-LICENSE.txt` にあり、版は `deploy/release/desktop.sh` の `APPIMAGE_RUNTIME_TAG` から読みます。
 - **runtime に静的リンクされた部品**（libfuse 3.15.0・musl libc・squashfuse・zstd・zlib・mimalloc）は、`deploy/release/licenses/runtime-components.json` を元データにして部品ごとの節を出します。
   節には版・著作権表示・ソースの URL と SHA-256・上流の改変・**ライセンス文の全文**が入ります。
-  libfuse は LGPL-2.1 なので、全文（`LGPL-2.1.txt`）・対応ソースの置き場・作り直しの手順（`RELINKING.md`）も節に書きます（DESIGN.md §5-14）。
+  libfuse は LGPL-2.1 なので、全文（`LGPL-2.1.txt`）・対応ソースの置き場・作り直しの手順（`RELINKING.md`）も節に書きます（DESIGN.md §5-4）。
   マニフェストの `runtime.tag` が `desktop.sh` の `APPIMAGE_RUNTIME_TAG` と違えば、生成は失敗します。写しの SHA-256 も確かめます。
 - モジュールのパスで並べ、日付は入れません。何度作り直しても同じ結果になります。
   ライセンス文が見つからないモジュールがあれば失敗するので、そのときは依存を見直してください。
@@ -293,32 +307,32 @@ libfuse（LGPL-2.1）の対応ソースは、**毎回のリリースには添付
 > **公開のときにやったこと**: `corresponding_source` は `status: published` で、`url` は確定済みです
 > （上の 7 本を取り直して照合し、1 回限りのリリースを作ってあります）。NOTICE も作り直し済みです。
 
-## 2-3. install.sh と grants.sql（導入用の資産）
+## 2-3. インストーラ（install.sh）と grants.sql
 
 `dist.sh build` は、実行ファイルと同じディレクトリに `install.sh`（`deploy/install.sh` の写し）と `grants.sql`（`deploy/grants.sql` の写し）を置きます。
-`dist.sh sums` がそれを `SHA256SUMS` に載せます。
-名前は写す前と同じにします。取得の 1 行が指す名前であり、install.sh の「取得元の規約」の接頭辞の下にそのまま並ぶからです。
-release.yml は `binaries` で「リポジトリの `deploy/` の写しと同じであること」を、`sums` で「`SHA256SUMS` に載っていること」を確かめます。
-そのうえで `publish` が Releases の資産に入れます（`gh release create … dist/*`）。
+`dist.sh sums` をそのディレクトリで実行すると、それも `SHA256SUMS` に載ります（手元の配布物・サーバの配布ディレクトリの形）。
+release.yml は `binaries` で「リポジトリの `deploy/` の写しと同じであること」を確かめます。
+**GitHub Releases の資産には入れず、書庫にも同梱しません。** `sums` と `publish` の `dist.sh check-release` が、上げるものに無いことを名前で確かめます。
 
-**公開後**の取得の 1 行は次のとおりです。`<org>/<repo>` は公開先で、README・利用者ガイド・DEPLOY.md にも同じ形を書いています。
-
-```bash
-curl -fsSL https://github.com/<org>/<repo>/releases/latest/download/install.sh -o install.sh
-less install.sh                                    # 実行する前に中身を読む
-sudo sh install.sh --from https://github.com/<org>/<repo>/releases/latest/download
-```
-
-- `releases/latest/download/<名前>` は最新の**正式版**の資産を指します（プレリリースは指しません）。
-  版を固定するなら `releases/download/<タグ>/<名前>` にします（README・DEPLOY.md はこちらの形）。
-- `--from` に渡すのは「その版の資産が並ぶ接頭辞」です。
-  install.sh はその下の `SHA256SUMS`・`SHA256SUMS.minisig`・`looptrack_<版>_linux_<arch>` を取り、SHA-256 と署名を確かめてから入れます。
-  取った install.sh 自身も `SHA256SUMS` に載っているので、別に取り直して照合できます（`grep ' install.sh$' SHA256SUMS | sha256sum -c -`）。
-- MySQL を最小権限で使うときは、同じ接頭辞から `grants.sql` も取れます（DEPLOY.md「保存先に MySQL を選ぶとき」）。
-- 更新は `sudo sh install.sh --upgrade --from <同じ接頭辞>` です。資産の並びは入れるときと同じです。
+- **インストーラは raw.githubusercontent.com の main から 1 行で取って走らせます**（README・利用者ガイド・DEPLOY.md に同じ形を書いています）。
+  1 行は版を含まないので、リリースのたびに文書を直しません。スクリプト自身は HTTPS で取るだけで照合できないことを README に書いています。
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
+  ```
+- `--from` を付けないとき、インストーラは `https://github.com/howashoji/looptrack/releases/latest/download` の `SHA256SUMS`・`SHA256SUMS.minisig`・
+  `looptrack_<版>_linux_<arch>_server.tar.gz` を取り、SHA-256 と署名を確かめてから展開して入れます（`--version <版>` なら `…/releases/download/<版>`）。
+  `releases/latest` は、GitHub がそのとき Latest としている版を指します。v1.0.0 の正式版が出るまでは rc が Latest なので rc の書庫を取り、
+  正式版が出た後は正式版（と、その後の PATCH）の書庫を取ります（その後に出す rc は Pre-release に戻るため。上の「起動と公開の条件」）。
+  Pre-release の rc は `--version` で指定して入れます。
+  **main のインストーラは、公開済みのリリースの書庫を取れる形を保ちます**（書庫の名前の規約を変えるときは、古い形も読めるようにしてから変える）。
+  素の実行ファイル（`looptrack_<版>_linux_<arch>`）しか無い取得元（`dist.sh build` の出力・サーバの配布ディレクトリ・1.0.0-rc.2 までの Releases）からも入れられます。
+- MySQL の最小権限は、`looptrack` に埋め込んだ `deploy/grants.sql` から `looptrack grants apply` が流します（DEPLOY.md「保存先に MySQL を選ぶとき」）。
+  Releases の grants.sql は要りません。
+- 更新は `… | sudo sh -s -- --upgrade` です。1.0.0-rc.1・rc.2 の install.sh で入れたサーバも同じ 1 行で上げます。
+  手元に残した古い install.sh を新しい Releases に `--from` で向けると、素の実行ファイルが無いので、何も入れ替えずに止まります（CHANGELOG の移り方に書く）。
 
 **公開前**（Releases がまだ無い間）は、手元で作った配布物のディレクトリをそのまま `--from` に渡して確かめます。
-install.sh 自身もその中にあるので、リポジトリではなく配布物から実行してください。
+install.sh 自身もその中にあるので、リポジトリではなく配布物から実行できます。Releases と同じ形（書庫）で確かめるなら、`dist.sh archive` の出力を `--from` に渡します。
 
 ```bash
 bash deploy/release/dist.sh build v0.0.0-local /tmp/dist
@@ -327,7 +341,7 @@ sudo sh /tmp/dist/install.sh --from /tmp/dist
 ```
 
 この経路は `deploy/install_test.sh` が Docker で確かめています。
-リリースの出力のディレクトリをそのまま取得元にして、install.sh も grants.sql もそこから取れることを見ています。
+素の形の取得元（`dist.sh build` の出力）と、Releases と同じ並びの取得元（書庫。`LOOPTRACK_INSTALL_REPO` で `--from` なしの既定の取得元を差し替える）の両方で見ています。
 
 ## 3. 版の付け方
 
@@ -352,19 +366,21 @@ README・利用者ガイド・`install.sh`・`setup` のどれかを変えたと
    ```
 4. Actions の `release` の実行を開き、artifact を取って確かめます。
    ```
-   sha256sum -c SHA256SUMS                        # macOS は shasum -a 256 -c SHA256SUMS
-   minisign -Vm SHA256SUMS -p deploy/release/minisign.pub   # 署名したとき（bash deploy/release/dist.sh verify <dir> でも同じ）
-   codesign -dvv looptrack_v1.0.0-rc.1_darwin_arm64 # 署名したとき: Authority=Developer ID Application: HOWA SHOJI K.K.
-   spctl -a -vvv -t install looptrack_v1.0.0-rc.1_darwin_arm64 # 署名したとき: accepted / source=Notarized Developer ID
-   ./looptrack_v1.0.0-rc.1_darwin_arm64 version     # → looptrack v1.0.0-rc.1 (headless, darwin/arm64)（既定は英語。日本語は LOOPTRACK_LANG=ja）
+   bash deploy/release/dist.sh verify release-v1.0.0-rc.1   # artifact release-<版> を展開したディレクトリ。書庫の中の実行ファイルの行も照合し、署名があれば確かめる
+   bash deploy/release/dist.sh check-release v1.0.0-rc.1 release-v1.0.0-rc.1   # 上げるものの名前（素の実行ファイル・install.sh・grants.sql が無い）
+   tar -xzf release-v1.0.0-rc.1/looptrack_v1.0.0-rc.1_darwin_arm64_server.tar.gz && cd looptrack_v1.0.0-rc.1_darwin_arm64_server
+   codesign -dvv looptrack                          # 署名したとき: Authority=Developer ID Application: HOWA SHOJI K.K.
+   spctl -a -vvv -t install looptrack               # 署名したとき: accepted / source=Notarized Developer ID
+   ./looptrack version                              # → looptrack v1.0.0-rc.1 (headless, darwin/arm64)（既定は英語。日本語は LOOPTRACK_LANG=ja）
    docker load -i image-amd64.tar && docker run --rm ghcr.io/<owner>/looptrack:v1.0.0-rc.1-amd64 version
    ```
 5. 公開します。`release` を手動で起動し、`version` にタグ名を入れて `publish` にチェックします。
    リポジトリ変数 `RELEASE_PUBLISH=true` にしておけば、タグの push で公開まで進みます。
 6. GHCR のイメージと Releases の下書きを確かめ、Releases の画面で公開します。
    イメージは `docker buildx imagetools inspect ghcr.io/<owner>/looptrack:<版>` で、amd64・arm64 の 2 つがあることを見ます。
-   下書きには実行ファイル 6 個・デスクトップ版・NOTICE・OFL-BIZUDGothic.txt・**install.sh**・**grants.sql**・SHA256SUMS・SHA256SUMS.minisig がそろっているはずです。
-   公開したら、取得の 1 行（上の「2-3. install.sh と grants.sql」）が実際に動くことを確かめます（`curl -fsSL …/releases/latest/download/install.sh -o install.sh` → `sudo sh install.sh --from …`）。
+   下書きには書庫 6 個（`…_server.tar.gz` 4・`…_server.zip` 2）・デスクトップ版 7 個・NOTICE・OFL-BIZUDGothic.txt・SHA256SUMS・SHA256SUMS.minisig の 17 個がそろっているはずです。
+   素の実行ファイル・install.sh・grants.sql は**無い**はずです（`gh release view <版> --json assets --jq '.assets[].name'`）。
+   公開したら、インストーラの 1 行（上の「2-3」）がその版の書庫を取って入ることを確かめます（まっさらな Linux で `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --version <版>`。Latest にしたなら `--version` なしでも）。
    初回は GHCR のパッケージの公開範囲（既定は private）と、リポジトリへの紐付けも確かめてください。
 
 やり直すとき: 公開前ならタグを消して打ち直して構いません（`git push --delete origin <tag>`）。公開後の版は消さずに、次の PATCH / rc を出します。
@@ -375,7 +391,11 @@ README・利用者ガイド・`install.sh`・`setup` のどれかを変えたと
 bash deploy/release/dist.sh build v0.0.0-local /tmp/dist   # 6 対象の looptrack と NOTICE・OFL-BIZUDGothic.txt・install.sh・grants.sql
 bash deploy/release/dist.sh sums /tmp/dist
 (cd /tmp/dist && shasum -a 256 -c SHA256SUMS)
-bash deploy/install_test.sh                                # Docker で install.sh（この出力を --from に渡す経路も）を通す
+bash deploy/release/dist.sh archive v0.0.0-local /tmp/dist /tmp/release        # Releases に上げる書庫 6 つ
+bash deploy/release/dist.sh check-archives v0.0.0-local /tmp/release /tmp/dist
+cp /tmp/dist/NOTICE /tmp/dist/OFL-BIZUDGothic.txt /tmp/release/ && bash deploy/release/dist.sh sums /tmp/release
+bash deploy/release/dist.sh check-release v0.0.0-local /tmp/release && bash deploy/release/dist.sh verify /tmp/release
+bash deploy/install_test.sh                                # Docker で install.sh（この出力を --from に渡す経路・書庫の経路・MySQL の権限も）を通す
 bash deploy/release/sign-macos.sh --identity - --skip-notarize /tmp/dist/*_darwin_*   # 署名の手順だけ（ad-hoc。Apple に送らない）
 bash deploy/release/dist.sh image-context v0.0.0-local arm64 /tmp/dist /tmp/ctx-arm64
 docker buildx build --platform linux/arm64 -t im-check:local --load /tmp/ctx-arm64 && docker run --rm im-check:local version

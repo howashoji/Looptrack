@@ -22,7 +22,7 @@
 
 ## 1. 仕組み（30 秒）
 
-**このシステムを導入すると、ループエンジニアリングの基盤が整います。** イシューを中心に「起票 → 着手（next）→ 作業 → 検証 → クローズ → 次へ」を AI が回します。規則（採番・append-only・クローズ済み不変・プロジェクト別ルール）はサーバが強制し、各段階のトークン消費は記録されます。
+**Looptrack は、AI コーディングエージェントの外部記憶となり、ループエンジニアリングを実現するイシュー管理ツールです。** コンテキストに収まらない作業計画・判断・経緯はイシューに残し、次のセッションはそこから再開します。ここのイシューは、プロジェクト本来の課題一覧とは別に、AI が分解した作業単位です。**このシステムを導入すると、ループエンジニアリングの基盤が整います。** イシューを中心に「起票 → 着手（next）→ 作業 → 検証 → クローズ → 次へ」を AI が回します。規則（採番・append-only・クローズ済み不変・プロジェクト別ルール）はサーバが強制し、各段階のトークン消費は記録されて分析レポートにできます。
 入れ子の 3 つのループ（Andrew Ng の整理）に当てはめると次のとおりです。
 
 | ループ | 周期 | 回す人 | このシステムでの形 |
@@ -305,7 +305,7 @@ looptrack issue usage report --request 3 --json > r.json    # 依頼 #3 の期�
 | `verify` | API モードだけ。本文の「## 検証コマンド」を手元（`CLAUDE_PROJECT_DIR`）で実行し、結果をコメントとイベントでサーバに記録する。シェルに `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT` が無いと、**何も実行・記録せず exit 2**（対訳表 `cli.err.verify_api_only`）。MCP の `verify_issue` は一覧と直近の記録を返すだけで実行しない（MCP の `report_verify` で送った記録には「MCP の自己申告」の印が付く。CLI の記録には付かない） |
 | `list --has-feedback` | API モードだけ。未応答のフィードバックがあるイシューだけを出す（既定でクローズ済みも含む。末尾に件数の行）。判定はサーバのコメントの時刻と状態変更の記録を使う。シェルに `LOOPTRACK_API_URL` が無いと、`--has-feedback` 専用のエラーではなく `list` 自体がサーバの URL が無いという案内で **exit 1**（対訳表 `cli.no_api.missing_url`） |
 | `summary` の見出し | API モードでは 3 層（`══ ① いまの周（AI の作業） ══`・`══ ② 人の判断待ち（…） ══`・`══ ③ 外からの反応（…） ══`）。該当が無い層も見出しと「該当なし」を出す（3 層に対応していない古いサーバでは従来の「進行中・レビュー待ち・着手可能」） |
-| トークン計測 | `new` / `push` / `comment` / `status` / `close` の直後に、コーディング AI の会話記録から「会話の累計」をサーバへ送る。AI の下でない（人がターミナルから打った）ときは送らない。失敗しても操作は成功する。`LOOPTRACK_USAGE=0` で切れる。指示文（作業名）は既定で送らず、プロジェクト別ルール `usage.send_prompts: true` のプロジェクトだけ送る（利用者は `LOOPTRACK_USAGE_SEND_PROMPTS=0` で止められる）。手動で付けるときは `usage attach <ID>`。レポートの集計は `usage report`、作ったレポートの記録は `usage ledger add`。設計は [server/DESIGN.md](server/DESIGN.md) |
+| トークン計測 | `new` / `push` / `comment` / `status` / `close` / `next`（着手したとき）/ `verify`（と担当が変わった `assign`）の直後に、コーディング AI の会話記録から「会話の累計」をサーバへ送る。AI の下でない（人がターミナルから打った）ときは送らない。失敗しても操作は成功する。`LOOPTRACK_USAGE=0` で切れる。指示文（作業名）は既定で送らず、プロジェクト別ルール `usage.send_prompts: true` のプロジェクトだけ送る（利用者は `LOOPTRACK_USAGE_SEND_PROMPTS=0` で止められる）。手動で付けるときは `usage attach <ID>`。レポートの集計は `usage report`、作ったレポートの記録は `usage ledger add`。設計は [server/DESIGN.md](server/DESIGN.md) |
 | トークン情報の付与漏れ | 送れなかったときだけ標準エラーに `looptrack issue usage attach <ID>` を示す 1 行が出る → **そのコマンドを実行する**。`summary`（SessionStart）の末尾にも同じコマンドが並ぶので、示されたイシューごとに実行して回収する（自分の AI 操作・直近 7 日。人がターミナルから打った操作は数えない）。**目印は文面ではなくこのコマンド**（文面は利用者の言語で変わるので、特定の言い回しで探さない） |
 | クローズ時の必須化（プロジェクト別ルール `usage.require_on_close`） | その会話のトークン情報がイシューに 1 件も無いまま Done / Canceled にすると拒否される。CLI は拒否されたら自動で `usage attach` してから 1 回だけやり直すので、通常は意識しなくてよい。会話記録が無く付けられないときは拒否のメッセージが出る（利用者の指示があるときだけ `--override "理由"`）。ルールが無いプロジェクトでは警告だけ |
 
@@ -469,7 +469,7 @@ Copilot でも、**イシューの操作は MCP のツールが主です**（Cod
 | 項目 | Copilot でのやり方 |
 | -- | -- |
 | MCP の接続 | VS Code: `.vscode/mcp.json` に `{"servers": {"looptrack": {"type": "http", "url": "https://example.com/looptrack/mcp", "headers": {"X-Looptrack-Project": "<slug>"}}}}`（`init --agent copilot --mcp` が書く。初回の接続でブラウザの許可）。Copilot CLI: リポジトリの `.github/mcp.json`（`init --agent copilot --mcp` が書く）か `.mcp.json`、または `~/.copilot/mcp-config.json` の `mcpServers.looptrack`（同じ `type`・`url`・`headers` と**必須の** `"tools": ["*"]`。CLI は 1.0.22 から `.vscode/mcp.json` を読まない）、認証は `/mcp auth looptrack`。CLI の MCP のツール呼び出しは毎回承認が要る（`copilot --allow-tool='looptrack'` で起動すれば要らない）（[CLI の command reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference)・[VS Code の MCP の設定](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)） |
-| AI の判定 | MCP の `clientInfo` が `github-copilot-developer`（CLI）・`Visual Studio Code` / `Visual Studio Code - Insiders` / `Code - OSS`（VS Code）なら `copilot`（`mcp_connections.agent`） |
+| AI の判定 | MCP の `clientInfo` が `copilot-cli`（CLI。1.0.86 の実物）/ `github-copilot-developer`（CLI。[github/copilot-cli#432](https://github.com/github/copilot-cli/issues/432) の保守者のコメント）・`Visual Studio Code` / `Visual Studio Code - Insiders` / `Code - OSS`（VS Code）なら `copilot`（`mcp_connections.agent`） |
 | 案内文 | `AGENTS.md` の管理節（Copilot CLI・VS Code とも AGENTS.md を読む。`.github/copilot-instructions.md` は使わない）。VS Code で読まれないときは設定 `chat.useAgentsMdFile` を確かめる。**CLAUDE.md も読まれる**（CLI は AGENTS.md・CLAUDE.md・copilot-instructions.md を合成、VS Code も既定で読む）ので、CLAUDE.md の管理節の冒頭に「Claude Code 向け。Copilot・Codex は AGENTS.md に従う」と書いてある |
 | ループの操作 | Codex と同じ（§7-1 の表）: `guide`・`next`・`create_issue`・`add_comment`・`set_status`・`get_issue` → `update_issue`、検証は `verify_issue` → 手元のシェル → `report_verify` |
 | フック | `init --agent copilot` が `.github/hooks/looptrack.json` に SessionStart の `summary`（導入済みの通知）と、loop を入れたなら loop の hook を配線する。VS Code は既定で読む（Preview の機能・組織の設定で無効のことがある）。Copilot CLI は起動時にフォルダを信頼したときだけ読む。どちらも新しいセッションから動く。出力は CLI（トップレベル）と VS Code（`hookSpecificOutput`）の両方の形で出し、VS Code は matcher を無視するので hook の中でツール名を見る（kit/README.ja.md「Copilot での対応」）。**Windows**: hook は `looptrack`（`powershell` / `windows` のフィールドにも `command` と同じ `looptrack hook …` を置く。環境変数の前置は PowerShell の形。Windows での実物は未確認。導入済みにならなければ `looptrack issue installed --agent copilot`） |

@@ -12,7 +12,7 @@ init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI other・dry
      - 作業の最初に `looptrack issue guide` を読む（MCP なら guide ツール）
      - ループ: next → 作業 → comment → 受け入れ条件を検証 → close --comment → next
   4. MCP: http://127.0.0.1:9/im/mcp（ヘッダ X-Looptrack-Project: demo、認証は OAuth）
-  5. フックがあれば、ツール実行後・ターン終了・セッション終了で looptrack hook usage を呼ぶ（トークン計測。docs/server/DESIGN.md §5-4）
+  5. フックがあれば、ツール実行後・ターン終了・セッション終了で looptrack hook usage を呼ぶ（トークン計測。docs/server/DESIGN.md §9-5）
   6. 導入が済んだら `looptrack issue installed --agent other` でサーバへ知らせる（MCP のツール結果の導入の指示が消える）
 
 #### stderr

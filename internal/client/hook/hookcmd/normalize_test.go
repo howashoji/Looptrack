@@ -143,3 +143,15 @@ func TestNormalize(t *testing.T) {
 	eqs(t, "遠隔の bash -c", Normalize(`ssh host bash -c 'git reset --hard'`, HeadOnly), `ssh host bash -c 'git reset --hard'`)
 	eqs(t, "どちらも無ければそのまま", Normalize("git status", HeadOnly), "git status")
 }
+
+func TestJoinContinuations(t *testing.T) {
+	// つなぐ側（改行か文字列の終わりが直後に来るバックスラッシュ）
+	eqs(t, "行末の継続", JoinContinuations("git \\\n  commit -m x"), "git   commit -m x")
+	eqs(t, "CRLF の行末の継続", JoinContinuations("git \\\r\n  push"), "git   push")
+	eqs(t, "末尾に残るバックスラッシュ", JoinContinuations(`cat /p/.env\`), "cat /p/.env")
+	eqs(t, "2 か所の継続", JoinContinuations("a \\\nb \\\nc"), "a b c")
+	// つながない側（後ろに改行が無いバックスラッシュ）
+	eqs(t, "Windows のパス", JoinContinuations(`type C:\tmp\notes.txt`), `type C:\tmp\notes.txt`)
+	eqs(t, "打ち消した空白", JoinContinuations(`ls a\ b`), `ls a\ b`)
+	eqs(t, "継続の無い改行", JoinContinuations("git status\ngit push"), "git status\ngit push")
+}

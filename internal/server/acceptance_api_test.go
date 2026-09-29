@@ -138,3 +138,123 @@ FROM issue_events e JOIN issues i ON i.id = e.issue_id WHERE i.display_id = ? AN
 	off := v.create("規則なし", "説明だけ")
 	v.ed.json(200, "POST", "/issues/"+off+"/status", map[string]any{"status": "Done", "comment": "終わり"}, nil)
 }
+
+// 受け入れ条件が雛形のままの着手は止めずに注意を返す（domain.AcceptanceStartNotice。判定は service の setStatus の 1 か所）。
+// REST の status（CLI の issue status と Web が叩く）・REST の next（CLI の issue next）・MCP の set_status・next の
+// 4 経路で、状態が In Progress に変わり、応答に同じ注意が載ることを確かめる。誤検知の側（載らない）も同じ経路で見る。
+func TestAcceptanceNoticeOnStart(t *testing.T) {
+	const rules = `{"acceptance": {"require_on_close": true}}`
+	want := func(id string) string {
+		return i18n.T(i18n.JA, "domain.rules.acceptance_template_on_start", "id", id, "statuses", "Done", "command", domain.AcceptanceEditCommand(id))
+	}
+
+	t.Run("REST status", func(t *testing.T) {
+		v := newVerifyEnv(t, "an", rules)
+		id := v.create("雛形のまま", "説明だけ")
+		var res struct {
+			Messages         []string `json:"messages"`
+			AcceptanceNotice string   `json:"acceptance_notice"`
+		}
+		v.ed.json(200, "POST", "/issues/"+id+"/status", map[string]any{"status": "In Progress"}, &res)
+		if st := v.ed.state(id); st.status != "In Progress" {
+			t.Fatalf("注意だけのはずが着手を止めた: %+v", st)
+		}
+		if res.AcceptanceNotice != want(id) {
+			t.Errorf("acceptance_notice:\n got %q\nwant %q", res.AcceptanceNotice, want(id))
+		}
+		if !slicesContains(res.Messages, want(id)) {
+			t.Errorf("messages に注意の行が無い（CLI が表示しない）: %q", res.Messages)
+		}
+
+		// 誤検知の側: In Progress → In Progress（着手ではない）・Todo へ戻す・記入済みの着手では載らない
+		for _, to := range []string{"In Progress", "Todo"} {
+			res.Messages, res.AcceptanceNotice = nil, ""
+			v.ed.json(200, "POST", "/issues/"+id+"/status", map[string]any{"status": to}, &res)
+			if res.AcceptanceNotice != "" || strings.Contains(strings.Join(res.Messages, "\n"), domain.AcceptanceEditCommand(id)) {
+				t.Errorf("%s への変更で注意が出た: %+v", to, res)
+			}
+		}
+		var d issueDetailJSON
+		v.ed.json(200, "GET", "/issues/"+id, nil, &d)
+		filled := strings.Replace(d.Markdown, acceptancePlaceholderLine(t), "- [ ] CI が緑", 1)
+		if filled == d.Markdown {
+			t.Fatal("起票の雛形の行が本文に無い")
+		}
+		v.ed.json(200, "PATCH", "/issues/"+id, map[string]any{"markdown": filled}, nil, "If-Match", strconv.Itoa(d.Version))
+		res.Messages, res.AcceptanceNotice = nil, ""
+		v.ed.json(200, "POST", "/issues/"+id+"/status", map[string]any{"status": "In Progress"}, &res)
+		if res.AcceptanceNotice != "" || len(res.Messages) != 1 {
+			t.Errorf("記入済みの着手で注意が出た: %+v", res)
+		}
+
+		// 節が無い本文の着手では載らない
+		nosec := v.create("節なし", "説明だけ")
+		v.ed.json(200, "GET", "/issues/"+nosec, nil, &d)
+		v.ed.json(200, "PATCH", "/issues/"+nosec, map[string]any{"markdown": dropAcceptanceSection(d.Markdown)}, nil, "If-Match", strconv.Itoa(d.Version))
+		res.Messages, res.AcceptanceNotice = nil, ""
+		v.ed.json(200, "POST", "/issues/"+nosec+"/status", map[string]any{"status": "In Progress"}, &res)
+		if res.AcceptanceNotice != "" {
+			t.Errorf("節の無い本文の着手で注意が出た: %q", res.AcceptanceNotice)
+		}
+	})
+
+	t.Run("REST next", func(t *testing.T) {
+		v := newVerifyEnv(t, "ann", rules)
+		id := v.create("雛形のまま", "説明だけ")
+		var n nextJSON
+		v.ed.json(200, "POST", "/projects/ann/next", map[string]any{"dry_run": true}, &n)
+		if n.Action != "would_start" || n.AcceptanceNotice != "" {
+			t.Errorf("dry_run で注意が出た（着手していない）: action=%q notice=%q", n.Action, n.AcceptanceNotice)
+		}
+		v.ed.json(200, "POST", "/projects/ann/next", map[string]any{}, &n)
+		if n.Action != "started" || n.Issue == nil || n.Issue.ID != id {
+			t.Fatalf("next が着手しない: action=%q", n.Action)
+		}
+		if n.AcceptanceNotice != want(id) || !strings.Contains(n.Text, want(id)) {
+			t.Errorf("next の注意: notice=%q\ntext=%s", n.AcceptanceNotice, n.Text)
+		}
+		n = nextJSON{}
+		v.ed.json(200, "POST", "/projects/ann/next", map[string]any{}, &n)
+		if n.Action != "resumed" || n.AcceptanceNotice != "" || strings.Contains(n.Text, want(id)) {
+			t.Errorf("resumed で注意が出た（着手ではない）: action=%q notice=%q", n.Action, n.AcceptanceNotice)
+		}
+	})
+
+	t.Run("MCP", func(t *testing.T) {
+		v := newVerifyEnv(t, "anm", rules)
+		m := v.mcpAs(v.ed.token, map[string]string{"X-Looptrack-Project": "anm"})
+		id := v.create("雛形のまま", "説明だけ")
+		text, _ := m.call("set_status", map[string]any{"id": id, "status": "In Progress"}, false)
+		if !strings.Contains(text, domain.AcceptanceEditCommand(id)) || !strings.Contains(text, id) {
+			t.Errorf("MCP set_status の本文に注意が無い: %q", text)
+		}
+		if st := v.ed.state(id); st.status != "In Progress" {
+			t.Fatalf("MCP で着手を止めた: %+v", st)
+		}
+		m.call("set_status", map[string]any{"id": id, "status": "Done", "override_reason": "記録のみ（テスト）"}, false)
+		nid := v.create("next で着手", "説明だけ")
+		text, _ = m.call("next", map[string]any{}, false)
+		if !strings.Contains(text, domain.AcceptanceEditCommand(nid)) {
+			t.Errorf("MCP next の本文に注意が無い: %q", text)
+		}
+	})
+
+	t.Run("規則なし", func(t *testing.T) {
+		v := newVerifyEnv(t, "ano", "")
+		id := v.create("雛形のまま", "説明だけ")
+		var res map[string]any
+		v.ed.json(200, "POST", "/issues/"+id+"/status", map[string]any{"status": "In Progress"}, &res)
+		if _, ok := res["acceptance_notice"]; ok {
+			t.Errorf("規則が未設定なのに注意が出た: %v", res)
+		}
+	})
+}
+
+func slicesContains(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}

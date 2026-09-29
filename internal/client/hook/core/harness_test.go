@@ -77,6 +77,8 @@ type fakeAPI struct {
 	// 接続を切った（送り手のプロセスが終わった・打ち切った）数を usageAbandoned に数える
 	usageHold      chan struct{}
 	usageAbandoned int
+	// usageOld は resend_delay_sec を知らない古いサーバの真似（知らない項目を 400 invalid_json で拒む）
+	usageOld bool
 }
 
 const basePath = "/im/api/v1"
@@ -169,6 +171,12 @@ func (f *fakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 		b, _ := json.Marshal(map[string]any{"items": items, "now_epoch": 0})
 		reply(200, string(b))
 	case r.Method == "POST" && strings.HasSuffix(p, "/usage"):
+		if m, _ := v.(map[string]any); f.usageOld && m != nil {
+			if _, ok := m["resend_delay_sec"]; ok {
+				reply(400, `{"error":{"code":"invalid_json","message":"Cannot parse the request JSON: json: unknown field \"resend_delay_sec\""}}`)
+				return
+			}
+		}
 		st := f.usageStatus
 		if st == 0 {
 			st = 201

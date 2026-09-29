@@ -11,7 +11,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 下位がすべて完了した要件の案内（DESIGN.md §5-10）。判定は domain.ClosableRequirements / ClosableFor。
+// 下位がすべて完了した要件の案内（DESIGN.md §9-4）。判定は domain.ClosableRequirements / ClosableFor。
 // close の応答（REST の messages と requirements_ready・MCP set_status）、matrix（md / json・MCP get_matrix）、
 // summary の ①（REST・MCP project_summary・CLI の summary）に同じ結果を出す。
 

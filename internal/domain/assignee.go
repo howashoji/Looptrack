@@ -2,7 +2,7 @@ package domain
 
 import "github.com/howashoji/looptrack/internal/mdformat"
 
-// AssigneeKey は表示用の frontmatter に差し込む担当者のキー（DESIGN.md §5-1）。
+// AssigneeKey は表示用の frontmatter に差し込む担当者のキー（DESIGN.md §9-2）。
 // 担当者はサーバだけの項目で、保存する Document（front_keys）には入らない。
 const AssigneeKey = "assignee"
 

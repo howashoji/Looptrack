@@ -1,0 +1,13 @@
+# new/dash-stdin-empty
+$ issue new 最小の起票 --body -
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 本文が空です（引数か標準入力で渡してください）。
+
+#### requests (0)
+
+#### files (0)

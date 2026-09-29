@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/i18n"
+	"github.com/howashoji/looptrack/internal/service"
 	"github.com/howashoji/looptrack/internal/store"
 )
 
@@ -118,8 +119,9 @@ func Provision(ctx context.Context, db *sql.DB, a Admin, p FirstProject, o Provi
 		case err == nil:
 			msg += i18n.T(o.Lang, "provision.project.exists", "slug", pr.Slug)
 		case errors.Is(err, store.ErrNotFound):
-			pr = store.Project{Slug: p.Slug, Prefix: p.Prefix, Width: DefaultProjectWidth, Name: p.Name}
-			if pr.ID, err = store.CreateProject(ctx, tx, pr); err != nil {
+			// 既定値の埋め方は CLI の project create・MCP・管理画面と同じ service.NewProjectDefaults
+			// （slug・prefix・name は checkProject が既に埋めているが、並び順はここでしか埋まらない）。
+			if pr, err = service.CreateProjectNoMember(ctx, tx, store.Project{Slug: p.Slug, Prefix: p.Prefix, Width: DefaultProjectWidth, Name: p.Name}); err != nil {
 				return "", i18n.Wrapf(err, "provision.err.project", "slug", p.Slug)
 			}
 			msg += i18n.T(o.Lang, "provision.project.created", "slug", pr.Slug, "id", pr.Prefix+"-"+strings.Repeat("n", pr.Width))
@@ -140,23 +142,18 @@ func Provision(ctx context.Context, db *sql.DB, a Admin, p FirstProject, o Provi
 	return msg, nil
 }
 
-// checkProject は最初のプロジェクトの答えを検査して揃える（slug が空か - なら作らない。接頭辞・名前の既定は slug から作る）。
+// checkProject は最初のプロジェクトの答えを検査して揃える（slug が空か - なら作らない。接頭辞・名前の既定は
+// service.NewProjectDefaults で埋める。CLI の project create・MCP・管理画面と同じ既定値になる）。
 func checkProject(slug, prefix, name string) (FirstProject, error) {
 	slug = strings.TrimSpace(slug)
 	if slug == "" || slug == "-" {
 		return FirstProject{}, nil
 	}
-	p := FirstProject{Slug: slug, Prefix: strings.TrimSpace(prefix), Name: strings.TrimSpace(name)}
-	if p.Prefix == "" {
-		p.Prefix = defaultPrefix(slug)
-	}
-	if p.Name == "" {
-		p.Name = slug
-	}
-	if err := store.ValidateNewProject(store.Project{Slug: p.Slug, Prefix: p.Prefix, Width: DefaultProjectWidth, Name: p.Name}); err != nil {
+	d := service.NewProjectDefaults(store.Project{Slug: slug, Prefix: prefix, Name: name, Width: DefaultProjectWidth})
+	if err := store.ValidateNewProject(d); err != nil {
 		return FirstProject{}, err
 	}
-	return p, nil
+	return FirstProject{Slug: d.Slug, Prefix: d.Prefix, Name: d.Name}, nil
 }
 
 // defaultPrefix は slug から接頭辞の既定値を作る（英大文字にするだけ。例 my-app → MY-APP）。

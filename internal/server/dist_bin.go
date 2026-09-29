@@ -16,7 +16,7 @@ import (
 	"github.com/howashoji/looptrack/internal/relver"
 )
 
-// 実行ファイル（looptrack）の配布（DESIGN.md §5-11「配布と更新」）。
+// 実行ファイル（looptrack）の配布（DESIGN.md §5-1「配布と更新」）。
 //
 // 並行期間（公開前）は、サーバの配布ディレクトリ（LOOPTRACK_DIST_DIR）に deploy/release/dist.sh の成果物
 // （looptrack_<版>_<os>_<arch>[.exe] と SHA256SUMS。置き方は docs/server/RELEASE.md §2-1）を置き、

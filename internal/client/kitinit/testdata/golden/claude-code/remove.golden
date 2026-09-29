@@ -223,6 +223,16 @@ init --remove-loop: $TMP/ws
         ],
         "PreToolUse": [
           {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-session-bind --agent claude-code",
+                "timeout": 5
+              }
+            ]
+          },
+          {
             "matcher": "Edit|Write|NotebookEdit",
             "hooks": [
               {
@@ -401,6 +411,18 @@ init --remove-loop: $TMP/ws
                 "type": "command",
                 "command": "looptrack hook usage --agent claude-code",
                 "timeout": 10
+              }
+            ]
+          }
+        ],
+        "PreToolUse": [
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-session-bind --agent claude-code",
+                "timeout": 5
               }
             ]
           }

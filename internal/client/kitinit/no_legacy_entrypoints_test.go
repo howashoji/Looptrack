@@ -39,7 +39,14 @@ func TestNoLegacyEntrypointsPlaced(t *testing.T) {
 				if r := runInit(t, root, "", args...); r.code != 0 {
 					t.Fatalf("init %v: %d %s", args, r.code, r.stderr)
 				}
-				for rel, body := range tree(t, ws) {
+				files := tree(t, ws)
+				// 置いたものを 1 つも見ずに緑になるのを塞ぐ（init が何も置かなかった・tree が空振りした）。
+				// どの AI でも settings か案内の節を置くので、1 件以上あるはず。
+				t.Logf("init が置いたファイル: %d 件", len(files))
+				if len(files) == 0 {
+					t.Fatal("init の後の ws にファイルが 1 つもありません（走査が空振りしています）")
+				}
+				for rel, body := range files {
 					if legacyEntryRe.MatchString(rel) {
 						t.Errorf("%s が置かれています（looptrack は実行ファイル 1 つで動きます）", rel)
 						continue

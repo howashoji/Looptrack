@@ -1017,9 +1017,29 @@ func TestSetupWorkspace(t *testing.T) {
 	}
 }
 
-// TestSetupCopilotEnv は Copilot 向けの手順のコマンドが、サーバの URL とプロジェクトを環境変数で前置していて、
-// .claude/settings.json の env を使わない Copilot でもそのまま動くことを確かめる。Claude Code 向けには付けない。
-func TestSetupCopilotEnv(t *testing.T) {
+// TestNeedsEnvPrefix は needsEnvPrefix（DB を使わない純粋な判定）が Copilot・Codex では真、Claude Code・other では
+// 偽を返すことを確かめる。以前は Copilot だけが真だったため、起動し直す前の Codex への手順が前置なしで落ちた。
+func TestNeedsEnvPrefix(t *testing.T) {
+	for _, tc := range []struct {
+		agent string
+		want  bool
+	}{
+		{agentCopilot, true},
+		{agentCodex, true},
+		{agentClaudeCode, false},
+		{agentOther, false},
+	} {
+		if got := needsEnvPrefix(tc.agent); got != tc.want {
+			t.Errorf("needsEnvPrefix(%q) = %v, want %v", tc.agent, got, tc.want)
+		}
+	}
+}
+
+// TestSetupAgentEnvPrefix は、init が書いた設定を CLI にすぐには渡さない AI（Copilot は .claude/settings.json 相当の
+// env を持たない・Codex は起動し直すまで .codex/config.toml の env を渡さない）向けの手順のコマンドが、サーバの URL と
+// プロジェクトを環境変数で前置していて、そのまま動くことを確かめる。対照として Claude Code 向けには付かないことも確かめる
+// （init が settings.json の env に置くため。以前は Codex にだけ前置が無く、起動し直す前のトークンの確認が落ちた）。
+func TestSetupAgentEnvPrefix(t *testing.T) {
 	e, _, ed := newAPIEnv(t)
 	hdr := map[string]string{"X-Looptrack-Project": "req"}
 	base := e.srv.URL + "/im"
@@ -1049,81 +1069,88 @@ func TestSetupCopilotEnv(t *testing.T) {
 	if goos == "windows" {
 		goos = "darwin"
 	}
-
-	// looptrack は LOOPTRACK_* を読む。1 回目は loop の問いだけなので、答え（入れない）を付けて呼ぶ
-	cp := e.mcpAsClient(ed.token, hdr, "github-copilot-developer", "1.0.86", "2025-06-18")
-	text, data := cp.call("setup", map[string]any{"os": goos}, false)
-	checkLoopAsk(t, "Copilot", text, setupOf(t, data))
-	_, data = cp.call("setup", map[string]any{"os": goos, "loop": "no"}, false)
-	out := setupOf(t, data)
 	goEnv := "export LOOPTRACK_API_URL=" + base + " LOOPTRACK_PROJECT=req && "
-	cmds := commands(out)
-	if len(cmds) < 2 {
-		t.Fatalf("手順: %+v", out.Steps)
-	}
-	for _, c := range cmds {
-		if !strings.HasPrefix(c, goEnv) {
-			t.Errorf("Copilot の手順のコマンドに環境変数が前置されていない: %s", c)
-		}
-	}
 	cfgRe := regexp.MustCompile(`（(export [^（）]*? config) で確認）`)
-	var cfg string
-	for _, s := range out.Steps {
-		if m := cfgRe.FindStringSubmatch(s.Title); m != nil {
-			cfg = m[1]
-		}
-	}
-	if cfg != goEnv+`"$HOME/.local/bin/looptrack" issue config` {
-		t.Errorf("config の確認のコマンド: %q", cfg)
+
+	for _, tc := range []struct{ label, client, version string }{
+		{"Copilot", "github-copilot-developer", "1.0.86"},
+		{"Codex", "codex-mcp-client", "1.0.0"},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			// looptrack は LOOPTRACK_* を読む。1 回目は loop の問いだけなので、答え（入れない）を付けて呼ぶ
+			cp := e.mcpAsClient(ed.token, hdr, tc.client, tc.version, "2025-06-18")
+			text, data := cp.call("setup", map[string]any{"os": goos}, false)
+			checkLoopAsk(t, tc.label, text, setupOf(t, data))
+			_, data = cp.call("setup", map[string]any{"os": goos, "loop": "no"}, false)
+			out := setupOf(t, data)
+			cmds := commands(out)
+			if len(cmds) < 2 {
+				t.Fatalf("%s: 手順: %+v", tc.label, out.Steps)
+			}
+			for _, c := range cmds {
+				if !strings.HasPrefix(c, goEnv) {
+					t.Errorf("%s の手順のコマンドに環境変数が前置されていない: %s", tc.label, c)
+				}
+			}
+			var cfg string
+			for _, s := range out.Steps {
+				if m := cfgRe.FindStringSubmatch(s.Title); m != nil {
+					cfg = m[1]
+				}
+			}
+			if cfg != goEnv+`"$HOME/.local/bin/looptrack" issue config` {
+				t.Errorf("%s: トークンの確認（issue config）のコマンド: %q", tc.label, cfg)
+			}
+
+			// そのまま動く: 取得 + init（入れない）の後、手順の config の確認を LOOPTRACK_API_URL の無いシェルで実行できる
+			if _, err := exec.LookPath("curl"); err == nil && runtime.GOOS != "windows" {
+				proj, home := t.TempDir(), t.TempDir()
+				sh := func(script string) cliResult {
+					cmd := exec.Command("/bin/sh", "-c", script)
+					cmd.Env = append(cliHomeEnv(home), "LOOPTRACK_TOKEN="+ed.token, "LOOPTRACK_USAGE=0")
+					cmd.Dir = proj
+					var so, se bytes.Buffer
+					cmd.Stdout, cmd.Stderr = &so, &se
+					err := cmd.Run()
+					code := 0
+					if ee, ok := err.(*exec.ExitError); ok {
+						code = ee.ExitCode()
+					}
+					return cliResult{so.String(), se.String(), code}
+				}
+				if res := sh(out.Steps[0].Command); res.code != 0 {
+					t.Fatalf("%s: 取得と init: %d\n%s\n%s", tc.label, res.code, res.stdout, res.stderr)
+				}
+				if res := sh(cfg); res.code != 0 || strings.Contains(res.stderr, "がありません") {
+					t.Errorf("%s: config の確認: %d\n%s\n%s", tc.label, res.code, res.stdout, res.stderr)
+				}
+				if res := sh(`"$HOME/.local/bin/looptrack" issue config`); res.code == 0 {
+					t.Logf("%s: 前置なしの config も通った（init が env を置く形になった？）: %s", tc.label, res.stdout)
+				}
+			}
+
+			// PowerShell は $env: で置く
+			_, data = cp.call("setup", map[string]any{"os": "darwin", "loop": "yes"}, false)
+			for _, c := range commands(setupOf(t, data)) {
+				if !strings.HasPrefix(c, goEnv) {
+					t.Errorf("%s の手順（macOS）: %s", tc.label, c)
+				}
+			}
+			_, data = cp.call("setup", map[string]any{"os": "windows", "loop": "yes"}, false)
+			for _, c := range commands(setupOf(t, data)) {
+				if !strings.HasPrefix(c, "$env:LOOPTRACK_API_URL='"+base+"'; $env:LOOPTRACK_PROJECT='req'; ") {
+					t.Errorf("%s の手順（Windows）: %s", tc.label, c)
+				}
+			}
+		})
 	}
 
-	// Claude Code 向けには付けない（init が settings.json の env に置く）
+	// 対照: Claude Code 向けには付けない（init が settings.json の env に置く）
 	cc := e.mcpAsClient(ed.token, hdr, "claude-code", "2.1.0", "2025-06-18")
-	_, data = cc.call("setup", map[string]any{"loop": "yes"}, false)
+	_, data := cc.call("setup", map[string]any{"loop": "yes"}, false)
 	for _, c := range commands(setupOf(t, data)) {
 		if strings.Contains(c, "IM_API_URL=") || strings.Contains(c, "LOOPTRACK_API_URL=") {
 			t.Errorf("Claude Code の手順に環境変数が前置されている: %s", c)
-		}
-	}
-
-	// そのまま動く: 取得 + init（入れない）の後、手順の config の確認を LOOPTRACK_API_URL の無いシェルで実行できる
-	if _, err := exec.LookPath("curl"); err == nil && runtime.GOOS != "windows" {
-		proj, home := t.TempDir(), t.TempDir()
-		sh := func(script string) cliResult {
-			cmd := exec.Command("/bin/sh", "-c", script)
-			cmd.Env = append(cliHomeEnv(home), "LOOPTRACK_TOKEN="+ed.token, "LOOPTRACK_USAGE=0")
-			cmd.Dir = proj
-			var so, se bytes.Buffer
-			cmd.Stdout, cmd.Stderr = &so, &se
-			err := cmd.Run()
-			code := 0
-			if ee, ok := err.(*exec.ExitError); ok {
-				code = ee.ExitCode()
-			}
-			return cliResult{so.String(), se.String(), code}
-		}
-		if res := sh(out.Steps[0].Command); res.code != 0 {
-			t.Fatalf("取得と init: %d\n%s\n%s", res.code, res.stdout, res.stderr)
-		}
-		if res := sh(cfg); res.code != 0 || strings.Contains(res.stderr, "がありません") {
-			t.Errorf("config の確認: %d\n%s\n%s", res.code, res.stdout, res.stderr)
-		}
-		if res := sh(`"$HOME/.local/bin/looptrack" issue config`); res.code == 0 {
-			t.Logf("前置なしの config も通った（Copilot の init が env を置く形になった？）: %s", res.stdout)
-		}
-	}
-
-	// PowerShell は $env: で置く
-	_, data = cp.call("setup", map[string]any{"os": "darwin", "loop": "yes"}, false)
-	for _, c := range commands(setupOf(t, data)) {
-		if !strings.HasPrefix(c, goEnv) {
-			t.Errorf("Copilot の手順（macOS）: %s", c)
-		}
-	}
-	_, data = cp.call("setup", map[string]any{"os": "windows", "loop": "yes"}, false)
-	for _, c := range commands(setupOf(t, data)) {
-		if !strings.HasPrefix(c, "$env:LOOPTRACK_API_URL='"+base+"'; $env:LOOPTRACK_PROJECT='req'; ") {
-			t.Errorf("Copilot の手順（Windows）: %s", c)
 		}
 	}
 }

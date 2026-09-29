@@ -705,3 +705,70 @@ func firstLines(s string, n int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// MySQL の DB がまだ無いとき（Inspect が *NoDatabaseError）は、アプリ用の接続先と表を作る接続先を渡して PrepareDatabase を呼び、
+// 作れたら接続を確かめ直して続きから進む。作らなかった（PrepareDatabase のエラー）ときは何も書かずに止まる。
+// 対照: DB があれば PrepareDatabase は呼ばない / PrepareDatabase が無ければ接続できないとして止まる。
+func TestMissingMySQLDatabase(t *testing.T) {
+	pre := Preset{Mode: "team", Store: "mysql", DSN: "lt_app:pw@tcp(mysql:3306)/ltnew?parseTime=true",
+		MigrateDSN: "lt_mig:pw@tcp(mysql:3306)/ltnew?parseTime=true", PublicURL: "https://im.example.com",
+		AdminLogin: "alice", AdminPassword: pw, TwoFactor: "required", Service: ServiceNone}
+	noDB := &NoDatabaseError{Err: errors.New("Error 1049 (42000): Unknown database 'ltnew'")}
+
+	t.Run("作る", func(t *testing.T) {
+		dir := t.TempDir()
+		f := &fakeBackend{inspectErr: noDB}
+		var got []string
+		prepare := func(_ context.Context, dsn, setupDSN string) error {
+			got = append(got, dsn, setupDSN)
+			f.inspectErr = nil
+			return nil
+		}
+		_, out, err := run(t, Options{Dir: dir, Yes: true, Preset: pre, Backend: f, PrepareDatabase: prepare})
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if len(got) != 2 || got[0] != pre.DSN || got[1] != pre.MigrateDSN {
+			t.Errorf("PrepareDatabase にアプリ用の接続先と、DB が無いと分かった接続先を 1 回渡す: %q", got)
+		}
+		if strings.Join(f.calls, ",") != "inspect,inspect,migrate,create" {
+			t.Errorf("呼ばれた順: %v", f.calls)
+		}
+		if !strings.Contains(out, "DB がまだありません（Error 1049") {
+			t.Errorf("DB が無いことを示す: %s", out)
+		}
+		if envOf(t, dir)["LOOPTRACK_DSN"] != pre.DSN {
+			t.Errorf(".env: %v", envOf(t, dir))
+		}
+	})
+	t.Run("作らない", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "srv")
+		f := &fakeBackend{inspectErr: noDB}
+		declined := errors.New("作らずに止めました")
+		_, out, err := run(t, Options{Dir: dir, Yes: true, Preset: pre, Backend: f,
+			PrepareDatabase: func(context.Context, string, string) error { return declined }})
+		if !errors.Is(err, declined) {
+			t.Fatalf("PrepareDatabase のエラーで止まる: %v\n%s", err, out)
+		}
+		if strings.Join(f.calls, ",") != "inspect" {
+			t.Errorf("migrate・管理者の作成に進まない: %v", f.calls)
+		}
+		mustNotExist(t, dir)
+	})
+	t.Run("対照: DB があれば呼ばない", func(t *testing.T) {
+		f := &fakeBackend{}
+		called := false
+		_, out, err := run(t, Options{Dir: t.TempDir(), Yes: true, Preset: pre, Backend: f,
+			PrepareDatabase: func(context.Context, string, string) error { called = true; return nil }})
+		if err != nil || called || strings.Contains(out, "DB がまだありません") {
+			t.Errorf("DB があるのに作ろうとした: called=%v err=%v\n%s", called, err, out)
+		}
+	})
+	t.Run("対照: PrepareDatabase が無ければ接続できないとして止まる", func(t *testing.T) {
+		f := &fakeBackend{inspectErr: noDB}
+		_, _, err := run(t, Options{Dir: t.TempDir(), Yes: true, Preset: pre, Backend: f})
+		if err == nil || !strings.Contains(i18n.Text(i18n.JA, err), "保存先に接続できません") || strings.Join(f.calls, ",") != "inspect" {
+			t.Errorf("err=%v calls=%v", err, f.calls)
+		}
+	})
+}

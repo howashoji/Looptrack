@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -231,7 +232,11 @@ func TestAppBarSource(t *testing.T) {
 	// 2 行目に落ちる（幅 601〜1000px のボードで起きた）。狭い画面の組み替え（@media）は
 	// deploy/dev/appbar-check.sh が実際のブラウザで幅ごとに測る
 	bar, _ := fs.ReadFile(assets, "static/appbar.css")
-	for _, m := range regexp.MustCompile(`(?m)^\.appbar-row\{([^}]*)\}`).FindAllStringSubmatch(string(bar), -1) {
+	rows := regexp.MustCompile(`(?m)^\.appbar-row\{([^}]*)\}`).FindAllStringSubmatch(string(bar), -1)
+	if len(rows) == 0 { // 式か書き方がずれると、折り返しの検査は何も見ずに通る
+		t.Errorf("appbar.css から .appbar-row の規則を 1 つも拾えません（書き方と式がずれています）")
+	}
+	for _, m := range rows {
 		if strings.Contains(strings.ReplaceAll(m[1], " ", ""), "flex-wrap:wrap") {
 			t.Errorf("appbar.css: .appbar-row が折り返す: %s", m[0])
 		}
@@ -242,12 +247,17 @@ func TestAppBarSource(t *testing.T) {
 	rule := regexp.MustCompile(`([^{}]+)\{([^{}]*)\}`)
 	part := regexp.MustCompile(`\.(appbar[\w-]*|usermenu[\w-]*|avatar)\b`)
 	sheets, _ := fs.Glob(assets, "static/*.css")
+	// 画面ごとのスタイルシートを 1 つも見ずに緑になるのを塞ぐ（2026-09 に appbar.css の外に 3 つ・規則はおよそ 200 個）。
+	// 対照として、ボードのヘッダを画面の上に留める指定（board.css の .appbar）を実際に通ったことも見る。
+	others, rules, pinned := 0, 0, false
 	for _, name := range sheets {
 		if filepath.Base(name) == "appbar.css" {
 			continue
 		}
+		others++
 		b, _ := fs.ReadFile(assets, name)
 		for _, m := range rule.FindAllStringSubmatch(string(b), -1) {
+			rules++
 			sel := m[1]
 			if k := strings.LastIndex(sel, "*/"); k >= 0 { // 直前のコメントを除く
 				sel = sel[k+2:]
@@ -261,12 +271,19 @@ func TestAppBarSource(t *testing.T) {
 				last := one[strings.LastIndexAny(one, " >+~")+1:] // セレクタが最後に指す要素
 				switch {
 				case one == ".appbar" && onlyProps(m[2], "position", "top", "z-index"):
+					pinned = true
 				case !part.MatchString(last): // .appbar-row .grow のように、差し込んだ自分の部品を指す
 				default:
 					t.Errorf("%s: ヘッダの部品 %q のスタイルを持っている（appbar.css に置く）", name, one)
 				}
 			}
 		}
+	}
+	if others < 2 || rules < 50 {
+		t.Errorf("appbar.css の外のスタイルシート %d 本・規則 %d 個しか見ていません（走査か式が空振りしています）", others, rules)
+	}
+	if !pinned {
+		t.Error("board.css の .appbar（ヘッダを画面の上に留める指定）を通っていません（式がヘッダの部品に当たっていない可能性）")
 	}
 }
 
@@ -282,6 +299,42 @@ func onlyProps(decls string, props ...string) bool {
 		}
 	}
 	return true
+}
+
+// updateCodeUnbroken は、更新の帯のコマンド（.appbar-update code）が独立の行に出て、空白以外の位置で
+// 折り返さない規則を持つかを返す。帯の枠は overflow-wrap:anywhere なので、code が引き継ぐと狭い幅で
+// 「sh -s -- --upgrade」の「--」の途中で行が割れ、手で打つ人が「-s -」「- --upgrade」と読み違える。
+// 見た目の崩れは検査では緑のまま残るので、規則そのものを見張る。found は規則を拾えたか。
+func updateCodeUnbroken(css string) (ok, found bool) {
+	m := regexp.MustCompile(`(?m)^\.appbar-update code\{([^}]*)\}`).FindStringSubmatch(css)
+	if m == nil {
+		return false, false
+	}
+	decl := strings.ReplaceAll(m[1], " ", "")
+	for _, want := range []string{"display:block", "white-space:pre", "overflow-wrap:normal", "overflow-x:auto"} {
+		if !strings.Contains(decl, want) {
+			return false, true
+		}
+	}
+	return true, true
+}
+
+func TestAppBarUpdateCommandUnbroken(t *testing.T) {
+	bar, err := fs.ReadFile(assets, "static/appbar.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, found := updateCodeUnbroken(string(bar))
+	if !found {
+		t.Fatalf("appbar.css から .appbar-update code の規則を拾えません（書き方と式がずれています）")
+	}
+	if !ok {
+		t.Errorf("appbar.css: .appbar-update code が折り返しを許している（更新のコマンドが「--」の途中で割れる）")
+	}
+	// 対照: 直す前の規則（枠の overflow-wrap:anywhere を引き継ぐ）は、この検査で落ちなければならない
+	if ok, found := updateCodeUnbroken(".appbar-update code{font-size:12px; user-select:all}\n"); !found || ok {
+		t.Errorf("前提が崩れています: 直す前の規則を検査が拾えない、または通してしまう（found=%v ok=%v）", found, ok)
+	}
 }
 
 func TestBoardAPI(t *testing.T) {
@@ -402,5 +455,13 @@ func TestRenderJS(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "fail 0") {
 		t.Errorf("検査結果:\n%s", out)
+	}
+	// 1 件も走らずに「fail 0」になる形（test の呼び方の崩れ・読み込みの空振り）を塞ぐ。下限は実物（2026-09 に 29 件）より下。
+	m := regexp.MustCompile(`(?m)^(?:ℹ|#) pass (\d+)`).FindStringSubmatch(string(out))
+	if m == nil {
+		t.Fatalf("node --test の出力から pass の件数を読めません:\n%s", out)
+	}
+	if n, _ := strconv.Atoi(m[1]); n < 20 {
+		t.Errorf("node --test で通った検査が %d 件しかありません（走っていない検査がある）:\n%s", n, out)
 	}
 }

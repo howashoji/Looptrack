@@ -296,12 +296,13 @@ function openIssue(id) {
     + '<button class="close" id="closeBtn" aria-label="' + attr(t("close")) + '">×</button></div>'
     + "<h2>" + esc(it.title) + "</h2></div>"
     + '<dl class="dmeta">'
-    // 担当。editor 以上には JS を使わない変更フォームを出す（閲覧のみの原則の例外・DESIGN.md §5-2）
+    // 担当。editor 以上には JS を使わない変更フォームを出す（閲覧のみの原則の例外・DESIGN.md §7）
     + row(t("row_assignee"), (esc(assigneeLabel(it, TEXT)) || esc(t("unassigned")))
       + assignForm({ base: BASE, slug: SLUG, csrf: document.body.dataset.csrf, it, members: DATA.members, me: DATA.me,
         canEdit: DATA.can_edit, closed: isClosed(it), t: TEXT }))
     // 状態の変更。editor 以上だけ。ルール（usage / verify の require_on_close・担当者）で拒否されたらその文言を出す
-    + (DATA.can_edit ? row(t("row_status_change"), statusForm({ canEdit: DATA.can_edit, it, statuses: DATA.statuses, t: TEXT })) : "")
+    + (DATA.can_edit ? row(t("row_status_change"), statusForm({ canEdit: DATA.can_edit, it, statuses: DATA.statuses, t: TEXT,
+      notice: statusNotice && statusNotice.id === it.id ? statusNotice.text : "" })) : "")
     + row(t("row_blocked"), ids(it.blocked_by))
     + row(t("row_traces"), ids(it.traces))
     + row(t("row_refs"), ids(it.refs))
@@ -341,6 +342,7 @@ function showDrawer(d) {
   document.getElementById("closeBtn").onclick = closeIssue;
 }
 function closeIssue() {
+  statusNotice = null;
   const d = document.getElementById("drawer");
   d.classList.remove("on");
   d.setAttribute("aria-hidden", "true");
@@ -352,6 +354,9 @@ function closeIssue() {
 /* ---------------- 起票・状態の変更・コメントの送信 ---------------- */
 // 既存の REST API を、画面のセッション（Cookie）と X-CSRF-Token で呼ぶ（サーバ側に新しい書き込みの経路は作らない）。
 // 失敗（権限の 403・ルールの 422 など）はサーバの文言をフォームの下に出す。上書きできる違反なら理由の欄を出す。
+// 成功しても応答が注意（acceptance_notice。受け入れ条件が雛形のままの着手）を載せたら、そのイシューの状態の変更フォームの
+// 下に出し続ける（ドロワーは見直しのたびに描き直すので、フォームの中ではなくここに持つ）。閉じるか次の変更で消す。
+let statusNotice = null;
 function submitForm(form) {
   const values = {};
   for (const el of form.elements) if (el.name) values[el.name] = el.value;
@@ -377,6 +382,10 @@ function submitForm(form) {
         return;
       }
       form.reset();
+      if (form.dataset.action === "status") {
+        const text = data && typeof data.acceptance_notice === "string" ? data.acceptance_notice : "";
+        statusNotice = text ? { id: form.dataset.id, text } : null;
+      }
       const id = form.dataset.action === "create" ? data && data.issue && data.issue.id : form.dataset.id;
       if (id) setHash("#" + id);
       return poller.poll(true);   // 取り直して、起票・変更したイシューの詳細を開き直す

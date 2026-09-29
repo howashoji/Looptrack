@@ -36,12 +36,13 @@ This is the same on Windows.
 
 From the releases page (https://github.com/howashoji/looptrack/releases ), download these two files:
 
-- `looptrack_<version>_<os>_<arch>` (one binary for the server, the CLI, and the hooks)
+- `looptrack_<version>_<os>_<arch>_server.tar.gz` (`.zip` on Windows): an archive holding one binary, `looptrack`, for the server, the CLI, and the hooks, together with its license texts
 - `SHA256SUMS` (the checksums)
 
 `<os>` is `darwin` (macOS), `linux`, or `windows`; `<arch>` is `amd64` or `arm64`.
-Windows files end in `.exe`.
-Put the binaries somewhere that does not need administrator rights.
+The archive unpacks into a single folder, `looptrack_<version>_<os>_<arch>_server/`, holding `looptrack` (`looptrack.exe` on Windows), `NOTICE`, `OFL-BIZUDGothic.txt`, and `LICENSE`.
+Check the archive against `SHA256SUMS` before you unpack it.
+Put the binary somewhere that does not need administrator rights.
 
 ### macOS / Linux
 
@@ -49,12 +50,14 @@ Put the binaries somewhere that does not need administrator rights.
 VER=v1.0.0
 OS=darwin      # linux on Linux
 ARCH=arm64     # amd64 on Intel / AMD CPUs
+NAME="looptrack_${VER}_${OS}_${ARCH}_server"
 BASE="https://github.com/howashoji/looptrack/releases/download/$VER"
 mkdir -p ~/.local/bin
 TMP="$(mktemp -d)" && cd "$TMP"
-curl -fsSL -O "$BASE/looptrack_${VER}_${OS}_${ARCH}" -O "$BASE/SHA256SUMS"
-grep -E " looptrack_${VER}_${OS}_${ARCH}\$" SHA256SUMS | shasum -a 256 -c -   # on Linux: sha256sum -c -
-install -m 755 "looptrack_${VER}_${OS}_${ARCH}" ~/.local/bin/looptrack
+curl -fsSL -O "$BASE/$NAME.tar.gz" -O "$BASE/SHA256SUMS"
+grep -E " $NAME\.tar\.gz\$" SHA256SUMS | shasum -a 256 -c -   # on Linux: sha256sum -c -
+tar -xzf "$NAME.tar.gz"
+install -m 755 "$NAME/looptrack" ~/.local/bin/looptrack
 ```
 
 Make sure the checksum output says `OK`.
@@ -67,23 +70,24 @@ export PATH="$HOME/.local/bin:$PATH"
 ### Windows (PowerShell)
 
 No administrator rights are needed.
-The binaries go in `%LOCALAPPDATA%\Programs\looptrack`.
+The binary goes in `%LOCALAPPDATA%\Programs\looptrack`.
 
 ```powershell
 $Ver = 'v1.0.0'
 $Arch = 'amd64'   # arm64 on ARM PCs
 $D = Join-Path $env:LOCALAPPDATA 'Programs\looptrack'
 New-Item -ItemType Directory -Force -Path $D | Out-Null
+$Name = "looptrack_${Ver}_windows_${Arch}_server"
 $Base = "https://github.com/howashoji/looptrack/releases/download/$Ver"
-Invoke-WebRequest -UseBasicParsing -Uri "$Base/looptrack_${Ver}_windows_$Arch.exe" -OutFile (Join-Path $D 'looptrack.exe')
-Invoke-WebRequest -UseBasicParsing -Uri "$Base/SHA256SUMS" -OutFile (Join-Path $D 'SHA256SUMS')
-Get-Content (Join-Path $D 'SHA256SUMS') | ForEach-Object {
-  $h, $n = $_ -split '\s+', 2
-  if ($n -match "^looptrack_${Ver}_windows_$Arch\.exe$") {
-    $f = Join-Path $D 'looptrack.exe'
-    if ((Get-FileHash -Algorithm SHA256 -Path $f).Hash -ne $h) { throw "SHA-256 mismatch: $n" } else { "OK $n" }
-  }
-}
+$Tmp = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid())
+New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
+Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Name.zip" -OutFile (Join-Path $Tmp "$Name.zip")
+Invoke-WebRequest -UseBasicParsing -Uri "$Base/SHA256SUMS" -OutFile (Join-Path $Tmp 'SHA256SUMS')
+$Line = Get-Content (Join-Path $Tmp 'SHA256SUMS') | Where-Object { ($_ -split '\s+', 2)[1] -eq "$Name.zip" }
+if (-not $Line) { throw "$Name.zip is not in SHA256SUMS" }
+if ((Get-FileHash -Algorithm SHA256 -Path (Join-Path $Tmp "$Name.zip")).Hash -ne ($Line -split '\s+', 2)[0]) { throw "SHA-256 mismatch: $Name.zip" } else { "OK $Name.zip" }
+Expand-Archive -Path (Join-Path $Tmp "$Name.zip") -DestinationPath $Tmp -Force
+Copy-Item (Join-Path $Tmp "$Name\looptrack.exe") (Join-Path $D 'looptrack.exe') -Force
 $UserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if (($UserPath -split ';') -notcontains $D) { [Environment]::SetEnvironmentVariable('Path', "$UserPath;$D", 'User') }
 ```
@@ -101,18 +105,21 @@ Open a new PowerShell window before you continue.
 ### Windows (Git Bash)
 
 Git Bash works too.
-Follow the macOS / Linux steps with `OS=windows`, and add `.exe` to the file names.
+Follow the macOS / Linux steps with `OS=windows`; the Windows archive is a `.zip`, and the binary inside it is `looptrack.exe`.
+Unpacking uses `unzip`; if your Git Bash has no `unzip`, use the PowerShell steps instead.
 
 ```bash
 VER=v1.0.0
 OS=windows
 ARCH=amd64     # arm64 on ARM PCs
+NAME="looptrack_${VER}_${OS}_${ARCH}_server"
 BASE="https://github.com/howashoji/looptrack/releases/download/$VER"
 mkdir -p ~/.local/bin
 TMP="$(mktemp -d)" && cd "$TMP"
-curl -fsSL -O "$BASE/looptrack_${VER}_${OS}_${ARCH}.exe" -O "$BASE/SHA256SUMS"
-grep -E " looptrack_${VER}_${OS}_${ARCH}\.exe\$" SHA256SUMS | sha256sum -c -
-cp "looptrack_${VER}_${OS}_${ARCH}.exe" ~/.local/bin/looptrack.exe
+curl -fsSL -O "$BASE/$NAME.zip" -O "$BASE/SHA256SUMS"
+grep -E " $NAME\.zip\$" SHA256SUMS | sha256sum -c -
+unzip -q "$NAME.zip"
+cp "$NAME/looptrack.exe" ~/.local/bin/looptrack.exe
 ```
 
 PowerShell and your agent may not see Git Bash's `~/.local/bin`.
@@ -214,27 +221,29 @@ Local mode listens on `127.0.0.1` only.
 ### On a bare Linux server (`install.sh`)
 
 On a fresh Ubuntu LTS or Debian server you do not have to do steps 1 to 3 by hand.
-One script downloads the binary, runs `looptrack setup`, writes a systemd unit (or a `compose.yaml`), starts the service and checks that it answers.
+One line runs the installer: it downloads the server archive, verifies it, unpacks it, runs `looptrack setup`, writes a systemd unit (or a `compose.yaml`), starts the service and checks that it answers.
 
 ```bash
-VER=v1.0.0
-curl -fsSL -O "https://github.com/howashoji/looptrack/releases/download/$VER/install.sh"
-less install.sh   # read it before running it
-sudo sh install.sh --from "https://github.com/howashoji/looptrack/releases/download/$VER"
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
 ```
 
-`--from` is where the executable is fetched from; the installer verifies `SHA256SUMS` and its signature before it installs anything.
+The installer takes `looptrack_<version>_linux_<arch>_server.tar.gz` of the newest release, and checks it against `SHA256SUMS` (and the signature of `SHA256SUMS` when the server has `minisign`) before it unpacks or installs anything.
+The script itself is fetched over HTTPS only and cannot check itself. To read it first, download it with `curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh`, read it, and run `sudo sh install.sh`.
+Options go after `sh -s --` (for example `… | sudo sh -s -- --version v1.0.0` to pin a version).
 If you built the distribution yourself, pass that directory instead: `sudo sh deploy/install.sh --from /path/to/dist`.
+The installer is for Linux only; on macOS or Windows, use the [desktop edition](desktop.md) to run a server.
 
 The installer first asks how to run the server (systemd or Docker compose), then the same questions as `looptrack setup`.
 When it finishes it prints Nginx and Caddy configuration examples (also written to `/etc/looptrack/proxy-examples.txt`), the browser URL, the CLI login command and the MCP connection settings.
 Put the reverse proxy in front, sign in at the public URL, and continue from step 4.
 
-If you choose MySQL and give the application's database user only the privileges it needs (`deploy/grants.sql`), the order matters: per-table `GRANT`s can only be run once the tables exist.
-So it is: run the installer (setup creates the tables) → load the grants file with an administrative account → run the installer again, which only starts the service and checks it.
-Before starting, the installer tries to read the storage as the service user; if it cannot, it stops and prints this order instead of waiting for a server that will never come up.
+If you choose MySQL and give the application's database user only the privileges it needs (`deploy/grants.sql`), the same run takes care of it.
+Per-table `GRANT`s can only be run once the tables exist, so after setup creates the tables, the installer asks on the terminal for an administrative MySQL account (the password is not shown and not stored).
+It creates the application user if it is missing, grants the privileges built into `looptrack` (`looptrack grants print` shows them), checks that the application user can read, and only then starts the service.
+If the administrative account is wrong, it stops without starting anything; run it again and it continues from the question.
+If the database does not exist yet, setup asks for the same administrative account up front and, after asking whether to go ahead, creates the database too (you are asked only once). This needs the user that creates the tables (`LOOPTRACK_SETUP_MIGRATE_DSN`) and its `GRANT` on that database to be in place first; without them it stops at the connection as before. Answer no and it stops without creating anything, showing the `CREATE DATABASE` statement to run yourself.
 
-To update, run `sudo sh install.sh --upgrade --from <source>` (details in [Updating](updating.md)); to remove it, `--uninstall` (`--purge` also deletes the settings and the data).
+To update, run `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` (details in [Updating](updating.md)); to remove it, `--uninstall` (`--purge` also deletes the settings and the data).
 
 ## 4. Create a project and join it
 

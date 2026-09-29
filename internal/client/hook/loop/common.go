@@ -79,6 +79,16 @@ func stateDir(ev hookio.Event, e *Env) string {
 	return filepath.Join(r, ".claude")
 }
 
+// hookLogName は hook の判定の記録のファイル名（状態の置き場の .looptrack-freshness の下。既存の .gitignore に乗る）。
+const hookLogName = "hook-log.jsonl"
+
+// HookLogPath は hook の判定の記録（LOOPTRACK_LOOP_HOOK_LOG=1 のとき）のパス。
+// 置き場の解決は stateDir の 1 か所に寄せる（core の hook も同じ置き場に書くため、ここを呼ぶ）。
+func HookLogPath(ev hookio.Event, getenv hookio.Getenv, getwd func() string) string {
+	e := (&Env{Getenv: getenv, Getwd: getwd}).withDefaults()
+	return filepath.Join(stateDir(ev, e), ".looptrack-freshness", hookLogName)
+}
+
 // abs は相対パスを作業ディレクトリ（Env.Getwd）からのパスにする（bash 版は hook のプロセスの cwd から読んだ）。
 func (e *Env) abs(p string) string {
 	if p == "" || filepath.IsAbs(p) {
@@ -294,14 +304,35 @@ func globMD(dir string) []string {
 	return out // os.ReadDir は名前順
 }
 
-// compileUser は利用者が環境変数で渡した正規表現（RE2 で読めなければ nil＝以前の hook と同じく無視）。
-func compileUser(s string) *regexp.Regexp {
+// compileUser は利用者が環境変数で渡した正規表現。空なら (nil, nil)。RE2 で読めなければ (nil, 誤り)。
+// 呼び出し側は、誤りを黙って捨てず userRegexp で利用者に知らせる（判定・検知は既定の語のまま続ける）。
+func compileUser(s string) (*regexp.Regexp, error) {
 	if s == "" {
-		return nil
+		return nil, nil
 	}
 	rx, err := regexp.Compile(s)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return rx
+	return rx, nil
+}
+
+// userRegexp は環境変数 name の正規表現を読む。空の変数は (nil, nil)、読めなければ (nil, 誤り)。
+// 知らせの文面は、読めないときに何を使って続けるかが hook ごとに違うので、呼び出し側が固定の i18n のキーで作る。
+// 誤りの文面は regexp の文面のままなので、入力の正規表現の一部か全部が入る（閉じ括弧の不足・余分な ) では全部、
+// 後読みや先読みでは (?< や (?! から後ろの断片）。この文面は利用者への知らせ（SystemMessage）にだけ出し、Kind には入れない
+// （判定の記録には残らない）。
+func (e *Env) userRegexp(name string) (*regexp.Regexp, error) {
+	return compileUser(e.env(name))
+}
+
+// joinNotices は空でない知らせを改行でつなぐ（1 つも無ければ ""）。
+func joinNotices(ns ...string) string {
+	var out []string
+	for _, n := range ns {
+		if n != "" {
+			out = append(out, n)
+		}
+	}
+	return strings.Join(out, "\n")
 }

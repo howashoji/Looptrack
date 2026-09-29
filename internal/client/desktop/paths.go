@@ -7,6 +7,7 @@ import (
 
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/i18n"
+	"github.com/howashoji/looptrack/internal/updatecheck"
 )
 
 // AppName は表示名（.app の名前・トレイのツールチップ・データのフォルダ）。公開名は公開の準備で確定する。
@@ -27,10 +28,16 @@ func (p Paths) Lock() string { return filepath.Join(p.DataDir, "desktop.lock") }
 // State は起動中のインスタンスの情報（pid・URL・版）と、次の起動で使うポート。
 func (p Paths) State() string { return filepath.Join(p.DataDir, "desktop.json") }
 
+// UpdateCheck は新しい版の確認の控え（update-check.json。確認を止める切り替えと最後の結果）。
+func (p Paths) UpdateCheck() string { return filepath.Join(p.DataDir, updatecheck.FileName) }
+
+// AppMenuOff はアプリ一覧の登録をトレイで外した印（Linux の AppImage。appmenu.go）。
+func (p Paths) AppMenuOff() string { return filepath.Join(p.DataDir, "app-menu-off") }
+
 // Log はログのファイル。
 func (p Paths) Log() string { return filepath.Join(p.LogDir, "looptrack.log") }
 
-// ResolvePaths は OS ごとの置き場を決める（DESIGN.md §5-14）。
+// ResolvePaths は OS ごとの置き場を決める（DESIGN.md §5-4）。
 //
 //	LOOPTRACK_DATA_DIR があれば、データはそこ・ログはその下の logs（テスト・持ち運び用）
 //	macOS   : ~/Library/Application Support/Looptrack・~/Library/Logs/Looptrack

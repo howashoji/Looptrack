@@ -25,7 +25,7 @@ import (
 const (
 	authCodeLifetime = 10 * time.Minute
 	oauthTokenLife   = 30 * 24 * time.Hour // アクセストークン（期限が来たら更新トークンで取り直す）
-	// oauthRefreshLife は更新トークンの期限（DESIGN.md §5-9）。使うたびに入れ替え、新しい値の期限をここから数え直す
+	// oauthRefreshLife は更新トークンの期限（DESIGN.md §3-2）。使うたびに入れ替え、新しい値の期限をここから数え直す
 	// （90 日のうちに一度でも使えば切れない。上限は設けない。止めるのはアカウント画面の失効・利用者の無効化・再利用の検知）
 	oauthRefreshLife = 90 * 24 * time.Hour
 	oauthScope       = "im"
@@ -507,7 +507,7 @@ func (s *Server) oauthTokenFromCode(w http.ResponseWriter, r *http.Request) {
 	s.issueOAuthTokens(w, r, u, ac.ClientID, ac.Scope, ac.Resource, family, nil)
 }
 
-// oauthTokenFromRefresh は更新トークンで取り直す（DESIGN.md §5-9）。使った更新トークンは使用済みにし、
+// oauthTokenFromRefresh は更新トークンで取り直す（DESIGN.md §3-2）。使った更新トークンは使用済みにし、
 // 対のアクセストークンを失効させて、同じ系列の新しい組を発行する（rotation）。
 // 使用済みの値がもう一度出されたら漏えいとみなし、系列の更新トークンとアクセストークンをすべて失効させる。
 func (s *Server) oauthTokenFromRefresh(w http.ResponseWriter, r *http.Request) {

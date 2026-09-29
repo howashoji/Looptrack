@@ -108,6 +108,9 @@ type Actor struct {
 	// 空（テストなどで指定しないとき）は i18n.T の既定どおり日本語になる。
 	// DB に保存する文面（起票の雛形など）の言語はこれとは別に、書いた利用者の言語を呼ぶ側が渡す。
 	Lang i18n.Lang
+	// ToolUse は MCP のツール呼び出しの ID のハッシュ（ToolUseHash の戻り。空なら記録しない）。
+	// issue_events.detail の "tool_use" に残し、後から届いたスナップショットの会話に操作を結ぶのに使う（LinkMCPEventSessions）。
+	ToolUse string
 }
 
 // SessionKindHost は、セッション ID が器（デスクトップ版のセッションの窓）の ID であることを表す
@@ -137,7 +140,7 @@ func CrossPath(a, b string) bool {
 	return a != "" && b != "" && !ComparableSessions(a, b)
 }
 
-// usageSession は「その会話」（トークン情報が付いているかの判定。DESIGN.md §5-4・§9-5）に使うセッション ID。
+// usageSession は「その会話」（トークン情報が付いているかの判定。DESIGN.md §9-5）に使うセッション ID。
 // MCP の SessionID は接続 ID（Mcp-Session-Id）で、会話（スナップショットの session_id）とは結び付かないので空にし、
 // 従来どおり「その利用者のスナップショット」で判定する（接続を張り直すたびに未付与と見なさない）。
 func (a Actor) usageSession() string {
@@ -323,7 +326,7 @@ func (s *Service) Create(ctx context.Context, a Actor, p store.Project, in Creat
 			return err
 		}
 		if err := store.InsertEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: issueID, Kind: "create", SessionID: a.SessionID,
-			// sections は本文の節ごとのハッシュ（§5-8-4）。起票時の値が、後の食い違いの判定の基準になる
+			// sections は本文の節ごとのハッシュ（DESIGN.md §9-3-4）。起票時の値が、後の食い違いの判定の基準になる
 			Author: s.author(a, now), Detail: map[string]any{"status": in.Status, "type": in.Type, "sections": domain.NewSectionHashes(doc.BodyMain)}}); err != nil {
 			return err
 		}
@@ -351,7 +354,7 @@ func (s *Service) Create(ctx context.Context, a Actor, p store.Project, in Creat
 }
 
 func (s *Service) author(a Actor, now time.Time) store.Author {
-	return store.Author{UserID: a.UserID, TokenID: a.TokenID, Via: a.Via, At: now, Agent: a.Agent, SessionKind: a.SessionKind}
+	return store.Author{UserID: a.UserID, TokenID: a.TokenID, Via: a.Via, At: now, Agent: a.Agent, SessionKind: a.SessionKind, ToolUse: a.ToolUse}
 }
 
 // change は変更の記録（イベントの kind と detail、ルールを上書きした場合はその内容、主のイベントの後に残す追加の記録）。
@@ -469,6 +472,9 @@ type StatusResult struct {
 	AssigneeChanged bool
 	AssigneeFrom    string
 	AssigneeAuto    bool
+	// AcceptanceNotice は、受け入れ条件が雛形のまま着手したときの注意（止めない。domain.AcceptanceStartNotice）。
+	// 経路（REST・MCP・CLI・Web）はこれをそのまま応答に載せる。対象外なら空
+	AcceptanceNotice string
 }
 
 // SetStatus は状態を変える。comment があれば同時に追記する（status --comment と同じ）。
@@ -483,7 +489,7 @@ func (s *Service) SetStatusAssign(ctx context.Context, a Actor, p store.Project,
 
 // setStatus は SetStatus の本体。expectFrom が空でなければ、ロックした時点の状態がそれと違うとき
 // Conflict（status_changed）で何も変えない（next が同じイシューを二重に着手しないため）。
-// assignee は担当の指定（空なら指定なし。In Progress にするなら未設定のとき本人・§5-1）。
+// assignee は担当の指定（空なら指定なし。In Progress にするなら未設定のとき本人・DESIGN.md §9-2）。
 func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issueID int64, status, comment, overrideReason, expectFrom, assignee string) (*StatusResult, error) {
 	if err := domain.ValidateValue("status", status, domain.Statuses); err != nil {
 		return nil, erri(Invalid, "invalid_argument", err)
@@ -492,7 +498,7 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 	if err != nil {
 		return nil, err
 	}
-	var from string
+	var from, acceptanceNotice string
 	var assigned *assignPlan
 	it, err := s.mutate(ctx, a, p, issueID, 0, func(tx *sql.Tx, doc *mdformat.Document, cur domain.Issue, now string) (change, error) {
 		if expectFrom != "" && cur.Status != expectFrom {
@@ -513,6 +519,9 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 		if err != nil {
 			return change{}, err
 		}
+		// 受け入れ条件が雛形のままの着手は止めずに知らせる（close の関門に後で止められる前に。next もここを通る）
+		acceptanceNotice = rules.AcceptanceStartNotice(a.Lang, domain.AcceptanceStart{ID: cur.ID, From: cur.Status, To: status,
+			HasSection: domain.HasAcceptanceSection(doc.BodyMain), Filled: domain.AcceptanceFilled(doc.BodyMain)})
 		from = domain.SetStatus(doc, status, now)
 		detail := map[string]any{"from": from, "to": status}
 		if comment != "" {
@@ -529,14 +538,14 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 	if err != nil {
 		return nil, err
 	}
-	res := &StatusResult{Issue: it, From: from}
+	res := &StatusResult{Issue: it, From: from, AcceptanceNotice: acceptanceNotice}
 	if assigned != nil {
 		res.AssigneeChanged, res.AssigneeFrom, res.AssigneeAuto = true, assigned.from.Login, assigned.auto
 	}
 	return res, nil
 }
 
-// UsageTarget は、トークン情報の付与を求める操作か（DESIGN.md §5-4「イベントとの突き合わせ」）。
+// UsageTarget は、トークン情報の付与を求める操作か（DESIGN.md §9-5「イベントとの突き合わせ」）。
 // MCP と、セッション ID 付きの CLI（コーディング AI の Bash から）が対象。セッション ID の無い CLI は
 // 人がターミナルから打った操作、web・api・admin・import は AI の操作ではないため対象外。
 // 会話記録と結び付かない種類のセッション ID（器の ID。SessionKindHost）の操作も、経路によらず対象外（付けようがない）。
@@ -561,7 +570,7 @@ func (s *Service) UsageTarget(ctx context.Context, q store.Queryer, a Actor, pro
 // hookWindow は「フックが働いている」とみなす直近の期間。
 const hookWindow = 7 * 24 * time.Hour
 
-// UsageNotice は、変更操作の応答に載せる付与の指示（経路 ③。DESIGN.md §5-4）。対象外の操作なら空。
+// UsageNotice は、変更操作の応答に載せる付与の指示（経路 ③。DESIGN.md §9-5）。対象外の操作なら空。
 // 応答の時点ではこの操作自体のスナップショットはまだ無い（CLI は応答の後に送り、MCP はフックが後から送る）ので、
 // 指示は「この後に付かなかったら」実行するもの。CLI は自分の付与に失敗したときだけ表示する。
 // MCP は、その利用者のフックが直近 7 日に届いていれば数秒後に付くので出さない（毎回の二重送信を避ける）。
@@ -736,7 +745,7 @@ func (s *Service) Update(ctx context.Context, a Actor, p store.Project, issueID 
 			}
 		}
 		domain.SetField(doc, "updated", now)
-		// sections は更新後の本文の節ごとのハッシュ（§5-8-4。起票時の値が無いイシューは、この記録が基準になる）
+		// sections は更新後の本文の節ごとのハッシュ（DESIGN.md §9-3-4。起票時の値が無いイシューは、この記録が基準になる）
 		return change{kind: "update", detail: map[string]any{"fields": changed, "sections": domain.NewSectionHashes(doc.BodyMain)}, extra: extra}, nil
 	})
 }
@@ -780,7 +789,7 @@ func applyPatch(doc *mdformat.Document, patch Patch) ([]string, error) {
 // cleanList はリスト項目の値を、ファイルに書いて読み戻したときと同じ形にする（前後の空白を除き、空の値を捨てる）。
 // カンマと改行は frontmatter の 1 行リストを壊すため拒否する。
 // ID の項目（blocked_by / traces / refs）は途中に空白を含む値も拒否する（"A B" を 1 要素で保存すると
-// 逆引き・ready の判定に出ない。分割せずに拒否するのはカンマと同じ扱いにするため。理由は DESIGN.md §4）。
+// 逆引き・ready の判定に出ない。分割せずに拒否するのはカンマと同じ扱いにするため。理由は DESIGN.md §2-3）。
 func cleanList(name string, values []string) ([]string, error) {
 	out := []string{}
 	for _, v := range values {

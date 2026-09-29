@@ -1,5 +1,5 @@
 # init/server-minimal
-$ issue init --project demo --source server --no-freshness --no-usage --no-summary --no-skill
+$ issue init --project demo --source server --no-freshness --no-usage --no-summary --no-session-bind --no-skill
 
 #### exit 0
 

@@ -168,8 +168,9 @@ func PreToolScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, err
 		return rr
 	}
 	lang := e.lang()
-	ask := func(reason string) (hookio.Result, error) {
-		return hookio.Result{Ask: i18n.T(lang, "loop.pretool.ask", "reason", reason)}, nil
+	// kind は判定の記録の種類（i18n のキーの末尾と同じ定数の語だけを渡す）
+	ask := func(kind, reason string) (hookio.Result, error) {
+		return hookio.Result{Ask: i18n.T(lang, "loop.pretool.ask", "reason", reason), Kind: "scope: " + kind}, nil
 	}
 	home := e.env("HOME")
 	if home == "" {
@@ -199,7 +200,7 @@ func PreToolScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, err
 		}
 		if p != "" {
 			if top := otherRepo(resolve(p, cwd0)); top != "" {
-				return ask(i18n.T(lang, "loop.pretool.other_repo_file", "root", r, "repo", top, "path", p))
+				return ask("other_repo_file", i18n.T(lang, "loop.pretool.other_repo_file", "root", r, "repo", top, "path", p))
 			}
 		}
 		return hookio.Result{}, nil
@@ -208,7 +209,7 @@ func PreToolScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, err
 			return hookio.Result{}, nil
 		}
 		if p := trimSpace(toStr(ti["project"])); slug != "" && p != "" && p != slug {
-			return ask(i18n.T(lang, "loop.pretool.other_project_mcp", "slug", slug, "other", p, "tool", ev.Tool.Name))
+			return ask("other_project_mcp", i18n.T(lang, "loop.pretool.other_project_mcp", "slug", slug, "other", p, "tool", ev.Tool.Name))
 		}
 		return hookio.Result{}, nil
 	case hookio.KindBash:
@@ -234,7 +235,7 @@ func PreToolScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, err
 		for _, m := range imProjectRe.FindAllStringSubmatch(body, -1) {
 			v := strings.Trim(m[1], `"'`)
 			if v != "" && v != slug {
-				return ask(i18n.T(lang, "loop.pretool.other_project_cli", "slug", slug, "other", v))
+				return ask("other_project_cli", i18n.T(lang, "loop.pretool.other_project_cli", "slug", slug, "other", v))
 			}
 		}
 	}
@@ -259,7 +260,7 @@ func PreToolScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, err
 			continue
 		}
 		if top := otherRepo(target); top != "" {
-			return ask(i18n.T(lang, "loop.pretool.other_repo_cmd", "root", r, "repo", top, "cmd", headStr(s, 80)))
+			return ask("other_repo_cmd", i18n.T(lang, "loop.pretool.other_repo_cmd", "root", r, "repo", top, "cmd", headStr(s, 80)))
 		}
 	}
 	return hookio.Result{}, nil

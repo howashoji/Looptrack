@@ -112,12 +112,11 @@ init --remove-loop: $TMP/ws（dry-run）
                  }
                ]
              }
-      @@ -139,79 +74,6 @@
+      @@ -150,77 +85,6 @@
+                   "timeout": 5
                  }
                ]
-             }
-      -    ],
-      -    "PreToolUse": [
+      -      },
       -      {
       -        "matcher": "Edit|Write|NotebookEdit",
       -        "hooks": [
@@ -188,10 +187,9 @@ init --remove-loop: $TMP/ws（dry-run）
       -            "timeout": 5
       -          }
       -        ]
-      -      }
+             }
            ]
          },
-         "permissions": {
   更新         .claude/.looptrack-kit.json
       --- a/.claude/.looptrack-kit.json
       +++ b/.claude/.looptrack-kit.json
@@ -426,6 +424,16 @@ dry-run のため何も書いていません。反映は --dry-run を外して�
           }
         ],
         "PreToolUse": [
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-session-bind --agent claude-code",
+                "timeout": 5
+              }
+            ]
+          },
           {
             "matcher": "Edit|Write|NotebookEdit",
             "hooks": [

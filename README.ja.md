@@ -2,19 +2,30 @@
 
 *English: [README.md](README.md)*
 
-Looptrack は AI 駆動開発にループエンジニアリングをかんたんに導入できるツールです。
+**Looptrack は、AI コーディングエージェントの外部記憶となり、ループエンジニアリングを実現するイシュー管理ツールです。**
+プロジェクト本来のイシューとは別に、AI が分解した作業単位の課題を記録します。
+AI の作業計画と意思決定を可視化し、各作業のトークンも記録して分析レポートを出力できます。
 
-バイブコーディングで AI が覚えていられるのはコンテキストウィンドウに収まる範囲の作業内容だけです。
-それを超える量は覚えておけません。
-そのためセッションをまたぐと、同じ作業を繰り返したりやるべき作業を飛ばしたりすることがあります。
-だから AI の外に記憶を置く必要があります。Looptrack は AI 専用のタスクの記憶装置として生まれました。
+これが大事な理由は 4 つあります。
 
-ここでいうループエンジニアリングとは、イシューを起点に「着手 → 作業 → 検証 → クローズ」を AI と人が同じ記録の上で回していくやり方です。
-いちばんの利点は、個人のバイブコーディングから一歩進んで**チーム開発も見据えた**形でこれを回せることです。
-人も同じイシューをブラウザで見て判断するので、チームで 1 つのループを共有できます。
+- **AI コーディングエージェントの外部記憶**: バイブコーディングで AI が覚えていられるのは、コンテキストウィンドウに収まる範囲の作業内容だけです。
+  それを超える量は覚えておけません。
+  そのためセッションをまたぐと、同じ作業を繰り返したりやるべき作業を飛ばしたりすることがあります。
+  だから AI の外に記憶を置く必要があります。Looptrack は AI 専用のタスクの記憶装置として生まれました。
+  どのセッションもどの AI も同じイシューを読むので、前のセッションで決めたことが次のセッションに残ります。
+- **ループエンジニアリングの実現**: ここでいうループエンジニアリングとは、イシューを起点に「着手 → 作業 → 検証 → クローズ」を AI と人が同じ記録の上で回していくやり方です。
+  いちばんの利点は、個人のバイブコーディングから一歩進んで**チーム開発も見据えた**形でこれを回せることです。
+  人も同じイシューをブラウザで見て判断するので、チームで 1 つのループを共有できます。
+- **プロジェクト本来のイシューとは別に、AI が分解した作業単位を記録**: 人が話し合う要望や不具合の報告は、プロジェクトがふだん使っている置き場に残します。
+  Looptrack が持つのは、AI がその仕事を分解した作業単位です（要件・設計・タスク・作業中に見つけた不具合・テスト）。
+  親子と traces でつなぎ、1 件ずつ着手して根拠を添えて閉じられる大きさにします。
+- **作業計画・意思決定・トークンの可視化**: 作業計画はイシューそのものです（本文・受け入れ条件・下位のタスク）。
+  見つけた原因・下した判断・検証の結果は、あとから直したり消したりできないコメントとして積み上がります。
+  人の判断が要るものは In Review に集まり、人はそのすべてをブラウザで読めます。
+  各作業で消費したトークンも記録し、分析レポート（PDF）として出力できます。
 
 具体的には、AI と人のループを回すためのイシュー管理ツールです。
-複数のプロジェクトの課題・不具合・要件を 1 つのサーバで管理します。
+複数のプロジェクトのイシューを 1 つのサーバで管理します。
 Claude Code・Codex・GitHub Copilot といったコーディング AI には CLI・リモート MCP・hook でイシューを渡します。
 
 サーバは Go の単一バイナリで、データは MySQL か SQLite に入ります。
@@ -22,6 +33,8 @@ Claude Code・Codex・GitHub Copilot といったコーディング AI には CL
 
 ## なぜ別のトラッカーなのか
 
+プロジェクト本来のトラッカーには、人が求めることが入っています。
+Looptrack は、AI にとってのもう 1 つの置き場です。その仕事を 1 件ずつ取れる単位に分けて置き、ルールを守らせる仕組みを備えています。
 ルールを守らせる仕組みさえあれば、AI はループを自分で回せるからです。
 
 Looptrack では AI が「起票 → 着手（`next`）→ 作業 → 検証 → クローズ → 次へ」を自分で進めます。
@@ -56,7 +69,7 @@ loop を入れると、「確認して」と頼んだときは編集を止めま
 
 Claude Code ならプロジェクトの `.claude/settings.json` に 2 行足すだけでサーバにつながります。
 Codex と Copilot の設定も同じ manifest から作ります。
-トークンの消費はセッション・AI・段階・イシューごとに集計し、PDF のレポートにできます。
+トークンの消費はセッション・AI・段階・イシューごとに集計し、PDF のレポートにできます（[トークンレポート](#トークンレポート)）。
 
 ## 始め方
 
@@ -83,24 +96,28 @@ OS ごとの初回起動は [デスクトップ版](docs/guide/ja/desktop.md) �
 
 ### 2. Linux サーバに入れる — `install.sh`
 
-Ubuntu LTS や Debian なら POSIX sh のスクリプト 1 つで、取得 → `looptrack setup` → 起動 → 動作確認まで進みます。
+Ubuntu LTS や Debian なら、1 行でインストーラ（POSIX sh のスクリプト）が走り、
+取得 → 照合 → 展開 → `looptrack setup` →（MySQL の権限）→ 起動 → 動作確認まで進みます。
 systemd の unit か compose.yaml も作り、リバースプロキシの設定例も表示します。
 
 ```sh
-# 1) インストーラを取る（中身を読んでから実行する）
-VER=v1.0.0
-curl -fsSL -O "https://github.com/howashoji/looptrack/releases/download/$VER/install.sh"
-less install.sh
-
-# 2) 実行する（--from は実行ファイルの取得元。SHA256SUMS と minisign の署名を確かめてから入れる）
-sudo sh install.sh --from "https://github.com/howashoji/looptrack/releases/download/$VER"
-
-# 読んでから実行する手順をまとめて 1 行にするなら（取得元は同じものを 2 回指す）
-curl -fsSL "https://github.com/howashoji/looptrack/releases/download/$VER/install.sh" |
-  sudo sh -s -- --from "https://github.com/howashoji/looptrack/releases/download/$VER"
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
 ```
 
-`deploy/release/dist.sh` で手元に作った配布物から入れるときは、`--from` にその出力先のディレクトリを渡します。
+インストーラは GitHub Releases の最新のリリースから `looptrack_<版>_linux_<arch>_server.tar.gz` を取り、
+`SHA256SUMS` で照合してから展開し、中の `looptrack` を置きます。サーバに `minisign` があれば `SHA256SUMS` の署名も確かめます
+（`--require-signature` で必須にできます）。
+スクリプト自身は HTTPS で取るだけで、自分を照合できません（照合の鍵と手順をスクリプトが持っているためです）。
+実行する前に中身を読むなら、次のようにします。
+
+```sh
+curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh
+less install.sh
+sudo sh install.sh                      # 版を固定するなら sudo sh install.sh --version v1.0.0
+```
+
+1 行の形でオプションを付けるときは `sh -s --` の後ろに置きます（例: `… | sudo sh -s -- --version v1.0.0`）。
+`deploy/release/dist.sh build` で手元に作った配布物から入れるときは、`--from` にその出力先のディレクトリを渡します。
 
 ```sh
 sudo sh deploy/install.sh --from /path/to/dist
@@ -110,16 +127,18 @@ sudo sh deploy/install.sh --from /path/to/dist
 終わると nginx と Caddy の設定例・ブラウザの URL・CLI のログイン方法・MCP の接続設定が表示されます。
 設定例は `/etc/looptrack/proxy-examples.txt` にも保存されます。あとはプロキシを立てて公開 URL からログインしましょう。
 
-MySQL を使い、アプリ用の DB 利用者を [deploy/grants.sql](deploy/grants.sql) で最小権限にする場合は順番に気をつけてください。
-表ごとの `GRANT` は表ができてからでないと流せません。
+MySQL を使い、アプリ用の DB 利用者を [deploy/grants.sql](deploy/grants.sql) で最小権限にする場合も、同じ 1 回の実行で進みます。
+表ごとの `GRANT` は表ができてからでないと流せないので、setup が表を作った後で、インストーラが MySQL の管理用の資格情報を端末で尋ねます
+（表示しません。保存しません）。アプリ用の利用者が無ければ作り、`looptrack` に埋め込んだ権限を与え（中身は `looptrack grants print` で見られます）、
+アプリ用の利用者で読めることを確かめてから起動します。資格情報が合わなければ、何も起動せずに止まります。もう一度実行すると、尋ねるところから続きます。
+DB がまだ無ければ、setup が同じ管理用の資格情報を先に尋ね、作ってよいかを確かめてから DB も作ります（尋ねるのは 1 回だけです）。
+ただし、表を作る利用者（`LOOPTRACK_SETUP_MIGRATE_DSN`）と、その DB への `GRANT` は先に用意しておきます（無ければ従来どおり接続で止まります）。
+作らないと答えると何も作らずに止まり、自分で流す `CREATE DATABASE` の文を示します。
 
-1. `install.sh` を実行します。ここで setup が表を作ります。
-2. `grants.sql` を管理用の資格情報で流します。
-3. `install.sh` をもう一度実行します。今度は起動と動作確認だけです。
+インストーラは Linux 専用です。macOS や Windows でサーバを動かすときは、上のデスクトップ版を使ってください。
 
-install.sh は起動の前に、アプリ用の利用者で読めるかどうかを確かめます。読めなければこの順番を案内して止まります。
-
-更新は `sudo sh install.sh --upgrade --from <取得元>` です。
+更新は `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` です。
+1.0.0-rc.1・rc.2 の `install.sh` で入れたサーバも同じ 1 行で上げられます。
 アンインストールは `--uninstall` で、`--purge` を付けると設定とデータも消えます。
 オプション・取得元の決まり・確かめ方は [DEPLOY.md](docs/server/DEPLOY.md) を見てください。
 
@@ -195,7 +214,7 @@ skill は実行時に選べないので、`looptrack issue init` が導入時の
 | URL | 内容 |
 | -- | -- |
 | `https://example.com/looptrack/` | プロジェクト選択（ログイン必須） |
-| `https://example.com/looptrack/p/<slug>/` | ボード / 一覧 / トレース + 詳細（閲覧専用） |
+| `https://example.com/looptrack/p/<slug>/` | ボード / 一覧 / トレース + 詳細（起票・状態の変更・コメント・担当の変更の最小限のフォーム） |
 | `https://example.com/looptrack/account` | アカウント設定（アクセストークンの発行・失効、パスワード変更） |
 | `https://example.com/looptrack/admin/users` | 利用者管理（管理者） |
 | `https://example.com/looptrack/api/v1/` | REST API（Bearer トークン） |
@@ -220,7 +239,9 @@ CLI と MCP は利用者ごとのアクセストークンを使います。ト�
 状態ごとの列に並べるボード・絞り込みと並べ替えができる一覧・イシュー同士のつながりをたどるトレースです。
 イシューを選ぶと横に詳細が開きます。本文・時系列のコメント・イベント・検証コマンドとその最後の結果が見られます。
 
-ブラウザでは閲覧だけができます。変更は CLI・MCP・API から行います。どこから変えても同じルールが効くようにするためです。
+ブラウザは閲覧が中心です。書き込めるのは担当者の変更と、起票・状態の変更・コメントの追記の最小限のフォームだけです。
+フォームはターミナルを使わない人の入口で、CLI・MCP・API と同じサーバの操作を通るので、どこから変えても同じルールが効きます。
+本文の編集は画面にはありません。それを含むほかの変更は CLI・MCP・API から行います。
 
 ## CLI
 
@@ -254,6 +275,18 @@ Windows では 1 つだけ注意してください。`looptrack issue verify` �
 フックが受け取るのはコマンドの文字列です。書かれた語がそのまま実行されるとは限りません。
 ヒアドキュメントの本文や引用符の中はデータとして扱います。実際に実行される語を取り出す共通部品は `internal/client/hook/hookcmd` にあります。
 
+## トークンレポート
+
+**AI がイシューごとに使ったトークンを、人が手で記録しなくても測れます。**
+イシューへの変更操作（CLI・MCP）の直後と、ターン・セッションの終わりに、`looptrack` が手元にある AI の会話記録を読み、
+トークンの累計をサーバへ送ります。人が打った指示文は既定では送りません。`LOOPTRACK_USAGE=0` で送信を止められます。
+
+サーバは会話の区間を、その区間を閉じた操作のイシューに帰属させ、好きな期間でイシュー・ラベル・段階・AI・会話ごとに集計します。
+プロジェクトのボードから AI にレポートを依頼すると、skill `token-report` が本文を書き、手元で `looptrack report pdf` を使って PDF を作り、
+追記のみの台帳に登録します。次の「前回以降」はこの台帳から始まります。PDF をサーバに置くことはありません。
+
+何が記録され、どう帰属させ、レポートをどう作って登録するかは [トークンレポート](docs/guide/ja/token-report.md) にあります。
+
 ## リポジトリの構成
 
 ```
@@ -283,6 +316,7 @@ looptrack/
 | 目的 | ファイル |
 | -- | -- |
 | 日々の使い方 | [利用者ガイド](docs/guide/ja/README.md)（[English](docs/guide/README.md)） |
+| AI のトークン消費を測り、レポートを作る | [トークンレポート](docs/guide/ja/token-report.md) |
 | **別プロジェクトからイシューを操作する**（AI はまずこれ） | [docs/AI-GUIDE.md](docs/AI-GUIDE.md) |
 | **新しいプロジェクトを載せる** | [docs/ADD-PROJECT.md](docs/ADD-PROJECT.md) |
 | プロジェクトの運用ルールを書く | [docs/projects/](docs/projects/) と [docs/templates/](docs/templates/) のひな形 |

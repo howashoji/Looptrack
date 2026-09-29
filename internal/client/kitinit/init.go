@@ -1,4 +1,4 @@
-// Package kitinit は `looptrack issue init`（以前の CLI（1.0.0 より前）の init の Go 版。DESIGN.md §5-11）。
+// Package kitinit は `looptrack issue init`（以前の CLI（1.0.0 より前）の init の Go 版。DESIGN.md §5-1）。
 //
 // 以前の CLI と同じにするもの: 引数・誤りの文面・.claude/.looptrack-kit.json の構造・CLAUDE.md / AGENTS.md の案内節・skill と rules の置き場・
 // loop の問いの文面・dry-run の差分の形・--remove-loop・既存の設定のマージと控え（.claude/.looptrack-init-backup）。
@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -34,6 +35,45 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/kit"
 )
+
+// gitIgnores は、導入先 dir が git の作業ツリーで、rel（dir からの相対）が作業ツリーの中の .gitignore によって
+// 既に無視されているかを返す。直下の .gitignore は clone の間で共有されるので、その clone にしか効かない
+// グローバルの excludes（core.excludesFile）と .git/info/exclude で無視されているだけのものは「無視済み」と数えない。
+// `git check-ignore -z -v --no-index --stdin` の出力（NUL 区切りの source・line・pattern・path）を読み、次の全部を満たすときだけ true:
+// 終了コード 0・source のファイル名が .gitignore・source が作業ツリーの中の相対パス（絶対パスでも .git/ 始まりでも ../ 始まりでもない）・
+// pattern が否定（!）でない（-v は否定に当たっても終了コード 0 を返す）。
+// --no-index は、追跡済みのパスを check-ignore が対象外（終了コード 1）にするのを避け、.gitignore の規則だけで答えを出させるために付ける。
+// -z は、パスに日本語などが入ったときの引用（core.quotePath）と、Windows のドライブ文字の「:」で読みが崩れるのを避けるために付ける
+// （-z は --stdin と組でしか使えないので、パスは標準入力で渡す）。
+// git が無い・作業ツリーでない・その他の失敗（終了コード 1 以外）は false で、直下の .gitignore の行だけを見る従来どおりになる。
+func gitIgnores(dir, rel string) bool {
+	if _, err := exec.LookPath("git"); err != nil {
+		return false
+	}
+	cmd := exec.Command("git", "check-ignore", "-z", "-v", "--no-index", "--stdin")
+	cmd.Dir = dir
+	cmd.Stdin = strings.NewReader(rel + "\x00")
+	for _, kv := range os.Environ() {
+		// 呼び出し元の git が指す作業ツリーではなく、導入先を調べる。
+		if k, _, _ := strings.Cut(kv, "="); k == "GIT_DIR" || k == "GIT_WORK_TREE" || k == "GIT_INDEX_FILE" {
+			continue
+		}
+		cmd.Env = append(cmd.Env, kv)
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	f := strings.Split(string(out), "\x00")
+	if len(f) < 4 {
+		return false
+	}
+	// core.excludesFile の相対パスは git が字面のまま出す（./../.gitignore・x/../../.gitignore）ので、整えてから見る
+	source, pattern := path.Clean(filepath.ToSlash(f[0])), f[2]
+	return path.Base(source) == ".gitignore" && !filepath.IsAbs(f[0]) && !path.IsAbs(source) &&
+		!strings.HasPrefix(source, ".git/") && source != ".." && !strings.HasPrefix(source, "../") &&
+		!strings.HasPrefix(pattern, "!")
+}
 
 // Register は `looptrack issue init` の本体を cli に登録する（cmd/looptrack が呼ぶ）。
 func Register() { cli.InitRunner = Run }
@@ -79,6 +119,7 @@ const (
 type Options struct {
 	Project, URL, Agent, Dir, Source, Dist                       string
 	DryRun, Force, MCP, NoFreshness, NoUsage, NoSummary, NoSkill bool
+	NoSessionBind                                                bool
 	Loop, NoLoop, RemoveLoop, NoVerify                           bool
 	agents                                                       []string
 }
@@ -87,7 +128,7 @@ func optionsFrom(v *cli.Values, e env.Env) *Options {
 	o := &Options{
 		Project: v.Str("project"), URL: v.Str("url"), Agent: v.Str("agent"), Dir: v.Str("dir"), Source: v.Str("source"), Dist: v.Str("dist"),
 		DryRun: v.Bool("dry_run"), Force: v.Bool("force"), MCP: v.Bool("mcp"), NoFreshness: v.Bool("no_freshness"), NoUsage: v.Bool("no_usage"),
-		NoSummary: v.Bool("no_summary"), NoSkill: v.Bool("no_skill"), Loop: v.Bool("loop"), NoLoop: v.Bool("no_loop"),
+		NoSummary: v.Bool("no_summary"), NoSessionBind: v.Bool("no_session_bind"), NoSkill: v.Bool("no_skill"), Loop: v.Bool("loop"), NoLoop: v.Bool("no_loop"),
 		RemoveLoop: v.Bool("remove_loop"), NoVerify: v.Bool("no_verify"),
 	}
 	if !v.IsSet("project") {
@@ -307,7 +348,7 @@ func (in *installer) run() error {
 	}
 	if !o.NoFreshness && has(o.agents, "claude-code") {
 		cur, _ := readFile(p.path(".gitignore"))
-		if !has(strings.Split(cur, "\n"), ".claude/.looptrack-freshness/") {
+		if !has(strings.Split(cur, "\n"), ".claude/.looptrack-freshness/") && !gitIgnores(in.target, ".claude/.looptrack-freshness/probe") {
 			next := ""
 			if trimSpace(cur) != "" {
 				next = strings.TrimRight(cur, "\n") + "\n"

@@ -1,4 +1,4 @@
-// Package desktop はデスクトップ版（looptrack の desktop ビルド・DESIGN.md §5-14）の起動と、トレイから呼ぶ操作。
+// Package desktop はデスクトップ版（looptrack の desktop ビルド・DESIGN.md §5-4）の起動と、トレイから呼ぶ操作。
 //
 // ダブルクリック（引数なし）か looptrack desktop で起動すると:
 //  1. データの置き場（ResolvePaths）にロックのファイルを作り、OS のファイルロックを取る
@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -70,6 +71,14 @@ type Options struct {
 	GOOS    string    // 空なら runtime.GOOS
 	Home    string    // 空なら os.UserHomeDir
 	Lang    i18n.Lang // 空なら環境変数（LOOPTRACK_LANG・LC_ALL・LC_MESSAGES・LANG）から決める
+	// UpdatePublicKey は新しい版の確認で SHA256SUMS の署名を確かめる公開鍵（cmd/looptrack が selfupdate.MinisignPublicKey を渡す）。
+	// 空なら鍵の無いビルドとして扱い、確認先が既定（GitHub）なら通信しない
+	UpdatePublicKey string
+	UpdateClient    *http.Client // 新しい版の確認と取得の HTTP クライアント（テスト用。nil は既定）
+	// UpdateRun は置き換えで使う外部のコマンド（codesign・spctl・hdiutil・ditto・open）の実行（テスト用。nil は実行する）
+	UpdateRun func(ctx context.Context, name string, args ...string) (string, error)
+	// UpdateStart は置き換えた後の起動し直し（Linux の AppImage。テスト用。nil は別のセッションで起こす）
+	UpdateStart func(name string, args ...string) error
 }
 
 // state は desktop.json（起動中のインスタンスと、次の起動で使うポート）。
@@ -97,6 +106,7 @@ func writeState(path string, s state) error {
 // Main は looptrack desktop（desktop ビルドでは引数なしの起動も）。
 //
 //	--background        ブラウザを開かない（ログイン時の自動起動）
+//	--after-update      置き換えた後の起動し直し（前のインスタンスがロックを放すのを待つ。ブラウザを開かない。replace.go）
 //	--no-tray           トレイを出さない（表示の無い環境・テスト）
 //	--status            起動中なら URL を出して 0、起動していなければ 1
 //	--quit              起動中のインスタンスを止める（トレイが出ない環境の逃げ道）
@@ -116,6 +126,7 @@ func Main(args []string, o Options) int {
 	enableAutostart := fs.Bool("enable-autostart", false, i18n.T(o.Lang, "desktop.arg.enable_autostart"))
 	installCLI := fs.Bool("install-cli", false, i18n.T(o.Lang, "desktop.arg.install_cli"))
 	unregister := fs.Bool("unregister", false, i18n.T(o.Lang, "desktop.arg.unregister"))
+	afterUpdate := fs.Bool("after-update", false, i18n.T(o.Lang, "desktop.arg.after_update"))
 	// macOS の古い版は Finder からの起動に -psn_… を付ける
 	var rest []string
 	for _, a := range args {
@@ -137,6 +148,17 @@ func Main(args []string, o Options) int {
 		return o.fail(i18n.T(o.Lang, "desktop.err.data_dir_create"), err)
 	}
 	release, locked, err := tryLock(paths.Lock())
+	// 置き換えた後の起動し直し: 前のインスタンスが止まる（ロックが外れる）のを待ってから起動する（ブラウザは開かない）
+	for deadline := time.Now().Add(afterUpdateWait); *afterUpdate && err == nil && !locked && time.Now().Before(deadline); {
+		time.Sleep(200 * time.Millisecond)
+		release, locked, err = tryLock(paths.Lock())
+	}
+	if *afterUpdate && err == nil && !locked {
+		return o.fail(i18n.T(o.Lang, "desktop.err.after_update_timeout", "wait", afterUpdateWait.String()), i18n.Errorf("desktop.err.lock_busy", "path", paths.Lock()))
+	}
+	if *afterUpdate {
+		*background = true
+	}
 	// --status・--quit も一瞬ロックを取る（起動していないことを確かめるため）ので、起動はそれと重なっても少し待って取り直す
 	for i := 0; err == nil && !locked && !*status && !*quit && i < 20; i++ {
 		if st := readState(paths.State()); st.PID > 0 {
@@ -295,6 +317,15 @@ func (o *Options) maintain(autostartOn, installCLI, unregister bool) int {
 		case removed:
 			fmt.Fprintln(o.Stdout, i18n.T(o.Lang, "desktop.msg.autostart_removed"))
 		}
+		// アプリ一覧（Linux の AppImage）: この AppImage の登録だけを消す
+		if m := o.appMenuFor(o.Env.Get("APPIMAGE"), ""); m != nil {
+			switch removed, err := m.RemoveIfOurs(); {
+			case err != nil:
+				warn(i18n.T(o.Lang, "desktop.err.app_menu_remove"), err)
+			case removed:
+				fmt.Fprintln(o.Stdout, i18n.T(o.Lang, "desktop.msg.app_menu_removed"))
+			}
+		}
 		// CLI: このアプリが置いたものだけを消す（setup・self-update で入れたものは残す）
 		switch removed, err := c.Uninstall(); {
 		case err != nil:
@@ -356,6 +387,14 @@ type App struct {
 	launcher string
 	quit     chan struct{}
 	quitOnce sync.Once
+	updates  *updates // 新しい版の確認（update.go）
+	updating atomic.Bool
+	// failMu・failVersion・failReason は直近の置き換えの失敗（画面の帯に出す。次の置き換えを始めると消える。update.go）
+	failMu                  sync.Mutex
+	failVersion, failReason string
+	// autoTried は自動の置き換えを試した版（同じ版は 1 回だけ試す）
+	autoMu    sync.Mutex
+	autoTried map[string]bool
 }
 
 // URL は画面の URL（http://127.0.0.1:<port>/looptrack/）。
@@ -387,8 +426,11 @@ func (o *Options) primary(paths Paths, background, noTray bool) int {
 		return o.fail(i18n.T(o.Lang, "desktop.err.listen"), err)
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
+	// 新しい版の確認（知らせはトレイのメニューの先頭と画面の帯。起動時に 1 回、その後は 24 時間ごと）
+	upd := o.newUpdates(paths, logger)
 	inst, err := localserve.Start(context.Background(), localserve.Options{
-		DBPath: paths.DB(), Listener: ln, BasePath: BasePath, Logger: logger,
+		DBPath: paths.DB(), Listener: ln, BasePath: BasePath, Logger: logger, UpdateNotice: upd.current, UpdateStopInTray: upd.tray.Load,
+		UpdateApplier: &bannerApplier{u: upd},
 	})
 	if err != nil {
 		ln.Close()
@@ -410,7 +452,20 @@ func (o *Options) primary(paths Paths, background, noTray bool) int {
 	})
 	defer stopWatch()
 	launcher, _ := Launcher(o.Env)
-	a := &App{opts: o, paths: paths, inst: inst, port: port, logger: logger, launcher: launcher, quit: make(chan struct{})}
+	a := &App{opts: o, paths: paths, inst: inst, port: port, logger: logger, launcher: launcher, quit: make(chan struct{}), updates: upd}
+	upd.onAuto = a.autoApply // 自動の置き換え（控えの "auto" を入れたときだけ。確認を始める前に入れる）
+	upd.app.Store(a)         // 画面の帯の「更新する」（bannerApplier。入れるまではボタンを出さない）
+	updCtx, stopUpdates := context.WithCancel(context.Background())
+	updDone := make(chan struct{})
+	go func() {
+		defer close(updDone)
+		upd.run(updCtx)
+	}()
+	// 終わるときは確認を止め、止まるのを待つ（控えのファイルを書きかけで終わらない）
+	defer func() {
+		stopUpdates()
+		<-updDone
+	}()
 	if err := writeState(paths.State(), state{
 		PID: os.Getpid(), Port: port, URL: a.URL(), Version: o.Version, Started: time.Now().Format(time.RFC3339),
 	}); err != nil {
@@ -521,7 +576,8 @@ func Launcher(e env.Env) (string, error) {
 	return exe, nil
 }
 
-// refresh は起動のたびに、自動起動の登録と CLI の置き場を今のアプリの場所に合わせる（.app・AppImage を動かした・更新した）。
+// refresh は起動のたびに、自動起動の登録・アプリ一覧の登録（AppImage）・CLI の置き場を今のアプリの場所に合わせる
+// （.app・AppImage を動かした・更新した）。
 func (a *App) refresh() {
 	if as := a.autostart(); as != nil {
 		if on, _ := as.Enabled(); on && !as.Current() {
@@ -530,6 +586,13 @@ func (a *App) refresh() {
 			} else {
 				a.logger.Info("desktop", "action", "autostart-refresh")
 			}
+		}
+	}
+	if m := a.appMenu(); m != nil {
+		if fixed, err := m.Refresh(); err != nil {
+			a.logger.Warn(i18n.T(a.opts.Lang, "desktop.log.app_menu_refresh_failed"), "err", err)
+		} else if fixed {
+			a.logger.Info("desktop", "action", "app-menu-refresh", "path", m.Path())
 		}
 	}
 	if fixed, err := a.cli().Refresh(); err != nil {
@@ -560,6 +623,20 @@ func (o *Options) cliFor(launcher string) CLIInstall {
 		c.BundledCLI = filepath.Join(filepath.Dir(launcher), "cli", "looptrack.exe")
 	}
 	return c
+}
+
+// appMenuFor は AppImage（appImage が $APPIMAGE）のアプリ一覧の登録（Linux で appImage があるときだけ。無ければ nil）。
+// offMark は外した印（--unregister は空）。
+func (o *Options) appMenuFor(appImage, offMark string) *AppMenu {
+	if o.GOOS != "linux" || appImage == "" || !filepath.IsAbs(appImage) {
+		return nil
+	}
+	return &AppMenu{DataHome: o.Env.Get("XDG_DATA_HOME"), Home: o.Home, AppDir: o.Env.Get("APPDIR"), Launcher: appImage,
+		OffMark: offMark, Lang: o.Lang}
+}
+
+func (a *App) appMenu() *AppMenu {
+	return a.opts.appMenuFor(a.opts.Env.Get("APPIMAGE"), a.paths.AppMenuOff())
 }
 
 func (a *App) autostart() *Autostart { return a.opts.autostartFor(a.launcher) }
@@ -660,6 +737,35 @@ func (a *App) AutostartEnabled() bool {
 	}
 	on, _ := as.Enabled()
 	return on
+}
+
+// AppMenuSupported はアプリ一覧に登録できるか（Linux の AppImage だけ。トレイの「アプリ一覧に登録する」を出すか）。
+func (a *App) AppMenuSupported() bool { return a.appMenu() != nil }
+
+// AppMenuEnabled はアプリ一覧に登録してあるか（トレイのチェック）。
+func (a *App) AppMenuEnabled() bool {
+	m := a.appMenu()
+	return m != nil && m.Registered()
+}
+
+// SetAppMenu はアプリ一覧に登録する / 消す（消したら外した印を作り、次の起動で登録し直さない）。変えた後の状態を返す。
+func (a *App) SetAppMenu(on bool) bool {
+	m := a.appMenu()
+	if m == nil {
+		return false
+	}
+	var err error
+	if on {
+		err = m.Enable()
+	} else {
+		err = m.Disable()
+	}
+	if err != nil {
+		a.logger.Warn("app-menu", "on", on, "err", err)
+		a.opts.Alert(AppName, i18n.T(a.opts.Lang, "desktop.alert.app_menu_failed", "reason", err), true)
+	}
+	a.logger.Info("desktop", "action", "app-menu", "on", on)
+	return a.AppMenuEnabled()
 }
 
 // SetAutostart はログイン時の自動起動を登録する / 消す。登録の後の状態を返す。

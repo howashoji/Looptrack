@@ -1,5 +1,5 @@
 {
-  "_comment": "検証コマンド節の抽出（DESIGN.md §5-8-1）と出力のマスク（§5-8-2）の例。Go（internal/domain/verify_test.go）と Python（scripts/issue_verify_test.py）の両方のテストで読む。",
+  "_comment": "検証コマンド節の抽出（DESIGN.md §9-3-1）と出力のマスク（§9-3-2）の例。Go（internal/domain/verify_test.go）と Python（scripts/issue_verify_test.py）の両方のテストで読む。",
   "extract": [
     {
       "name": "1. fenced のみ",

@@ -2,7 +2,7 @@
 
 クラウドで動くコーディング AI から、イシュー管理（CLI・MCP・hook）を使うための設定手順です。
 内容は 2026-09-19 に各サービスの公式文書で確かめたもので、**実物での確認はまだです**。「未確認」と書いたところは、確認の結果を見てこの文書を直します。
-調べた結果の表と出典は [DESIGN.md §5-4「クラウド版の AI」](server/DESIGN.md) にあります。
+調べた結果の表と出典は [DESIGN.md §9-5「クラウド版の AI」](server/DESIGN.md) にあります。
 
 コマンドは `looptrack issue …` の形で書きます。
 クラウドの環境には `looptrack` を入れておいてください（セットアップスクリプトなどで）。実行ファイル 1 つで動き、ほかの処理系は要りません。
@@ -117,7 +117,7 @@
    - `"Authorization": "Bearer $COPILOT_MCP_IM_TOKEN"` のように文字列の途中で展開できるかは、文書に例がありません（未確認）。上のように secret に `Bearer ` まで入れておいてください。
    - リポジトリの `.github/mcp.json`・`.vscode/mcp.json`（init が書くもの）は cloud agent の文書に出てきません。使われるのは Settings の JSON です。
 4. **hook**: コミットした `.github/hooks/looptrack.json`（`init --agent copilot` が書くもの）は cloud agent も読みます。
-5. **トークン計測（任意）**: Copilot で測れるのは、OpenTelemetry のファイル出力を有効にした利用者の操作だけです（DESIGN §5-4「Copilot のトークン」）。
+5. **トークン計測（任意）**: Copilot で測れるのは、OpenTelemetry のファイル出力を有効にした利用者の操作だけです（DESIGN §9-5「Copilot のトークン」）。
    cloud agent で測るなら、Agents の variable に `COPILOT_OTEL_FILE_EXPORTER_PATH`（例: `/tmp/copilot-otel.jsonl`）を置きます（動くかは未確認）。
    測らないなら何もしなくてかまいません。トークン情報の未付与には数えられません。
 6. **確かめる**: Issue を Copilot に割り当て、`looptrack issue summary` の結果を PR の説明に書かせます。
@@ -133,7 +133,7 @@
 1. 上の手順どおりに許可リストとトークンを設定します。
 2. CLI で `looptrack issue next` → `looptrack issue comment <ID> "…"` → `looptrack issue close <ID>` を実行します。MCP でも同じことをします（使える経路だけ）。
 3. サーバの `issue_events` で `via`・`session_id`・`detail.agent` を見ます（期待する値は §0「どう記録されるか」）。
-4. hook（SessionStart の summary が導入済みを知らせるか）とトークン計測（`looptrack issue usage show <ID>`）が、DESIGN §5-4「クラウド版の AI」のとおりかを確かめます。
+4. hook（SessionStart の summary が導入済みを知らせるか）とトークン計測（`looptrack issue usage show <ID>`）が、DESIGN §9-5「クラウド版の AI」のとおりかを確かめます。
 5. 試験に使った PAT を失効させます。
 
 ## 5. 困ったとき

@@ -1,5 +1,5 @@
 #!/bin/bash
-# デスクトップ版の配布物を組み立てる（DESIGN.md §5-14）。release.yml の desktop-* ジョブと手元で同じものを使う。
+# デスクトップ版の配布物を組み立てる（DESIGN.md §5-4）。release.yml の desktop-* ジョブと手元で同じものを使う。
 # 手順の全体は docs/server/RELEASE.md「デスクトップ版」。
 #
 #   bash deploy/release/desktop.sh macos-app <版> <出力先>
@@ -12,7 +12,7 @@
 #         要るもの: mksquashfs（squashfs-tools）・curl・sha256sum か shasum。runtime は下の版と SHA-256 で固定して取る
 #         runtime（MIT）のライセンス文も同じ版から取り、AppImage の usr/share/doc/looptrack/ に入れる
 #         runtime に静的リンクされた部品（libfuse は LGPL-2.1）のライセンス文の全文・マニフェスト・作り直しの手順は
-#         usr/share/doc/looptrack/licenses/ に入れる（deploy/release/licenses/。DESIGN.md §5-14「AppImage の runtime の部品」）
+#         usr/share/doc/looptrack/licenses/ に入れる（deploy/release/licenses/。DESIGN.md §5-4「AppImage の runtime に静的リンクされた部品」）
 #   bash deploy/release/desktop.sh windows-zip <版> <amd64|arm64> <出力先>
 #       → <出力先>/Looptrack_<版>_windows_<arch>.zip（Looptrack\Looptrack.exe＝GUI・アイコンつき、Looptrack\cli\looptrack.exe＝CLI）
 #         アイコンの埋め込みは rsrc（go run で版を固定して取る。MIT）。zip が要る
@@ -161,7 +161,7 @@ plist_version() {
   local v=${1#v}
   v=${v%%-*}
   v=${v%%+*}
-  [[ "$v" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || v="0.0.0"
+  [[ "$v" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]] || v="0.0.0"
   echo "$v"
 }
 
@@ -289,7 +289,8 @@ appimage() {
 [Desktop Entry]
 Type=Application
 Name=$APP_NAME
-Comment=Issue tracking for coding agents and people
+Comment=Issue tracker serving as external memory for AI coding agents, enabling loop engineering
+Comment[ja]=AI コーディングエージェントの外部記憶となり、ループエンジニアリングを実現するイシュー管理ツール
 Exec=looptrack
 Icon=looptrack
 Terminal=false

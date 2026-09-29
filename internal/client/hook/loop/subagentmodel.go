@@ -63,7 +63,7 @@ func PreToolSubagentModel(ctx context.Context, ev hookio.Event) (hookio.Result, 
 		return hookio.Result{}, nil
 	}
 	return hookio.Result{Deny: i18n.T(e.lang(), "loop.subagentmodel.deny",
-		"env", "LOOPTRACK_LOOP_SUBAGENT_MODEL_ALLOW")}, nil
+		"env", "LOOPTRACK_LOOP_SUBAGENT_MODEL_ALLOW"), Kind: "subagent-model: no_model"}, nil
 }
 
 // subagentDefHasModel は subagent_type の定義ファイル（作業ディレクトリの .claude/agents/<名>.md か

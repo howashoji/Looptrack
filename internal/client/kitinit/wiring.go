@@ -13,7 +13,7 @@ import (
 
 // hook の配線。
 //
-// 新しい形: `looptrack hook <名前> --agent <AI>`（core・loop とも。DESIGN.md §5-11 の Q2）。
+// 新しい形: `looptrack hook <名前> --agent <AI>`（core・loop とも。DESIGN.md §5-1 の Q2）。
 //   - プロジェクトのルートはコマンドに書かない。looptrack hook が CLAUDE_PROJECT_DIR → 入力の cwd の git のルート → cwd の順に
 //     決める（hookio。以前の配線の ${CLAUDE_PROJECT_DIR:-$(git rev-parse …)} と同じ順）ので、Copilot が .claude/settings.json を
 //     CLAUDE_PROJECT_DIR なしで起動しても失敗しない。Claude Code 以外からの起動は --agent claude-code の hook が何もせず終わる（hookio.ForeignHost）。
@@ -81,6 +81,11 @@ func coreWants(w wiring, o *Options) []want {
 			add("Stop", "", "usage", "", 10)
 			add("SessionEnd", "", "usage", "", 10)
 		}
+		// MCP の呼び出しの直前に、会話のセッション ID を合鍵として届ける（サーバが _meta の tool_use_id で引く）。
+		// _meta にツール呼び出しの ID を入れてくるのは Claude Code だけなので、ほかの AI には配線しない
+		if !o.NoSessionBind {
+			add("PreToolUse", "mcp__.*", "issue-session-bind", "", 5)
+		}
 	case "codex":
 		if !o.NoUsage {
 			add("PostToolUse", codexMCPMatcher, "usage", "", 10)
@@ -107,7 +112,7 @@ const (
 
 type wired struct {
 	kind int
-	id   string // hook の名前（summary・issue-freshness-mark・usage・loop の名前）
+	id   string // hook の名前（summary・issue-freshness-mark・usage・issue-session-bind・loop の名前）
 	loop bool
 }
 

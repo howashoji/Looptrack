@@ -193,3 +193,65 @@ func TestCommitFieldsWithoutGit(t *testing.T) {
 		t.Errorf("出力から取れる欄は埋める: %q", got)
 	}
 }
+
+// TestHandoffMarkCommitCountsFollowsCommitLocation は、commitCounts（引き継ぎのファイルだけのコミットを
+// 完了から除く判定）が「コミットした場所」（cd・-C を追った先）の HEAD を見ることの回帰。
+//
+// 以前は本体のルートの HEAD を問うていたため、別の作業ツリーで引き継ぎのファイルだけをコミットしても、
+// 本体側の無関係な HEAD の diff で判定してしまい、除外できないことがあった。
+func TestHandoffMarkCommitCountsFollowsCommitLocation(t *testing.T) {
+	needGit(t)
+	R := func(s *sandbox, parts ...string) string { return s.p(append([]string{"repo"}, parts...)...) }
+	W := func(s *sandbox) string { return s.p("wt") }
+	Wsh := func(s *sandbox) string { return filepath.ToSlash(W(s)) }
+	H := func(s *sandbox) string { return R(s, ".claude", "memories", "handoff.md") }
+	HW := func(s *sandbox) string { return filepath.Join(W(s), ".claude", "memories", "handoff.md") }
+	setup := func(s *sandbox) {
+		s.git("init", "-q", "-b", "main", R(s))
+		s.mkdir("repo", ".claude", "memories")
+		s.write(H(s), "# 引き継ぎ\n")
+		s.write(R(s, "src", "a.txt"), "a\n")
+		s.git("-C", R(s), "add", "src/a.txt", ".claude/memories/handoff.md")
+		s.git("-C", R(s), "commit", "-qm", "base")
+		s.git("-C", R(s), "worktree", "add", "-q", "-b", "feat", W(s))
+	}
+	mark := func(cmd string) func(*sandbox) call {
+		return func(s *sandbox) call {
+			return call{hook: "post-work-complete-handoff-mark", env: map[string]string{"CLAUDE_PROJECT_DIR": R(s)}, cwd: R(s),
+				input: jsonInput(map[string]any{"session_id": "s1", "tool_name": "Bash", "cwd": R(s),
+					"tool_input": map[string]any{"command": cmd}, "tool_response": ""})}
+		}
+	}
+	clear := func(s *sandbox) { os.RemoveAll(R(s, ".claude", "handoff-pending.d")) }
+
+	scenario{name: "commitCounts はコミットした場所の HEAD を見る", setup: setup, steps: []step{
+		{name: "別の作業ツリーで引き継ぎのファイルだけをコミットしたときは積まない",
+			do: func(s *sandbox) {
+				clear(s)
+				s.write(HW(s), "# 引き継ぎ\n\n更新\n")
+				s.git("-C", W(s), "add", ".claude/memories/handoff.md")
+				s.git("-C", W(s), "commit", "-qm", "handoff")
+			},
+			mk:   func(s *sandbox) call { return mark("git -C " + Wsh(s) + " commit -m handoff")(s) },
+			want: wantMark("QUIET")},
+		{name: "対照: 同じ作業ツリーで作業ファイルも一緒にコミットすれば積む",
+			do: func(s *sandbox) {
+				clear(s)
+				s.write(filepath.Join(W(s), "b.txt"), "b\n")
+				s.write(HW(s), "# 引き継ぎ\n\n更新 2\n")
+				s.git("-C", W(s), "add", "b.txt", ".claude/memories/handoff.md")
+				s.git("-C", W(s), "commit", "-qm", "both")
+			},
+			mk:   func(s *sandbox) call { return mark("git -C " + Wsh(s) + " commit -m both")(s) },
+			want: wantMark("OUT")},
+		{name: "対照: 本体の作業ツリーで引き継ぎのファイルだけをコミットするのは従来どおり積まない",
+			do: func(s *sandbox) {
+				clear(s)
+				s.write(H(s), "# 引き継ぎ\n\n本体の更新\n")
+				s.git("-C", R(s), "add", ".claude/memories/handoff.md")
+				s.git("-C", R(s), "commit", "-qm", "handoff-main")
+			},
+			mk:   mark("git commit -m handoff-main"),
+			want: wantMark("QUIET")},
+	}}.run(t)
+}

@@ -1,4 +1,4 @@
-// Package cli は `looptrack issue …`（以前の CLI（1.0.0 より前）と互換）の骨組み（DESIGN.md §5-11）。
+// Package cli は `looptrack issue …`（以前の CLI（1.0.0 より前）と互換）の骨組み（DESIGN.md §5-1）。
 //
 // 互換の範囲: サブコマンド・引数（argparse.go）・--json・標準出力と標準エラーの文面・終了コード（誤り 1・引数の誤り 2）。
 // 確かめ方は internal/clitest の golden（LOOPTRACK_BIN=<looptrack> go test ./internal/clitest）。

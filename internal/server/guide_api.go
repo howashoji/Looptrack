@@ -16,11 +16,12 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/service"
 	"github.com/howashoji/looptrack/internal/store"
+	"github.com/howashoji/looptrack/internal/updatecheck"
 	"github.com/howashoji/looptrack/kit"
 )
 
 // guide（使い方とルールを 1 回で返す）・next（ループ運用の着手）・dist（配布物: kit と looptrack の実行ファイル）。
-// REST と MCP が同じ組み立てを使う。設計は DESIGN.md §5-5。
+// REST と MCP が同じ組み立てを使う。設計は DESIGN.md §5-2。
 
 // composeGuide はプロジェクトの guide を lang で組み立てる。
 // 導入セットの loop の有無は呼び出した利用者の導入済み通知から AI ごとに引き、「次に読むもの」に AI ごとの行で並べる
@@ -34,6 +35,7 @@ func (s *Server) composeGuide(ctx context.Context, lang i18n.Lang, pr store.Proj
 	}
 	for i := range installs {
 		a := guide.AgentLoop{Agent: installs[i].Agent, Label: agentLabel(lang, installs[i].Agent), Loop: loopStateOf(&installs[i])}
+		a.SelfRepo = selfRepoLoop(installs[i].SelfRepo, a.Loop)
 		if a.Loop == "installed" {
 			a.Version = installs[i].LoopVersion
 		}
@@ -114,6 +116,8 @@ type nextJSON struct {
 	Text              string             `json:"text"` // 人（と AI）が読む形。CLI はこれをそのまま出す
 	// UsageNotice は started（In Progress にした）ときだけ載る、トークン情報の付与の指示（service.UsageNotice）
 	UsageNotice string `json:"usage_notice,omitempty"`
+	// AcceptanceNotice は started のとき、受け入れ条件が雛形のままなら載る注意（service.StatusResult と同じ文面）
+	AcceptanceNotice string `json:"acceptance_notice,omitempty"`
 }
 
 func refOf(set *domain.Set, id string) relatedRefJSON {
@@ -207,6 +211,10 @@ func nextView(lang i18n.Lang, res *service.NextResult) nextJSON {
 		out.Next = append(out.Next, i18n.T(lang, "server.api.next.step_traces", "id", id))
 	}
 	b.WriteString(out.Message + "\n")
+	if res.AcceptanceNotice != "" { // 着手の直後に目に入る位置（本文より前）に出す
+		out.AcceptanceNotice = res.AcceptanceNotice
+		b.WriteString(res.AcceptanceNotice + "\n")
+	}
 	if len(out.Others) > 0 {
 		b.WriteString(i18n.T(lang, "server.api.next.others", "ids", strings.Join(out.Others, ", ")) + "\n")
 	}
@@ -420,7 +428,33 @@ func (s *Server) apiDist(w http.ResponseWriter, r *http.Request) {
 	for k, v := range s.distSumsLinks(urlBase) {
 		out[k] = v
 	}
+	if su := s.serverUpdate(r); su != nil {
+		out["server_update"] = su
+	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// serverUpdate は GET /api/v1/dist の server_update（このサーバの新しい版。looptrack doctor が注意として出す）。
+// トークンの利用者が admin のときだけ付ける（券の一覧 /setup/<券>/ と member には付けない）。更新の 1 行はサーバ版（Config.UpdateServer）だけ
+func (s *Server) serverUpdate(r *http.Request) map[string]string {
+	if r.PathValue("ticket") != "" || s.cfg.UpdateNotice == nil {
+		return nil
+	}
+	if p := principalFrom(r.Context()); p == nil || p.User.Role != "admin" {
+		return nil
+	}
+	n := s.cfg.UpdateNotice()
+	if n == nil {
+		return nil
+	}
+	su := map[string]string{"version": n.Version, "current": n.Current}
+	if n.URL != "" {
+		su["url"] = n.URL
+	}
+	if s.cfg.UpdateServer {
+		su["command"] = updatecheck.ServerUpgradeCommand
+	}
+	return su
 }
 
 // apiDistFile は GET /dist/{name...}（本体。X-Looptrack-SHA256 にハッシュ）。kit の名前は「/」を含む。

@@ -30,6 +30,10 @@ func stageName(lang i18n.Lang, key string) (string, bool) {
 		return i18n.T(lang, "report.stage.comment"), true
 	case "status":
 		return i18n.T(lang, "report.stage.status"), true
+	case "verify":
+		return i18n.T(lang, "report.stage.verify"), true
+	case "assign":
+		return i18n.T(lang, "report.stage.assign"), true
 	case "stop":
 		return i18n.T(lang, "report.stage.stop"), true
 	case "session_end":

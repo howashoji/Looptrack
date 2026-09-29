@@ -30,7 +30,7 @@ func TestDetectLikeLegacyCLI(t *testing.T) {
 		{"Copilot の下の明示", map[string]string{"LOOPTRACK_SESSION_ID": "sess-explicit", "COPILOT_AGENT": "1"}, "sess-explicit", "copilot"},
 		{"Claude の下の明示と Copilot の印", map[string]string{"LOOPTRACK_SESSION_ID": "e", "CLAUDE_CODE_SESSION_ID": "c", "COPILOT_AGENT": "1"}, "e", ""},
 		{"TERM_PROGRAM だけは AI でない", map[string]string{"TERM_PROGRAM": "vscode"}, "", ""},
-		// クラウド版（DESIGN.md §5-4「クラウド版の AI」）。クラウド固有の変数を足しても判定はローカルと同じ
+		// クラウド版（DESIGN.md §9-5「クラウド版の AI」）。クラウド固有の変数を足しても判定はローカルと同じ
 		{"Copilot cloud agent", map[string]string{"COPILOT_CLI": "1", "COPILOT_AGENT_SESSION_ID": "cloud-1", "COPILOT_AGENT_ACTION": "task",
 			"CI": "true", "GITHUB_ACTIONS": "true", "CLOUD_SESSION_STORE": "true"}, "cloud-1", "copilot"},
 		{"Claude Code on the web", map[string]string{"CLAUDE_CODE_SESSION_ID": "cc-web-1", "CLAUDE_CODE_REMOTE": "true",

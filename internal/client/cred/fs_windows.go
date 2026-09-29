@@ -11,7 +11,7 @@ import (
 	"github.com/howashoji/looptrack/internal/privfile"
 )
 
-// Windows のファイルの保護（DESIGN.md §5-11 Q7: ファイル + ACL を本人だけ）。ACL の作り方と確かめ方は internal/privfile
+// Windows のファイルの保護（DESIGN.md §5-1 Q5: ファイル + ACL を本人だけ）。ACL の作り方と確かめ方は internal/privfile
 // （サーバの .env・SQLite の DB と同じ）。
 //
 // 書くとき: DACL を「本人に全権」の 1 つだけにし、親からの継承を切る（PROTECTED_DACL）。ディレクトリは作るときに

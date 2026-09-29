@@ -68,7 +68,13 @@ func (e *env) mcpAs(token string, header map[string]string) *mcpClient {
 // call はツールを呼び、テキストと構造化データを返す。wantErr ならツールの実行エラーを期待する。
 func (m *mcpClient) call(name string, args map[string]any, wantErr bool) (string, map[string]any) {
 	m.t.Helper()
-	res, err := m.cs.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+	return m.callWithMeta(name, args, wantErr, nil)
+}
+
+// callWithMeta は call に tools/call の _meta を足したもの（Claude Code の claudecode/toolUseId など）。
+func (m *mcpClient) callWithMeta(name string, args map[string]any, wantErr bool, meta mcp.Meta) (string, map[string]any) {
+	m.t.Helper()
+	res, err := m.cs.CallTool(context.Background(), &mcp.CallToolParams{Meta: meta, Name: name, Arguments: args})
 	if err != nil {
 		m.t.Fatalf("%s: %v", name, err)
 	}

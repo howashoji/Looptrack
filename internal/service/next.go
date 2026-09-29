@@ -10,7 +10,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// next（設計は DESIGN.md §5-5）: ループ運用の「着手」を 1 回で行う。
+// next（設計は DESIGN.md §5-2）: ループ運用の「着手」を 1 回で行う。
 //
 // 規則:
 //  1. 自分が着手中（In Progress）のイシューがあれば、状態を変えずにそれを返す（resumed）。
@@ -66,6 +66,8 @@ type NextResult struct {
 	Skipped           []NextSkip
 	Set               *domain.Set // 関連（親・blocked_by・traces・子）の組み立て用
 	Verify            *VerifyPlan // 検証コマンド（節が無ければ nil。verify.go の Next が添える）
+	// AcceptanceNotice は started のとき、受け入れ条件が雛形のままなら載る注意（StatusResult と同じ）
+	AcceptanceNotice string
 }
 
 // maxNextCandidates は 1 回の next で判定する候補の上限（ルールで見送り続けるときの打ち切り）。
@@ -107,8 +109,10 @@ func (s *Service) next(ctx context.Context, a Actor, p store.Project, opt NextOp
 		// 取り込んだまま着手のイベントが無いもの）と、種類の違う ID（CLI のセッション ID と MCP の接続 ID）は
 		// 比べられないので、従来どおり自分の着手として扱う（決めつけると、同じ AI が CLI と MCP を併用したときに
 		// 片方の着手が消える）
-		otherSess := ComparableSessions(a.SessionID, st.SessionID) && st.SessionID != a.SessionID && st.UserID == a.UserID
-		crossPath := CrossPath(a.SessionID, st.SessionID) && st.UserID == a.UserID
+		// 着手のセッション ID は、MCP の着手を後から会話に結んだものならその値で比べる（StarterSession。見る側による）
+		stSess := StarterSession(a, st)
+		otherSess := ComparableSessions(a.SessionID, stSess) && stSess != a.SessionID && st.UserID == a.UserID
+		crossPath := CrossPath(a.SessionID, stSess) && st.UserID == a.UserID
 		var ok bool
 		switch {
 		case as.UserID == a.UserID: // 担当が自分。自分の別のセッション（または端末）が着手したものは横取りしない
@@ -201,7 +205,7 @@ func (s *Service) next(ctx context.Context, a Actor, p store.Project, opt NextOp
 		if res.Issue, err = s.Detail(ctx, p, id); err != nil {
 			return nil, err
 		}
-		res.Action, res.From = "started", st.From
+		res.Action, res.From, res.AcceptanceNotice = "started", st.From, st.AcceptanceNotice
 		return res, nil
 	}
 	if firstViolation != nil {
@@ -280,5 +284,5 @@ func hasOpenChild(set *domain.Set, id string) bool {
 }
 
 // AcceptanceCriteria は本文から受け入れ条件の節の中身を取り出す（「## 受け入れ条件」または「## Acceptance criteria」から
-// 次の ## 見出しまで。コードブロックの中の見出しは読まない）。無ければ空。規則は domain.AcceptanceCriteria（§5-13）。
+// 次の ## 見出しまで。コードブロックの中の見出しは読まない）。無ければ空。規則は domain.AcceptanceCriteria（DESIGN.md §9-6）。
 func AcceptanceCriteria(body string) string { return domain.AcceptanceCriteria(body) }

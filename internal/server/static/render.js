@@ -173,7 +173,7 @@ export function matchAssignee(it, want, me) {
   return a === want;
 }
 
-// 詳細ドロワーの担当変更フォーム（JS を使わない通常の POST・CSRF。DESIGN.md §5-2 の閲覧のみの例外）。
+// 詳細ドロワーの担当変更フォーム（JS を使わない通常の POST・CSRF。DESIGN.md §7 の閲覧のみの例外）。
 // 変更できない（viewer・クローズ済み）ときは空文字。値は必ず esc / attr を通す。
 export function assignForm(opt) {
   const { base, slug, csrf, it, members, me, canEdit, closed, t } = opt;
@@ -200,7 +200,7 @@ export function assignForm(opt) {
     + ' <button type="submit">' + esc(tx(t, "assign_submit")) + "</button></form>";
 }
 
-/* ---------------- 外からの反応（DESIGN.md §5-8-6） ---------------- */
+/* ---------------- 外からの反応（DESIGN.md §9-3-6） ---------------- */
 // 未応答のフィードバック（先頭「フィードバック:」のコメントで、その後に先頭語の無いコメントも状態変更も無いもの）の件数は
 // サーバが board の各項目に feedback_pending として付ける（判定は SQL。画面では数え直さない）。
 export function feedbackPending(it) {
@@ -278,9 +278,11 @@ export function newIssueForm(opt) {
 }
 
 // statusForm は詳細ドロワーの状態の変更フォーム。canEdit でなければ空文字。
+// notice は直前の変更の応答が載せた注意（受け入れ条件が雛形のままの着手など。止めずに知らせるもの）。空なら出さない。
 export function statusForm(opt) {
-  const { canEdit, it, statuses, t } = opt || {};
+  const { canEdit, it, statuses, t, notice } = opt || {};
   if (!canEdit || !it) return "";
+  const note = notice ? '<p class="form-notice" role="status">' + esc(notice) + "</p>" : "";
   return '<form class="issue-form inline" data-action="status" data-id="' + attr(it.id) + '">'
     + '<select name="status" aria-label="' + attr(tx(t, "status_label")) + '">'
     + (statuses || []).map(s => '<option value="' + attr(s) + '"' + (s === it.status ? " selected" : "") + ">" + esc(s) + "</option>").join("")
@@ -288,7 +290,7 @@ export function statusForm(opt) {
     + ' <input name="comment" maxlength="2000" placeholder="' + attr(tx(t, "status_comment_placeholder"))
     + '" aria-label="' + attr(tx(t, "status_comment")) + '" autocomplete="off">'
     + ' <button type="submit">' + esc(tx(t, "status_submit")) + "</button>"
-    + overrideField(t) + formError + "</form>";
+    + overrideField(t) + formError + note + "</form>";
 }
 
 // commentForm は詳細ドロワーのコメントの追記フォーム。canEdit でなければ空文字。

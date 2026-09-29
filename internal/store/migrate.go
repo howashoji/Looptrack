@@ -260,6 +260,8 @@ var legacyMigrations = map[int]string{
 //     書き換えを求める。旧記録がそろっていない（途中まで適用した）DB は、書き換えても
 //     スキーマが足りないため、1.0.0 より前の版のサーバで最後まで適用するよう求める。
 //   - 同じ番号で名前の違う記録があれば拒否する（別の版のマイグレーションを当てた DB）。
+//   - このバイナリが持たない番号の記録があれば拒否する（新しい版で migrate した DB）。新しい版から古い版へ
+//     戻したときに、古い版が新しい形の DB に書き込んで壊さないため。
 func checkAppliedRecords(applied map[int]string, migs []Migration, sqlite bool) error {
 	legacy, missing := 0, []string{}
 	for v, name := range legacyMigrations {
@@ -291,7 +293,79 @@ func checkAppliedRecords(applied map[int]string, migs []Migration, sqlite bool) 
 			return i18n.Errorf("store.err.migrate.record_mismatch", "version", fmt.Sprintf("%04d", m.Version), "applied", name, "name", m.Name)
 		}
 	}
+	known := make(map[int]bool, len(migs))
+	for _, m := range migs {
+		known[m.Version] = true
+	}
+	var unknown []int
+	for v := range applied {
+		if !known[v] {
+			unknown = append(unknown, v)
+		}
+	}
+	if len(unknown) > 0 {
+		sort.Ints(unknown)
+		names := make([]string, len(unknown))
+		for i, v := range unknown {
+			names[i] = applied[v]
+		}
+		latest := "-"
+		if len(migs) > 0 {
+			latest = migs[len(migs)-1].Name
+		}
+		return i18n.Errorf("store.err.migrate.newer_records", "names", strings.Join(names, " "), "latest", latest)
+	}
 	return nil
+}
+
+// CheckApplied は、DB の適用記録をこのバイナリのマイグレーションと突き合わせるだけで、何も適用しない
+// （規則は Migrate と同じ checkAppliedRecords）。migrate を行わずに起動するチームのサーバが、起動の前に呼ぶ。
+// 適用記録の表がまだ無い（見えない）DB は、突き合わせる記録が無いので通す。
+func CheckApplied(ctx context.Context, db *sql.DB, fsys fs.FS) error {
+	_, _, err := Pending(ctx, db, fsys)
+	return err
+}
+
+// Pending は、まだ適用していないマイグレーションのファイル名（番号順）と、DB にある適用記録の件数を返す。何も適用しない。
+// 適用記録は Migrate と同じ規則（checkAppliedRecords）で突き合わせ、食い違えばそのエラーを返す。
+// 適用記録の表がまだ無い（見えない）DB は、記録 0 件・全部が未適用として返す。
+// MySQL は fsys 直下、SQLite は fsys の sqlite/ のファイルを使う（Migrate と同じ）。
+func Pending(ctx context.Context, db *sql.DB, fsys fs.FS) (pending []string, recorded int, err error) {
+	sqlite := IsSQLite(db)
+	var exists string
+	if sqlite {
+		sub, err := fs.Sub(fsys, SQLiteMigrationsDir)
+		if err != nil {
+			return nil, 0, err
+		}
+		fsys = sub
+		exists = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'"
+	} else {
+		exists = "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_migrations'"
+	}
+	migs, err := LoadMigrations(fsys)
+	if err != nil {
+		return nil, 0, err
+	}
+	var n int
+	if err := db.QueryRowContext(ctx, exists).Scan(&n); err != nil {
+		return nil, 0, err
+	}
+	applied := map[int]string{}
+	if n > 0 {
+		if applied, err = appliedMigrations(ctx, db); err != nil {
+			return nil, 0, err
+		}
+		if err := checkAppliedRecords(applied, migs, sqlite); err != nil {
+			return nil, 0, err
+		}
+	}
+	for _, m := range migs {
+		if _, ok := applied[m.Version]; !ok {
+			pending = append(pending, m.Name)
+		}
+	}
+	return pending, len(applied), nil
 }
 
 // SplitStatements は SQL ファイルを文に分ける。行頭の -- コメント行を除き、行末の ; で区切る。

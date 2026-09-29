@@ -180,13 +180,20 @@ func TestUsageFromCLIAndHook(t *testing.T) {
 		t.Errorf("session_end のスナップショット = %d", n)
 	}
 
-	// ③ 送れないときは溜め、次に送れたときに届く（サーバの URL を間違えて 1 回、正しい URL で 1 回）
+	// ③ 送れないときは溜め、次に送れたときに届く。退避はプロジェクト（API の URL + slug）ごとの置き場に分かれ、
+	// 同じ送り先のセッションだけが再送する。まず URL を間違えて 1 回（その URL の置き場に溜まり、正しい URL では送らない）、
+	// 次に送信の待ち時間の設定を読めない値にして同じ送り先で 1 回（送る前に「後で再送」になる）、最後に正しく 1 回
 	claudeTranscript(t, home, "sess-cli",
 		`{"type":"assistant","timestamp":"2026-09-18T01:05:00.000Z","message":{"id":"m6","model":"claude-opus-5","usage":{"input_tokens":4,"cache_creation_input_tokens":0,"cache_read_input_tokens":4,"output_tokens":4}}}`)
 	run(hookIn("SessionEnd", "", `{}`, `{}`), []string{"LOOPTRACK_API_URL=http://127.0.0.1:1/im", "LOOPTRACK_USAGE_TIMEOUT=1"}, "usage-hook")
-	spool, _ := filepath.Glob(filepath.Join(state, "usage-spool", "*.json"))
+	spool, _ := filepath.Glob(filepath.Join(state, "usage-spool", "*", "*.json"))
 	if len(spool) != 1 {
 		t.Fatalf("スプール = %v", spool)
+	}
+	wrongURL := spool[0]
+	run(hookIn("SessionEnd", "", `{}`, `{}`), []string{"LOOPTRACK_USAGE_TIMEOUT=x"}, "usage-hook")
+	if spool, _ = filepath.Glob(filepath.Join(state, "usage-spool", "*", "*.json")); len(spool) != 2 {
+		t.Fatalf("スプール（URL 違いと、同じ送り先の 1 件）= %v", spool)
 	}
 	claudeTranscript(t, home, "sess-cli",
 		`{"type":"assistant","timestamp":"2026-09-18T01:06:00.000Z","message":{"id":"m7","model":"claude-opus-5","usage":{"input_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":5,"output_tokens":5}}}`)
@@ -194,8 +201,9 @@ func TestUsageFromCLIAndHook(t *testing.T) {
 	if n := count("trigger_kind = 'session_end'"); n != 3 {
 		t.Errorf("スプールの再送後の session_end = %d, want 3", n)
 	}
-	if spool, _ = filepath.Glob(filepath.Join(state, "usage-spool", "*.json")); len(spool) != 0 {
-		t.Errorf("スプールが残っている: %v", spool)
+	// URL を間違えた分は別のサーバの置き場なので、このサーバへは送らずに残る
+	if spool, _ = filepath.Glob(filepath.Join(state, "usage-spool", "*", "*.json")); len(spool) != 1 || spool[0] != wrongURL {
+		t.Errorf("残るのは URL を間違えた 1 件だけのはず: %v（%s）", spool, wrongURL)
 	}
 
 	// LOOPTRACK_USAGE=0 で切れる

@@ -1,6 +1,6 @@
 package cli
 
-// login（以前の CLI（1.0.0 より前）と互換。DESIGN.md §5-9）。
+// login（以前の CLI（1.0.0 より前）と互換。DESIGN.md §3-2）。
 //
 //   - login: 標準入力（端末ならエコーなしの入力）のアクセストークンを /me で確かめて資格情報に保存する（控えた client_id は残す）。
 //   - login --browser: サーバの OAuth（MCP と同じ認可コード + PKCE）をブラウザで通し、トークンと更新トークンを保存する。

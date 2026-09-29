@@ -145,6 +145,28 @@ or a package left out all look the same from the summary. When you rest a case
 on a specific red being cleared, run it with `-count=1 -v` and quote the `===
 RUN` and `--- PASS` lines.
 
+`deploy/dev/test-record.sh` collects all of that for you. It runs the command
+above with `-v` added and prints one line to keep as the record of the run: the
+start time, the SHA, the worktree path, whether `-count=1` was on, the elapsed
+time (the whole run, and the `ok` line of `internal/server`), the PASS / FAIL /
+SKIP counts with the names of the skipped and failed tests, the package `ok` /
+`FAIL` / `(cached)` counts, the `go test` runs already going when it started,
+whether `--- PASS: TestSQLiteSchemaMatchesMySQL` appeared, the exit code and
+where the log went.
+
+```bash
+SHA=$(git rev-parse --short HEAD); git worktree add --detach ../verify-$SHA $SHA
+cd ../verify-$SHA && deploy/dev/test-record.sh   # the log goes to $TMPDIR unless you pass --log <path>
+deploy/dev/test-record.sh --parse <log>          # rebuild the line from a saved log, without running anything
+```
+
+It refuses to run when the worktree has uncommitted or untracked changes, since
+the record would not be evidence for that SHA (`--allow-dirty` runs anyway and
+marks the line `dirty`). It keeps the log outside the worktree, and it exits
+with the status of `go test`, printing the line even for a red run. Paste the
+line as it is wherever you report the result. The counting is covered by
+`deploy/dev/test-record_test.sh`, which `go test ./internal/docscheck/` runs.
+
 `GOOS=windows go vet ./...`, `GOOS=windows go build ./...` and `GOOS=windows go
 test -c` only tell you that the code compiles: the test binary they produce
 cannot be run on macOS or Linux. How the code behaves at run time on Windows —

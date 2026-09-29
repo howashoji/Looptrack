@@ -37,6 +37,7 @@ What loop adds:
 The rule texts ship in English and Japanese, and the hooks pick one at run time.
 Confirm mode reacts to requests in English (check, investigate, review, … / implement, fix, add, …) and in Japanese (「確認して」 / 「実装して」). When a request contains both, the Japanese words decide.
 To add your own phrasing, add patterns through `LOOPTRACK_LOOP_TASK_MODE_INVEST_RE` and `LOOPTRACK_LOOP_TASK_MODE_EXEC_RE` in the `env` of your agent settings.
+These are Go regular expressions (RE2), so lookahead and lookbehind such as `(?!…)` are not supported. `LOOPTRACK_LOOP_RUNAWAY_ALLOW` (processes to exempt from the runaway check) is the same. A pattern that cannot be read is ignored, only the default words apply, and the hook shows the variable name and the error as a message.
 
 **The user, not the agent, decides** whether to install loop.
 
@@ -124,7 +125,7 @@ You can install on a machine with neither the CLI nor hooks, starting from just 
 
 1. Add the MCP connection to the agent and authorise it in the browser. To have the agent add the connection too, use the prompts in "Installing by pasting one prompt" below
 2. Ask the agent to "set up issue management". The agent calls the `setup` tool
-3. The `setup` tool first returns only the question of whether to install loop. The agent asks you, then calls `setup` again with your answer, and runs the single command it gets back (download → SHA-256 check → init) after you approve it
+3. The `setup` tool first returns only the question of whether to install loop. The agent asks you, then calls `setup` again with your answer, and runs the single command it gets back (download → SHA-256 check → init) after you approve it. If `~/.local/bin/looptrack` (on Windows, `%LOCALAPPDATA%\Programs\looptrack\looptrack.exe`) is already there, nothing is downloaded or replaced and only init runs with the existing one; if that version is older, the next setup suggests `looptrack self-update`
 4. If there is no token yet, the agent asks for approval and runs `looptrack issue login --browser`. You sign in and allow access in the browser
 5. You restart the agent and approve its hooks
 6. At the start of the next session, a hook tells the server the install is complete, and the [Setup incomplete] note disappears from tool results
@@ -203,9 +204,9 @@ If it already holds a looptrack entry for another project, setup is available at
 Without the project argument, setup would then return the steps for the project in the connection's header (the other project), and the agent would not notice.
 That is why step 4 passes project (setup falls back to the header's project only when the argument is left out).
 After the install, too, the MCP tools use the header's project. If the header names another project, pass the project argument on every MCP tool call.
-Before Codex is restarted, the token check that setup shows (`looptrack issue config`) can fail with `Error: the issue server URL …`.
-The environment variables that init writes into the repository's `.codex/config.toml` take effect only after Codex restarts.
-In that case, run it again with `LOOPTRACK_API_URL` and `LOOPTRACK_PROJECT` set (in the hands-on check, the agent noticed this and added them itself).
+The environment variables that init writes into the repository's `.codex/config.toml` take effect only after Codex restarts. So that it still works
+before Codex is restarted, setup returns the steps' commands (including the token check, `looptrack issue config`) with the server's URL and project
+already prefixed.
 
 ### The prompt for GitHub Copilot (VS Code)
 

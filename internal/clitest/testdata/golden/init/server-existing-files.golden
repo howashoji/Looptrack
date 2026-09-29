@@ -15,7 +15,7 @@ kit の取得元: サーバ（$API/api/v1/dist・SHA-256 を確認）
   更新         .gitignore
   作成         .claude/.looptrack-kit.json
 変更前のファイル: .claude/.looptrack-init-backup/$NOW
-verify: 配線 7 件・looptrack <版> を確かめました
+verify: 配線 8 件・looptrack <版> を確かめました
 次に:
   1. Claude Code を再起動する（env とフックの反映）。フック・設定の確認を求められたら内容を見て承認する（デスクトップ版は確認を出さずに読み込む）
   2. 確認: looptrack issue config → guide → next --dry-run
@@ -95,6 +95,18 @@ ws/.claude/settings.json (0644)
               {
                 "command": "looptrack hook usage --agent claude-code",
                 "timeout": 10,
+                "type": "command"
+              }
+            ],
+            "matcher": "mcp__.*"
+          }
+        ],
+        "PreToolUse": [
+          {
+            "hooks": [
+              {
+                "command": "looptrack hook issue-session-bind --agent claude-code",
+                "timeout": 5,
                 "type": "command"
               }
             ],

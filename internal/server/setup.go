@@ -21,6 +21,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/howashoji/looptrack/internal/guide"
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/relver"
 	"github.com/howashoji/looptrack/internal/service"
@@ -28,7 +29,7 @@ import (
 	"github.com/howashoji/looptrack/kit"
 )
 
-// MCP の接続設定だけで導入が完了するための仕組み（設計は DESIGN.md §5-6）。
+// MCP の接続設定だけで導入が完了するための仕組み（設計は DESIGN.md §6）。
 //   - 接続の記録: initialize の clientInfo を接続（Mcp-Session-Id）ごとに DB へ記録する（/im/mcp は stateless のため）
 //   - setup ツール: 接続してきた AI の種類に合わせた導入手順と、配布物の SHA-256・取得 URL（期限つきの券）を返す
 //   - 導入済み通知: フック（SessionStart の looptrack hook）が POST /projects/{slug}/install で知らせる。
@@ -64,7 +65,7 @@ func agentOf(name string) string {
 		return agentClaudeCode
 	case strings.Contains(n, "codex"):
 		return agentCodex
-	// GitHub Copilot: CLI は "github-copilot-developer"（copilot-cli#432）、VS Code は productService.nameLong
+	// GitHub Copilot: CLI は "copilot-cli"（1.0.86 の実物）か "github-copilot-developer"（copilot-cli#432）、VS Code は productService.nameLong
 	// （"Visual Studio Code"・"Visual Studio Code - Insiders"・ソースからのビルドは "Code - OSS"。mcpServer.ts）。
 	case strings.Contains(n, "copilot") || strings.HasPrefix(n, "visual studio code") || strings.HasPrefix(n, "code - oss") || n == "vscode":
 		return agentCopilot
@@ -339,7 +340,7 @@ type installStateJSON struct {
 	SelfRepo      bool   `json:"self_repo,omitempty"`
 	Message       string `json:"message"`
 	UpdateCommand string `json:"update_command,omitempty"`
-	// 導入セット（DESIGN.md §5-7）。Loop: installed / declined（辞退）/ none（未選択・通知が無い）。
+	// 導入セット（DESIGN.md §8）。Loop: installed / declined（辞退）/ none（未選択・通知が無い）。
 	// StaleKit は一式のハッシュが現在の配布物と違う層（core / loop）。loop は installed のときだけ比べる
 	Loop             string   `json:"loop"`
 	LoopVersion      string   `json:"loop_version,omitempty"`
@@ -372,8 +373,20 @@ func loopStateOf(inst *store.AgentInstall) string {
 	return "none"
 }
 
+// selfRepoLoop は導入を「正本として扱う」か。looptrack 自身のリポジトリ（kit の正本）からの通知で、loop が
+// none（未選択）か declined（辞退）のとき。正本では init がクライアントに拒否されるので loop を問わず・勧めず、
+// .claude/ は kit を指して手で配線する。setup の問い（needLoopAsk）・文（loopPhrase）・辞退の勧め、guide の
+// 「次に読むもの」（composeGuide）、prompt「loop」の選択（loopState）がこの判定だけを見る。installed の通知は通常どおり扱う。
+func selfRepoLoop(selfRepo bool, loop string) bool {
+	return selfRepo && (loop == "none" || loop == "declined")
+}
+
 // loopPhrase は導入済みの文に添える loop の状態。
 func loopPhrase(lang i18n.Lang, st installStateJSON) string {
+	if selfRepoLoop(st.SelfRepo, st.Loop) {
+		// 未選択のまま問わない（needLoopAsk）。「setup の手順で問う」とも「辞退」とも書かない
+		return i18n.T(lang, "server.mcp.setup.loop.self_repo")
+	}
 	switch st.Loop {
 	case "installed":
 		v := st.LoopVersion
@@ -813,8 +826,11 @@ func loopQuestion(lang i18n.Lang, l distLatest) string {
 
 // needLoopAsk は loop を入れるかを利用者に問う状態か。導入状態の loop が none（未選択）で、配布物に kit/loop があり、
 // loop を入れられる AI（Claude Code / Codex / Copilot）のとき（辞退・導入済み・other には問わない）。
+// looptrack 自身のリポジトリ（kit の正本）からの通知にも問わない: 答えに合わせて返す init はクライアントが「自身です」と
+// 拒否するので、問いに答えても実行できないコマンドしか返らない（正本の .claude/ は kit を指して手で配線する）。
+// 問いの手順（loopAskStep）も答えの手順（loopStep）もこの判定だけを見る。
 func needLoopAsk(agent string, st installStateJSON, l distLatest) bool {
-	return st.Loop == "none" && l.HasLoop && agent != agentOther
+	return st.Loop == "none" && l.HasLoop && agent != agentOther && !selfRepoLoop(st.SelfRepo, st.Loop)
 }
 
 // loopAskStep は問いだけの結果の手順（who: human）。コマンドは持たない。
@@ -867,24 +883,33 @@ type setupJSON struct {
 // （yes / no。問う状態なら composeSetupFor が答えのある呼び出しでだけここへ来る）で、答えに合う loop の手順を挟む。
 // 取得と init がある手順（missing・以前の CLI の導入の置き換え）では、取得 + init のコマンドに答えの旗（--loop / --no-loop）を付けた
 // 1 つにし、承認 1 回で導入を終える。
-// Copilot 向けは、手順のコマンドにサーバの URL とプロジェクトを環境変数で前置する（copilotEnv）。
+// Copilot・Codex 向けは、手順のコマンドにサーバの URL とプロジェクトを環境変数で前置する（agentEnvPrefix）。
 func setupStepsFor(lang i18n.Lang, agent, slug, base, dist string, st installStateJSON, l distLatest, g *goSetup, answer string) []setupStepJSON {
 	steps := setupStepsOf(lang, agent, slug, base, dist, st, l, g, answer)
-	if agent != agentCopilot {
+	if !needsEnvPrefix(agent) {
 		return steps
 	}
 	for i := range steps {
 		s := &steps[i]
-		s.Command, s.CommandWindows = copilotEnv(s.Command, base, slug, g.isWindows()), copilotEnv(s.CommandWindows, base, slug, true)
+		s.Command, s.CommandWindows = agentEnvPrefix(s.Command, base, slug, g.isWindows()), agentEnvPrefix(s.CommandWindows, base, slug, true)
 	}
 	return steps
 }
 
-// copilotEnv は Copilot 向けの手順のコマンドの前に、サーバの URL とプロジェクトの環境変数を置く。
-// Claude Code は init が書いた .claude/settings.json の env を CLI に渡すが、Copilot（CLI・VS Code）は渡さないため、
-// 前置しないと「サーバの URL がありません」になる。looptrack は LOOPTRACK_* を読む。
+// needsEnvPrefix は、init が書いた設定を CLI にすぐには渡さない AI かどうか。
+// Copilot（CLI・VS Code）は init が書く設定（.claude/settings.json 相当の env）を持たず、
+// Codex は init が `.codex/config.toml` に書く `[shell_environment_policy]` を Codex を起動し直すまで渡さない。
+// どちらも前置しないと「サーバの URL がありません」になる。
+func needsEnvPrefix(agent string) bool {
+	return agent == agentCopilot || agent == agentCodex
+}
+
+// agentEnvPrefix は Copilot・Codex 向けの手順のコマンドの前に、サーバの URL とプロジェクトの環境変数を置く。
+// Claude Code は init が書いた .claude/settings.json の env を CLI に渡すが、Copilot（CLI・VS Code）は渡さず、
+// Codex は起動し直すまで .codex/config.toml の env を渡さないため、前置しないと「サーバの URL がありません」になる。
+// looptrack は LOOPTRACK_* を読む。
 // && でつないだ後ろのコマンドにも効くよう、sh は export、PowerShell は $env: で置く。空のコマンドはそのまま。
-func copilotEnv(cmd, base, slug string, win bool) string {
+func agentEnvPrefix(cmd, base, slug string, win bool) string {
 	if cmd == "" {
 		return cmd
 	}
@@ -1034,10 +1059,10 @@ func (s *Server) composeSetupFor(ctx context.Context, lang i18n.Lang, base strin
 			fmt.Fprintf(&b, "   %s\n", i18n.T(lang, "server.mcp.setup.text.after_loop_install"))
 		}
 	}
-	if st.Loop == "declined" && agent != agentOther {
+	if st.Loop == "declined" && agent != agentOther && !selfRepoLoop(st.SelfRepo, st.Loop) { // 正本には init を勧めない（クライアントが拒否する）
 		cmd := goInitCommand("looptrack", agent, pr.Slug, base, dist)
-		if agent == agentCopilot {
-			cmd = copilotEnv(cmd, base, pr.Slug, g.isWindows()) // Copilot には環境変数を付けて渡す
+		if needsEnvPrefix(agent) {
+			cmd = agentEnvPrefix(cmd, base, pr.Slug, g.isWindows()) // Copilot・Codex には環境変数を付けて渡す
 		}
 		fmt.Fprintf(&b, "\n%s\n", i18n.T(lang, "server.mcp.setup.text.loop_declined", "command", cmd))
 	}
@@ -1134,7 +1159,7 @@ const loopPromptText = `イシュー管理（looptrack）のループを 1 周�
 4. set_status で Done にし、comment に検証結果（条件ごとの結果と確かめた方法）を書く。プロジェクト別ルールで拒否されたらメッセージの指示に従う。利用者の判断が要るもの（仕様の解釈・見た目・方針）は Done にせず In Review にし、comment に判断してほしい点を書く（人の判断待ち）。結果の末尾に、要件の検証と close を促す行（looptrack issue show <要件ID> と close のコマンドを含む。文面ではなくこのコマンドで判断する）が付いたら、次へ進む前にその要件の受け入れ条件を get_issue で確かめ、満たしていれば set_status で Done にする（comment に検証結果）
 5. 利用者が続けるよう指示していれば次の next へ。そうでなければ、この周の結果（イシュー ID・変更・検証）を報告して止まる`
 
-// loopIteratePromptText は loop（ループエンジニアリング一式）が入っている作業環境の prompt「loop」（DESIGN.md §5-7）。
+// loopIteratePromptText は loop（ループエンジニアリング一式）が入っている作業環境の prompt「loop」（DESIGN.md §8）。
 // skill /iterate（kit/loop）の手順: next → 実装 → ゲート → close → next。0・0' は最小ループと同じ。
 const loopIteratePromptText = `イシュー管理（looptrack）のループを 1 周回してください%s。この作業環境にはループエンジニアリング一式（loop）が入っているので、skill /iterate の手順で回す。
 
@@ -1226,7 +1251,7 @@ func (s *Server) addSetupMCP(srv *mcp.Server, lang i18n.Lang) {
 		Description: i18n.T(lang, "server.mcp.tool.setup"),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}},
 		func(ctx context.Context, req *mcp.CallToolRequest, in setupIn) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1275,7 +1300,7 @@ func (s *Server) addSetupMCP(srv *mcp.Server, lang i18n.Lang) {
 		Description: i18n.T(lang, "server.mcp.prompt.loop.description"),
 		Arguments:   projectArgDef}, func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		text := promptText(lang, loopPromptText, loopPromptTextEN)
-		if s.promptLoopState(ctx, req) == "installed" {
+		if s.promptLoopIterate(ctx, req) {
 			text = promptText(lang, loopIteratePromptText, loopIteratePromptTextEN)
 		}
 		return prompt(text)(ctx, req)
@@ -1290,13 +1315,21 @@ func (s *Server) addSetupMCP(srv *mcp.Server, lang i18n.Lang) {
 	srv.AddReceivingMiddleware(s.setupNoticeMiddleware)
 }
 
-// promptLoopState は prompt を求めた利用者・プロジェクト・AI の loop の状態（installed / declined / none）。
+// promptLoopIterate は prompt「loop」を skill /iterate の版にするか。prompt を求めた利用者・プロジェクト・AI の導入に
+// loop が入っているか、正本として扱う導入（selfRepoLoop）で手で配線した skill のある AI（guide.SelfRepoSkill）のとき。
+func (s *Server) promptLoopIterate(ctx context.Context, req *mcp.GetPromptRequest) bool {
+	st, self, agent := s.promptLoopState(ctx, req)
+	return st == "installed" || (self && guide.SelfRepoSkill(agent))
+}
+
+// promptLoopState は prompt を求めた利用者・プロジェクト・AI の loop の状態（installed / declined / none）と、
+// その導入を正本として扱うか（selfRepoLoop）と、判定した AI。
 // プロジェクトは引数 → X-Looptrack-Project → 唯一のプロジェクト。決まらない・引けないときは none（最小ループ）。
-func (s *Server) promptLoopState(ctx context.Context, req *mcp.GetPromptRequest) string {
+func (s *Server) promptLoopState(ctx context.Context, req *mcp.GetPromptRequest) (string, bool, string) {
 	extra := req.GetExtra()
 	p := principalOfExtra(extra)
 	if p == nil {
-		return "none"
+		return "none", false, ""
 	}
 	c := &mcpCall{p: p, lang: setupMCPLang(extra, p)}
 	if extra.Header != nil {
@@ -1308,39 +1341,41 @@ func (s *Server) promptLoopState(ctx context.Context, req *mcp.GetPromptRequest)
 	}
 	slug, err := s.projectSlug(ctx, c, arg)
 	if err != nil {
-		return "none"
+		return "none", false, ""
 	}
 	pr, _, err := s.resolveProject(ctx, c.lang, p.User, slug)
 	if err != nil {
-		return "none"
+		return "none", false, ""
 	}
 	client := s.mcpClient(ctx, extra, req.ClientInfo(), p.User.ID)
-	st, err := s.loopState(ctx, p.User.ID, pr, client.Agent)
+	st, self, err := s.loopState(ctx, p.User.ID, pr, client.Agent)
 	if err != nil {
 		s.cfg.Logger.Warn("prompt loop state", "err", err)
-		return "none"
+		return "none", false, ""
 	}
-	return st
+	return st, self, client.Agent
 }
 
-// loopState は利用者のそのプロジェクトへの導入の loop の状態。agent が空（AI を判定できない）なら、
-// どれかの AI の導入に loop が入っていれば installed（guide は CLI・REST・MCP で同じ Markdown を返すため agent を使わない）。
-func (s *Server) loopState(ctx context.Context, userID int64, pr store.Project, agent string) (string, error) {
+// loopState は利用者のそのプロジェクトへの導入の loop の状態と、その導入を正本として扱うか（selfRepoLoop）。
+// agent が空（AI を判定できない）なら、どれかの AI の導入に loop が入っていれば installed
+// （guide は CLI・REST・MCP で同じ Markdown を返すため agent を使わない）。AI が決まらないときは正本として扱わない
+// （正本の扱いは AI ごとに違う。guide.SelfRepoSkill）。
+func (s *Server) loopState(ctx context.Context, userID int64, pr store.Project, agent string) (string, bool, error) {
 	installs, err := store.AgentInstalls(ctx, s.db, userID, pr.ID)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	best := "none"
 	for i := range installs {
 		st := loopStateOf(&installs[i])
 		if agent != "" && installs[i].Agent == agent {
-			return st, nil
+			return st, selfRepoLoop(installs[i].SelfRepo, st), nil
 		}
 		if agent == "" && (st == "installed" || (st == "declined" && best == "none")) {
 			best = st
 		}
 	}
-	return best, nil
+	return best, false, nil
 }
 
 // setupNoticeMiddleware は tools/call の結果に、未導入・フック未承認・配布物が古いときの指示を付ける（setup ツール自身には付けない）。
@@ -1365,7 +1400,7 @@ func (s *Server) setupNoticeMiddleware(next mcp.MethodHandler) mcp.MethodHandler
 // setupNotice は、その呼び出しの利用者・プロジェクト・AI の導入状態が最新でなければ指示の文を返す。
 // プロジェクトを決められない呼び出し（複数プロジェクトで project 未指定）には付けない。
 func (s *Server) setupNotice(ctx context.Context, call *mcp.CallToolRequest) string {
-	c, err := mcpCallOf(call)
+	c, err := s.mcpCallOf(call)
 	if err != nil {
 		return ""
 	}

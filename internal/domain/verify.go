@@ -10,11 +10,11 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// 検証コマンド（DESIGN.md §5-8-1・§5-8-2）。
+// 検証コマンド（DESIGN.md §9-3-1・§9-3-2）。
 // 本文の「## 検証コマンド」節（英語の別名 ## Verify commands も同じ。見出しは heading.go の VerifyHeading）から、verify で実行するコマンドを取り出す。
 // 例は testdata/verify_commands.json（verify_test.go が読む）。
 
-// 上限（§5-8-1）。超えたら verify を 400 で拒否し、本文を直すよう返す。
+// 上限（DESIGN.md §9-3-1）。超えたら verify を 400 で拒否し、本文を直すよう返す。
 const (
 	MaxVerifyCommands   = 20
 	MaxVerifyCommandLen = 1000
@@ -76,7 +76,7 @@ func SectionLines(body string, heading *regexp.Regexp) (lines []string, found bo
 	return lines, found
 }
 
-// VerifyCommands は本文の「## 検証コマンド」節からコマンドを取り出す（§5-8-1）。
+// VerifyCommands は本文の「## 検証コマンド」節からコマンドを取り出す（DESIGN.md §9-3-1）。
 //   - 節の中の fenced code block の各行（空行と # で始まる行は捨てる）
 //   - fenced の外では、行全体が 1 つのインラインコードの箇条書き（- `…` / * `…` / 1. `…`）だけ
 //
@@ -142,7 +142,7 @@ func CheckVerifyCommands(lang i18n.Lang, id string, cmds []string) *VerifyLimitE
 	return nil
 }
 
-// BodySHA256 は本文の版（§5-8-3）: 本文（frontmatter とコメント節を除いた body_main）の SHA-256（16 進）。
+// BodySHA256 は本文の版（DESIGN.md §9-3-3）: 本文（frontmatter とコメント節を除いた body_main）の SHA-256（16 進）。
 // コメント・状態変更では変わらない（verify 自身のコメントや close --comment で記録が無効にならない）。
 func BodySHA256(bodyMain string) string {
 	sum := sha256.Sum256([]byte(bodyMain))
@@ -161,7 +161,7 @@ func NoVerifyCommandsMsg(id string) i18n.Msg {
 	return i18n.M("domain.verify.err.no_commands", "id", id)
 }
 
-// 出力のマスク（§5-8-2）。CLI が送る前にかけ、サーバも同じ規則で再度かける。
+// 出力のマスク（DESIGN.md §9-3-2）。CLI が送る前にかけ、サーバも同じ規則で再度かける。
 var secretMasks = []struct {
 	re   *regexp.Regexp
 	repl string

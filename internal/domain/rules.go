@@ -10,7 +10,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// プロジェクト別ルール（DESIGN.md §5）。projects.rules の JSON を解釈して判定する。
+// プロジェクト別ルール（DESIGN.md §9-1）。projects.rules の JSON を解釈して判定する。
 // ルールはデータで持ち、コードにプロジェクト固有の分岐を入れない。メッセージは rules の message テンプレートで
 // 上書きでき、{id} {status} {hit} {bugs} {count} を置き換える。
 
@@ -30,7 +30,7 @@ type Rules struct {
 	Acceptance *AcceptanceRule `json:"acceptance,omitempty"`
 }
 
-// VerifyRule は検証コマンドの記録の必須化（DESIGN.md §5-8-4）。RequireOnClose が true なら、
+// VerifyRule は検証コマンドの記録の必須化（DESIGN.md §9-3-4）。RequireOnClose が true なら、
 // 「## 検証コマンド」節を持つイシューを Statuses（既定 Done だけ）にするとき、直近の verify が現在の本文に対する
 // 全件成功であることを求める（理由付きで上書き可）。経路（AI・人）を問わない。
 // Message は 3 つの状態（記録なし・本文が変わった・失敗）で共通の上書き（{id} {status} {command} {state} {failed}）。
@@ -40,7 +40,7 @@ type VerifyRule struct {
 	Message        string   `json:"message,omitempty"`
 }
 
-// UsageRule はトークン計測（DESIGN.md §5-4）の強さ。RequireOnClose が false（既定）なら警告だけで、
+// UsageRule はトークン計測（DESIGN.md §9-5）の強さ。RequireOnClose が false（既定）なら警告だけで、
 // true なら AI からの操作で Statuses（既定 Done / Canceled）にするとき、その会話のトークン情報が
 // そのイシューに 1 件以上あることを求める（理由付きで上書き可）。
 // CasePattern は案件ラベルの正規表現。レポートの案件別（by_case）で、区間の帰属先イシューのラベル、無ければ

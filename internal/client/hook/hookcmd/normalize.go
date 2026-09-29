@@ -2,7 +2,8 @@ package hookcmd
 
 // 包んだ形（前置の語・入れ子のシェル・eval）をほどいて、判定に掛ける文字列を作る段。**ここが唯一の置き場**で、
 // 秘密のガード・git ガード・待ちループのガード（と、それを使う stop-runaway-background-process）・
-// 別リポジトリの変更の確認（pre-tool-scope-guard。ほどく段だけ）が同じ関数を呼ぶ。
+// 別リポジトリの変更の確認（pre-tool-scope-guard。ほどく段だけ）・記録する側の hook（鮮度ガードの実作業と参照の記録・
+// 引き継ぎの完了の記録）が同じ関数を呼ぶ。
 // 同じ規則を hook ごとに写すと、次に片方だけが直り、経路によって効いたり効かなかったりする状態が残る
 // （実測: `bash -c '…'` は待ちループのガードでは止まり、秘密のガードでは素通りしていた。逆に前置の語は
 // 秘密のガードだけが外していた。試した人は「どれかは止まった」と報告でき、止まらない組み合わせだけが残る）。
@@ -72,6 +73,24 @@ var prefixWordSet = func() map[string]bool {
 // （git ガードは deny なので、そのガードについて書く作業そのものが止まる）。
 func Normalize(cmd string, pos UnwrapPos) string {
 	return StripCommandPrefixes(UnwrapNestedShell(cmd, pos))
+}
+
+// lineContRe は行末の継続（バックスラッシュ + 改行）と、コマンドの末尾に残るバックスラッシュ。
+var lineContRe = regexp.MustCompile(`\\(?:\r?\n|$)`)
+
+// JoinContinuations は行末の継続（バックスラッシュ + 改行）をシェルと同じように取り除いて行をつなぐ。
+//
+// つながずに判定すると、`git \` + 改行 + `commit` は `git` と `commit` が別の行（改行は区切り）に分かれ、
+// `cat /p/.env\` + 改行 は語が `.env\` になる。長いコマンドを読みやすく折り返しただけで判定が黙る。
+//
+// 取り除くのは**改行（か文字列の終わり）が直後に来るバックスラッシュだけ**。Windows のパスの区切り
+// （C:\tmp\x.txt）は後ろに改行が無いので壊れない。
+//
+// **Normalize には含めない**（呼ぶ側が選ぶ）。git ガードは行末の継続を「止めないもの」として文書にしており、
+// Normalize に入れると deny の範囲が黙って広がる。いまこれを呼ぶのは、秘密のガード（ask）と、記録する側の
+// hook（鮮度ガード・引き継ぎの完了の記録）。
+func JoinContinuations(cmd string) string {
+	return lineContRe.ReplaceAllString(cmd, "")
 }
 
 // UnwrapPos は入れ子のシェルをどの位置で当てるか。**呼ぶ側が必ず明示する**（既定値に頼らない）。

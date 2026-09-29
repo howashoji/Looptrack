@@ -6,7 +6,8 @@
 //	looptrack settings two-factor …       二段階認証の必須 / 任意（settings.go）
 //	looptrack project create|list          プロジェクトの作成・一覧（ADD-PROJECT.md）
 //	looptrack project rules set|show|clear プロジェクト別ルール
-//	looptrack migrate                     DB スキーマを最新にする（接続先は環境変数 LOOPTRACK_DSN）
+//	looptrack migrate [--check]           DB スキーマを最新にする（接続先は環境変数 LOOPTRACK_DSN）。--check は未適用を示すだけ
+//	looptrack grants print|apply          MySQL のアプリ用の利用者に最小権限（deploy/grants.sql）を与える（grants.go）
 //	looptrack import --root <dir> [slug…] 旧形式（Markdown）を DB に取り込む（プロジェクト単位で置き換え）
 //	looptrack verify --root <dir> [slug…] DB から再生成したファイルが旧形式とバイト一致するか確認する
 //	looptrack export --out <dir> [slug…]  DB を旧形式で書き出す（移行時の確認・一時出力用）
@@ -41,7 +42,8 @@ var serverCommands = map[string]func(args []string) int{
 	"project":      projectCmd,
 	"healthcheck":  func([]string) int { return healthcheck() },
 	"secret-key":   func([]string) int { return secretKeyCmd() },
-	"migrate":      func([]string) int { return migrate() },
+	"migrate":      migrateCmd,
+	"grants":       grantsCmd,
 	"import":       importCmd,
 	"verify":       verifyCmd,
 	"export":       exportCmd,
@@ -68,6 +70,45 @@ func openDB() (*sql.DB, error) {
 		return nil, err
 	}
 	return db, db.Ping()
+}
+
+// migrateExitPending は migrate --check で未適用のマイグレーションがあるときの終了コード（誤りの 1・使い方の 2 と分ける）。
+// install.sh の無人の更新（自動の置き換え）が、置き換えの前に「新しい版が DB の形を変えるか」を知るのに使う。
+const migrateExitPending = 3
+
+// migrateCmd は looptrack migrate [--check]。--check は何も適用せず、未適用のマイグレーションを 1 行ずつ示して、
+// あれば migrateExitPending・無ければ 0 で終わる（適用記録の突き合わせは serve の起動と同じ store.Pending）。
+func migrateCmd(args []string) int {
+	check := false
+	for _, a := range args {
+		switch a {
+		case "--check":
+			check = true
+		default:
+			return usageErr(i18n.T(cmdLang(), "cmd.migrate.usage", "arg", a))
+		}
+	}
+	if !check {
+		return migrate()
+	}
+	lang := cmdLang()
+	db, err := openDB()
+	if err != nil {
+		return fail(err)
+	}
+	defer db.Close()
+	pending, _, err := store.Pending(context.Background(), db, migrations.FS)
+	if err != nil {
+		return fail(err)
+	}
+	if len(pending) == 0 {
+		fmt.Println(i18n.T(lang, "cmd.migrate.up_to_date"))
+		return 0
+	}
+	for _, name := range pending {
+		fmt.Println(i18n.T(lang, "cmd.migrate.pending", "name", name))
+	}
+	return migrateExitPending
 }
 
 func migrate() int {
@@ -192,6 +233,7 @@ func exportCmd(args []string) int {
 	lang := cmdLang()
 	fs := flag.NewFlagSet("export", flag.ExitOnError)
 	out := fs.String("out", "", i18n.T(lang, "cmd.arg.export.out"))
+	archived := fs.Bool("archived", false, i18n.T(lang, "cmd.arg.export.archived"))
 	_ = fs.Parse(args)
 	if *out == "" {
 		return fail(i18n.Errorf("cmd.err.out_required"))
@@ -201,7 +243,7 @@ func exportCmd(args []string) int {
 		return fail(err)
 	}
 	defer db.Close()
-	n, err := transfer.Export(context.Background(), db, *out, fs.Args())
+	n, err := transfer.Export(context.Background(), db, *out, fs.Args(), *archived)
 	if err != nil {
 		return fail(err)
 	}

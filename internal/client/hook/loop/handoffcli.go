@@ -42,6 +42,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/howashoji/looptrack/internal/client/dashstdin"
 	clientenv "github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/client/session"
 	"github.com/howashoji/looptrack/internal/hookio"
@@ -172,24 +173,26 @@ func handoffParse(args []string) (handoffOpts, string) {
 	return o, ""
 }
 
-// handoffReadBody は本文（位置引数が無いか "-" なら標準入力）。
+// handoffReadBody は本文（位置引数が無いか "-" なら標準入力。「-」の判定は dashstdin を共有する
+// — issue comment・new --body 等の CLI と同じ規則を 2 か所に書かないため）。
 func handoffReadBody(o handoffOpts, stdin io.Reader, stderr io.Writer, lang i18n.Lang) (string, int) {
 	if len(o.args) > 1 {
 		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.too_many_args"))
 		return "", handoffExitUsage
 	}
-	if len(o.args) == 1 && o.args[0] != "-" {
-		return o.args[0], handoffExitOK
+	arg := dashstdin.Dash // 位置引数が無いときも標準入力を読む（以前からの挙動）
+	if len(o.args) == 1 {
+		arg = o.args[0]
 	}
-	if stdin == nil {
-		return "", handoffExitOK
-	}
-	b, err := io.ReadAll(stdin)
+	raw, used, err := dashstdin.Resolve(arg, stdin)
 	if err != nil {
 		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.io_error", "path", "-", "err", err.Error()))
 		return "", handoffExitError
 	}
-	return decodeReplace(b), handoffExitOK
+	if !used {
+		return string(raw), handoffExitOK
+	}
+	return decodeReplace(raw), handoffExitOK
 }
 
 // handoffCLIFile は書き込むファイル（--file → 鮮度ガードと同じ解決）。

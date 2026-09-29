@@ -3,7 +3,7 @@ package loop
 // user-prompt-task-mode・pre-edit-task-mode-guard（kit/loop/hooks/user-prompt-task-mode.sh・pre-edit-task-mode-guard.sh の Go 版）。
 //
 // 「確認して」等 → 確認モード（investigate。編集は PreToolUse で deny）、「実装して」等 → 実行モード（execute）。
-// 英語の依頼（please check … / implement …）も同じ（DESIGN.md §5-13。kit の bash 版には足さない）。
+// 英語の依頼（please check … / implement …）も同じ（DESIGN.md §9-6。kit の bash 版には足さない）。
 // モードはセッションごとに <状態>/task-mode.d/<session_id> に記録する（session_id が無ければ共有の <状態>/task-mode）。
 // 7 日より古い記録は消し、ガードは 24 時間より古い記録を無効として扱う。
 //
@@ -32,14 +32,19 @@ var (
 	// （実測: 2026-09-20、他セッションの連絡 1 通で確認モードに落ち、次の連絡で実行モードに戻った）。
 	// タスクの通知と同じく、ブロックを含むメッセージ全体を判定しない（Claude Code はこの形のメッセージに
 	// 利用者自身の文を混ぜない。連絡の前後に付くのは harness の定型文だけ）。
-	notificationRe = regexp.MustCompile(`<task-notification>|<cross-session-message[\s>]|\[SYSTEM NOTIFICATION|<local-command-caveat>|<command-name>|^\s*` +
+	// <agent-message …> はサブエージェントの最終報告。Claude Code は同じく「Another Claude session sent a message:」に続けて
+	// このタグで包んだ本文を UserPromptSubmit に渡す。報告の文面にも「確認して」「実装して」等の語が出るので、同じ理由で判定しない。
+	// 利用者が自分の文にこのタグの名前を書いたり報告を貼ったりしても判定するよう、当てるのは 1 行目か 2 行目の行頭の
+	// <agent-message from=…（属性つき。harness の定型文が 1 行目に来る）だけにする（定型文の文言には依存しない）。
+	// <cross-session-message は位置を問わず当たる。利用者が貼った文でも判定しない（同じ穴。ここでは触らない）。
+	notificationRe = regexp.MustCompile(`<task-notification>|<cross-session-message[\s>]|^\s*(?:[^\n]*\n[ \t]*)?<agent-message\s+from=|\[SYSTEM NOTIFICATION|<local-command-caveat>|<command-name>|^\s*` +
 		regexp.QuoteMeta(hookio.CopilotStopMarker))
 	execWords = regexp.MustCompile(`(実行して|作業して|実装して|作成して|執筆して|修正して|直して|対応して|適用して|反映して|やって|作って|書いて|` +
 		`追加して|削除して|変更して|更新して|移植して|コミットして|マージして|デプロイして|リリースして)`)
 	investWords = regexp.MustCompile(`(確認して|確認だけ|調査して|調べて|洗い出して|監査して|チェックして|検証して|レビューして|分析して|整理して|選別して|` +
 		`計画(を|案を)?(立てて|提示して|作って)|提案して|提示して)`)
 
-	// 英語の別名（DESIGN.md §5-13）。単語の境界で、英字の大小を問わずに判定する（fixture を fix と読まない）。
+	// 英語の別名（DESIGN.md §9-6）。単語の境界で、英字の大小を問わずに判定する（fixture を fix と読まない）。
 	// \b は ASCII の単語の境界。語の間の空白は 1 つ以上
 	execWordsEn   = regexp.MustCompile(`(?i)\b(implement|fix|apply|create|write|add|remove|update|commit|merge|deploy|release|go\s+ahead)\b`)
 	investWordsEn = regexp.MustCompile(`(?i)\b(check|investigate|look\s+into|review|audit|analy[sz]e|explain|propose|plan)\b`)
@@ -67,23 +72,28 @@ func UserPromptTaskMode(ctx context.Context, ev hookio.Event) (hookio.Result, er
 		rel = relpath(marker, r)
 	}
 
-	hit := func(base *regexp.Regexp, extra string) bool {
-		if base.MatchString(prompt) {
-			return true
+	// 利用者が足した正規表現は RE2 で読めないことがある（先読み・後読みなど）。読めないものは既定の語だけで判定を続け、
+	// 黙って無視せずに変数名と誤りを利用者に知らせる（どちらの変数も、判定に使われるかに関わらず先に読む）
+	badRE := func(name string, err error) string {
+		if err == nil {
+			return ""
 		}
-		if rx := compileUser(extra); rx != nil {
-			return rx.MatchString(prompt)
-		}
-		return false
+		return i18n.T(e.lang(), "loop.userregex.invalid.taskmode", "name", name, "err", err.Error())
+	}
+	execExtra, execErr := e.userRegexp("LOOPTRACK_LOOP_TASK_MODE_EXEC_RE")
+	investExtra, investErr := e.userRegexp("LOOPTRACK_LOOP_TASK_MODE_INVEST_RE")
+	notice := joinNotices(badRE("LOOPTRACK_LOOP_TASK_MODE_EXEC_RE", execErr), badRE("LOOPTRACK_LOOP_TASK_MODE_INVEST_RE", investErr))
+	hit := func(base, extra *regexp.Regexp) bool {
+		return base.MatchString(prompt) || (extra != nil && extra.MatchString(prompt))
 	}
 	// 実行系が確認系に勝つ（日本語・英語とも）。日本語の語（と利用者が足した語）で決まればそれを使い、英語の語は
 	// 日本語で決まらないときだけ見る（「deploy.sh を確認して」「コミットの update 漏れを確認して」のように、コマンド名・
 	// ファイル名の英単語を含む日本語の依頼を今までどおり確認モードにする）
 	mode := ""
 	switch {
-	case hit(execWords, e.env("LOOPTRACK_LOOP_TASK_MODE_EXEC_RE")):
+	case hit(execWords, execExtra):
 		mode = "execute"
-	case hit(investWords, e.env("LOOPTRACK_LOOP_TASK_MODE_INVEST_RE")):
+	case hit(investWords, investExtra):
 		mode = "investigate"
 	case execWordsEn.MatchString(prompt):
 		mode = "execute"
@@ -117,20 +127,24 @@ func UserPromptTaskMode(ctx context.Context, ev hookio.Event) (hookio.Result, er
 
 	lang := e.lang()
 	var msg string
+	var kind string // 判定の記録の種類（定数の語だけ）
 	switch {
 	case mode == "investigate":
-		msg = i18n.T(lang, "loop.taskmode.investigate")
+		msg, kind = i18n.T(lang, "loop.taskmode.investigate"), "task-mode: investigate"
 	case mode == "execute":
-		msg = i18n.T(lang, "loop.taskmode.execute")
+		msg, kind = i18n.T(lang, "loop.taskmode.execute"), "task-mode: execute"
 		if note := trimSpace(e.env("LOOPTRACK_LOOP_TASK_MODE_EXEC_NOTE")); note != "" {
 			msg += note
 		}
 	case current == "investigate":
-		msg = i18n.T(lang, "loop.taskmode.continued", "marker", rel)
+		msg, kind = i18n.T(lang, "loop.taskmode.continued", "marker", rel), "task-mode: continued"
 	default:
+		if notice != "" {
+			return hookio.Result{SystemMessage: notice, Kind: "task-mode: invalid_regex"}, nil
+		}
 		return hookio.Result{}, nil
 	}
-	return hookio.Result{Context: msg}, nil
+	return hookio.Result{Context: msg, SystemMessage: notice, Kind: kind}, nil
 }
 
 // firstLine は最初の改行までの 1 行（改行を含む）。
@@ -233,5 +247,5 @@ func editGuardDeny(e *Env, r, marker, p string) (hookio.Result, bool) {
 		reason += i18n.T(lang, "loop.taskmode.deny.allow_dirs", "dirs", strings.Join(ds, " "))
 	}
 	reason += i18n.T(lang, "loop.taskmode.deny.target", "path", p)
-	return hookio.Result{Deny: reason}, true
+	return hookio.Result{Deny: reason, Kind: "task-mode: investigate_edit"}, true
 }

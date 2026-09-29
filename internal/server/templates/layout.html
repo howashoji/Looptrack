@@ -41,7 +41,31 @@
     </div>
     {{template "usermenu" .}}
   </div>
+  {{- template "update_notice" .}}
 {{- end}}
+
+{{/* update_notice は新しい版の帯（ヘッダの行の下。確認の結果を渡したときだけ出す）。
+     リリースのページの URL は https:// のものだけが来る（updatecheck.Result.Notice）。
+     デスクトップ版: 止め方の案内は、トレイを出していればメニューの「新しい版を確認する」、出していなければ環境変数（updateStopInTray）。
+     サーバ版（updateServer。looptrack serve）: role が admin の利用者にだけ出し、更新の 1 行（install.sh --upgrade）と止め方（.env）を案内する。
+     デスクトップ版の「更新する」（updateApply。UpdateApplier を渡したときだけ）: 置き換えられて進行中でなく、CSRF のある画面だけに
+     POST {base}/update/apply のフォームを出す（ログアウトと同じ hidden の csrf）。進行中はボタンの代わりに進行中の文面、
+     直近の失敗がこの版のものなら失敗の文面を出す。 */}}
+{{define "update_notice"}}{{with updateNotice}}{{if or (not updateServer) (and $.User (eq $.User.Role "admin"))}}{{$n := .}}
+  <div class="appbar-update" role="status">{{T $.Lang "server.web.common.update_available" "version" .Version "current" .Current}}
+    {{- with updateApply}}
+      {{- if .Running}} <strong class="appbar-update-state">{{T $.Lang "server.web.common.update_applying" "version" $n.Version}}</strong>
+      {{- else}}
+        {{- if and .FailedReason (eq .FailedVersion $n.Version)}} <strong class="appbar-update-state">{{T $.Lang "server.web.common.update_apply_failed" "version" $n.Version "reason" .FailedReason}}</strong>{{end}}
+        {{- if .Ready}}{{with $.CSRF}} <form class="appbar-update-form" method="post" action="{{base}}/update/apply"><input type="hidden" name="csrf" value="{{.}}"><button type="submit" class="small">{{T $.Lang "server.web.common.update_apply"}}</button></form>{{end}}{{end}}
+      {{- end}}
+    {{- end}}
+    {{- with .URL}} <a href="{{.}}" target="_blank" rel="noopener noreferrer">{{T $.Lang "server.web.common.update_release_page"}}</a>{{end}}
+    {{- if updateServer}} <span class="appbar-update-hint">{{T $.Lang "server.web.common.update_hint_server"}} <code>{{updateCommand}}</code>
+      {{T $.Lang "server.web.common.update_hint_server_stop" "name" "LOOPTRACK_UPDATE_CHECK"}}</span>
+    {{- else if updateStopInTray}} <span class="appbar-update-hint">{{T $.Lang "server.web.common.update_hint_tray"}}</span>
+    {{- else}} <span class="appbar-update-hint">{{T $.Lang "server.web.common.update_hint_env" "name" "LOOPTRACK_UPDATE_CHECK"}}</span>{{end}}</div>
+{{- end}}{{end}}{{end}}
 
 {{define "appbar_close"}}
 </header>

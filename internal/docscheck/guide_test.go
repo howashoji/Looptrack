@@ -14,13 +14,15 @@ import (
 //  1. 英語版と日本語版で .md のファイル名がそろっている
 //  2. 各ファイルの見出しの階層の並び（コードブロックの外）・コードブロックの数・表の数が同じ
 //  3. 相対リンクの先のファイルがある
-//  4. 社内固有の名前・内部の番号が無い（公開リポジトリ github.com/<組織>/looptrack は除く）
+//  4. 社内固有の名前・内部の番号が無い（公開リポジトリ github.com/<組織>/looptrack と、そのインストーラを取る
+//     raw.githubusercontent.com/<組織>/looptrack は除く）
 
 // 語は分けて書く（このファイル自身が公開物の検査に掛からないように）
 var (
 	org       = "howa" + "shoji"
 	forbidden = regexp.MustCompile(strings.Join([]string{`IM` + `-[0-9]`, "HP" + "C-", "REQ" + "-", "RW" + "-", org, "宝" + "和", `dev\.` + org}, "|"))
 	allowed   = "github.com/" + org + "/looptrack"
+	allowRaw  = "raw.githubusercontent.com/" + org + "/looptrack"
 	link      = regexp.MustCompile(`\]\(([^)#\s]+)(#[^)]*)?\)`)
 	fence     = regexp.MustCompile("^\\s*(```|~~~)")
 	heading   = regexp.MustCompile(`^(#{1,6})\s`)
@@ -118,12 +120,16 @@ func TestGuideStructure(t *testing.T) {
 }
 
 func TestGuideWordsAndLinks(t *testing.T) {
+	// 相対リンクを 1 本も見ずに緑になるのを塞ぐ（link の式か読み方が崩れると、リンク切れの検査は何も見ずに通る）。
+	checked := map[string]bool{} // 調べた相対リンク（"<相対パス> -> <リンク先>"）
+	files := 0
 	for _, dir := range []string{guideDir, filepath.Join(guideDir, "ja")} {
 		for _, n := range mdNames(t, dir) {
+			files++
 			p := filepath.Join(dir, n)
 			rel, _ := filepath.Rel(guideDir, p)
 			for i, line := range strings.Split(read(t, p), "\n") {
-				if forbidden.MatchString(strings.ReplaceAll(line, allowed, "")) {
+				if forbidden.MatchString(strings.ReplaceAll(strings.ReplaceAll(line, allowRaw, ""), allowed, "")) {
 					t.Errorf("%s:%d: 社内固有の名前か内部の番号: %s", rel, i+1, strings.TrimSpace(line))
 				}
 				for _, m := range link.FindAllStringSubmatch(line, -1) {
@@ -131,12 +137,22 @@ func TestGuideWordsAndLinks(t *testing.T) {
 					if scheme.MatchString(target) {
 						continue
 					}
+					checked[filepath.ToSlash(rel)+" -> "+target] = true
 					if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(target))); err != nil {
 						t.Errorf("%s:%d: リンク先がありません: %s", rel, i+1, target)
 					}
 				}
 			}
 		}
+	}
+	t.Logf("docs/guide の .md %d 本・相対リンク %d 本を調べました", files, len(checked))
+	// 下限は実物（2026-09 に 20 本・重複を除いた相対リンク 104 本）のおよそ半分。
+	if files < 10 || len(checked) < 60 {
+		t.Fatalf("調べた .md が %d 本・相対リンクが %d 本しかありません（走査か link の式が空振りしています）", files, len(checked))
+	}
+	// 検出できる側の対照: 目次から各章へのリンクを実際に調べていること。
+	if want := "README.md -> concepts.md"; !checked[want] {
+		t.Errorf("%s を調べていません（link の式が目次のリンクに当たっていません）", want)
 	}
 }
 

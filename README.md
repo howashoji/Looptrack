@@ -2,32 +2,51 @@
 
 *日本語版: [README.ja.md](README.ja.md)*
 
-Looptrack is a tool that makes it easy to bring loop engineering into AI-driven
-development.
+**Looptrack is an issue tracker serving as external memory for AI coding agents,
+enabling loop engineering.** It records the work items an AI plans, apart from
+your project's own issues, shows the plans and decisions behind them, and logs
+the tokens each task consumed so you can report on them.
 
-In vibe coding, an AI can remember what it is working on only as far as its
-context window reaches. It cannot hold more than that, so across sessions it
-may repeat work or skip it. That calls for a memory kept outside the AI, and
-Looptrack was built to be one: a task memory made for AI.
+Four things make that matter:
 
-By loop engineering we mean running *start → work → verify → close* from an
-issue, with the AI and people working on the same record. The biggest benefit
-is that it takes you a step beyond solo vibe coding: you can run that loop
-**with team development in mind**. People review the same issues in a browser,
-so a whole team can share one loop.
+- **External memory for AI coding agents.** In vibe coding, an AI can remember
+  what it is working on only as far as its context window reaches. It cannot
+  hold more than that, so across sessions it may repeat work or skip it. That
+  calls for a memory kept outside the AI, and Looptrack was built to be one: a
+  task memory made for AI. Every session and every agent reads the same issues,
+  so what one session decided is still there for the next.
+- **Loop engineering, made real.** By loop engineering we mean running
+  *start → work → verify → close* from an issue, with the AI and people working
+  on the same record. The biggest benefit is that it takes you a step beyond solo
+  vibe coding: you can run that loop **with team development in mind**. People
+  review the same issues in a browser, so a whole team can share one loop.
+- **AI-planned work items, kept apart from project issues.** The feature requests
+  and bug reports people discuss stay in your project's own tracker. Looptrack
+  holds the units an AI breaks that work into — requirements, designs, tasks, the
+  bugs it runs into, tests — tied together by parent and trace links, small
+  enough to pick up one at a time and close with evidence.
+- **Plans, decisions and tokens in plain view.** The plan is the issue itself:
+  its body, its acceptance criteria and its child tasks. Causes found, decisions
+  made and verification results are added as comments that can never be edited
+  or deleted, anything that needs a human's judgement collects in *In Review*,
+  and people read all of it in a browser. The tokens each task consumed are
+  recorded as well and come out as an analysis report (a PDF).
 
 Under the hood, it is an issue tracker for the loop between an AI and a human.
-Looptrack keeps the issues of many projects — features, bugs, requirements — in
-one server (a single Go binary on MySQL or SQLite) and hands them to coding
-agents (Claude Code, Codex, GitHub Copilot) over a CLI, a remote MCP endpoint and
-hooks. People read and review the same issues in a browser.
+Looptrack keeps the issues of many projects in one server (a single Go binary on
+MySQL or SQLite) and hands them to coding agents (Claude Code, Codex, GitHub
+Copilot) over a CLI, a remote MCP endpoint and hooks. People read and review the
+same issues in a browser.
 
 Issues never get committed into the repositories being tracked. The database is
 the source of truth, and the work products stay free of tracking numbers.
 
 ## Why another tracker
 
-Because an agent can run the loop by itself if something keeps the rules.
+A project's own tracker holds what people ask for. Looptrack is the second place
+an agent needs: one where that work is broken into items it can take one at a
+time, and where something keeps the rules — because with that, an agent can run
+the loop by itself.
 
 Looptrack turns *file an issue → start it (`next`) → work → verify → close → next*
 into something an agent performs, with the server enforcing what must not slip:
@@ -65,7 +84,7 @@ What you get out of the box:
 - **Claude Code fits first.** Two lines in a project's `.claude/settings.json`
   point it at the server. Codex and Copilot are wired from the same manifest.
 - **Token accounting.** Consumption is attributed to sessions, agents, stages and
-  issues, and comes out as a PDF report.
+  issues, and comes out as a PDF report (see [Token reports](#token-reports)).
 
 ## Getting started
 
@@ -95,27 +114,33 @@ Details, including how each OS behaves on the first launch:
 
 ### 2. On a Linux server — `install.sh`
 
-On an Ubuntu LTS or Debian server, one POSIX shell script does
-**fetch → `looptrack setup` → start → health check**, including creating the
-systemd unit (or the Compose file) and printing reverse-proxy examples.
+On an Ubuntu LTS or Debian server, one line runs the installer (a POSIX shell
+script). It does **download → verify → unpack → `looptrack setup` → (MySQL
+grants) → start → health check**, including creating the systemd unit (or the
+Compose file) and printing reverse-proxy examples.
 
 ```sh
-# 1) Get the installer and read it before you run it
-VER=v1.0.0
-curl -fsSL -O "https://github.com/howashoji/looptrack/releases/download/$VER/install.sh"
-less install.sh
-
-# 2) Run it. --from is where the binary comes from; verify SHA256SUMS and the
-#    minisign signature before installing.
-sudo sh install.sh --from "https://github.com/howashoji/looptrack/releases/download/$VER"
-
-# As a single line, once you have read it (both arguments point at the same place)
-curl -fsSL "https://github.com/howashoji/looptrack/releases/download/$VER/install.sh" |
-  sudo sh -s -- --from "https://github.com/howashoji/looptrack/releases/download/$VER"
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
 ```
 
-To install from artifacts you built yourself (the output of
-`deploy/release/dist.sh`), pass that directory to `--from`:
+The installer downloads the newest release's
+`looptrack_<version>_linux_<arch>_server.tar.gz` from GitHub Releases, checks it
+against `SHA256SUMS` — and the minisign signature of `SHA256SUMS` when the
+server has `minisign`; `--require-signature` makes the signature mandatory —
+and only then unpacks it and puts `looptrack` in place. The script itself is
+fetched over HTTPS only and cannot verify itself (it carries the key and the
+steps), so if you want to read it before running it:
+
+```sh
+curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh
+less install.sh
+sudo sh install.sh                      # sudo sh install.sh --version v1.0.0 to pin a version
+```
+
+Options go after `sh -s --` in the one-line form (for example
+`… | sudo sh -s -- --version v1.0.0`). To install from artifacts you built
+yourself (the output of `deploy/release/dist.sh build`), pass that directory to
+`--from`:
 
 ```sh
 sudo sh deploy/install.sh --from /path/to/dist
@@ -127,17 +152,32 @@ examples** (also written to `/etc/looptrack/proxy-examples.txt`), the browser
 URL, the CLI sign-in command and the MCP connection settings. Put the proxy in
 front and sign in on the public URL.
 
-**If you choose MySQL and want the application's database user restricted to the
-minimum grants ([deploy/grants.sql](deploy/grants.sql)), the order matters.**
-Per-table `GRANT` statements can only run once the tables exist, so it is
-`install.sh` (setup creates the tables) → run `grants.sql` with administrative
-credentials → `install.sh` again (just start and check). The installer verifies
-that the application's user can read before starting, and stops with these
-instructions if it cannot.
+**If you choose MySQL and restrict the application's database user to the
+minimum grants ([deploy/grants.sql](deploy/grants.sql)), the same run takes
+care of them.** Per-table `GRANT` statements can only run once the tables exist,
+so after `looptrack setup` creates the tables the installer asks on the terminal
+for administrative MySQL credentials (not shown, not stored), creates the
+application user if it does not exist yet, applies the grants built into
+`looptrack` (`looptrack grants print` shows them), checks that the application
+user can read, and then starts the server. If the credentials are wrong it stops
+before starting anything; run it again and it picks up at the question.
+If the database does not exist yet, setup asks for the same administrative
+credentials up front and, after asking whether to go ahead, creates the database
+too (you are asked only once). This needs the user that creates the tables
+(`LOOPTRACK_SETUP_MIGRATE_DSN`) and its `GRANT` on that database to be in place
+first; without them it stops at the connection as before. Answer no and it
+stops without creating anything, showing the `CREATE DATABASE` statement to run
+yourself.
 
-Upgrade with `sudo sh install.sh --upgrade --from <source>`, remove with
-`--uninstall` (`--purge` also removes configuration and data). Options and how to
-verify what you downloaded: [DEPLOY.md](docs/server/DEPLOY.md).
+The installer is for Linux only. To run a server on macOS or Windows, use the
+desktop edition above.
+
+Upgrade with
+`curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade`,
+remove with `--uninstall` (`--purge` also removes configuration and data).
+Servers installed with the `install.sh` of 1.0.0-rc.1 or rc.2 upgrade the same
+way. Options and how to verify what you downloaded:
+[DEPLOY.md](docs/server/DEPLOY.md).
 
 ### 3. Anywhere with Docker — Compose
 
@@ -217,7 +257,7 @@ of the installation (same order; run it again after changing the language).
 | URL | What it is |
 | -- | -- |
 | `https://example.com/looptrack/` | Project picker (sign-in required) |
-| `https://example.com/looptrack/p/<slug>/` | Board / list / trace, with issue detail (read-only) |
+| `https://example.com/looptrack/p/<slug>/` | Board / list / trace, with issue detail (minimal forms to file, change status, comment and reassign) |
 | `https://example.com/looptrack/account` | Account settings: issue and revoke access tokens, change password |
 | `https://example.com/looptrack/admin/users` | User administration (administrators) |
 | `https://example.com/looptrack/api/v1/` | REST API (bearer token) |
@@ -241,9 +281,13 @@ description each. Inside a project, one bar switches between three views of the
 same issues — a **board** with a column per status, a **list** you can filter and
 sort, and a **trace** view following the links between issues — and selecting an
 issue opens its detail beside them: body, comments in order, events, and the
-verification commands with their last result. Everything in the browser is
-read-only; changes go through the CLI, MCP or the API, so that every change
-passes the same rules.
+verification commands with their last result. The browser is mainly for
+reading. The only writes it offers are changing the assignee and minimal forms
+to file an issue, change its status and add a comment — an entry point for
+people who do not use a terminal — and they go through the same server-side
+operations as the CLI, MCP and the API, so every change passes the same rules.
+Issue bodies are not edited in the browser; that, and everything else, goes
+through the CLI, MCP or the API.
 
 ## The CLI
 
@@ -287,6 +331,26 @@ necessarily a word that will be executed — heredoc bodies and quoted text are
 data. The shared component that extracts the words actually executed is
 `internal/client/hook/hookcmd`.
 
+## Token reports
+
+**It measures how many tokens your agents spend on each issue, without anyone
+keeping a log by hand.** Right after each change to an issue (from the CLI or
+through MCP) and at the end of a turn or a session, `looptrack` reads the
+agent's own conversation record on your machine and sends the running token
+totals to the server. What the human types is not sent by default, and
+`LOOPTRACK_USAGE=0` stops sending altogether.
+
+The server attributes each stretch of the conversation to the issue whose
+operation closed it, and adds it up for any period — per issue, label, stage,
+agent and conversation. From the project board you can ask an agent for a
+report; the `token-report` skill writes the prose, builds the PDF with
+`looptrack report pdf` on your machine, and records the report in an
+append-only ledger, where the next "since the last report" starts. The PDF is
+never stored on the server.
+
+What is recorded, how it is attributed, and how to make and record a report:
+[Token reports](docs/guide/token-report.md).
+
 ## Repository layout
 
 ```
@@ -316,6 +380,7 @@ looptrack/
 | If you want to | Read |
 | -- | -- |
 | Use Looptrack day to day | [User guide](docs/guide/README.md) ([日本語](docs/guide/ja/README.md)) |
+| Measure agents' token usage and make a report | [Token reports](docs/guide/token-report.md) |
 | **Work with issues from another project** (agents start here) | [docs/AI-GUIDE.md](docs/AI-GUIDE.md) |
 | **Put a new project on the server** | [docs/ADD-PROJECT.md](docs/ADD-PROJECT.md) |
 | Write the operating rules for a project | [docs/projects/](docs/projects/) and the templates in [docs/templates/](docs/templates/) |

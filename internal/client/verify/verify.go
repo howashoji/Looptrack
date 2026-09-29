@@ -1,4 +1,4 @@
-// Package verify は `looptrack issue verify` の中身（DESIGN §5-8-2・§5-11）。
+// Package verify は `looptrack issue verify` の中身（DESIGN §9-3-2・§5-1）。
 //
 // サーバはコマンドを実行しない。GET /issues/{id}/verify の commands を手元でその順に実行し（Run）、
 // 同じ body_sha256 で POST /issues/{id}/verify に 1 回で送る（Send）。

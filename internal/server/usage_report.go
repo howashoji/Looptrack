@@ -23,7 +23,7 @@ import (
 	"github.com/howashoji/looptrack/internal/xlsxreport"
 )
 
-// トークンレポートの集計と台帳（設計は docs/server/DESIGN.md §5-4）。
+// トークンレポートの集計と台帳（設計は docs/server/DESIGN.md §9-5）。
 // GET  /projects/{slug}/usage/report?from=&to=  または ?since_last=1  … 期間の集計（?format=md で表示用の文）
 //      &group=label（案件ラベル別）/ type / stage / client … その切り口を groups に入れる（md はその表だけ）
 // GET  /projects/{slug}/usage/report.xlsx（同じ引数）                  … 同じ集計の数表
@@ -799,7 +799,7 @@ func (s *Server) addUsageMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.ToolA
 	addTool(srv, lang, &mcp.Tool{Name: "add_usage_ledger", Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive},
 		Description: i18n.T(lang, "server.mcp.tool.add_usage_ledger")},
 		func(ctx context.Context, req *mcp.CallToolRequest, in addLedgerIn) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -818,7 +818,7 @@ func (s *Server) addUsageMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.ToolA
 
 // mcpProject は引数・ヘッダからプロジェクトを決め、利用者の権限と一緒に返す。
 func (s *Server) mcpProject(ctx context.Context, req *mcp.CallToolRequest, arg, tool string) (store.Project, string, error) {
-	c, err := mcpCallOf(req)
+	c, err := s.mcpCallOf(req)
 	if err != nil {
 		return store.Project{}, "", err
 	}

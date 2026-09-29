@@ -43,6 +43,26 @@ var (
 	evalInnerRe = regexp.MustCompile(`eval '(.*)'`)
 )
 
+// shellCBody は、ps が `-c` の引数の引用符を落として表示する行（例: `/bin/bash -c while true; do
+// sleep 1; done`）から、待ちループの形の判定に渡す本体を取り出す。ps は argv を空白でつなぐだけで引用符を
+// 再現しないので、`bash -c '…'` で起こしたシェルでも command 列には引用符そのものが残らないことがある。
+// hookcmd.UnwrapNestedShell（秘密のガード・git ガードと共有する、入れ子のシェルをほどく共通の処理）は
+// 引用符の対を頼りにほどくので、この形はほどけない。共通の処理はここでは変えず、その手前・この hook だけで補う。
+//
+// isToolShell と同じ範囲（shellRe。unix の絶対パス + bash/zsh -c）に限る。`-c` の後ろが引用符で始まる行は
+// 引用符が残っているということなので、ここでは何もしない（unboundedWaitLoops の内側で hookcmd がほどく）。
+func shellCBody(cmd string) (string, bool) {
+	loc := shellRe.FindStringIndex(cmd)
+	if loc == nil {
+		return "", false
+	}
+	rest := strings.TrimPrefix(cmd[loc[1]:], " ")
+	if rest == "" || rest[0] == '\'' || rest[0] == '"' {
+		return "", false
+	}
+	return rest, true
+}
+
 // cmdHead はコマンド行の最初の語（"…" で囲まれていればその中身。Windows のパスは空白を含む）。
 func cmdHead(cmd string) (head, rest string) {
 	if strings.HasPrefix(cmd, `"`) {
@@ -87,6 +107,24 @@ func StopRunawayBackgroundProcess(ctx context.Context, ev hookio.Event) (hookio.
 	if ev.StopHookActive {
 		return hookio.Result{}, nil
 	}
+	// 利用者が足した許可の正規表現が RE2 で読めないときは、既定の許可だけで検知を続け、変数名と誤りを利用者に知らせる
+	// （検知の途中の早い終わりの経路にも知らせが落ちないよう、先に読んで結果へ足す）
+	extra, allowErr := e.userRegexp("LOOPTRACK_LOOP_RUNAWAY_ALLOW")
+	notice := ""
+	if allowErr != nil {
+		notice = i18n.T(e.lang(), "loop.userregex.invalid.runaway", "name", "LOOPTRACK_LOOP_RUNAWAY_ALLOW", "err", allowErr.Error())
+	}
+	res, err := stopRunaway(ctx, ev, e, extra)
+	if notice != "" {
+		res.SystemMessage = joinNotices(res.SystemMessage, notice)
+		if res.Kind == "" {
+			res.Kind = "runaway: invalid_regex"
+		}
+	}
+	return res, err
+}
+
+func stopRunaway(ctx context.Context, ev hookio.Event, e *Env, extra *regexp.Regexp) (hookio.Result, error) {
 	lang := e.lang()
 	threshold := 30
 	if v := e.env("LOOPTRACK_LOOP_RUNAWAY_THRESHOLD_MIN"); v != "" {
@@ -152,7 +190,6 @@ func StopRunawayBackgroundProcess(ctx context.Context, ev hookio.Event) (hookio.
 		return hookio.Result{}, nil
 	}
 
-	extra := compileUser(e.env("LOOPTRACK_LOOP_RUNAWAY_ALLOW"))
 	type hit struct {
 		pid, mins int
 		cmd       string
@@ -172,6 +209,8 @@ func StopRunawayBackgroundProcess(ctx context.Context, ev hookio.Event) (hookio.
 		shown := p.Command
 		if m := evalInnerRe.FindStringSubmatch(p.Command); m != nil {
 			shown = m[1]
+		} else if body, ok := shellCBody(p.Command); ok {
+			shown = body
 		}
 		loopShape := len(unboundedWaitLoops(shown)) > 0
 		limit := threshold
@@ -200,7 +239,7 @@ func StopRunawayBackgroundProcess(ctx context.Context, ev hookio.Event) (hookio.
 	}
 	reason := i18n.T(lang, "loop.runaway.reason", "threshold", threshold, "list", strings.Join(lines, "\n"))
 	// LOOPTRACK_LOOP_NO_BLOCK=1（--no-block）のときは hookio.Render が systemMessage に回す
-	return hookio.Result{Block: reason}, nil
+	return hookio.Result{Block: reason, Kind: "runaway"}, nil
 }
 
 func atoiDefault(s string, def int) int {

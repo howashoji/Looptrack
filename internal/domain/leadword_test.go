@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// コメントの先頭語（§5-8-6）。例は testdata/leadword.json。
+// コメントの先頭語（DESIGN.md §9-3-6）。例は testdata/leadword.json。
 
 // LeadWordExamples は testdata/leadword.json（判定の並びは server の DB テストも読む）。
 type LeadWordExamples struct {
@@ -21,7 +21,7 @@ type LeadWordExamples struct {
 		N       int    `json:"n"`
 		Out     string `json:"out"`
 	} `json:"excerpt"`
-	// 英語の別名（§5-13）。Go だけが読む
+	// 英語の別名（DESIGN.md §9-6）。Go だけが読む
 	LeadEn []struct {
 		Name    string `json:"name"`
 		Content string `json:"content"`

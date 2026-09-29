@@ -43,7 +43,29 @@ var forbidden = regexp.MustCompile(`(?i)` + "how" + "ashoji|宝" + "和|153\\.12
 
 func TestFixturesHaveNoInternalNames(t *testing.T) {
 	root := testdata.Root(t)
-	for rel, b := range tree(t, root) {
+	files := tree(t, root)
+	// 走査が空振りすると何も見ずに緑になる。下限は実物（2026-09 に 87 ファイル）の半分より下にし、
+	// プロジェクトごとにも 1 ファイル以上あることを見る。
+	if len(files) < 40 {
+		t.Fatalf("フィクスチャのファイルが %d 件しかありません（走査が空振りしています）", len(files))
+	}
+	for _, slug := range testdata.Slugs {
+		found := false
+		for rel := range files {
+			if strings.HasPrefix(rel, slug+"/") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("フィクスチャのプロジェクト %s のファイルを 1 つも拾えていません", slug)
+		}
+	}
+	// 検出できる側の対照: 式が社内の名前に実際に当たること
+	if forbidden.FindString("x "+"How"+"ashoji y") == "" {
+		t.Error("前提が崩れています。forbidden が社内の名前に当たりません")
+	}
+	for rel, b := range files {
 		if m := forbidden.Find([]byte(rel)); m != nil {
 			t.Errorf("%s: ファイル名に %q", rel, m)
 		}

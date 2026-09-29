@@ -1,6 +1,6 @@
 // Package usage はトークン消費のスナップショットから、区間の消費とイシューへの帰属を計算する。
 // 保存してあるのは「会話の累計」だけで、差分と帰属はここで毎回計算する（規則を後から直せるようにするため。
-// 設計は docs/server/DESIGN.md §5-4）。DB にも HTTP にも依存しない。
+// 設計は docs/server/DESIGN.md §9-5）。DB にも HTTP にも依存しない。
 package usage
 
 import (
@@ -18,10 +18,31 @@ const (
 )
 
 // Triggers は受け付けるきっかけ、Ops は issue_op のときの操作（issue_events.kind と同じ語）。
+//
+// Ops は「トークン情報を付ける操作」の唯一の一覧で、次の 3 つはすべてここから作る（1 本だけ直してずれるのを防ぐ）。
+//   - サーバが受け付ける op（POST …/usage の issue_op）
+//   - 未付与の検知で数える issue_events の kind（internal/store の UsageCoverage）
+//   - 付与の hook が拾う MCP のツール（ToolOps の値。internal/client/hook/core）
 var (
 	Triggers = []string{TriggerIssueOp, TriggerStop, TriggerSessionEnd, TriggerManual, TriggerImport}
-	Ops      = []string{"create", "update", "comment", "status", "verify"}
+	Ops      = []string{"create", "update", "comment", "status", "verify", "assign"}
 )
+
+// ToolOps は、issue_events を書く MCP のツール → そのとき書く kind（= 付与の hook が送る op）。
+// 付与の hook（internal/client/hook/core）はこの鍵のツールだけを拾う。値は Ops のどれか。
+//
+// next は着手（In Progress にする）で kind status を、report_verify は kind verify を、
+// assign_issue は kind assign を書く。どれもサーバの付与の対象（service.UsageTarget は kind を見ない）。
+// ツールを足したら internal/docscheck の宣言表（mcpWriteTools）も直す（直さなければそのテストが落ちる）。
+var ToolOps = map[string]string{
+	"create_issue":  "create",
+	"update_issue":  "update",
+	"add_comment":   "comment",
+	"set_status":    "status",
+	"next":          "status",
+	"report_verify": "verify",
+	"assign_issue":  "assign",
+}
 
 // Tokens は 4 種のトークン数。
 type Tokens struct {

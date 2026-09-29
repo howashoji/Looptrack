@@ -7,14 +7,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/howashoji/looptrack/internal/client/env"
+	"github.com/howashoji/looptrack/internal/client/usagesnap"
 	"github.com/howashoji/looptrack/internal/hookio"
+	"github.com/howashoji/looptrack/internal/usage"
 )
 
 func claudeLine(kind, ts string, extra map[string]any) string {
@@ -101,15 +105,67 @@ func wantSent(n int, check func(t *testing.T, last map[string]any)) step {
 	}}
 }
 
+// spoolFiles はプロジェクトごとの置き場（usage-spool/<鍵>/）の退避の全部（どのプロジェクトの分かは問わない）。
 func spoolFiles(s *sandbox) []string {
-	m, _ := filepath.Glob(filepath.Join(s.appDir(), "usage-spool", "*.json"))
+	m, _ := filepath.Glob(filepath.Join(s.appDir(), "usage-spool", "*", "*.json"))
 	return m
+}
+
+// projSpool はプロジェクト slug の、偽 API に対する退避の置き場。
+func projSpool(s *sandbox, slug string) string {
+	d := usagesnap.SpoolDir(s.appDir(), s.api.url(), slug)
+	if d == "" {
+		s.t.Fatal("退避の置き場が分かりません（前提が崩れています）")
+	}
+	return d
+}
+
+// usagePaths は偽 API に送った usage の要求の経路（?以降を含む）と本文。
+func usagePaths(s *sandbox) (paths []string, bodies []map[string]any) {
+	for _, r := range s.api.requests() {
+		if r.Method == "POST" && strings.HasSuffix(strings.SplitN(r.Path, "?", 2)[0], "/usage") {
+			m, _ := r.Body.(map[string]any)
+			paths, bodies = append(paths, r.Path), append(bodies, m)
+		}
+	}
+	return paths, bodies
 }
 
 func wantSpool(n int) step {
 	return step{name: "spool の数", do: func(s *sandbox) {
 		if got := len(spoolFiles(s)); got != n {
 			s.t.Errorf("spool は %d 件のはず: %d", n, got)
+		}
+	}}
+}
+
+// backdateSpool は退避したファイルの名前（退避した時刻の Unix 秒）と更新時刻を d だけ前にする。
+func backdateSpool(s *sandbox, d time.Duration) {
+	for _, p := range spoolFiles(s) {
+		base := filepath.Base(p)
+		i := strings.IndexByte(base, '-')
+		sec, err := strconv.ParseInt(base[:i], 10, 64)
+		if err != nil {
+			s.t.Fatal(err)
+		}
+		old := time.Unix(sec, 0).Add(-d)
+		np := filepath.Join(filepath.Dir(p), strconv.FormatInt(old.Unix(), 10)+base[i:])
+		if err := os.Rename(p, np); err != nil {
+			s.t.Fatal(err)
+		}
+		_ = os.Chtimes(np, old, old)
+	}
+}
+
+// wantFailure は usage-failure.json の理由（"" は記録が無いこと）。
+func wantFailure(reason string) step {
+	return step{name: "失敗の記録", do: func(s *sandbox) {
+		f := usagesnap.ReadFailure(s.appDir())
+		switch {
+		case reason == "" && f != nil:
+			s.t.Errorf("失敗の記録は無いはず: %+v", *f)
+		case reason != "" && (f == nil || f.Reason != reason):
+			s.t.Errorf("失敗の記録の理由は %q のはず: %+v", reason, f)
 		}
 	}}
 }
@@ -195,7 +251,56 @@ func TestUsage(t *testing.T) {
 		{name: "4xx は捨てる（spool しない）", steps: []step{
 			setAPI(func(a *fakeAPI) { a.usageStatus = 400 }),
 			usageStep("400", "Stop", nil, nil, wantQuiet), wantSpool(0), wantSent(1, nil),
+			wantFailure(usagesnap.FailRejected),
 			usageStep("送ったことになるので間引く", "Stop", nil, nil, wantQuiet), wantSent(1, nil),
+		}},
+		{name: "再送は退避してからの経過秒を付け、送れたら失敗の記録を消す", steps: []step{
+			setAPI(func(a *fakeAPI) { a.usageStatus = 503 }),
+			usageStep("503（MCP の操作）", "PostToolUse", mcp("mcp__looptrack__add_comment", map[string]any{"id": "tst-0001"}, nil), nil, wantQuiet),
+			wantSpool(1), wantFailure(usagesnap.FailUnreachable),
+			func() step {
+				// 退避した時刻を 15 分前にする（付与の窓の 10 分を過ぎてから再送した状態を、時間を待たずに作る）
+				return step{name: "退避を 15 分前にする", do: func(s *sandbox) { backdateSpool(s, 15*time.Minute) }}
+			}(),
+			setAPI(func(a *fakeAPI) { a.usageStatus = 0 }),
+			usageStep("送れる", "SessionEnd", nil, nil, wantQuiet), wantSpool(0), wantFailure(""),
+			{name: "再送の payload", do: func(s *sandbox) {
+				ps := sent(s)
+				if len(ps) != 3 {
+					s.t.Fatalf("送った usage は 3 件のはず（503・再送・今回）: %d", len(ps))
+				}
+				re, now := ps[1], ps[2]
+				d, _ := re["resend_delay_sec"].(float64)
+				if re["trigger"] != "issue_op" || re["issue"] != "TST-0001" || d < 900 || d > 960 {
+					s.t.Errorf("再送は issue_op のまま、経過秒（15 分前後）を付けるはず: %v", re)
+				}
+				if _, ok := ps[0]["resend_delay_sec"]; ok {
+					s.t.Errorf("最初の送信には経過秒を付けない: %v", ps[0])
+				}
+				if _, ok := now["resend_delay_sec"]; ok || now["trigger"] != "session_end" {
+					s.t.Errorf("今回の送信には経過秒を付けない: %v", now)
+				}
+			}},
+		}},
+		{name: "経過秒を知らない古いサーバには付けずに送り直す", steps: []step{
+			setAPI(func(a *fakeAPI) { a.usageStatus = 503 }),
+			usageStep("503", "PostToolUse", mcp("mcp__looptrack__add_comment", map[string]any{"id": "tst-0001"}, nil), nil, wantQuiet),
+			{name: "退避を 15 分前にする", do: func(s *sandbox) { backdateSpool(s, 15*time.Minute) }},
+			setAPI(func(a *fakeAPI) { a.usageStatus, a.usageOld = 0, true }),
+			usageStep("古いサーバ", "SessionEnd", nil, nil, wantQuiet), wantSpool(0), wantFailure(""),
+			{name: "送り直した payload", do: func(s *sandbox) {
+				ps := sent(s)
+				// 503・再送（400 で拒まれる）・経過秒を外した再送・今回
+				if len(ps) != 4 {
+					s.t.Fatalf("送った usage は 4 件のはず: %d", len(ps))
+				}
+				if _, ok := ps[1]["resend_delay_sec"]; !ok {
+					s.t.Errorf("1 回目の再送は経過秒を付ける（対照）: %v", ps[1])
+				}
+				if _, ok := ps[2]["resend_delay_sec"]; ok || ps[2]["issue"] != "TST-0001" {
+					s.t.Errorf("送り直しは経過秒を外す: %v", ps[2])
+				}
+			}},
 		}},
 		{name: "繋がらなければ spool", steps: []step{
 			{name: "down", mk: func(s *sandbox) call { return call{hook: "usage", input: usageIn(s, "Stop", nil), downAPI: true} }, want: wantQuiet},
@@ -203,13 +308,77 @@ func TestUsage(t *testing.T) {
 		}},
 		{name: "7 日より古い spool は捨てる", steps: []step{
 			{name: "古い spool を置く", do: func(s *sandbox) {
-				p := filepath.Join(s.appDir(), "usage-spool", "1700000000-deadbeef.json")
+				p := filepath.Join(projSpool(s, "tst"), "1700000000-deadbeef.json")
 				s.write(p, `{"client": "claude-code", "session_id": "old"}`)
 				old := time.Now().Add(-8 * 24 * time.Hour)
 				_ = os.Chtimes(p, old, old)
-				s.write(filepath.Join(s.appDir(), "usage-spool", "1700000001-00000000.json"), `{"client": "claude-code", "session_id": "keep", "n": 1.5}`)
+				s.write(filepath.Join(projSpool(s, "tst"), "1700000001-00000000.json"), `{"client": "claude-code", "session_id": "keep", "n": 1.5}`)
 			}},
 			usageStep("stop", "Stop", nil, nil, wantQuiet), wantSpool(0), wantSent(2, nil),
+		}},
+		{name: "退避は退避したプロジェクトへだけ再送する", steps: []step{
+			setAPI(func(a *fakeAPI) { a.usageStatus = 503 }),
+			usageStep("プロジェクト oth で 503（MCP の操作）", "PostToolUse", mcp("mcp__looptrack__add_comment", map[string]any{"id": "oth-0001"}, nil),
+				map[string]string{"LOOPTRACK_PROJECT": "oth"}, wantQuiet),
+			{name: "oth の置き場に退避した", do: func(s *sandbox) {
+				if m, _ := filepath.Glob(filepath.Join(projSpool(s, "oth"), "*.json")); len(m) != 1 {
+					s.t.Errorf("oth の置き場に 1 件のはず: %v（全体 %v）", m, spoolFiles(s))
+				}
+			}},
+			setAPI(func(a *fakeAPI) { a.usageStatus = 0 }),
+			// 別のプロジェクト（tst）のセッションは oth の退避を送らない（送ると 404 で捨てられるか、tst の消費に混ざる）
+			usageStep("プロジェクト tst で送れる", "SessionEnd", nil, nil, wantQuiet), wantSpool(1),
+			{name: "tst には tst の分だけ", do: func(s *sandbox) {
+				paths, bodies := usagePaths(s)
+				if len(paths) != 2 || !strings.Contains(paths[1], "/projects/tst/usage") || bodies[1]["trigger"] != "session_end" {
+					s.t.Errorf("503 の 1 件と tst の session_end の 1 件だけのはず: %v %v", paths, bodies)
+				}
+			}},
+			// 対照: oth のセッションが来たら oth へ再送する（経路が生きていること）
+			usageStep("プロジェクト oth で送れる", "SessionEnd", nil, map[string]string{"LOOPTRACK_PROJECT": "oth"}, wantQuiet), wantSpool(0),
+			{name: "oth へ再送した", do: func(s *sandbox) {
+				paths, bodies := usagePaths(s)
+				if len(paths) != 4 {
+					s.t.Fatalf("503・tst・oth の再送・oth の今回の 4 件のはず: %v", paths)
+				}
+				if !strings.Contains(paths[2], "/projects/oth/usage") || bodies[2]["issue"] != "OTH-0001" || bodies[2]["op"] != "comment" {
+					s.t.Errorf("再送は oth へ、元の操作のまま: %s %v", paths[2], bodies[2])
+				}
+				if !strings.Contains(paths[3], "/projects/oth/usage") || bodies[3]["trigger"] != "session_end" {
+					s.t.Errorf("今回の分も oth へ: %s %v", paths[3], bodies[3])
+				}
+			}},
+		}},
+		{name: "API の URL が違えば別の置き場（別のサーバへ再送しない）", steps: []step{
+			{name: "繋がらない URL で退避", mk: func(s *sandbox) call { return call{hook: "usage", input: usageIn(s, "Stop", nil), downAPI: true} }, want: wantQuiet},
+			wantSpool(1),
+			setAPI(func(a *fakeAPI) { a.usageStatus = 0 }),
+			usageStep("同じ slug・別の URL で送れる", "SessionEnd", nil, nil, wantQuiet), wantSpool(1), wantSent(1, nil),
+		}},
+		{name: "鍵の無い以前の置き場は再送せず、7 日で捨てる", steps: []step{
+			{name: "以前の置き場とほかのプロジェクトに置く", do: func(s *sandbox) {
+				legacy := filepath.Join(s.appDir(), "usage-spool")
+				old := time.Now().Add(-8 * 24 * time.Hour)
+				for _, p := range []string{filepath.Join(legacy, "1700000000-00000001.json"), filepath.Join(projSpool(s, "oth"), "1700000000-00000002.json")} {
+					s.write(p, `{"client": "claude-code", "session_id": "old"}`)
+					_ = os.Chtimes(p, old, old)
+				}
+				s.write(filepath.Join(legacy, "1700000001-00000003.json"), `{"client": "claude-code", "session_id": "legacy-new"}`)
+			}},
+			usageStep("stop", "Stop", nil, nil, wantQuiet), wantSent(1, nil),
+			{name: "古いものだけ消え、新しい以前の置き場の分は送らずに残る", do: func(s *sandbox) {
+				legacy := filepath.Join(s.appDir(), "usage-spool")
+				m, _ := filepath.Glob(filepath.Join(legacy, "*.json"))
+				if len(m) != 1 || filepath.Base(m[0]) != "1700000001-00000003.json" {
+					s.t.Errorf("以前の置き場には 7 日以内の 1 件だけ残るはず: %v", m)
+				}
+				if o, _ := filepath.Glob(filepath.Join(projSpool(s, "oth"), "*.json")); len(o) != 0 {
+					s.t.Errorf("ほかのプロジェクトの 7 日より古い分は捨てるはず: %v", o)
+				}
+				if _, bodies := usagePaths(s); bodies[0]["session_id"] == "legacy-new" {
+					s.t.Errorf("以前の置き場の分を送った: %v", bodies)
+				}
+			}},
 		}},
 		{name: "作業名を送るかをサーバの応答から覚える", steps: []step{
 			setAPI(func(a *fakeAPI) { a.sendPrompts = &yes }),
@@ -229,9 +398,11 @@ func TestUsage(t *testing.T) {
 			usageStep("LOOPTRACK_USAGE=0", "Stop", nil, map[string]string{"LOOPTRACK_USAGE": "0"}, wantQuiet),
 			{name: "API なし", mk: func(s *sandbox) call { return call{hook: "usage", input: usageIn(s, "Stop", nil), noAPI: true} }, want: wantQuiet},
 			usageStep("プロジェクトなし", "Stop", nil, map[string]string{"LOOPTRACK_PROJECT": ""}, wantQuiet),
-			{name: "トークンなし", mk: func(s *sandbox) call { return call{hook: "usage", input: usageIn(s, "Stop", nil), noToken: true} }, want: wantQuiet},
 			usageStep("会話記録が無い", "Stop", map[string]any{"transcript_path": "/nonexistent/x.jsonl"}, nil, wantQuiet),
-			wantSent(0, nil), wantSpool(0),
+			wantSent(0, nil), wantSpool(0), wantFailure(""),
+			// トークンが無いときは送れないが、payload は退避してログインの後に再送し、失敗を残す（以前は黙って捨てた）
+			{name: "トークンなし", mk: func(s *sandbox) call { return call{hook: "usage", input: usageIn(s, "Stop", nil), noToken: true} }, want: wantQuiet},
+			wantSent(0, nil), wantSpool(1), wantFailure(usagesnap.FailNoToken),
 		}},
 		{name: "Copilot から .claude の配線が起動したら何もしない・--client copilot なら動く", steps: []step{
 			{name: "Copilot から", mk: func(s *sandbox) call {
@@ -323,5 +494,89 @@ func TestUsageDebugCopilotMissHint(t *testing.T) {
 	}
 	if out := run("claude-code"); !strings.Contains(out, "会話記録を読めません（client=claude-code") || strings.Contains(out, "OpenTelemetry") {
 		t.Errorf("Copilot 以外は従来の表示: %s", out)
+	}
+}
+
+// TestUsagePlanAllEventWritingTools は、issue_events を書く MCP のツール（usage.ToolOps）を付与の hook が
+// Claude Code・Copilot のどちらの名前の形でも拾い、書く kind と同じ op で送ること。
+// 対照として、読むだけのツール（get_issue・verify_issue）と台帳だけを書くツール（add_usage_ledger）は拾わないことを同じテストで見る。
+func TestUsagePlanAllEventWritingTools(t *testing.T) {
+	e := (&Env{}).withDefaults()
+	c := &Call{Env: e}
+	plan := func(raw map[string]any, agent hookio.Agent) *usagePlan {
+		ev := hookio.FromMap(raw, hookio.ParseOptions{Agent: agent, Getenv: func(string) string { return "" }})
+		return c.plan(ev, string(agent))
+	}
+	// next・create_issue は引数に ID を持たないので、応答（日本語の文）から取る
+	respFor := map[string]any{
+		"create_issue": map[string]any{"content": []any{map[string]any{"type": "text", "text": "作成: REQ-0001 x（version 1）"}}},
+		"next":         map[string]any{"content": []any{map[string]any{"type": "text", "text": "着手: REQ-0001: Todo → In Progress（x）"}}},
+	}
+	names := map[hookio.Agent]string{hookio.ClaudeCode: "mcp__looptrack__%s", hookio.Copilot: "looptrack-%s"}
+	if len(usage.ToolOps) < 7 {
+		t.Fatalf("usage.ToolOps が %d 件しかありません（前提が崩れています）", len(usage.ToolOps))
+	}
+	for tool, op := range usage.ToolOps {
+		for agent, form := range names {
+			raw := map[string]any{"hook_event_name": "PostToolUse", "tool_name": fmt.Sprintf(form, tool), "tool_input": map[string]any{"id": "req-0001"}}
+			if r, ok := respFor[tool]; ok {
+				raw["tool_input"] = map[string]any{}
+				raw["tool_response"] = r
+			}
+			if p := plan(raw, agent); p == nil || p.IssueID != "REQ-0001" || p.Op != op || p.Trigger != "issue_op" {
+				t.Errorf("%s（%s）: %+v（op %q で拾うはず）", tool, agent, p, op)
+			}
+		}
+	}
+	for _, tool := range []string{"get_issue", "verify_issue", "add_usage_ledger", "ready_issues"} {
+		for agent, form := range names {
+			raw := map[string]any{"hook_event_name": "PostToolUse", "tool_name": fmt.Sprintf(form, tool), "tool_input": map[string]any{"id": "REQ-0001"}}
+			if p := plan(raw, agent); p != nil {
+				t.Errorf("%s（%s）は issue_events を書かないので拾わない: %+v", tool, agent, p)
+			}
+		}
+	}
+}
+
+// TestUsagePlanNextAndCreateFromResponse は、next と create_issue の対象を応答から取ること（日英の文・構造化の値）。
+// next は In Progress にしたとき（started）だけ送り、着手中の再掲（resumed）・試行（would_start）・対象なしは送らない。
+func TestUsagePlanNextAndCreateFromResponse(t *testing.T) {
+	e := (&Env{}).withDefaults()
+	c := &Call{Env: e}
+	plan := func(tool string, resp any) *usagePlan {
+		raw := map[string]any{"hook_event_name": "PostToolUse", "tool_name": "mcp__looptrack__" + tool, "tool_input": map[string]any{}, "tool_response": resp}
+		ev := hookio.FromMap(raw, hookio.ParseOptions{Agent: hookio.ClaudeCode, Getenv: func(string) string { return "" }})
+		return c.plan(ev, string(hookio.ClaudeCode))
+	}
+	text := func(s string) any { return map[string]any{"content": []any{map[string]any{"type": "text", "text": s}}} }
+	cases := []struct {
+		name, tool string
+		resp       any
+		want       string // "" = 送らない
+	}{
+		{"next（日本語）", "next", text("着手: TST-0012: Todo → In Progress（x）\n他: TST-0099"), "TST-0012"},
+		{"next（英語）", "next", text("Started: TST-0013: Todo → In Progress (x)"), "TST-0013"},
+		{"next（文字列の応答）", "next", "着手: TST-0014: Todo → In Progress（x）", "TST-0014"},
+		{"next（_meta の構造化の値）", "next", map[string]any{"content": []any{}, "_meta": map[string]any{"looptrack/data": map[string]any{
+			"action": "started", "issue": map[string]any{"id": "TST-0015"}}}}, "TST-0015"},
+		{"next（structuredContent）", "next", map[string]any{"structuredContent": map[string]any{"action": "started", "issue": map[string]any{"id": "TST-0016"}}}, "TST-0016"},
+		{"next の resumed（日本語）は送らない", "next", text("着手中: TST-0012 x（あなたが In Progress にしたもの。状態は変えていません）"), ""},
+		{"next の resumed（英語）は送らない", "next", text("Already started: TST-0012 x (you moved it to In Progress; the status was left as is)"), ""},
+		{"next の resumed（構造化の値）は文に着手があっても送らない", "next", map[string]any{"structuredContent": map[string]any{"action": "resumed", "issue": map[string]any{"id": "TST-0012"}},
+			"content": []any{map[string]any{"type": "text", "text": "着手: TST-0012: x"}}}, ""},
+		{"next の would_start は送らない", "next", map[string]any{"structuredContent": map[string]any{"action": "would_start", "issue": map[string]any{"id": "TST-0012"}}}, ""},
+		{"next の対象なしは送らない", "next", text("着手できるイシューがありません"), ""},
+		{"create_issue（日本語）", "create_issue", text("作成: TST-0021 x（version 1）"), "TST-0021"},
+		{"create_issue（英語）", "create_issue", text("Created: TST-0022 x (version 1)"), "TST-0022"},
+		{"create_issue（_meta の構造化の値）", "create_issue", map[string]any{"_meta": map[string]any{"looptrack/data": map[string]any{"id": "TST-0023"}}}, "TST-0023"},
+	}
+	for _, tc := range cases {
+		p := plan(tc.tool, tc.resp)
+		switch {
+		case tc.want == "" && p != nil:
+			t.Errorf("%s: 送らないはず: %+v", tc.name, p)
+		case tc.want != "" && (p == nil || p.IssueID != tc.want):
+			t.Errorf("%s: %s を拾うはず: %+v", tc.name, tc.want, p)
+		}
 	}
 }

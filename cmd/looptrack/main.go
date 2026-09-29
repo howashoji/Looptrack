@@ -1,9 +1,10 @@
-// looptrack は Looptrack の単一の実行ファイル（設計は docs/server/DESIGN.md §5-11。クライアントとサーバを 1 つにまとめてある）。
+// looptrack は Looptrack の単一の実行ファイル（設計は docs/server/DESIGN.md §5-1。クライアントとサーバを 1 つにまとめてある）。
 //
 // クライアントの操作:
 //
 //	looptrack issue <サブコマンド> …   イシューの操作（読み取り・変更・init）
-//	looptrack hook <名前> [--agent …] …  AI の hook。core の 4 本（issue-freshness-mark・issue-freshness-check・usage・summary。
+//	looptrack hook <名前> [--agent …] …  AI の hook。core の 5 本（issue-freshness-mark・issue-freshness-check・usage・summary・
+//	                                   issue-session-bind。
 //	                                   internal/client/hook/core）と loop の hook（internal/client/hook/loop）。
 //	                                   名前は重ならない（core を先に引き、無ければ loop）
 //	looptrack issue-freshness <mark|check|ack|reset|show> …
@@ -18,7 +19,7 @@
 //	looptrack doctor                   PATH・hook の配線・導入の記録・配布の版を確かめる（internal/client/kitinit）
 //	looptrack worktree list|prune|mark 作業が終わった作業ツリーとブランチの後始末（internal/client/worktree）
 //	looptrack desktop [--background] [--no-tray] [--status] [--quit]
-//	                                   デスクトップ版（ローカルモードのサーバ・ブラウザ・トレイ。internal/client/desktop。§5-14）。
+//	                                   デスクトップ版（ローカルモードのサーバ・ブラウザ・トレイ。internal/client/desktop。DESIGN.md §5-4）。
 //	                                   desktop ビルド（-tags desktop）は引数なしの起動（ダブルクリック）もこれ。headless はトレイなし
 //
 // サーバの操作（setup・serve・user・member・token・settings・project・secret-key・healthcheck・migrate・import・verify・
@@ -139,6 +140,7 @@ func usage(w io.Writer, lang i18n.Lang) {
 func runDesktop(args []string, stdio cli.IO, e env.Env) int {
 	return desktop.Main(args, desktop.Options{
 		Version: version, Env: e, Stdout: stdio.Stdout, Stderr: stdio.Stderr, UI: desktopUI(),
+		UpdatePublicKey: selfupdate.MinisignPublicKey, // 新しい版の確認で SHA256SUMS の署名を確かめる鍵（空のビルドは GitHub に通信しない）
 	})
 }
 

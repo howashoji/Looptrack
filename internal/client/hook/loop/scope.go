@@ -77,7 +77,7 @@ func SessionScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, err
 			_ = os.WriteFile(path, []byte(fmt.Sprintf("WARNED=%d\n", cx)), 0o666)
 		}
 		return hookio.Result{Context: i18n.T(e.lang(), "loop.scope.warn",
-			"man", man, "k", kilo, "limit_man", floorDiv(warnAt, 10000), "limit_k", floorDiv(warnAt, 1000))}, nil
+			"man", man, "k", kilo, "limit_man", floorDiv(warnAt, 10000), "limit_k", floorDiv(warnAt, 1000)), Kind: "session-scope: warn"}, nil
 	}
 	return hookio.Result{}, nil
 }

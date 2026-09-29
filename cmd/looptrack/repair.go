@@ -20,7 +20,7 @@ import (
 //	looptrack repair-lists --apply [slug…]                 補正する（issue_events に kind repair_lists・via admin で残る）
 //	looptrack repair-lists --fields refs,traces [slug…]    項目を限る（既定 blocked_by,traces,refs。labels も指定できる）
 //
-// slug を省略すると全プロジェクト。クローズ済みも対象（DESIGN.md §3「既存データの補正」）。
+// slug を省略すると全プロジェクト。クローズ済みも対象（DESIGN.md §2-3「取り込んだデータの補正」）。
 func repairListsCmd(args []string) int {
 	lang := cmdLang()
 	fs := flag.NewFlagSet("repair-lists", flag.ExitOnError)

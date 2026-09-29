@@ -56,6 +56,8 @@ The AppImage does not need FUSE 2, but it does need `fusermount3` (on Ubuntu: `s
 If you cannot install it, start the app with `APPIMAGE_EXTRACT_AND_RUN=1 ./Looptrack_<version>_linux_x86_64.AppImage`, or unpack it with `./Looptrack_<version>_linux_x86_64.AppImage --appimage-extract` and run `squashfs-root/usr/bin/looptrack`.
 The tray icon needs a desktop that shows StatusNotifierItem icons (KDE, Xfce, Cinnamon, …; on GNOME install the "AppIndicator and KStatusNotifierItem Support" extension).
 Without a tray the app still runs; stop it with `looptrack desktop --quit` (see [Troubleshooting](#troubleshooting)).
+On the first start, the app adds Looptrack to the app list (the launcher and the activities search): it puts `~/.local/share/applications/looptrack.desktop` and an icon (`~/.local/share/icons/hicolor/256x256/apps/looptrack.png`) in place, so you can start it from there afterwards.
+If you move the AppImage, the entry follows the new location the next time you start that AppImage. If you do not want the entry, clear "Show in the app list" in the tray (it then stays off on later starts too).
 
 Double-clicking again while the app is running does not start a second copy; it just opens the UI in the browser.
 
@@ -89,14 +91,25 @@ From here, everything is a prompt: ask the agent to file an issue, or to take th
 
 | Item | What it does |
 | -- | -- |
+| Update to version <version> | Appears at the top of the menu only while a new version is out. Choosing it downloads and verifies the new version, replaces the app and restarts it (the macOS .app and the Linux AppImage; see [Update](#update)). Where the app cannot be replaced (Windows and the like) it reads "New version <version> available" instead, and choosing it opens that version's release page in the browser |
 | Open the app | Opens the web UI (`http://127.0.0.1:18090/looptrack/` by default) |
 | Settings | Opens the account settings page (`/account`) in the browser |
 | Copy AI connection settings | Copies the MCP settings for Claude Code, Codex, or GitHub Copilot to the clipboard, ready to paste. "Open the connection settings page" shows them all in the browser |
 | Make the CLI available | Makes `looptrack` callable from terminals and agents (see [Use the CLI](#use-the-cli)) |
+| Show in the app list | Shown only for the Linux AppImage. While checked, you can start the app from the launcher and the activities search (it is added on the first start; clearing it removes the entry and keeps it off on later starts) |
 | Start at login | When checked, the app starts in the background when you log in (it does not open the browser then) |
+| Check for updates | While checked, the app looks for a new version in the GitHub release list at startup and every 24 hours. Clear it to stop checking; the app then contacts nothing (checked by default) |
+| Install updates automatically | When checked, the app replaces itself and restarts as soon as it finds a new version (unchecked by default). Shown only for the macOS .app and the Linux AppImage |
 | Quit | Stops the server and the app |
 
 On every OS, left-clicking the tray icon shows the menu.
+
+When a new version is out, the top of the menu and a strip at the top of the web UI say so. No OS notification is shown.
+The app follows the same kind of version you run (if you run an rc, it tells you about rcs too), and only tells you about a version whose signature it could verify.
+On macOS and Linux, choosing the top of the menu is all it takes to replace the app ([Update](#update)). On Windows, download the new version from the release page and replace the app.
+The "Update now" button in the strip in the web UI does the same replacement (it works without a tray too, as with `--no-tray`). While the replacement runs, and when it fails, the strip says so.
+When a check fails (offline, for example), the notice about the version found earlier stays.
+Start the app with the environment variable `LOOPTRACK_UPDATE_CHECK=off` to turn checking off whatever the menu says. Without a tray (`--no-tray` and the like), the strip in the web UI points you to this environment variable instead.
 
 The port stays the same between launches, so the MCP settings you copied keep working.
 If another program is already using the port, the app picks a free one and remembers it; copy the MCP settings again in that case.
@@ -114,6 +127,10 @@ The app and your data are kept apart, so replacing the app keeps your data.
 The data folder holds `looptrack.db` (all issues, users, and settings) and `looptrack.db.secret-key` (the key that encrypts two-factor secrets).
 Back up both together; without the key, two-factor registrations cannot be used.
 Only you can read them.
+
+The `backups` folder inside the data folder holds copies of `looptrack.db` that the app takes by itself before a new version changes the database format (`looptrack.db.20260926T010203Z`; the time is in UTC).
+It takes one only when the new version actually has changes to apply to an existing database, and keeps the two newest, deleting older ones.
+Only you can read them, like the database. They are what you use to go back to the previous version ([Update](#update)).
 
 ## Use the CLI
 
@@ -144,17 +161,43 @@ If you move the app, the registration follows it the next time you start the app
 
 ## Update
 
+The macOS .app and the Linux AppImage are replaced from the top of the tray menu, "Update to version <version>".
+With "Install updates automatically" checked, the app does the same by itself as soon as it finds a new version.
+
+1. It downloads the new version's file and compares it with the SHA-256 in `SHA256SUMS`, whose signature it has verified. If they differ, nothing is replaced.
+2. On macOS, it checks the signatures of the dmg and of the `Looptrack.app` inside it with `spctl` and `codesign`, and that the identifier and the signing team match the running app.
+3. It renames the current app with a `.prev` suffix (`Looptrack.app.prev`, `<AppImage file name>.prev`) and puts the new version in place under the original name. An older `.prev` is deleted.
+4. It restarts the app: the new version waits for the old one to stop, then starts (without opening the browser).
+
+If a step fails, the current version keeps running and the app tells you why. If the new version cannot be started, the previous version is put back.
+If the app's location (`/Applications` and the like) is not writable, nothing is replaced: on macOS the verified dmg is opened so you can drag `Looptrack` onto `Applications`; on Linux the release page is opened.
+To go back after a replacement, choose "Quit" in the tray, delete the current app, and rename the `.prev` back to the original name (restore the database as in the steps below).
+
+On Windows, and whenever the tray cannot replace the app, replace it by hand:
+
 1. Choose "Quit" in the tray menu.
 2. Replace the app with the new version:
    - macOS: open the new dmg and drag `Looptrack` onto `Applications` (choose "Replace").
    - Windows: run the new installer; it replaces the old version in place and keeps your options. If Looptrack is still running, the installer stops it first. If you use the zip, extract the new zip over the old folder.
-   - Linux: put the new AppImage in place of the old one (you can keep the old file name).
+   - Linux: put the new AppImage in place of the old one (you can keep the old file name; a replacement from the tray keeps it too).
 3. Start the app again.
 
 Your data stays in the data folder above and is upgraded automatically on the first start.
+Once it has been upgraded, putting the previous version of the app back does not start: it reports that the DB was migrated by a newer looptrack (a version from before this check was added does not stop and runs on the data anyway, which is all the more reason not to go back that way).
+Before it changes the format, the new version copies `looptrack.db` into the `backups` folder of the data folder ([Where your data lives](#where-your-data-lives)); if it cannot make the copy, it does not change the format and does not start, and tells you why.
+To go back to the previous version:
+
+1. Choose "Quit" in the tray menu.
+2. Put the previous version of the app back.
+3. In the data folder, replace `looptrack.db` with the newest file in `backups` (the name with the latest time). Delete `looptrack.db-wal` and `looptrack.db-shm` if they are there.
+4. Start the app.
+
+Anything you changed after the backup was taken is not in the restored database.
+The key file (`looptrack.db.secret-key`) stays as it is.
+If the update did not change the format, no backup is taken, and the previous version can use the database as it is.
 The desktop app does not use `looptrack self-update`; update the whole app instead.
 The CLI link (macOS / Linux) keeps pointing at the app, and the Windows CLI copy is refreshed on the next start.
-Nothing in the desktop app tells you about a new version. [Updating](updating.md) sums up what is automatic and what is manual.
+The tray menu and a strip in the web UI tell you about a new version ([Tray / menu bar](#tray--menu-bar)). [Updating](updating.md) sums up what is automatic and what is manual.
 
 ## Uninstall
 
@@ -164,7 +207,7 @@ Then remove the app, the CLI, the CLI's credentials, and (only if you no longer 
 ### macOS
 
 ```bash
-rm -rf /Applications/Looptrack.app
+rm -rf /Applications/Looptrack.app /Applications/Looptrack.app.prev
 rm -f ~/Library/LaunchAgents/*looptrack*.plist        # only if "Start at login" was left on
 [ -L ~/.local/bin/looptrack ] && rm ~/.local/bin/looptrack
 # The CLI's credentials (access tokens for the servers you signed in to; keep it if you still use the CLI elsewhere):
@@ -197,8 +240,9 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Looptrack"   # your data — this
 ### Linux
 
 ```bash
-rm -f ~/Applications/Looptrack_*.AppImage                   # use your location
+rm -f ~/Applications/Looptrack_*.AppImage ~/Applications/Looptrack_*.AppImage.prev   # use your location
 rm -f ~/.config/autostart/looptrack.desktop
+rm -f ~/.local/share/applications/looptrack.desktop ~/.local/share/icons/hicolor/256x256/apps/looptrack.png   # the app list entry
 [ -L ~/.local/bin/looptrack ] && rm ~/.local/bin/looptrack
 # The CLI's credentials (access tokens for the servers you signed in to; keep it if you still use the CLI elsewhere):
 rm -rf ~/.config/looptrack

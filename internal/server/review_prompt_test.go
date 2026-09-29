@@ -168,7 +168,7 @@ func TestMeritTextMatchesDesign(t *testing.T) {
 	}
 	q := quoteBlocks(s)
 	if len(q) != 1 || strings.Count(q[0], "\n") != 2 {
-		t.Fatalf("§5-8-8 のメリットの文面（3 行の引用）が見つからない: %q", q)
+		t.Fatalf("DESIGN.md §9-3-8 のメリットの文面（3 行の引用）が見つからない: %q", q)
 	}
 	if !strings.Contains(guide.Common(i18n.JA), "\n"+q[0]+"\n") {
 		t.Errorf("common.md の 3 層の箇条書きが DESIGN §9-3-8 と違う:\n%s", q[0])

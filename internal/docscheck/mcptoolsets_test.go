@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/howashoji/looptrack/internal/usage"
 )
 
 // 「イシューを変える MCP のツール」を表す一覧が、離れた 4 か所にある。
@@ -18,18 +20,20 @@ import (
 //   - サーバ: MCP のツールの登録（internal/server の mcp.AddTool）。変更系は Annotations に
 //     DestructiveHint を持ち、読み取り専用は ReadOnlyHint を持つ。そのうち issue_events を
 //     書くものが「付与の対象」になる。
-//   - 付与の hook: internal/client/hook/core/usage.go の toolRe・copilotToolRe・opOf。
+//   - 付与の hook: internal/client/hook/core/usage.go の toolRe・copilotToolRe・opOf。この 3 つは
+//     internal/usage の ToolOps から作る（ToolOps の値の集合は usage.Ops ＝ サーバが受け付ける op で、
+//     未付与の検知（internal/store の UsageCoverage）が数える kind も usage.Ops から作る）。
 //   - loop の PreToolUse: internal/client/hook/loop/pretool.go の imWriteTools。
 //   - 設計: docs/server/DESIGN.md の「MCP の変更系のツール」の一覧と、§9-5 の hook の仕様表。
 //
-// この 4 つは実際にずれていて（hook は 4 つ・loop は 8 つ・issue_events を書くのは 7 つ）、
+// この 4 つは以前は実際にずれていて（hook は 4 つ・loop は 8 つ・issue_events を書くのは 7 つ）、
 // ずれていても何も落ちなかった。文書の中ですら 7 つと 4 つが同時に書かれていた。
 // どれか 1 本だけを直すと、残りは黙って古いままになる。
 //
 // そこで、**一覧をもう 1 本手で書き写すのではなく**、4 か所を実物から読み取って
 // 1 つの宣言表（mcpWriteTools）と突き合わせる。宣言表は「どのツールが、どの一覧に、なぜ入るか」を
-// 書く唯一の場所で、意図してずらしているもの（verify_issue・add_usage_ledger）も、
-// まだ直していないずれ（next・report_verify・assign_issue）も、理由の欄が空なら落ちる。
+// 書く唯一の場所で、意図してずらしているもの（verify_issue・add_usage_ledger・next の loop の扱い）は、
+// 理由の欄が空なら落ちる。
 //
 // 実行: go test -count=1 ./internal/docscheck/（DB は要らない）
 
@@ -43,7 +47,7 @@ type mcpWriteTool struct {
 	serverWrite bool
 	// event は issue_events に書く kind（空 = 書かない）。付与の対象はここが空でないもの。
 	event string
-	// hookOp は internal/client/hook/core/usage.go の opOf の値（空 = 付与の hook が拾わない）。
+	// hookOp は付与の hook が送る op（internal/usage の ToolOps の値。空 = 付与の hook が拾わない）。
 	hookOp string
 	// inPretool は internal/client/hook/loop/pretool.go の imWriteTools に入るか。
 	inPretool bool
@@ -63,14 +67,11 @@ var mcpWriteTools = []mcpWriteTool{
 	{tool: "set_status", serverWrite: true, event: "status", hookOp: "status", inPretool: true},
 	{tool: "update_issue", serverWrite: true, event: "update", hookOp: "update", inPretool: true},
 
-	{tool: "assign_issue", serverWrite: true, event: "assign", inPretool: true,
-		why: "付与の hook（core/usage.go）が拾わない。担当者だけを変えた操作はトークン情報が送られない。" +
-			"未付与の検知の SQL（internal/store/usage.go）は assign を数えるので、取りこぼしは未付与の一覧には出る"},
-	{tool: "next", serverWrite: true, event: "status", inPretool: false,
-		why: "付与の hook が拾わない（着手で kind status を書くのに、トークン情報が送られない）。" +
-			"loop の PreToolUse も見ていない（着手は他プロジェクトへの誤爆の確認が要る操作ではないという判断）"},
-	{tool: "report_verify", serverWrite: true, event: "verify", inPretool: true,
-		why: "付与の hook が拾わない（kind verify を書くのに、トークン情報が送られない）"},
+	{tool: "assign_issue", serverWrite: true, event: "assign", hookOp: "assign", inPretool: true},
+	{tool: "report_verify", serverWrite: true, event: "verify", hookOp: "verify", inPretool: true},
+	{tool: "next", serverWrite: true, event: "status", hookOp: "status", inPretool: false,
+		why: "loop の PreToolUse だけが見ていない（着手は他プロジェクトへの誤爆の確認が要る操作ではないという判断）。" +
+			"付与の hook は拾う（着手で kind status を書くので付与の対象）"},
 
 	{tool: "add_usage_ledger", serverWrite: true, inPretool: true,
 		why: "台帳（usage_ledger）だけを書き、issue_events を書かないので付与の対象ではない。" +
@@ -133,21 +134,39 @@ func TestMCPWriteToolSetsAgree(t *testing.T) {
 	diffSets(t, "サーバの変更系のツール（internal/server の mcp.AddTool・Annotations が読み取り専用でないもの）",
 		serverWrite, declared(func(w mcpWriteTool) bool { return w.serverWrite }))
 
-	// ② 付与の hook（core/usage.go）。正規表現 2 本と opOf の 3 つが互いに一致することも確かめる。
-	toolAlt, copilotAlt, opOf := parseUsageHookTools(t)
-	diffSets(t, "付与の hook の toolRe（internal/client/hook/core/usage.go）",
-		toolAlt, declared(func(w mcpWriteTool) bool { return w.hookOp != "" }))
-	diffSets(t, "付与の hook の copilotToolRe（internal/client/hook/core/usage.go）",
-		copilotAlt, declared(func(w mcpWriteTool) bool { return w.hookOp != "" }))
-	opKeys := map[string]bool{}
-	for k := range opOf {
-		opKeys[k] = true
+	// ② 付与の hook（core/usage.go の toolRe・copilotToolRe・opOf は usage.ToolOps から作る）。
+	hookOps := usage.ToolOps
+	hookTools := map[string]bool{}
+	for k := range hookOps {
+		hookTools[k] = true
 	}
-	diffSets(t, "付与の hook の opOf（internal/client/hook/core/usage.go）",
-		opKeys, declared(func(w mcpWriteTool) bool { return w.hookOp != "" }))
-	for name, op := range opOf {
+	diffSets(t, "付与の hook が拾う MCP のツール（internal/usage の ToolOps）",
+		hookTools, declared(func(w mcpWriteTool) bool { return w.hookOp != "" }))
+	for name, op := range hookOps {
 		if w, ok := byName[name]; ok && w.hookOp != op {
-			t.Errorf("付与の hook の opOf が %s → %q ですが、宣言表は %q です", name, op, w.hookOp)
+			t.Errorf("usage.ToolOps が %s → %q ですが、宣言表は %q です", name, op, w.hookOp)
+		}
+	}
+	// 付与の hook が送る op は、サーバが受け付ける op（usage.Ops）でなければならない（外れると 400 で捨てられる）。
+	// 未付与の検知が数える kind も usage.Ops なので、ここが揃えば「送る op」「受け付ける op」「数える kind」が揃う。
+	ops := map[string]bool{}
+	for _, op := range usage.Ops {
+		ops[op] = true
+	}
+	events := map[string]bool{}
+	for _, w := range mcpWriteTools {
+		if w.event != "" {
+			events[w.event] = true
+		}
+		if w.hookOp != "" && w.hookOp != w.event {
+			t.Errorf("%s: 付与の hook が送る op %q が、書く issue_events の kind %q と違います"+
+				"（未付与の検知は kind で数え、付与は op で送るので、違うと付けても未付与のまま残ります）", w.tool, w.hookOp, w.event)
+		}
+	}
+	for _, name := range sortedSet(events) {
+		if !ops[name] {
+			t.Errorf("MCP のツールが issue_events に kind %q を書きますが、usage.Ops にありません"+
+				"（サーバが op として受け付けず、未付与の検知も数えません）", name)
 		}
 	}
 
@@ -394,75 +413,6 @@ func stringLit(e ast.Expr) (string, bool) {
 	return s, true
 }
 
-// namedGroup は正規表現の (?P<tool>a|b|c) から a|b|c を取る。
-var namedGroup = regexp.MustCompile(`\(\?P<tool>([^)]*)\)`)
-
-// parseUsageHookTools は internal/client/hook/core/usage.go の toolRe・copilotToolRe・opOf を読む。
-func parseUsageHookTools(t *testing.T) (toolAlt, copilotAlt map[string]bool, opOf map[string]string) {
-	t.Helper()
-	path := filepath.Join(repoRoot, "internal", "client", "hook", "core", "usage.go")
-	_, f := parseGo(t, path)
-	res := map[string]map[string]bool{}
-	opOf = map[string]string{}
-	for _, d := range f.Decls {
-		gd, ok := d.(*ast.GenDecl)
-		if !ok || gd.Tok != token.VAR {
-			continue
-		}
-		for _, spec := range gd.Specs {
-			vs, ok := spec.(*ast.ValueSpec)
-			if !ok {
-				continue
-			}
-			for i, nm := range vs.Names {
-				if i >= len(vs.Values) {
-					continue
-				}
-				switch nm.Name {
-				case "toolRe", "copilotToolRe":
-					call, ok := vs.Values[i].(*ast.CallExpr)
-					if !ok || len(call.Args) != 1 {
-						continue
-					}
-					pat, ok := stringLit(call.Args[0])
-					if !ok {
-						continue
-					}
-					m := namedGroup.FindStringSubmatch(pat)
-					if m == nil {
-						t.Fatalf("%s の (?P<tool>…) を読み取れません: %s", nm.Name, pat)
-					}
-					set := map[string]bool{}
-					for _, s := range strings.Split(m[1], "|") {
-						set[s] = true
-					}
-					res[nm.Name] = set
-				case "opOf":
-					lit := compositeOf(vs.Values[i])
-					if lit == nil {
-						continue
-					}
-					for _, el := range lit.Elts {
-						kv, ok := el.(*ast.KeyValueExpr)
-						if !ok {
-							continue
-						}
-						k, ok1 := stringLit(kv.Key)
-						v, ok2 := stringLit(kv.Value)
-						if ok1 && ok2 {
-							opOf[k] = v
-						}
-					}
-				}
-			}
-		}
-	}
-	if res["toolRe"] == nil || res["copilotToolRe"] == nil || len(opOf) == 0 {
-		t.Fatalf("%s から toolRe・copilotToolRe・opOf を読み取れません（書き方が変わっていないか確かめてください）", path)
-	}
-	return res["toolRe"], res["copilotToolRe"], opOf
-}
-
 // parseLoopPretoolTools は internal/client/hook/loop/pretool.go の imWriteTools の要素を読む。
 func parseLoopPretoolTools(t *testing.T) map[string]bool {
 	t.Helper()
@@ -665,8 +615,9 @@ var backticked = regexp.MustCompile("`([a-z_]+)`")
 
 // TestDesignMCPToolListsMatchCode は、DESIGN.md の 2 つの一覧が実物と合っていることを確かめる。
 //
-// この 2 つは同じ文書の中で 7 つと 4 つに食い違っていた（どちらも「MCP の変更系のツール」に見える書き方）。
-// 数が違うこと自体は正しい（hook が拾う範囲は狭い）ので、それぞれが実物と合っているかを見る。
+// この 2 つは以前、同じ文書の中で 7 つと 4 つに食い違っていた（どちらも「MCP の変更系のツール」に見える書き方）。
+// いまは hook が issue_events を書くツールをすべて拾うので同じ集合になるが、別々の実物（issue_events を書くか・
+// hook が拾うか）と突き合わせる（片方の実物だけが動いたときに、どちらの記述が古いかを出すため）。
 func TestDesignMCPToolListsMatchCode(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join(repoRoot, "docs", "server", "DESIGN.md"))
 	if err != nil {

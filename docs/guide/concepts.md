@@ -64,6 +64,11 @@ That is what lets you trace the history later.
 If work moves forward only in chat or private notes, neither of those reaches the next session.
 Looptrack's basic rule is simple: **start work from an issue**.
 
+Put together, the issues are the agent's external memory: what does not fit in its context window is kept here, and the next session starts from it.
+They are not meant to replace your project's own issue list.
+The feature requests and bug reports people discuss can stay where you keep them; what goes here are the work items an AI breaks that work into.
+Each is small enough to take one at a time, and carries its plan, its decisions and the tokens its work consumed ([Token reports](token-report.md)).
+
 ## The server enforces the rules
 
 The server checks numbering, append-only comments, the immutability of closed issues, and per-project rules.

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/howashoji/looptrack/internal/hookio"
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // wantUpdatedPrompt は updatedInput.prompt が元の指示文を残したまま印と上限の一文を足していること。
@@ -82,6 +83,8 @@ func TestPreToolSubagentBound(t *testing.T) {
 		}
 	}
 	const orig = "テストを走らせて結果を報告して"
+	// hook が実際に追記する注意文（ja）。これを既に含む指示文には二度足さないことを確かめる
+	appended := i18n.T("ja", "loop.subagentbound.note", "mark", backgroundBoundMarker)
 	task := func(prompt string) map[string]any {
 		return map[string]any{"description": "テスト", "prompt": prompt, "subagent_type": "Explore"}
 	}
@@ -97,9 +100,25 @@ func TestPreToolSubagentBound(t *testing.T) {
 		{name: "衝突しない命名の一文（en）", mk: withLang("en", mk("Agent", task(orig), "")),
 			want: wantNoteWords(orig, "scratchpad", "cannot collide", "the measurement")},
 
+		// 印に続けて識別子の照合の一文が入る（日英とも。報告の語を実物に当てずに写すと、誤りが中継のたびに伝わる）
+		{name: "識別子の照合の一文（ja）", mk: withLang("ja", mk("Agent", task(orig), "")),
+			want: wantNoteWords(orig, "git show / git grep", "実物と照合する", "渡された語と実測の食い違い")},
+		{name: "識別子の照合の一文（en）", mk: withLang("en", mk("Agent", task(orig), "")),
+			want: wantNoteWords(orig, "git show / git grep", "cross-check", "the word you were handed")},
+
 		// 何もしないべき（誤って足さない・二重に足さない）
 		{name: "既に印が入っている指示文には足さない",
 			mk: mk("Agent", task(orig+"\n\n"+backgroundBoundMarker+" 背景で待つループを書かない。"), ""), want: wantQuiet},
+		// 追記した結果をもう一度通しても、照合の一文を含む注意文が二重にならない（上の「Agent の起動」が追記する側の対照）
+		{name: "追記済みの指示文（照合の一文を含む）には二度足さない",
+			mk: mk("Agent", task(orig+"\n\n"+appended), ""),
+			want: func(t *testing.T, s *sandbox, g got) {
+				t.Helper()
+				if !strings.Contains(appended, "渡された語と実測の食い違い") {
+					t.Fatalf("前提が崩れている: 追記する注意文に照合の一文が無い: %q", appended)
+				}
+				wantQuiet(t, s, g)
+			}},
 		{name: "Bash（サブエージェントの起動ではない）",
 			mk: mk("Bash", map[string]any{"command": "go test ./..."}, ""), want: wantQuiet},
 		{name: "prompt が無い", mk: mk("Agent", map[string]any{"description": "x"}, ""), want: wantQuiet},

@@ -161,6 +161,18 @@ func importProject(ctx context.Context, db *sql.DB, sp SourceProject) (ImportRes
 	}
 	defer tx.Rollback() //nolint:errcheck
 
+	// アーカイブ済みの slug は拒む（内容を差し替えると、アーカイブしたはずのプロジェクトが使える状態に戻るため）。
+	// UpsertProject は archived_at に触れないので、この判定は Upsert の前に行う（触れた後でも結果は変わらないが、
+	// アーカイブ済みの名前・表示名を書き換えてしまう前に止める）。新規のプロジェクト（行が無い）は archived 扱いにしない。
+	var archived bool
+	switch err := tx.QueryRowContext(ctx, "SELECT archived_at IS NOT NULL FROM projects WHERE slug = ?", sp.Project.Slug).Scan(&archived); {
+	case err == sql.ErrNoRows:
+	case err != nil:
+		return res, err
+	case archived:
+		return res, i18n.Errorf("transfer.err.project_archived", "slug", sp.Project.Slug)
+	}
+
 	projectID, err := store.UpsertProject(ctx, tx, sp.Project)
 	if err != nil {
 		return res, err
@@ -304,7 +316,9 @@ func diffAt(a, b []byte) int {
 }
 
 // Export は DB のプロジェクトを out/<slug>/{open,closed}/ と counter に書き出す（移行時の確認・一時出力用）。
-func Export(ctx context.Context, db *sql.DB, out string, slugs []string) (int, error) {
+// アーカイブ済みのプロジェクトは既定で外す。includeArchived が true ならそれも書き出す
+// （slugs で名指ししても、includeArchived が false ならアーカイブ済みは出さない＝存在しないのと同じ扱い）。
+func Export(ctx context.Context, db *sql.DB, out string, slugs []string, includeArchived bool) (int, error) {
 	projects, err := store.ListProjects(ctx, db)
 	if err != nil {
 		return 0, err
@@ -316,6 +330,9 @@ func Export(ctx context.Context, db *sql.DB, out string, slugs []string) (int, e
 	n := 0
 	for _, p := range projects {
 		if len(want) > 0 && !want[p.Slug] {
+			continue
+		}
+		if p.Archived && !includeArchived {
 			continue
 		}
 		files, err := RenderProject(ctx, db, p)

@@ -25,6 +25,13 @@ The highest-priority code of conduct, distilled from the instructions and correc
 - **Establish every fact from a primary source** (the actual file, the actual data, a live value, something the user said explicitly). Never take an earlier summary, your memory, or hearsay on trust.
 - **Map out every path, every related document, and every stakeholder before you start.** Do not discover the gaps one at a time and restart.
 - **Watch for the blind spots in a grep's scope**: variant spellings (okurigana, kanji vs. kana, mixed English and Japanese, full-width vs. half-width) make a search come back empty. An audit checks the variants too.
+- **Once you gather a rule or a component into one place, count both the side that shares it and the side that reads the same input, and check the difference.**
+  "Keep it in one place" gets written down, but nobody counts how many places share it. Whatever is left in the difference is not fixed by fixing the shared component.
+  One way to count: take two lists, `git grep -ln '<call to the shared component>' -- <target directories>` and `git grep -ln '<word that reads the same input>' -- <target directories>`, and look at the difference.
+- **When you re-check someone else's count or measurement, do not repeat the same method; first confirm that the method is able to answer the question.**
+  With the same method, the answers agree mistake and all. **"They agreed" is no evidence on its own: agreement counts as evidence only when the method was different.**
+  A number a search hits is "the number of hits", not "the answer to the question". After the search, read the hits one by one (the difference between the two lists above is only a starting point, too).
+  A difference that showed up when you changed the method once can show up again when you change it once more. Do not stop at "I checked it with a different method".
 
 ### Verification and completion
 - **Prove completion with evidence**: the output of the run, the artifact actually existing, a quote of the real text, a pass/fail per criterion. A grep result alone is not "done".
@@ -58,6 +65,10 @@ The highest-priority code of conduct, distilled from the instructions and correc
   the packages in parallel, so three minutes overall does not contradict one package taking 100 seconds on its own).
   **It only becomes evidence once the cache setting and the skip count are there too.** In the same round, a check that really did run was left unprovable
   because the report carried neither the elapsed time nor the skip count.
+- **Zero parallel runs counted with `ps` describes what was running at that instant. It is no proof that the runs of the subagents you started have finished.**
+  A run that has already finished and a run that is about to start both stay out of the list. Before you hand over a shared resource (the right to run checks that use the database, say),
+  confirm from the reports that no run using that resource is left among the subagents you started.
+  Hand a check that uses a shared resource to a child only while the parent holds that resource, and write into the instruction that the parent already holds it.
 - **A test that failed under parallel execution can come from contention even when it does not look like a timeout.** A test that calls an external
   command in a child process can have that call fail under load, and if the implementation is fail-open it **turns into a "content" failure — the expected
   string simply is not there** (what actually happened: it failed when the whole suite ran in parallel, and the same test passed on its own with the cache bypassed).
@@ -78,14 +89,40 @@ The highest-priority code of conduct, distilled from the instructions and correc
   rejects by field count silently drops the verdict depending on the order the branches come out in (this bit us for real. The test caught it first).
 - **What you confirm before a push is not the scope of your own change but that the base is green.** Running every check is the default; a light check alone is enough only when
   the base SHA carries a record of every check having been green (with no record, run them all). **A narrow blast radius is no evidence that the base is green** (what actually happened: a documentation-only push moved a red base one step further).
+- **A rebase that completes with no conflicts is no evidence that the integration worked.** When a function or type name collides
+  in a different file of the same package, git sees separate additions to separate files and does not call it a conflict. "It did not conflict",
+  like "I did not touch it" or "my base is new", is only an estimate of the blast radius drawn from your own diff.
+  **Right after a rebase, before the full checks, run the type check and the build first** (for Go, `go build ./...` and `go vet ./...`).
+  This kind fails there, so you do not spend the long full run or a shared resource on it.
 - **A green summary (0 failed, 0 skipped) is no evidence that the test you cared about ran** (an empty name filter, a build condition or a unit left out all make "green without having run" look the same).
   When you rest a case on a specific red being cleared or on a specific fix, run it with the cache bypassed and verbose output, and quote the lines showing that test started and passed.
   **When you narrow a run by name, confirm the names of the tests that ran from the verbose output** (a test you meant to select once failed to match
   the pattern and stayed unrun while the run looked green; a PASS count alone cannot show a test that did not run).
   **"Zero matching tests" is not green.** It is a warning that not a single test ran, but the exit code stays 0 and
-  a success line still appears, so unless you look at the count you misread it as green.
-- **A test that confirms "X does not happen" carries a control, inside the same test, on the side where detection does happen.** Without one it passes even when the path is dead.
-  A control counts when it actually exercises the phenomenon you are after (having one there is not enough), and when the premise breaks, word the failure so that it reads as "the premise has broken".
+  a success line still appears, so unless you look at the count you misread it as green. A green summary being no evidence is the same thing seen from the side of the summary.
+  **If the green behind "the base is green" is only a summary, the base's green has the same hole.**
+- **When you find a hole, decide how to treat it by whether the person who steps on it notices on the spot.** A hole nobody notices (it stays silently green) gets closed,
+  or gets a witness (a test that fails when the thing breaks). A hole that makes itself noticed (it fails loudly) needs no more than a comment.
+  When you decide "not fixing it", write the reason in the form "it fails loudly, so whoever steps on it will notice". Never settle for "low priority" or "not now".
+- **A test that confirms "X does not happen" carries a control, inside the same test, on the side where detection does happen.** Pinning a false positive and confirming an exclusion are this kind of test.
+  Without a control it passes even when the path is dead, so it is no evidence.
+  A control counts when it actually exercises the phenomenon you are after (having one there is not enough: count a control by whether it runs through, not by whether it is there).
+  When the premise breaks, word the failure as "the premise has broken", so that it cannot be read as "the false-positive check passed".
+- **Checking a guard (anything that stops something) does not end with one example that stops; look for the forms that do not stop.**
+  Carry a list of wrappings, prefix words and quoting (`sudo`, `env`, `nohup`, `eval`, `bash -c`, `sh -c`, no quotes) and try every one.
+  A guard that works only in part lets a report of "it stopped" through, and only the forms that do not stop remain.
+  Read this as the pair of the control for "X does not happen" above (a negative check can come up empty; a positive check is satisfied by a single example).
+- **A change that widens what passes lets more through.** "Fewer false alarms" and "no more false detections" always widen what passes.
+  **"It narrows things, so it is safe" does not hold until you have tried concrete examples on the side that was widened.**
+  Checking a guard is about "trying only the examples that stop"; this one is about "not trying what widening the passing side does".
+- **Change something that gets recorded — a request, a header, the wiring, a count — and the golden that records it moves.**
+  It moves even when your branch has not touched that package by a single line, so the list of files you touched cannot tell you the blast radius.
+  Whenever you change a request, a header, the wiring or a count, always run the golden tests that record it.
+- **When you write a number into an acceptance criterion or a rule, add the value measured at the time of writing** (for example, "A is 127 and B is 126 right now, so add about the same amount in both directions").
+  Never make an absolute value such as "the same number" the criterion without counting first.
+- **When you write "there is no check" into a handoff, confirm it against the real thing at the time of writing and add the SHA you confirmed it at.**
+  When you rest a case on an old statement in a handoff, confirm it against the real thing again at the time you use it.
+  Numbers get fixed once a check is added, but nobody fixes a handoff, so only the old premise "there is no check" goes on circulating.
 
 ### Parallel sessions (same project)
 - **Declare that you have started by changing the state on the server.** Before you tell anyone "I'll take this", put the issue In Progress first (`looptrack issue next` or
@@ -135,9 +172,20 @@ The highest-priority code of conduct, distilled from the instructions and correc
 - **Put "keep your report within N lines" into every instruction you give a subagent.** The report itself eats the parent's context
   (what actually happened: one report ran past 100 lines). What you need is the conclusion, the paths that changed and the pass/fail of the verification — not a retelling of what was read.
   Ask only for what the parent needs to make the next decision, and specify the line count.
+- **Put "if you doubted something along the way and withdrew the doubt after checking, say so in one line of the report" into the instruction** (one line fits within the line cap).
+  A doubt you withdrew, and a doubt before it was withdrawn, both deprive the receiving side of material for re-examining its own measurements unless they are relayed.
+  Relay a doubt you receive, as it is, to the side that holds the measurement — even if in your own judgment the other side is right.
 - **Never take a result on trust.** Always verify what comes back before you integrate it.
   **The verification can go to a subagent too** — a different agent from the one that did the work, asked to confirm it with quotes from the actual output.
   What the parent does is decide whether to accept it as verified.
+- **When you hand an implementation out for verification, include the tests attached to that implementation in what gets verified.** Name the tests as a target of the verification in the instruction.
+  Never make it a verification that "looks only at the implementation, assuming the tests are right".
+- **Put "check the diff for changes nobody asked for" into every instruction for an independent verification.** Have it read every line of the diff and list, one by one, each change that answers to nothing in the instruction.
+  An independent verification looks only at the scope it was given, so an addition outside the instruction never enters its net.
+  When it finds a change that widens what passes, have it check with concrete examples on the widened side whether more gets through (→ "A change that widens what passes lets more through" under verification and completion).
+  An addition outside the instruction goes in with good intentions, so never frame it as blaming the one who did the work.
+- **When you hand out a measurement that handles a value, write into the instruction not just the prohibition (never print the value) but the procedure from the moment of reading it** (hash it and compare; never pass through the raw value).
+  A prohibition only marks the boundary of what must not be done; it does not bind the steps in between.
 - **When you hand a subagent the push itself, put into the instruction that it shows the parent the full set of checks and never pushes before the parent has approved them.**
   Write "push if everything is green" and the report only arrives after the push, so have them send **the numbers from the checks first, in short form** (the full report can follow). **"A green carries its numbers" applies when the one you are telling is the parent, too — and it has to apply before the push.**
 - **When you run jobs in parallel, give each one its own worktree.** Never put two into the same worktree
@@ -154,6 +202,34 @@ The highest-priority code of conduct, distilled from the instructions and correc
   Three things go into the instruction: always carry a bound (a maximum number of attempts or a deadline), **confirm that the thing being waited on exists before the wait starts**,
   and **report, in one line, every background process started and that it was stopped**. The parent checks for that one line before integrating the result
   (three unbounded `until` loops really were created in a single day; one of them was waiting on a path that did not exist).
+- **Neither the rules nor the state reach anyone but the parent.** Rules are injected into the parent's session only and never enter a subagent's instructions on their own
+  (the only things that go down automatically are the templates a hook appends, such as bounding a background wait). The state — the status of an issue, who holds a shared resource, what has been pushed — reaches only the parent too,
+  and a child that is already running knows nothing of what the parent learned afterwards. **There are two remedies: spell it out in the instruction, and send it on to a child that is already running.**
+  What gets left out leans towards the side nobody sees. A danger that shows when it breaks, such as a write or a run, gets written down; a danger that only goes quietly wrong, such as a read, slips out.
+  So list not just "what must not be done" but also "what to read against". Copy the template below into the instruction verbatim — do not paraphrase it.
+  When you do hand a child the issue operations or the push, rewrite only that line to match what you are handing over.
+  ```text
+  Do not change the status of any issue. The parent closes it, after the push.
+  Before using a shared resource (the right to run checks that use the database, say), check with the parent.
+  When you read, specify the SHA of `origin/main` (never read against the main worktree or `HEAD`).
+  Before you write, confirm against the real thing at that SHA (`git show <SHA>:<path>`, `git grep <SHA>`). If it differs, report that it differs.
+  Before you start, confirm the state live. If it contradicts a premise in these instructions, trust the live state, not the instructions, and report the contradiction.
+  ```
+- **Send it on to a child that is already running.** The moment the parent learns of a change of state (a push completed, a close, a shared resource changing hands), send it to the running child
+  (on Claude Code, send it to the running subagent with `SendMessage`). The state as it was when you wrote the instruction may already be stale by the time the child reads it.
+- **When you have interrupted work resumed, write it in two steps.** (1) The parent's side: take every premise you put into the resuming instruction from a measurement, not a guess
+  (`git log --oneline -1` and `git status --porcelain` in the worktree; the status of an issue from `looptrack issue show`).
+  (2) The child's side (the insurance for when the parent forgets to measure): put "confirm the state live; if it contradicts a premise in these instructions, trust the live state and report the contradiction" into the instruction (the last line of the template above).
+  **When you have read the partial results of an interrupted agent, never infer the rest from them — always take the live state again.** With partial results in hand you feel
+  "I already know" and skip the measurement; having partial results is itself the trigger (what actually happened: the same parent resumed two jobs from the same interruption.
+  The one written after measuring went right; the one written from a guess based on partial results — "all that is left is posting the comment" — contradicted the live state. The comment had already been posted).
+- **Write acceptance criteria against strings or function names, not line numbers.** Line numbers shift every time the revision moves on
+  (what actually happened: while the revision moved on, every one of the 5 criteria written with line numbers broke, and not one of those pinned by a string did).
+- **When you list examples, give each one its file name (the writing side). The receiving side confirms against the real thing before writing.** One side alone does not close the gap:
+  vague writing may decrease and people who never check remain; more people may check and vague reports keep coming (what actually happened: of two examples of holes, only the first carried a file name,
+  and the parent relayed them to a child as if both were in one file. The instruction said "confirm against the real thing before you write", so the child checked and split them into two files).
+  What an instruction can prevent is only reading an old revision. A mistake in the research itself (a path that does not exist, a miscount) is wrong whatever revision you look at,
+  so it comes out only in an independent verification, where a different agent checks each item against the real thing.
 
 ---
 

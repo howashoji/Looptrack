@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/domain"
@@ -13,13 +14,13 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 検証コマンド（A-1。DESIGN.md §5-8）。
+// 検証コマンド（A-1。DESIGN.md §9-3）。
 // サーバはコマンドを実行しない（各プロジェクトのチェックアウトが無く、任意コマンドの実行は RCE の入口になる）。
 // 実行と計測は CLI（looptrack issue verify）が手元で行い、結果を POST /issues/{id}/verify で記録する。
 // MCP の verify_issue は一覧と直近の結果を返して CLI の実行を促す（文言は VerifyPlan で CLI の GET と共有）。
 // MCP の report_verify は AI が手元で実行した結果を同じ RecordVerify で記録する。経路が mcp の記録は「MCP の自己申告」
 // の印を detail（self_reported）とコメントに付け、表示（next・verify_issue・summary）でも見分けられるようにする。
-// 規則 verify.require_on_close は自己申告も数える（§5-8-2）。
+// 規則 verify.require_on_close は自己申告も数える（DESIGN.md §9-3-2）。
 
 // VerifyPlan は 1 イシューの検証コマンドと直近の記録（GET /issues/{id}/verify・MCP verify_issue・next で共通）。
 type VerifyPlan struct {
@@ -34,21 +35,11 @@ type VerifyPlan struct {
 	Message    string // 次にすること（節なし・上限超過ならその理由）
 	Text       string // 人が読む全文（CLI と MCP で同じ）
 	// SectionDrift は「受け入れ条件の節は起票の後に更新されたのに、検証コマンドの節が起票時のまま」か
-	// （§5-8-4。判定は domain.SectionDrift の 1 か所。節のハッシュを持たない古いイシューは常に false）
+	// （DESIGN.md §9-3-4。判定は domain.SectionDrift の 1 か所。節のハッシュを持たない古いイシューは常に false）
 	SectionDrift bool
 	// SectionDriftNote は SectionDrift のときの注記（そうでなければ空）
 	SectionDriftNote string
 }
-
-// SelfReportedLabel は MCP（report_verify）から送られた記録のコメントに付ける印。
-// コメントは DB に残る記録なので訳さない（記録した人の言語で変えない）。画面・MCP・summary に出す印は
-// 対訳の service.verify.last.self_reported で、要求の言語で出す。
-const SelfReportedLabel = "MCP の自己申告"
-
-// CachedLabel は出力に結果キャッシュの印（(cached)）があった記録のコメントに付ける注記
-// （SelfReportedLabel と同じく記録なので訳さない。表示は service.verify.last.cached）。
-// 失敗にはしない（キャッシュが返っても、そのコマンド自体は走って 0 で終わっているため）。
-const CachedLabel = "結果キャッシュあり"
 
 // SelfReported は記録が MCP の自己申告か（detail の印、または issue_events の経路 mcp）。
 func SelfReported(ev *store.VerifyEvent) bool {
@@ -164,7 +155,7 @@ func (s *Service) verifyText(lang i18n.Lang, p *VerifyPlan) (message, text strin
 	return message, b.String()
 }
 
-// Next は next（next.go）に、着手したイシューの検証コマンド（§5-8-1。節が無ければ nil）を添える。
+// Next は next（next.go）に、着手したイシューの検証コマンド（DESIGN.md §9-3-1。節が無ければ nil）を添える。
 func (s *Service) Next(ctx context.Context, a Actor, p store.Project, opt NextOptions) (*NextResult, error) {
 	res, err := s.next(ctx, a, p, opt)
 	if err != nil || res.Issue == nil {
@@ -199,7 +190,8 @@ type VerifyRecord struct {
 // RecordVerify は CLI（または MCP の report_verify）が手元で実行した結果を、コメントと issue_events kind verify として 1 トランザクションで残す。
 // 検査: ① body_sha256 が現在の本文と違えば 409 body_changed ② コマンドが現在の節と同じ順で同じでなければ 400
 // ③ 出力はマスクして 4,096 バイトに切る ④ クローズ済みにも記録できる（コメントの追記と同じ）。拒否したときは何も記録しない。
-func (s *Service) RecordVerify(ctx context.Context, a Actor, p store.Project, issueID int64, in VerifyInput) (*VerifyRecord, error) {
+// lang は記録した利用者の言語（コメントの文面がこれで決まる。DB に残る文面は書いた利用者の言語・DESIGN §9-6。Create と同じく呼ぶ側が渡す）。
+func (s *Service) RecordVerify(ctx context.Context, a Actor, p store.Project, issueID int64, in VerifyInput, lang i18n.Lang) (*VerifyRecord, error) {
 	if strings.TrimSpace(in.BodySHA256) == "" {
 		return nil, errm(Invalid, "invalid_argument", i18n.M("service.err.invalid.body_sha_required"))
 	}
@@ -236,7 +228,7 @@ func (s *Service) RecordVerify(ctx context.Context, a Actor, p store.Project, is
 			return change{}, errm(Invalid, "verify_commands_mismatch", i18n.M("service.err.verify_mismatch", "id", cur.ID, "n", len(cmds), "command", domain.VerifyCommand(cur.ID)))
 		}
 		detail = newVerifyDetail(sum, host, workspace, a.Via == "mcp", in.Results)
-		text := verifyComment(detail)
+		text := verifyComment(lang, detail)
 		if v := rules.CheckText(a.Lang, cur.ID, "", text); v != nil {
 			return change{}, ruleError(v)
 		}
@@ -288,7 +280,7 @@ func sameCommands(cmds []string, results []store.VerifyResult) bool {
 	return true
 }
 
-// cleanName はホスト名・ディレクトリ名（パスは送らない。§5-6 と同じ）を 1 行 128 文字以内にする。
+// cleanName はホスト名・ディレクトリ名（パスは送らない。DESIGN.md §6 と同じ）を 1 行 128 文字以内にする。
 func cleanName(v string) string {
 	v = strings.TrimSpace(strings.NewReplacer("\r", " ", "\n", " ").Replace(v))
 	if i := strings.LastIndexAny(v, `/\`); i >= 0 {
@@ -310,8 +302,6 @@ func toMap(v any) (map[string]any, error) {
 	return m, err
 }
 
-func seconds(ms int64) string { return fmt.Sprintf("%.1f 秒", float64(ms)/1000) }
-
 func inlineCode(s string) string {
 	if strings.Contains(s, "`") {
 		return "`` " + s + " ``"
@@ -319,45 +309,60 @@ func inlineCode(s string) string {
 	return "`" + s + "`"
 }
 
-// verifyComment はコメントの文面（§5-8-3）。DB に残る記録なので、記録した人の言語に依らず同じ文面で書く。出力はコメントに入れない（verify --last と GET …/verify で見る）。
+// seconds は所要時間の表示（CLI の verify の行と同じ文面）。
+func seconds(lang i18n.Lang, ms int64) string {
+	return i18n.T(lang, "verify.line.seconds", "secs", fmt.Sprintf("%.1f", float64(ms)/1000))
+}
+
+// verifyComment はコメントの文面（DESIGN.md §9-3-3）。DB に残る記録なので、記録した利用者の言語（lang）で書き、
+// 後から表示の言語を変えても書き換えない（既存の記録はそのときの言語のまま）。出力はコメントに入れない（verify --last と GET …/verify で見る）。
 // MCP の自己申告は見出しに印を付ける（「検証コマンド（MCP の自己申告）: …」）。
 // 結果キャッシュの印があった記録も同じ形で注記する（「検証コマンド（結果キャッシュあり）: …」）。
-func verifyComment(d store.VerifyDetail) string {
+// 印と成否の件数は、画面・MCP・summary に出す直近の記録の行と同じ対訳を使う（同じものに別の語を作らない）。
+func verifyComment(lang i18n.Lang, d store.VerifyDetail) string {
 	var total int64
 	for _, r := range d.Results {
 		total += r.DurationMS
 	}
-	var b strings.Builder
-	b.WriteString("検証コマンド")
+	join := func(a, b string) string { return i18n.T(lang, "service.verify.comment.join", "a", a, "b", b) }
+	title := i18n.T(lang, "service.verify.comment.title")
 	var notes []string
 	if d.SelfReported {
-		notes = append(notes, SelfReportedLabel)
+		notes = append(notes, i18n.T(lang, "service.verify.last.self_reported"))
 	}
 	if d.Cached {
-		notes = append(notes, CachedLabel)
+		notes = append(notes, i18n.T(lang, "service.verify.last.cached"))
 	}
 	if len(notes) > 0 {
-		b.WriteString("（" + strings.Join(notes, "・") + "）")
+		note := notes[0]
+		for _, n := range notes[1:] {
+			note = join(note, n)
+		}
+		title = i18n.T(lang, "service.verify.comment.title_note", "note", note)
 	}
-	fmt.Fprintf(&b, ": %d/%d 成功", d.Passed, len(d.Results))
+	counts := i18n.T(lang, "service.verify.last.passed", "passed", d.Passed, "total", len(d.Results))
 	if d.Failed > 0 {
-		fmt.Fprintf(&b, "・%d 失敗", d.Failed)
+		counts = i18n.T(lang, "service.verify.last.passed_failed", "passed", d.Passed, "total", len(d.Results), "failed", d.Failed)
 	}
-	fmt.Fprintf(&b, "（%s・本文 %s）", seconds(total), d.BodySHA256[:8])
+	var b strings.Builder
+	b.WriteString(i18n.T(lang, "service.verify.comment.summary", "title", title, "counts", counts, "secs", seconds(lang, total), "sha", d.BodySHA256[:8]))
+	line := func(status, command, detail string) {
+		b.WriteString("\n" + i18n.T(lang, "service.verify.comment.line", "status", status, "command", inlineCode(command), "detail", detail))
+	}
 	for _, r := range d.Results {
 		switch r.Status {
 		case "ok", "timeout":
-			detail := seconds(r.DurationMS)
+			detail := seconds(lang, r.DurationMS)
 			if r.Cached {
-				detail += "・" + CachedLabel
+				detail = join(detail, i18n.T(lang, "service.verify.last.cached"))
 			}
-			fmt.Fprintf(&b, "\n- %s %s（%s）", r.Status, inlineCode(r.Command), detail)
+			line(r.Status, r.Command, detail)
 		case "fail":
-			exit := "exit ?"
+			code := "?"
 			if r.ExitCode != nil {
-				exit = fmt.Sprintf("exit %d", *r.ExitCode)
+				code = strconv.Itoa(*r.ExitCode)
 			}
-			fmt.Fprintf(&b, "\n- fail %s（%s・%s）", inlineCode(r.Command), exit, seconds(r.DurationMS))
+			line("fail", r.Command, i18n.T(lang, "verify.line.exit", "code", code, "secs", seconds(lang, r.DurationMS)))
 		default:
 			fmt.Fprintf(&b, "\n- %s %s", r.Status, inlineCode(r.Command))
 		}

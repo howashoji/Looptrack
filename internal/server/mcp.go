@@ -64,7 +64,7 @@ func mcpInstructions(lang i18n.Lang) string {
 	return mcpInstructionsEN
 }
 
-// reviewPromptText は prompt「review」の本文（全文は DESIGN.md §5-8-5 と一致させる。テストで比較する）。
+// reviewPromptText は prompt「review」の本文（全文は DESIGN.md §9-3-5 と一致させる。テストで比較する）。
 const reviewPromptText = `イシュー管理（looptrack）の「人の判断待ち」と「外からの反応」を利用者に持ちかけてください%s。
 
 1. project_summary を呼び、「人の判断待ち（In Review）」と「外からの反応（未応答のフィードバック）」の一覧を得る。どちらも無ければ「判断待ちはありません」と伝えて止まる
@@ -194,7 +194,14 @@ func mcpConnLang(r *http.Request) i18n.Lang {
 	return langFor("", r.Header.Get(langHeader), userLang(principalOfContext(r.Context())), r.Header.Get("Accept-Language"))
 }
 
-func mcpCallOf(req *mcp.CallToolRequest) (*mcpCall, error) {
+// mcpCallOf は MCP の呼び出しの主体を決める。セッション ID を決めるのはここだけで、順は次のとおり
+// （判定の側（service.StarterSession・ComparableSessions）は、ここで決まった値を比べるだけ）。
+//
+//  1. X-Looptrack-Session（クライアントが名乗った値）
+//  2. 合鍵（PreToolUse の hook が届けた、このツール呼び出しの会話のセッション ID。同じ利用者のものだけ。session_binds.go）
+//  3. Mcp-Session-Id（サーバが発行した接続 ID）に service.MCPSessionPrefix を付けたもの
+//  4. 空
+func (s *Server) mcpCallOf(req *mcp.CallToolRequest) (*mcpCall, error) {
 	lang := mcpLang(req)
 	extra := req.GetExtra()
 	if extra == nil || extra.TokenInfo == nil {
@@ -205,8 +212,18 @@ func mcpCallOf(req *mcp.CallToolRequest) (*mcpCall, error) {
 		return nil, errors.New(i18n.T(lang, "server.mcp.err.auth_required"))
 	}
 	c := &mcpCall{p: p, actor: service.Actor{UserID: p.User.ID, TokenID: p.TokenID, Via: "mcp", Lang: lang}, lang: lang}
+	c.actor.ToolUse = mcpToolUse(req)
+	named := ""
 	if extra.Header != nil {
-		if sid := strings.TrimSpace(extra.Header.Get("X-Looptrack-Session")); sid != "" && len(sid) <= 128 {
+		if sid := strings.TrimSpace(extra.Header.Get("X-Looptrack-Session")); len(sid) <= 128 {
+			named = sid
+		}
+	}
+	if sid, kind, ok := s.binds.get(p.User.ID, c.actor.ToolUse); ok && named == "" {
+		// 合鍵は会話のセッション ID（クライアントが名乗る値と同じ種類）なので、接続 ID の印は付けない
+		c.actor.SessionID, c.actor.SessionKind = sid, kind
+	} else if extra.Header != nil {
+		if sid := named; sid != "" {
 			c.actor.SessionID = sid
 			// X-Looptrack-Session-Kind: セッション ID の種類（REST の actor と同じ判定。知らない値は読み捨てる）。
 			// host は器（デスクトップ版の窓）の ID で会話記録と結び付かないので、付与の対象から外す（§9-5）。
@@ -221,16 +238,40 @@ func mcpCallOf(req *mcp.CallToolRequest) (*mcpCall, error) {
 			// クライアントが名乗るセッション ID とは種類が違うので印を付けて区別する（service.ComparableSessions）。
 			c.actor.SessionID = service.MCPSessionPrefix + sid
 		}
+	}
+	if extra.Header != nil {
 		c.project = strings.TrimSpace(extra.Header.Get("X-Looptrack-Project"))
 	}
 	return c, nil
+}
+
+// mcpToolUseKey は、Claude Code が tools/call の _meta に入れるツール呼び出しの ID のキー。
+// 同じ呼び出しの PostToolUse の hook の tool_use_id と同じ値で、付与の hook はそれをスナップショットの tool_use_id として送る。
+// PreToolUse の hook（issue-session-bind）も同じ値を合鍵として届けるので、mcpCallOf はこのハッシュで合鍵を引く。
+// 公開の仕様ではないので、無い・形が違うときは黙って捨てて従来どおり（接続 ID か空のセッション ID）に倒す。
+const mcpToolUseKey = "claudecode/toolUseId"
+
+// mcpToolUse は _meta のツール呼び出しの ID を検査し、記録に使うハッシュを返す（生の値は返さない。検査は service.ToolUseHash）。
+func mcpToolUse(req *mcp.CallToolRequest) string {
+	if req == nil || req.Params == nil {
+		return ""
+	}
+	id, ok := req.Params.Meta[mcpToolUseKey].(string)
+	if !ok {
+		return ""
+	}
+	h, ok := service.ToolUseHash(id)
+	if !ok {
+		return ""
+	}
+	return h
 }
 
 // mcpCallAgent は mcpCallOf に、接続してきた AI の種類（clientInfo から判定。setup ツールと同じ）を足す。
 // 変更系のツールが使う: 計測を利用者が有効にしたときだけ測れる AI（Copilot）の操作を、有効にしていない利用者なら付与の指示・クローズ時の必須・
 // 未付与の検知から外す（判定は service.UsageTarget・store.UsageCoverage）。
 func (s *Server) mcpCallAgent(ctx context.Context, req *mcp.CallToolRequest) (*mcpCall, error) {
-	c, err := mcpCallOf(req)
+	c, err := s.mcpCallOf(req)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +415,7 @@ type (
 		Sort     string `json:"sort,omitempty" jsonschema:"server.mcp.arg.list_issues.sort"`
 		Reverse  bool   `json:"reverse,omitempty" jsonschema:"server.mcp.arg.list_issues.reverse"`
 		Assignee string `json:"assignee,omitempty" jsonschema:"server.mcp.arg.list_issues.assignee"`
-		// 未応答のフィードバックで絞る（§5-8-6）
+		// 未応答のフィードバックで絞る（DESIGN.md §9-3-6）
 		HasFeedback bool `json:"has_feedback,omitempty" jsonschema:"server.mcp.arg.list_issues.has_feedback"`
 	}
 	readyIn struct {
@@ -476,7 +517,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 
 	addTool(srv, lang, &mcp.Tool{Name: "list_projects", Description: i18n.T(lang, "server.mcp.tool.list_projects"), Annotations: ro},
 		func(ctx context.Context, req *mcp.CallToolRequest, _ noArgs) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -505,7 +546,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 	// prefix と width は後から変えられないので、ツールの説明で実行前に利用者へ値を確かめさせる。読み取り専用の注釈は付けない。
 	addTool(srv, lang, &mcp.Tool{Name: "create_project", Description: i18n.T(lang, "server.mcp.tool.create_project"), Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive}},
 		func(ctx context.Context, req *mcp.CallToolRequest, in createProjectIn) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -541,7 +582,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 
 	addTool(srv, lang, &mcp.Tool{Name: "get_issue", Description: i18n.T(lang, "server.mcp.tool.get_issue"), Annotations: ro},
 		func(ctx context.Context, req *mcp.CallToolRequest, in issueIDArg) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -609,6 +650,9 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				return nil, nil, s.toolError(c.lang, "set_status", err)
 			}
 			data := map[string]any{"issue": toIssueJSON(res.Issue), "from": res.From, "to": res.Issue.Item.Status}
+			if res.AcceptanceNotice != "" {
+				data["acceptance_notice"] = res.AcceptanceNotice
+			}
 			// 下位の最後の 1 件を閉じたら要件の検証と close を促す（REST の messages と同じ行）
 			text := strings.Join(withClosable(c.lang, statusMessages(c.lang, res, in.Comment), data, s.closedRequirements(ctx, pr, res)), "\n")
 			notice := s.usageNotice(ctx, c.lang, c.actor, pr, res.Issue, res.Issue.Closed() && res.From != res.Issue.Item.Status)
@@ -700,7 +744,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			if err != nil {
 				return nil, nil, err
 			}
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -717,8 +761,8 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				return itemsJSON(pr, rows, set.List(domain.Filter{Status: st}, "priority", false))
 			}
 			inProgress, top := byStatus("In Progress"), itemsJSON(pr, rows, ready[:min(limit, len(ready))])
-			markOtherSession(ctx, c.lang, s.db, pr.ID, c.actor.SessionID, inProgress) // 別のセッションが着手したものに印
-			// 3 層の見出し（§5-8-7。② ③ の行は以前の CLI の summary と同じ文言）
+			markOtherSession(ctx, c.lang, s.db, pr.ID, c.actor, inProgress) // 別のセッションが着手したものに印
+			// 3 層の見出し（DESIGN.md §9-3-7。② ③ の行は以前の CLI の summary と同じ文言）
 			inReview, fb, cnt, err := s.loopLayers(ctx, c.lang, pr, rows, byStatus("In Review"), counts(set), limit)
 			if err != nil {
 				return nil, nil, s.toolError(c.lang, "project_summary", err)
@@ -762,7 +806,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 
 	addTool(srv, lang, &mcp.Tool{Name: "usage_missing", Description: i18n.T(lang, "server.mcp.tool.usage_missing"), Annotations: ro},
 		func(ctx context.Context, req *mcp.CallToolRequest, in usageMissingIn) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -790,7 +834,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 
 	addTool(srv, lang, &mcp.Tool{Name: "guide", Description: i18n.T(lang, "server.mcp.tool.guide"), Annotations: ro},
 		func(ctx context.Context, req *mcp.CallToolRequest, in projectArg) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -840,7 +884,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 
 	addTool(srv, lang, &mcp.Tool{Name: "issue_activity", Description: i18n.T(lang, "server.mcp.tool.issue_activity"), Annotations: ro},
 		func(ctx context.Context, req *mcp.CallToolRequest, in activityIn) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -883,7 +927,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 
 	addTool(srv, lang, &mcp.Tool{Name: "issue_usage", Description: i18n.T(lang, "server.mcp.tool.issue_usage"), Annotations: ro},
 		func(ctx context.Context, req *mcp.CallToolRequest, in issueIDArg) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -935,7 +979,7 @@ func (s *Server) mcpIssue(ctx context.Context, req *mcp.CallToolRequest, in issu
 
 // mcpProjectSet はプロジェクトを決めて全イシュー（frontmatter）を読む。
 func (s *Server) mcpProjectSet(ctx context.Context, req *mcp.CallToolRequest, arg, tool string) (store.Project, *domain.Set, []service.Issue, error) {
-	c, err := mcpCallOf(req)
+	c, err := s.mcpCallOf(req)
 	if err != nil {
 		return store.Project{}, nil, nil, err
 	}
@@ -970,13 +1014,13 @@ func (s *Server) mcpList(ctx context.Context, req *mcp.CallToolRequest, project,
 	if err != nil {
 		return nil, nil, err
 	}
-	c, err := mcpCallOf(req)
+	c, err := s.mcpCallOf(req)
 	if err != nil {
 		return nil, nil, err
 	}
 	out := filterAssignee(itemsJSON(pr, rows, items), assignee, c.p.User.Login)
 	// 別のセッションが着手したものに印を付ける（空きを探す経路。project_summary と同じ判定）
-	markOtherSession(ctx, c.lang, s.db, pr.ID, c.actor.SessionID, out)
+	markOtherSession(ctx, c.lang, s.db, pr.ID, c.actor, out)
 	none := i18n.T(c.lang, "server.api.summary.none")
 	text := rowsText(c.lang, out, none)
 	if hasFeedback {

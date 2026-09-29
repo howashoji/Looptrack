@@ -1,4 +1,4 @@
-// Package selfupdate は looptrack self-update（DESIGN.md §5-11「配布と更新」）。
+// Package selfupdate は looptrack self-update（DESIGN.md §5-1「配布と更新」）。
 //
 //	looptrack self-update [--check] [--force] [--url URL]
 //
@@ -8,6 +8,8 @@
 //   - 取得はサーバの API（トークンつき）。一覧の URL がサーバの外（公開後の GitHub Releases など）ならトークンを付けずに取る
 //   - 署名（SHA256SUMS を minisign で署名する）: 公開鍵（MinisignPublicKey）を持つビルドでは、一覧の SHA256SUMS と
 //     .minisig を取り、署名と、SHA256SUMS の中のハッシュが一覧と同じことを確かめる。署名が無い・合わなければ置き換えない。
+//     一覧の version も、署名で守られた版（SHA256SUMS の中の名前と、リリースの trusted comment）と同じことを確かめる
+//     （signedVersion。手元より古い版へ置き換えるのは --force を付けたときだけなので、一覧の version の偽装で古い版へ戻されないため）。
 //     公開鍵はソースに埋め込んである（リリースと go build はこれ）。署名しない配布（サーバの配布ディレクトリに置く配布。RELEASE.md §2-1）の
 //     ビルドだけが -X で空にし、ハッシュの確認だけを行う
 //   - 置き換え: 同じディレクトリに一時ファイルを書き、POSIX は rename で差し替える。Windows は実行中の exe を消せないので、
@@ -35,6 +37,7 @@ import (
 	"github.com/howashoji/looptrack/internal/client/api"
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/i18n"
+	"github.com/howashoji/looptrack/internal/relsig"
 	"github.com/howashoji/looptrack/internal/relver"
 )
 
@@ -60,6 +63,17 @@ type Listing struct {
 	Binaries   []Binary `json:"binaries"`
 	SumsURL    string   `json:"sha256sums_url"`
 	MinisigURL string   `json:"sha256sums_minisig_url"`
+	// ServerUpdate はサーバ自身の新しい版（トークンの利用者が admin のときだけサーバが付ける。古いサーバは付けない）。
+	// looptrack doctor が注意として出す
+	ServerUpdate *ServerUpdate `json:"server_update,omitempty"`
+}
+
+// ServerUpdate はサーバの新しい版（サーバの Server.serverUpdate）。Command は install.sh で入れたサーバの更新の 1 行（サーバ版だけ）。
+type ServerUpdate struct {
+	Version string `json:"version"`
+	Current string `json:"current"`
+	URL     string `json:"url,omitempty"`
+	Command string `json:"command,omitempty"`
 }
 
 // For は (os, arch) の実行ファイル（無ければ nil）。
@@ -323,7 +337,8 @@ func download(lang i18n.Lang, cl *api.Client, b *Binary) ([]byte, error) {
 	return body, nil
 }
 
-// verifySignature は SHA256SUMS の署名を確かめ、その中の b のハッシュが一覧と同じことを確かめる（公開鍵が無ければ何もしない）。
+// verifySignature は SHA256SUMS の署名を確かめ、b の版が署名された版と同じこと（signedVersion）と、その中の b のハッシュが
+// 一覧と同じことを確かめる（公開鍵が無ければ何もしない。署名しない配布では版を署名から読めないので、一覧の version をそのまま使う）。
 func verifySignature(lang i18n.Lang, cl *api.Client, l *Listing, b *Binary) error {
 	if MinisignPublicKey == "" {
 		return nil
@@ -339,19 +354,40 @@ func verifySignature(lang i18n.Lang, cl *api.Client, l *Listing, b *Binary) erro
 	if err != nil {
 		return err
 	}
-	if err := VerifyMinisign(MinisignPublicKey, sums, sig); err != nil {
+	trusted, err := relsig.Verify(MinisignPublicKey, sums, sig)
+	if err != nil {
 		return i18n.Errorf("selfupdate.err.minisig_verify", "reason", err)
 	}
-	for _, line := range strings.Split(string(sums), "\n") {
-		f := strings.Fields(line)
-		if len(f) == 2 && strings.TrimPrefix(f[1], "*") == b.Name {
-			if !strings.EqualFold(f[0], b.SHA256) {
-				return i18n.Errorf("selfupdate.err.sums_mismatch", "name", b.Name)
-			}
-			return nil
-		}
+	if err := signedVersion(trusted, b); err != nil {
+		return err
 	}
-	return i18n.Errorf("selfupdate.err.sums_missing", "name", b.Name)
+	h, ok := relsig.Lookup(sums, b.Name)
+	if !ok {
+		return i18n.Errorf("selfupdate.err.sums_missing", "name", b.Name)
+	}
+	if !strings.EqualFold(h, b.SHA256) {
+		return i18n.Errorf("selfupdate.err.sums_mismatch", "name", b.Name)
+	}
+	return nil
+}
+
+// signedVersion は一覧の版（b.Version）が、署名で守られた情報の版と同じことを確かめる。
+// 一覧は署名されていない。その version だけを信じると、署名の正しい古い版の SHA256SUMS と新しく見せかけた version を
+// 組にして返す配布元から、古い版へ置き換えられてしまう（手元より新しいかの判定は b.Version で行っている）。
+//   - 名前: SHA256SUMS に載る名前は looptrack_<版>_<os>_<arch>[.exe]（dist.sh build）。呼ぶ側はこの名前の行を
+//     署名された SHA256SUMS から選ぶので、名前の版が b.Version と同じなら b.Version は署名された版になる。形の違う名前も拒む
+//   - trusted comment: リリース（release.yml）は "looptrack <版> SHA256SUMS" で署名する。この形のときだけ版を読んで比べる
+//     （dist.sh sign-sums の既定の "looptrack SHA256SUMS <ディレクトリ名>" のように版を持たない形は、名前だけで確かめる）
+//
+// 名前と trusted comment の形は internal/relsig（新しい版の確認と共通）。
+func signedVersion(trusted string, b *Binary) error {
+	if b.Version == "" || b.Name != relsig.BinaryName(b.Version, b.OS, b.Arch) {
+		return i18n.Errorf("selfupdate.err.name_version", "name", b.Name, "version", b.Version, "os", b.OS, "arch", b.Arch)
+	}
+	if v, ok := relsig.TrustedVersion(trusted); ok && v != b.Version {
+		return i18n.Errorf("selfupdate.err.trusted_version", "signed", v, "version", b.Version)
+	}
+	return nil
 }
 
 // cleanupOld は前回の Windows の置き換えで残った <名前>.old を消す（実行中なら消えないので、失敗は無視する）。

@@ -12,7 +12,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 担当者（設計は DESIGN.md §5-1）。
+// 担当者（設計は DESIGN.md §9-2）。
 //
 // 規則（全経路共通。判定は行ロックの中）:
 //

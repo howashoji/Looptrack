@@ -17,7 +17,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// トークンレポートの作成依頼（設計は docs/server/DESIGN.md §5-4）。
+// トークンレポートの作成依頼（設計は docs/server/DESIGN.md §9-5）。
 // 画面の「レポート作成」で依頼を登録し、次のセッション開始時の summary に未完了の依頼を出して AI に拾わせる。
 // 完了は依頼の行を書き換えず、台帳（usage_reports）に request_id つきの行があることで判定する。
 // GET  /projects/{slug}/usage/requests[?all=1] … 依頼の一覧（既定は未完了だけ）

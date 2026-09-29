@@ -73,7 +73,7 @@ flowchart LR
 CLI の変更操作と hook が、AI の会話のトークン消費をサーバへ送ります。
 消費は起票・コメント・状態の変更といった、そのイシューへの操作の段階ごとに貯まります。
 `looptrack issue usage show <ID>` で段階ごとの内訳を見られます。
-期間ごとの集計と PDF のレポートも作れます。
+期間ごとの集計と PDF のレポートも作れます（[トークンレポート](token-report.md)）。
 
 ## kit の hook（core と loop）
 

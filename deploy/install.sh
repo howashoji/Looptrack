@@ -1,30 +1,48 @@
 #!/bin/sh
+# looptrack-install-sh（この行は印。自動の置き換えが手元に置く写しが本物の install.sh かを見分ける。消さない）
 # looptrack のインストーラ。まっさらな Linux サーバ（Ubuntu LTS・Debian）で
-# 実行ファイルの取得 → 設定（looptrack setup）→ 起動 → 動作確認までを 1 回で行う。手順と判断は docs/server/DEPLOY.md「install.sh」。
+# 書庫の取得 → 照合（SHA256SUMS と minisign の署名）→ 展開 → 設定（looptrack setup）→（MySQL の最小権限なら）権限 →
+# 起動 → 動作確認までを 1 回で行う。手順と判断は docs/server/DEPLOY.md「install.sh」。
 #
-#   sudo sh install.sh --from <ディレクトリ | URL の接頭辞>                      対話（動かし方と setup の問いに答える）
-#   sudo sh install.sh --from <…> --yes --method systemd -- <setup の引数>       非対話（setup の引数は -- の後ろ）
-#   sudo sh install.sh --upgrade --from <…>                                      実行ファイルを入れ替え、migrate して再起動（データは保つ）
-#   sudo sh install.sh --uninstall [--purge]                                     外す（既定はデータを残す。--purge で消す）
+#   curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
+#                                                                                対話（最新のリリースを入れる）
+#   … | sudo sh -s -- --version <版>                                              版を固定する
+#   … | sudo sh -s -- --yes --method systemd -- <setup の引数>                     非対話（setup の引数は -- の後ろ）
+#   … | sudo sh -s -- --upgrade                                                   実行ファイルを入れ替え、migrate して再起動（データは保つ）
+#   … | sudo sh -s -- --auto-upgrade on|off                                       自動の置き換え（systemd timer。既定は off）を入れる / 外す
+#   sudo sh install.sh --from <ディレクトリ | URL の接頭辞>                          手元の配布物・自分の取得元から入れる
+#   sudo sh install.sh --uninstall [--purge]                                      外す（既定はデータを残す。--purge で消す）
 #
-# 取得元の規約（deploy/release/dist.sh の出力をそのまま読む）:
-#   <接頭辞>/SHA256SUMS                          sha256sum の形（<hash>  <名前>）
-#   <接頭辞>/looptrack_<版>_linux_<amd64|arm64>    実行ファイル
-#   <接頭辞>/SHA256SUMS.minisig                  SHA256SUMS の minisign の署名（公式の配布物にはある）
-#   <接頭辞>/install.sh・<接頭辞>/grants.sql      このスクリプト自身と MySQL の最小権限（人が curl で取るもの。
-#     このスクリプトは取りに行かないので無くても入る。SHA256SUMS には載るので、取った install.sh を照合できる）
+# このスクリプト自身は HTTPS で取るだけで、照合できない（照合の鍵と手順をこのスクリプトが持つため）。
+# 取った実行ファイルは、下の公開鍵で署名を確かめた SHA256SUMS で照合してから展開・配置する。
+#
+# 取得元（--from を付けないときは GitHub Releases の <リポジトリ>/releases/latest/download。--version なら …/releases/download/<版>）:
+#   <接頭辞>/SHA256SUMS                                     sha256sum の形（<hash>  <名前>）
+#   <接頭辞>/looptrack_<版>_linux_<amd64|arm64>_server.tar.gz  書庫（GitHub Releases の形。中の <書庫の名前>/looptrack を置く）
+#   <接頭辞>/looptrack_<版>_linux_<amd64|arm64>               素の実行ファイル（deploy/release/dist.sh build の出力・サーバの配布ディレクトリ・
+#                                                             1.0.0-rc.2 までの Releases の形）。同じ版に書庫があれば書庫を使う
+#   <接頭辞>/SHA256SUMS.minisig                             SHA256SUMS の minisign の署名（公式の配布物にはある）
 #     minisign コマンドがあれば、下の公開鍵で署名を確かめ、合わなければ何も入れない。minisign が無い・署名が無いときは注意を出して続ける
 #     （--require-signature で止める）。公開鍵は looptrack（selfupdate.MinisignPublicKey）・deploy/release/minisign.pub と同じ
 # 保存先に MySQL を選び、アプリ用の利用者を最小権限（deploy/grants.sql）にするときは、流す順番が決まっている:
-#   DB とアプリ用の利用者を作る → install.sh（setup が表を作る）→ ここで一度止まる → 管理用の資格情報で grants.sql を流す
-#   → install.sh をもう一度実行（起動と動作確認だけ）。表ごとの GRANT は表ができてからしか流せないため、この順番になる。
-#   起動の前に「保存先の確認」でアプリ用の利用者が読めるかを試し、読めなければ grants.sql の案内を出して止まる
-#   （黙って 60 秒待たない）。アプリ用の利用者に DB 単位の広い権限を与える構成では、この確認は素通りして最後まで進む。
+#   setup が表を作る → 管理用の資格情報で権限を与える → 起動。表ごとの GRANT は表ができてからしか流せないため。
+#   起動の前に「保存先の確認」でアプリ用の利用者が読めるかを試し、読めなければ管理用の資格情報を端末で尋ねて
+#   looptrack grants apply（権限の中身は実行ファイルに埋め込んだ deploy/grants.sql）で与え、読めることを確かめてから起動する。
+#   資格情報はファイル・.env・install.conf・ログに残さない。アプリ用の利用者に DB 単位の広い権限を与える構成では、この確認は素通りする。
+#   DB がまだ無ければ、setup が接続の段（migrate の前）で気づき、同じ処理（looptrack grants apply）を先に動かす
+#   （管理用の資格情報を端末で尋ね、作るかを確かめてから DB・アプリ用の利用者・表・権限を作る）。そのあと起動の前の確認は素通りする。
 # 動かし方:
 #   systemd  専用ユーザー looptrack・/usr/local/bin/looptrack・/etc/looptrack/.env・/var/lib/looptrack・サンドボックス付きの unit
 #   compose  <dir>（既定 /opt/looptrack）に setup が書く compose.yaml。取得した実行ファイルを scratch に載せたイメージ looptrack:<版> を作る
 #            （第三者のライセンス文は looptrack licenses の出力をイメージの /NOTICE に入れる。公式のイメージと同じ）
 # どちらも 127.0.0.1 だけで待ち受ける。TLS は前段のリバースプロキシ（nginx・Caddy の設定例を出す）が持つ。
+# 自動の置き換え（--auto-upgrade on。既定は off。systemd だけ）: 1 日 1 回の systemd timer（looptrack-upgrade.timer）が、
+#   手元に置いたこのスクリプトの写し（/usr/local/lib/looptrack/install.sh。root だけが書ける）を
+#   --upgrade --require-signature --yes --only-newer で動かす。取るのは書庫だけで、書庫は SHA256SUMS と minisign の署名で確かめる。
+#   写しを新しくするのは、人がこのスクリプトを動かしたとき（1 行か手元のファイルで --upgrade・--auto-upgrade on・入れる）だけ。
+#   無人の更新（--yes で端末が無い。timer）は、MySQL で新しい版に未適用の migrate があれば置き換えず、止めた後に失敗すれば
+#   前の実行ファイル（SQLite は DB の控えも）に戻して起動し直し、0 でない終了コードで終わる（サービスを止めたままにしない）。
+#   compose（コンテナのイメージ）は自動では置き換えない（新しい版は looptrack serve が管理画面の帯・doctor・起動時のログで知らせる）。
 set -eu
 
 PROG=install.sh
@@ -42,6 +60,18 @@ IMAGE=${LOOPTRACK_INSTALL_IMAGE:-looptrack}
 MINISIGN_PUBKEY_DEFAULT=RWRrJP/r1wfXKalGsxLnzFmmsExUd2azSJh4ccrYDJEBu8yE3N0ZlLJy
 MINISIGN_PUBKEY=${LOOPTRACK_INSTALL_MINISIGN_PUBKEY:-$MINISIGN_PUBKEY_DEFAULT}
 REQUIRE_SIG=${LOOPTRACK_INSTALL_REQUIRE_SIGNATURE:-0}
+# --from を付けないときの取得元（GitHub のリポジトリ。LOOPTRACK_INSTALL_REPO はテスト・ミラー用）
+REPO=${LOOPTRACK_INSTALL_REPO:-https://github.com/howashoji/looptrack}
+# このスクリプトを取る 1 行（案内に出す）
+ONE_LINER='curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh'
+# 1 行（curl … | sh）で動かしたときに写しを取る URL（手元のファイルで動かしたときはそのファイルを写す。
+# LOOPTRACK_INSTALL_SCRIPT_URL はテスト・ミラー用）
+SCRIPT_URL=${LOOPTRACK_INSTALL_SCRIPT_URL:-https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh}
+# 自動の置き換え（--auto-upgrade on）で置くもの
+AUTO_LIB=/usr/local/lib/looptrack
+AUTO_SH=$AUTO_LIB/install.sh
+AUTO_SVC=/etc/systemd/system/looptrack-upgrade.service
+AUTO_TIMER=/etc/systemd/system/looptrack-upgrade.timer
 
 # 最初のプロジェクトの slug（MCP の接続設定の X-Looptrack-Project に使う）。
 # setup の引数（--project）・起動前の確認（check_store_access）・印（install.conf）の順に決まる。
@@ -60,6 +90,15 @@ NO_START=0
 PURGE=0
 TMP=""
 LOCAL_MODE=""
+# 自動の置き換えの指定（on / off。空は「変えない」= 印の値、印に無ければ off）と、決まった値
+AUTO_UPGRADE="${LOOPTRACK_INSTALL_AUTO_UPGRADE:-}"
+AUTO=off
+ONLY_NEWER=0
+# 無人の更新で、止めた後の失敗を前の版に戻すための状態（rollback_upgrade）
+UNATTENDED=0
+ROLLBACK=0
+RB_BIN=0
+RB_BACKUP=""
 
 # ---------------------------------------------------------------- 共通
 
@@ -68,6 +107,7 @@ step() { printf '\n==> %s\n' "$*"; }
 warn() { printf '%s: 注意: %s\n' "$PROG" "$*" >&2; }
 die() {
   printf '%s: エラー: %s\n' "$PROG" "$*" >&2
+  if [ "$ROLLBACK" = 1 ]; then rollback_upgrade; fi
   exit 1
 }
 
@@ -81,25 +121,33 @@ trap 'cleanup; printf "\n%s: 中断しました（一時ファイルは片付け
 
 usage() {
   cat <<'EOF'
-使い方: sudo sh install.sh [オプション] [-- <looptrack setup の引数>]
+使い方: curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- [オプション] [-- <looptrack setup の引数>]
+        sudo sh install.sh [オプション] [-- <looptrack setup の引数>]
 
-  --from <ディレクトリ | URL の接頭辞>   実行ファイルの取得元（環境変数 LOOPTRACK_INSTALL_FROM でも可）。
-                                        <接頭辞>/SHA256SUMS と <接頭辞>/looptrack_<版>_linux_<arch>（deploy/release/dist.sh の出力）
-  --version <版>                        取得元に複数の版があるときに選ぶ（LOOPTRACK_INSTALL_VERSION）
-  --sha256 <hash>                       実行ファイルの SHA-256 を別経路で固定する（SHA256SUMS と両方で確かめる）
+  --from <ディレクトリ | URL の接頭辞>   取得元（環境変数 LOOPTRACK_INSTALL_FROM でも可）。省略すると GitHub Releases の最新
+                                        （--version を付ければその版）。<接頭辞>/SHA256SUMS と、書庫
+                                        <接頭辞>/looptrack_<版>_linux_<arch>_server.tar.gz か素の <接頭辞>/looptrack_<版>_linux_<arch>
+  --version <版>                        入れる版（LOOPTRACK_INSTALL_VERSION）。--from があれば、取得元に複数の版があるときの選択
+  --sha256 <hash>                       取得するファイル（書庫か素の実行ファイル）の SHA-256 を別経路で固定する（SHA256SUMS と両方で確かめる）
   --require-signature                   SHA256SUMS の署名（SHA256SUMS.minisig）を必ず確かめる（minisign か署名が無ければ止める。
                                         LOOPTRACK_INSTALL_REQUIRE_SIGNATURE=1）。指定しなくても、minisign があれば確かめる
   --method systemd|compose              動かし方（対話では問う。--yes の既定は systemd）
   --dir <ディレクトリ>                  compose の置き場（既定 /opt/looptrack）
-  --yes                                 対話しない（setup の答えは -- の後ろに渡す。秘密は環境変数 LOOPTRACK_SETUP_*）
+  --yes                                 対話しない（setup の答えは -- の後ろに渡す。秘密は環境変数 LOOPTRACK_SETUP_*）。
+                                        MySQL の権限を与える管理用の資格情報は、それでも端末で尋ねる（端末が無ければ
+                                        LOOPTRACK_INSTALL_DB_ADMIN_USER と LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE。systemd のみ）
   --no-start                            設定まで行い、サービスを起動しない（compose ではイメージも作らない）
   --upgrade                             実行ファイルを入れ替え、migrate して再起動する（データは保つ）
+  --only-newer                          --upgrade で、取得した版が入っている版より新しいときだけ置き換える（同じ・古いなら何もしない）
+  --auto-upgrade on|off                 自動の置き換え（LOOPTRACK_INSTALL_AUTO_UPGRADE。既定は off。systemd だけ）。on は 1 日 1 回の
+                                        systemd timer が --upgrade --require-signature --only-newer を動かす（minisign が要る）。
+                                        入れた後のサーバにだけ付けても効く（入れ直さない）
   --uninstall [--purge]                 外す。既定では設定とデータを残す。--purge で設定・データ・利用者も消す
   -h, --help                            この表示
 
 例（非対話・SQLite・systemd）:
   printf '%s\n' '<管理者のパスワード>' > /root/pw && chmod 600 /root/pw
-  sudo sh install.sh --from https://example.com/looptrack/v1.0.0 --yes --method systemd -- \
+  sudo sh install.sh --version v1.0.0 --yes --method systemd -- \
     --store sqlite --public-url https://im.example.com --admin-login alice \
     --admin-password-file /root/pw --two-factor required
 EOF
@@ -180,6 +228,9 @@ parse_args() {
       --no-start) NO_START=1; shift ;;
       --require-signature) REQUIRE_SIG=1; shift ;;
       --upgrade) ACTION=upgrade; shift ;;
+      --only-newer) ONLY_NEWER=1; shift ;;
+      --auto-upgrade) AUTO_UPGRADE=${2:?--auto-upgrade on|off}; shift 2 ;;
+      --auto-upgrade=*) AUTO_UPGRADE=${1#--auto-upgrade=}; shift ;;
       --uninstall) ACTION=uninstall; shift ;;
       --purge) PURGE=1; shift ;;
       -h | --help) usage; exit 0 ;;
@@ -210,13 +261,20 @@ parse_args() {
     die "--purge は --uninstall と一緒に使います"
   fi
   case $WANT_SHA in "" | [0-9a-f]*) ;; *) die "--sha256 は 16 進の小文字で指定してください" ;; esac
+  case $AUTO_UPGRADE in "" | on | off) ;; *) die "--auto-upgrade は on か off です: $AUTO_UPGRADE" ;; esac
+  if [ "$AUTO_UPGRADE" != "" ] && [ "$ACTION" = uninstall ]; then
+    die "--auto-upgrade は --uninstall と一緒に使えません（--uninstall は自動の置き換えも外します）"
+  fi
+  if [ "$ONLY_NEWER" = 1 ] && [ "$ACTION" != upgrade ]; then
+    die "--only-newer は --upgrade と一緒に使います"
+  fi
 }
 
 # ---------------------------------------------------------------- 取得
 
 detect_platform() {
   os=$(uname -s)
-  [ "$os" = Linux ] || die "Linux 専用です（この OS: ${os}）"
+  [ "$os" = Linux ] || die "Linux 専用です（この OS: ${os}）。何も変えていません。macOS・Windows でサーバを動かすときは、デスクトップ版を使ってください"
   case $(uname -m) in
     x86_64 | amd64) ARCH=amd64 ;;
     aarch64 | arm64) ARCH=arm64 ;;
@@ -272,9 +330,16 @@ verify_sums_signature() {
   say "  SHA256SUMS の署名を確かめました（minisign）"
 }
 
-# get_binary — 取得元から looptrack を取り、SHA-256 を確かめて $TMP/looptrack に置く。NEW_VERSION・NEW_SHA を決める
+# get_binary — 取得元から looptrack を取り、SHA-256 を確かめて $TMP/looptrack に置く。NEW_VERSION・NEW_SHA（置く実行ファイルの SHA-256）を決める。
+# 書庫（…_server.tar.gz）は照合してから展開し、中の looptrack だけを取り出す。照合が合わなければ何も置かない
 get_binary() {
-  [ -n "$FROM" ] || die "取得元を --from <ディレクトリ | URL の接頭辞>（または LOOPTRACK_INSTALL_FROM）で指定してください"
+  if [ -z "$FROM" ]; then
+    if [ -n "$WANT_VERSION" ]; then
+      FROM="${REPO%/}/releases/download/$WANT_VERSION"
+    else
+      FROM="${REPO%/}/releases/latest/download"
+    fi
+  fi
   SRC=${FROM%/}
   case $SRC in
     http://*)
@@ -288,34 +353,64 @@ get_binary() {
   step "実行ファイルを取得します（${SRC}・linux/${ARCH}）"
   fetch SHA256SUMS "$TMP/SHA256SUMS"
   verify_sums_signature
-  # SHA256SUMS から looptrack_<版>_linux_<arch> を選ぶ（名前の前の * は二進の印）
+  # SHA256SUMS から、書庫 looptrack_<版>_linux_<arch>_server.tar.gz と素の looptrack_<版>_linux_<arch> を版ごとに選ぶ
+  # （名前の前の * は二進の印）。同じ版に書庫があれば書庫を取る（公式の SHA256SUMS は書庫の中の実行ファイルの行も持つが、
+  # その名前のファイルは並んでいない）。行: <取るものの hash> <名前> <版> <archive|raw> <素の実行ファイルの hash か ->
   awk -v arch="$ARCH" -v want="$WANT_VERSION" '
     NF == 2 {
       n = $2; sub(/^\*/, "", n)
-      if (n !~ ("^looptrack_[0-9A-Za-z][0-9A-Za-z.+-]*_linux_" arch "$")) next
-      v = n; sub(/^looptrack_/, "", v); sub("_linux_" arch "$", "", v)
-      if (want != "" && v != want) next
-      print tolower($1), n, v
+      if (n ~ ("^looptrack_[0-9A-Za-z][0-9A-Za-z.+-]*_linux_" arch "_server[.]tar[.]gz$")) {
+        v = n; sub(/^looptrack_/, "", v); sub("_linux_" arch "_server[.]tar[.]gz$", "", v)
+        if (want != "" && v != want) next
+        arc[v] = tolower($1) " " n
+      } else if (n ~ ("^looptrack_[0-9A-Za-z][0-9A-Za-z.+-]*_linux_" arch "$")) {
+        v = n; sub(/^looptrack_/, "", v); sub("_linux_" arch "$", "", v)
+        if (want != "" && v != want) next
+        raw[v] = tolower($1); rawn[v] = n
+      } else next
+      seen[v] = 1
+    }
+    END {
+      for (v in seen) {
+        if (v in arc) print arc[v], v, "archive", ((v in raw) ? raw[v] : "-")
+        else print raw[v], rawn[v], v, "raw", "-"
+      }
     }' "$TMP/SHA256SUMS" >"$TMP/candidates"
   count=$(wc -l <"$TMP/candidates" | tr -d ' ')
   if [ "$count" -eq 0 ]; then
     if [ -n "$WANT_VERSION" ]; then
-      die "取得元に looptrack_${WANT_VERSION}_linux_$ARCH がありません（SHA256SUMS を確かめてください）"
+      die "取得元に looptrack_${WANT_VERSION}_linux_${ARCH}_server.tar.gz（または looptrack_${WANT_VERSION}_linux_${ARCH}）がありません（SHA256SUMS を確かめてください）"
     fi
-    die "取得元の SHA256SUMS に looptrack_<版>_linux_$ARCH がありません"
+    die "取得元の SHA256SUMS に looptrack_<版>_linux_${ARCH}_server.tar.gz（または looptrack_<版>_linux_${ARCH}）がありません"
   fi
   if [ "$count" -gt 1 ]; then
     say "取得元に複数の版があります:" >&2
     awk '{print "  " $3}' "$TMP/candidates" >&2
     die "--version <版> で選んでください"
   fi
-  read -r NEW_SHA name NEW_VERSION <"$TMP/candidates"
-  if [ -n "$WANT_SHA" ] && [ "$WANT_SHA" != "$NEW_SHA" ]; then
-    die "--sha256 と SHA256SUMS が合いません（指定 ${WANT_SHA}・SHA256SUMS ${NEW_SHA}）"
+  read -r want_sha name NEW_VERSION kind raw_sha <"$TMP/candidates"
+  if [ -n "$WANT_SHA" ] && [ "$WANT_SHA" != "$want_sha" ]; then
+    die "--sha256 と SHA256SUMS が合いません（指定 ${WANT_SHA}・SHA256SUMS ${want_sha}）"
   fi
-  fetch "$name" "$TMP/looptrack"
-  got=$(sha256_of "$TMP/looptrack")
-  [ "$got" = "$NEW_SHA" ] || die "SHA-256 が合いません: ${name}（期待 ${NEW_SHA}・実際 ${got}）。何も入れ替えていません"
+  fetch "$name" "$TMP/download"
+  got=$(sha256_of "$TMP/download")
+  [ "$got" = "$want_sha" ] || die "SHA-256 が合いません: ${name}（期待 ${want_sha}・実際 ${got}）。何も入れ替えていません"
+  if [ "$kind" = archive ]; then
+    # 照合の後で展開する。取り出すのは <書庫の名前>/looptrack の 1 つだけ（ほかの名前・パスは展開しない）
+    base=${name%.tar.gz}
+    mkdir -p "$TMP/archive"
+    tar -xzf "$TMP/download" -C "$TMP/archive" "$base/looptrack" 2>/dev/null ||
+      die "書庫 ${name} から ${base}/looptrack を取り出せません。何も入れ替えていません"
+    mv "$TMP/archive/$base/looptrack" "$TMP/looptrack"
+    rm -rf "$TMP/archive" "$TMP/download"
+    NEW_SHA=$(sha256_of "$TMP/looptrack")
+    if [ "$raw_sha" != - ] && [ "$raw_sha" != "$NEW_SHA" ]; then
+      die "書庫の中の looptrack が SHA256SUMS の looptrack_${NEW_VERSION}_linux_$ARCH の行と合いません（期待 ${raw_sha}・実際 ${NEW_SHA}）。何も入れ替えていません"
+    fi
+  else
+    mv "$TMP/download" "$TMP/looptrack"
+    NEW_SHA=$want_sha
+  fi
   chmod 0755 "$TMP/looptrack"
   v=$("$TMP/looptrack" version 2>/dev/null) || die "取得した実行ファイルがこのサーバで動きません（${name}）"
   # looptrack version は「looptrack <版>（headless・linux/<arch>）」（英語は "looptrack <版> (headless, linux/<arch>)"）
@@ -323,7 +418,7 @@ get_binary() {
     "looptrack ${NEW_VERSION}（"* | "looptrack $NEW_VERSION "*) ;;
     *) warn "実行ファイルの版（${v}）が名前の版（${NEW_VERSION}）と違います" ;;
   esac
-  say "  ${name}（SHA-256 一致: ${NEW_SHA}）"
+  say "  ${name}（SHA-256 一致: ${want_sha}）"
 }
 
 # place_binary — $TMP/looptrack を $BIN に置く（同じ中身なら何もしない。置き換えは rename で一度に）
@@ -353,6 +448,7 @@ write_state() {
     say "VERSION=$NEW_VERSION"
     say "PROJECT=$PROJECT"
     say "STARTED=$([ "$NO_START" = 1 ] && echo no || echo yes)"
+    say "AUTO_UPGRADE=$AUTO"
   } >"$t"
   chmod 0644 "$t"
   mv -f "$t" "$STATE"
@@ -365,6 +461,8 @@ load_state() {
   S_VERSION=$(sed -n 's/^VERSION=//p' "$STATE")
   S_PROJECT=$(sed -n 's/^PROJECT=//p' "$STATE")
   S_STARTED=$(sed -n 's/^STARTED=//p' "$STATE")
+  S_AUTO=$(sed -n 's/^AUTO_UPGRADE=//p' "$STATE")
+  [ "$S_AUTO" = on ] || S_AUTO=off # 以前の版の印（この行が無い）は off
   return 0
 }
 
@@ -470,13 +568,21 @@ print_access() {
     say "  状態・ログ: cd $DIR && docker compose ps / docker compose logs -f"
     say "  管理コマンド: cd $DIR && docker compose run --rm --no-deps looptrack user list"
   fi
-  say "  更新: sudo sh install.sh --upgrade --from <取得元>"
+  say "  更新: $ONE_LINER -s -- --upgrade"
+  if [ "$METHOD" = systemd ] && [ "$AUTO" = on ]; then
+    say "  自動の置き換え: 有効（1 日 1 回・署名を確かめて新しい版だけ。止める: $ONE_LINER -s -- --auto-upgrade off）"
+  elif [ "$METHOD" = systemd ]; then
+    say "  自動の置き換え: 無効（既定。有効にする: $ONE_LINER -s -- --auto-upgrade on。minisign が要る）"
+  else
+    say "  コンテナのイメージは自動では置き換えません（新しい版は管理画面の帯・looptrack doctor・起動時のログで知らせます）"
+  fi
   say "  $DIR/.env の LOOPTRACK_SECRET_KEY を失うと全員の二段階認証が使えなくなります。別の場所に控えてください。"
 }
 
 show_configured() {
   METHOD=$S_METHOD
   DIR=$S_DIR
+  AUTO=$S_AUTO
   [ -n "$PROJECT" ] || PROJECT=$S_PROJECT
   say "設定済みです（${STATE}）。何も変えていません。"
   say "  動かし方: ${S_METHOD}・版: ${S_VERSION}・設定: $DIR/.env"
@@ -500,7 +606,7 @@ start_hint() {
   if [ "$METHOD" = systemd ]; then
     echo "systemctl enable --now looptrack"
   else
-    echo "cd $DIR && docker compose up -d（イメージは sudo sh install.sh --upgrade --from <取得元> で作る）"
+    echo "cd $DIR && docker compose up -d（イメージは $ONE_LINER -s -- --upgrade で作る）"
   fi
 }
 
@@ -736,15 +842,14 @@ app_run() {
 # check_store_access — 起動の前に、サービスと同じ利用者で保存先を読めるかを確かめる。
 #
 # MySQL を最小権限（deploy/grants.sql）で使う構成では、権限を与える順番が決まっている: 表ごとの GRANT は
-# 表ができてからしか流せないので、「setup（migrate）が表を作る → grants.sql を流す → 起動」になる。
-# install.sh は setup から起動まで続けて行うため、grants.sql を流す隙が無く、アプリ用の利用者は
-# まだ何も読めない。そのまま起動すると /healthz が上がらず、60 秒待ってから「ログを見てください」で終わる。
-# ここで先に読んでみて、読めなければ原因（権限か接続先）を指すエラーにして止める。設定はそのまま残るので、
-# grants.sql を流してからもう一度実行すれば、setup を飛ばして起動と動作確認だけになる。
+# 表ができてからしか流せないので、「setup（migrate）が表を作る → 権限を与える → 起動」になる。
+# ここで先に読んでみて、読めなければ管理用の資格情報を端末で尋ね、looptrack grants apply で権限を与えてから
+# もう一度読む（黙って起動して 60 秒待たない）。与えられなければ、起動せずに止める。設定（.env）は残るので、
+# もう一度実行すると setup を飛ばし、尋ねるところから続く。
 # ついでに、読めたときは最初のプロジェクトの slug を控える（MCP の接続設定に出す）。
 #
-# 止めるのは MySQL のときだけにする。ここまで来ていれば setup（migrate）は繋がっているので、
-# アプリ用の DSN だけが読めないのは「権限がまだ無い」か「接続先が違う」のどちらかで、どちらも起動しても直らない。
+# 権限を与えるのは MySQL のときだけ。ここまで来ていれば setup（migrate）は繋がっているので、
+# アプリ用の DSN だけが読めないのは「権限がまだ無い」か「接続先が違う」のどちらか。
 # SQLite と、確認そのものができなかったとき（setpriv が無いなど）は、注意だけ出して進む
 check_store_access() {
   if [ "$METHOD" = systemd ] && ! command -v setpriv >/dev/null 2>&1; then
@@ -752,6 +857,36 @@ check_store_access() {
     return 0
   fi
   step "保存先の確認（サービスと同じ利用者で読めるか）"
+  if store_readable; then
+    return 0
+  fi
+  if ! is_mysql; then
+    warn "保存先を確かめられませんでした（このまま起動します）: $out"
+    return 0
+  fi
+  retry="$ONE_LINER"
+  if [ "$ACTION" = upgrade ]; then retry="$ONE_LINER -s -- --upgrade"; fi
+  printf '%s\n' "$out" >&2
+  step "MySQL の権限（アプリ用の利用者はまだ表を読めません。管理用の資格情報で権限を与えます）"
+  say "  表ごとの GRANT は表ができてからしか流せないので、setup（表を作る）の後のここで与えます。"
+  say "  管理用の資格情報は接続にだけ使い、保存しません。"
+  if ! grants_apply; then
+    die "MySQL の権限を与えられませんでした（上の出力）。サービスは起動していません。
+設定（$DIR/.env）は残っています。資格情報を確かめて、もう一度実行してください（setup は飛ばし、管理用の資格情報を尋ねるところから続きます）:
+  $retry
+（自分で与えるなら: sudo sh -c 'set -a; . $DIR/.env; exec $BIN grants print' で GRANT 文を出し、管理用の資格情報で流してから、もう一度実行します）"
+  fi
+  if store_readable; then
+    return 0
+  fi
+  printf '%s\n' "$out" >&2
+  die "権限を与えた後も、MySQL の保存先をアプリ用の利用者で読めません（上の出力）。サービスは起動していません。
+$DIR/.env の LOOPTRACK_DSN（アプリが使う接続先）が、権限を与えた DB・利用者と合っているかを確かめてください。
+表を作るときの接続先（LOOPTRACK_SETUP_DSN・LOOPTRACK_SETUP_MIGRATE_DSN）とは別に指定しています。"
+}
+
+# store_readable — サービスと同じ利用者・設定で保存先を読む（読めたら最初のプロジェクトの slug を控える）。出力は $out
+store_readable() {
   if out=$(app_run project list 2>&1); then
     say "  読めました"
     if [ -z "$PROJECT" ]; then
@@ -760,32 +895,31 @@ check_store_access() {
     fi
     return 0
   fi
-  if ! is_mysql; then
-    warn "保存先を確かめられませんでした（このまま起動します）: $out"
-    return 0
+  return 1
+}
+
+# grants_apply — .env の接続先（LOOPTRACK_DSN）に、管理用の資格情報で最小権限を与える（looptrack grants apply）。
+# 資格情報は looptrack が端末（/dev/tty）で尋ねる（表示しない・保存しない）。端末が無いときは、systemd に限り
+# LOOPTRACK_INSTALL_DB_ADMIN_USER・LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE（1 行目がパスワード）で渡せる
+grants_apply() {
+  set -- grants apply
+  [ "$YES" = 1 ] && set -- "$@" --yes
+  if [ "$METHOD" = systemd ]; then
+    if [ -n "${LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE:-}" ]; then
+      set -- "$@" --admin-user "${LOOPTRACK_INSTALL_DB_ADMIN_USER:-root}" --admin-password-file "$LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE"
+    fi
+    (
+      set -a
+      # shellcheck disable=SC1090,SC1091
+      . "$DIR/.env"
+      set +a
+      exec "$BIN" "$@"
+    )
+  else
+    # コンテナの中から繋ぐ（compose のネットワークの接続先でも届くように）。尋ねるので端末を渡す
+    ( : </dev/tty ) 2>/dev/null || { warn "管理用の資格情報を尋ねる端末がありません"; return 1; }
+    compose run --rm --no-deps looptrack "$@" </dev/tty
   fi
-  retry="sudo sh $PROG --from <取得元>"
-  if [ "$ACTION" = upgrade ]; then retry="sudo sh $PROG --upgrade --from <取得元>"; fi
-  printf '%s\n' "$out" >&2
-  die "MySQL の保存先をアプリ用の利用者で読めません（上の出力）。サービスは起動していません。
-
-考えられるのは次の 2 つです。
-
-(1) 表への権限がまだ無い（最小権限（grants.sql）の構成）。
-    表ごとの GRANT は表ができてからしか流せないので、順番が決まっています:
-      1. looptrack setup が表を作る（ここまで終わりました）
-      2. 管理用の資格情報（root など）で grants.sql を流す:
-           mysql -u root -p <DB 名> < grants.sql
-         grants.sql は取得元（--from の接頭辞）にも同じ名前で並んでいます:
-           curl -fsSL -O \"<取得元>/grants.sql\"
-         ソースから使うなら deploy/grants.sql です。DB 名・利用者名が im・im_app と違うときは、
-         中の「im.」と「'im_app'@'%'」を自分の名前に置き換えてから流してください。
-      3. もう一度 $retry を実行する
-         （設定（$DIR/.env）は残っているので、setup は飛ばして起動と動作確認だけになります）
-    表が増えた更新（--upgrade）でも同じことが起きます。grants.sql は表を足したときにも流し直してください。
-
-(2) $DIR/.env の LOOPTRACK_DSN（アプリが使う接続先）が違う。
-    表を作るときの接続先（LOOPTRACK_SETUP_DSN・LOOPTRACK_SETUP_MIGRATE_DSN）とは別に指定しています。"
 }
 
 # ---------------------------------------------------------------- 起動の確認
@@ -816,6 +950,187 @@ wait_health() {
   say "  200 OK"
 }
 
+# ---------------------------------------------------------------- 自動の置き換え（--auto-upgrade。既定は off）
+
+# version_gt <a> <b> — 版 a が b より新しければ真（semver の順。先頭の v と +build は見ない。
+# プレリリース（-rc.1 など）は同じ版の正式版より古く、識別子は数なら数として、それ以外は文字列として比べる）
+version_gt() {
+  awk -v a="$1" -v b="$2" '
+    function norm(s) { sub(/^v/, "", s); sub(/[+].*$/, "", s); return s }
+    function cmpid(x, y,    xn, yn) {
+      xn = (x ~ /^[0-9]+$/); yn = (y ~ /^[0-9]+$/)
+      if (xn && yn) return (x + 0 > y + 0) - (x + 0 < y + 0)
+      if (xn) return -1
+      if (yn) return 1
+      return ("" x > "" y) - ("" x < "" y)
+    }
+    function cmpv(a, b,    i, ca, cb, pa, pb, xa, xb, na, nb, n, r) {
+      a = norm(a); b = norm(b)
+      ca = a; pa = ""; i = index(a, "-"); if (i > 0) { ca = substr(a, 1, i - 1); pa = substr(a, i + 1) }
+      cb = b; pb = ""; i = index(b, "-"); if (i > 0) { cb = substr(b, 1, i - 1); pb = substr(b, i + 1) }
+      split(ca, xa, "."); split(cb, xb, ".")
+      for (i = 1; i <= 3; i++) { r = cmpid(xa[i] + 0 "", xb[i] + 0 ""); if (r) return r }
+      if (pa == "" && pb == "") return 0
+      if (pa == "") return 1
+      if (pb == "") return -1
+      na = split(pa, xa, "."); nb = split(pb, xb, ".")
+      n = (na < nb) ? na : nb
+      for (i = 1; i <= n; i++) { r = cmpid(xa[i], xb[i]); if (r) return r }
+      return (na > nb) - (na < nb)
+    }
+    BEGIN { exit (cmpv(a, b) > 0) ? 0 : 1 }'
+}
+
+# check_auto_upgrade — 自動の置き換えを入れられるかを、何かを変える前に確かめる（on のときだけ。合わなければ止める）
+check_auto_upgrade() {
+  [ "$AUTO" = on ] || return 0
+  if [ "$METHOD" = compose ]; then
+    die "compose ではコンテナのイメージを自動では置き換えません（何も変えていません）。新しい版は管理画面の帯・looptrack doctor・起動時のログで知らせます。更新: $ONE_LINER -s -- --upgrade"
+  fi
+  [ "$NO_START" = 0 ] || die "--no-start と --auto-upgrade on は一緒に使えません（起動していないサーバを置き換えないため）。何も変えていません"
+  have_systemd || die "systemd が動いていないので、自動の置き換え（systemd timer）を入れられません。何も変えていません"
+  command -v minisign >/dev/null 2>&1 ||
+    die "自動の置き換えは SHA256SUMS の署名の確認を必須にします。minisign を入れてください（apt-get install -y minisign）。何も変えていません"
+  if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+    die "自動の置き換えはこのスクリプトを取り直すので、curl か wget が要ります（apt-get install -y curl）。何も変えていません"
+  fi
+}
+
+# warn_auto_mysql — MySQL では、DB の形を変える版を自動では置き換えないことを知らせる（.env がある時点で呼ぶ）
+warn_auto_mysql() {
+  if [ "$AUTO" = on ] && [ -f "$DIR/.env" ] && is_mysql; then
+    warn "MySQL では、新しい版が DB の形を変える（未適用の migrate がある）ときは自動では置き換えません（migrate の後に権限を与え直す管理用の資格情報を無人では尋ねられず、MySQL の DB は控えから戻せないため）。サービスは今の版のまま動き、知らせは続きます。そのときは $ONE_LINER -s -- --upgrade を端末で実行してください"
+  fi
+}
+
+# write_if_changed <一時ファイル> <置き場> <権限> — 中身が同じなら置かない
+write_if_changed() {
+  chmod "$3" "$1"
+  if [ -f "$2" ] && cmp -s "$1" "$2"; then
+    rm -f "$1"
+  else
+    mv -f "$1" "$2"
+  fi
+}
+
+# save_installer_copy — timer が動かすこのスクリプトの写しを置く（root 0755）。手元のファイルで動かしたときはそのファイルを、
+# 1 行（curl … | sh）で動かしたとき（$0 がファイルでない）は同じ URL から取り直したものを写す。timer の回は写しそのものが
+# 動いているので中身は変わらない（写しを新しくするのは人が動かしたときだけ）
+save_installer_copy() {
+  mkdir -p "$AUTO_LIB"
+  chmod 0755 "$AUTO_LIB"
+  t="$AUTO_SH.install-$$"
+  if [ -f "$0" ] && sed -n 2p "$0" | grep -q '^# looptrack-install-sh'; then
+    cp "$0" "$t"
+  else
+    download "$SCRIPT_URL" "$t" || die "自動の置き換えが動かす install.sh の写しを取れません: $SCRIPT_URL"
+    if ! sed -n 2p "$t" | grep -q '^# looptrack-install-sh' || ! sh -n "$t"; then
+      rm -f "$t"
+      die "取った install.sh（${SCRIPT_URL}）が install.sh の形をしていません。写しを置いていません"
+    fi
+  fi
+  write_if_changed "$t" "$AUTO_SH" 0755
+}
+
+# unit_env <名前> — timer の service に写す環境変数の行（値があるときだけ。systemd の % を %% にする）。
+# 取得元を差し替えて有効にしたとき（ミラー・テスト）は、自動の置き換えも同じ取得元から取る
+unit_env() {
+  eval "val=\${$1:-}"
+  [ -n "$val" ] || return 0
+  case $val in *[\"\\[:space:]]*) die "$1 に空白・引用符・バックスラッシュがあるので、自動の置き換えに写せません" ;; esac
+  printf 'Environment="%s=%s"\n' "$1" "$(printf '%s' "$val" | sed 's/%/%%/g')"
+}
+
+# write_auto_files — 自動の置き換えのスクリプトの写し・service・timer を置く（何度行っても同じ結果）
+write_auto_files() {
+  save_installer_copy
+  t="$AUTO_SVC.install-$$"
+  {
+    cat <<AUTOEOF
+# install.sh が作成（--auto-upgrade on）。looptrack-upgrade.timer から動く。止める: $ONE_LINER -s -- --auto-upgrade off
+# 動かすのは手元の写し ${AUTO_SH}（人が install.sh を動かしたときだけ新しくなる）。取るのは書庫だけで、署名を必須にする
+[Unit]
+Description=Looptrack server automatic upgrade (install.sh --upgrade --require-signature --only-newer)
+Documentation=https://github.com/howashoji/looptrack/blob/main/docs/server/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+AUTOEOF
+    unit_env LOOPTRACK_INSTALL_REPO
+    unit_env LOOPTRACK_INSTALL_ALLOW_HTTP
+    unit_env LOOPTRACK_INSTALL_MINISIGN_PUBKEY
+    say "ExecStart=/bin/sh $AUTO_SH --upgrade --require-signature --yes --only-newer"
+  } >"$t"
+  write_if_changed "$t" "$AUTO_SVC" 0644
+  t="$AUTO_TIMER.install-$$"
+  cat >"$t" <<'AUTOEOF'
+# install.sh が作成（--auto-upgrade on）。1 日 1 回（時刻は 1 時間の幅でずらす。止まっていた間の回は起動した後に 1 回）
+[Unit]
+Description=Daily automatic upgrade of the Looptrack server
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+AUTOEOF
+  write_if_changed "$t" "$AUTO_TIMER" 0644
+}
+
+# apply_auto_upgrade — 設定（${AUTO}）どおりに timer を入れる / 外す（入れるのは systemd だけ。compose には置いていない）
+apply_auto_upgrade() {
+  if [ "$AUTO" = on ]; then
+    step "自動の置き換え（looptrack-upgrade.timer）"
+    write_auto_files
+    systemctl daemon-reload
+    systemctl enable --now looptrack-upgrade.timer >/dev/null 2>&1 ||
+      die "looptrack-upgrade.timer を有効にできません（systemctl status looptrack-upgrade.timer）"
+    say "  有効: 1 日 1 回、署名を確かめて新しい版に置き換えます（${AUTO_TIMER}・写し ${AUTO_SH}）"
+    return
+  fi
+  if [ -e "$AUTO_TIMER" ] || [ -e "$AUTO_SVC" ] || [ -e "$AUTO_SH" ]; then
+    step "自動の置き換えを外します"
+    if have_systemd; then systemctl disable --now looptrack-upgrade.timer >/dev/null 2>&1 || true; fi
+    rm -f "$AUTO_TIMER" "$AUTO_SVC" "$AUTO_SH"
+    rmdir "$AUTO_LIB" 2>/dev/null || true
+    if have_systemd; then systemctl daemon-reload; fi
+    say "  無効にしました（looptrack-upgrade.timer と $AUTO_SH を外しました）"
+  fi
+}
+
+# auto_state_line — 印の AUTO_UPGRADE だけを書き換える（入れた後のサーバの設定だけを変えるとき）
+auto_state_line() {
+  t="$STATE.install-$$"
+  {
+    grep -v '^AUTO_UPGRADE=' "$STATE" || true
+    say "AUTO_UPGRADE=$AUTO"
+  } >"$t"
+  chmod 0644 "$t"
+  mv -f "$t" "$STATE"
+}
+
+# auto_upgrade_only — 入れた後のサーバの自動の置き換えだけを変える（入れ直さない）
+auto_upgrade_only() {
+  METHOD=$S_METHOD
+  DIR=$S_DIR
+  AUTO=$AUTO_UPGRADE
+  if [ "$S_STARTED" = no ]; then NO_START=1; fi
+  check_auto_upgrade
+  warn_auto_mysql
+  apply_auto_upgrade
+  auto_state_line
+  say ""
+  if [ "$AUTO" = on ]; then
+    say "自動の置き換えを有効にしました（既定は無効）。止める: $ONE_LINER -s -- --auto-upgrade off"
+  else
+    say "自動の置き換えは無効です（既定）。新しい版は管理画面の帯・looptrack doctor・起動時のログで知らせます。更新: $ONE_LINER -s -- --upgrade"
+  fi
+}
+
 # ---------------------------------------------------------------- 更新
 
 backup_sqlite() { # <SQLite のファイル>
@@ -830,6 +1145,79 @@ backup_sqlite() { # <SQLite のファイル>
     fi
   done
   say "  控え: ${b}（止めた状態で写した SQLite）"
+  RB_BACKUP=$b
+}
+
+# unattended — 無人の実行か（--yes で、尋ねる端末が無い。自動の置き換えの timer はこれ）
+unattended() { [ "$YES" = 1 ] && ! (: </dev/tty) 2>/dev/null; }
+
+# precheck_unattended_mysql — 無人の更新で、止める前に確かめる（MySQL だけ）。新しい版に未適用の migrate があれば置き換えない。
+# MySQL を最小権限で使うと、migrate の後に新しい表の権限を与え直すには管理用の資格情報が要り、無人では尋ねられないため。
+# また MySQL の DB は控えから戻せないので、migrate が DB を変える更新は無人では行わない（止めた後に戻せるのは実行ファイルだけ）
+precheck_unattended_mysql() {
+  is_mysql || return 0
+  step "無人の更新の確認（新しい版が DB の形を変えるか）"
+  rc=0
+  out=$(
+    set -a
+    # shellcheck disable=SC1090,SC1091
+    . "$DIR/.env"
+    set +a
+    exec "$TMP/looptrack" migrate --check
+  ) 2>&1 || rc=$?
+  case $rc in
+    0) say "  未適用の migrate はありません（DB の形は変わりません）" ;;
+    3)
+      printf '%s\n' "$out" >&2
+      die "新しい版 $NEW_VERSION は DB の形を変えます（上の未適用の migrate）。MySQL では、無人の更新（自動の置き換え）は migrate の後に権限を与え直せないので置き換えません。サービスは今の版 $S_VERSION のまま動いています。端末で $ONE_LINER -s -- --upgrade を実行してください"
+      ;;
+    *)
+      printf '%s\n' "$out" >&2
+      die "新しい版で DB の適用記録を確かめられません（上の出力）。置き換えていません。サービスは今の版 $S_VERSION のまま動いています"
+      ;;
+  esac
+}
+
+# rollback_upgrade — 無人の更新で、止めた後に失敗したとき（die から呼ぶ）: 前の実行ファイルに戻し、SQLite なら DB を止めた直後の控えに戻し、
+# 前の版で起動し直す。MySQL は置き換えの前に「DB の形を変えない」ことを確かめているので（precheck_unattended_mysql）、実行ファイルだけを戻す。
+# 印（install.conf）は前の版のまま。呼んだ die が 0 でない終了コードで終わる（timer の service は失敗として journal に残る）
+rollback_upgrade() {
+  ROLLBACK=0
+  printf '\n==> %s\n' "前の版 ${S_VERSION} に戻して起動し直します（無人の更新なので、サービスを止めたままにしない）" >&2
+  systemctl stop looptrack >/dev/null 2>&1 || true
+  # 置き換えは rename で一度に（実行中のプロセスが残っていても「Text file busy」にならない。place_binary と同じ）
+  if [ "$RB_BIN" = 1 ] && [ -f "$BIN.prev" ]; then
+    if ! { cp -p "$BIN.prev" "$BIN.rollback-$$" && mv -f "$BIN.rollback-$$" "$BIN"; }; then
+      rm -f "$BIN.rollback-$$"
+      printf '%s: エラー: 前の実行ファイル %s に戻せません（手で: mv %s %s && systemctl start looptrack）\n' "$PROG" "$BIN.prev" "$BIN.prev" "$BIN" >&2
+      return
+    fi
+  fi
+  rdb=$(sqlite_host_path)
+  if [ -n "$rdb" ] && [ -n "$RB_BACKUP" ] && [ -f "$RB_BACKUP/$(basename "$rdb")" ]; then
+    rm -f "$rdb" "$rdb-wal" "$rdb-shm"
+    for f in "$RB_BACKUP/$(basename "$rdb")" "$RB_BACKUP/$(basename "$rdb")-wal" "$RB_BACKUP/$(basename "$rdb")-shm"; do
+      if [ -f "$f" ]; then cp -p "$f" "$(dirname "$rdb")/"; fi
+    done
+    restrict_sqlite "$rdb"
+    printf '  DB を控え %s に戻しました\n' "$RB_BACKUP" >&2
+  fi
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  if ! systemctl start looptrack; then
+    printf '%s: エラー: 前の版 %s でも起動できません（journalctl -u looptrack）\n' "$PROG" "$S_VERSION" >&2
+    return
+  fi
+  i=0
+  while ! health_once; do
+    i=$((i + 1))
+    if [ "$i" -ge 60 ]; then
+      printf '%s: エラー: 前の版 %s でも 60 秒待って /healthz が 200 を返しません（journalctl -u looptrack）\n' "$PROG" "$S_VERSION" >&2
+      return
+    fi
+    sleep 1
+  done
+  printf '%s: 前の版 %s に戻して起動し直しました（新しい版 %s は入れていません）。上の理由を直すか、端末で %s -s -- --upgrade を実行してください\n' \
+    "$PROG" "$S_VERSION" "$NEW_VERSION" "$ONE_LINER" >&2
 }
 
 upgrade() {
@@ -837,9 +1225,21 @@ upgrade() {
   METHOD=$S_METHOD
   DIR=$S_DIR
   PROJECT=$S_PROJECT # 印に書き戻すため（更新では変わらない）
+  AUTO=${AUTO_UPGRADE:-$S_AUTO}
+  check_auto_upgrade # 自動の置き換えを入れられない（compose・minisign なし）なら、何かを変える前に止める
   get_binary
   if [ "$NEW_VERSION" = "$S_VERSION" ] && [ -f "$BIN" ] && [ "$(sha256_of "$BIN")" = "$NEW_SHA" ]; then
     say "すでに $NEW_VERSION です。何も変えていません。"
+    # 人が動かしたとき（無人でない）は、自動の置き換えの写しもこのスクリプトにそろえる
+    if [ -n "$AUTO_UPGRADE" ] || { [ "$AUTO" = on ] && ! unattended; }; then
+      warn_auto_mysql
+      apply_auto_upgrade
+      auto_state_line
+    fi
+    return
+  fi
+  if [ "$ONLY_NEWER" = 1 ] && ! version_gt "$NEW_VERSION" "$S_VERSION"; then
+    say "取得した版 $NEW_VERSION は入っている版 $S_VERSION より新しくないので、置き換えません（--only-newer）。何も変えていません。"
     return
   fi
   read_env_info
@@ -847,8 +1247,14 @@ upgrade() {
   # MySQL で、テーブルを作れる利用者を別に使うときは LOOPTRACK_SETUP_MIGRATE_DSN（setup と同じ）
   mdsn=${LOOPTRACK_SETUP_MIGRATE_DSN:-$dsn}
   if [ "$METHOD" = systemd ]; then
+    if unattended; then
+      UNATTENDED=1
+      precheck_unattended_mysql
+    fi
     step "停止"
     systemctl stop looptrack
+    # 無人の更新は、ここから後の失敗（die）で前の版に戻して起動し直す（rollback_upgrade）
+    if [ "$UNATTENDED" = 1 ]; then ROLLBACK=1; fi
     db=$(sqlite_host_path)
     if [ -n "$db" ]; then
       backup_sqlite "$db"
@@ -856,6 +1262,7 @@ upgrade() {
     fi
     step "実行ファイル"
     place_binary
+    RB_BIN=1
     step "マイグレーション（$SVC_USER として）"
     (
       set -a
@@ -863,8 +1270,8 @@ upgrade() {
       . "$DIR/.env"
       set +a
       LOOPTRACK_DSN=$mdsn exec setpriv --reuid "$SVC_USER" --regid "$SVC_USER" --init-groups "$BIN" migrate
-    ) || die "マイグレーションに失敗しました。前の実行ファイルは $BIN.prev にあります（戻すときは mv $BIN.prev $BIN && systemctl start looptrack）"
-    check_store_access # 表が増えた更新では grants.sql を流し直すまで読めない
+    ) || die "マイグレーションに失敗しました。前の実行ファイルは $BIN.prev にあります（戻すときは mv $BIN.prev $BIN && systemctl start looptrack）。上に「適用:」（英語では Applied:）の行があれば、前の版はその DB で起動しないので、DB もこの更新の前の控え（SQLite は上の「控え:」、MySQL は自分で取った控え）に戻してください"
+    check_store_access # 表が増えた更新では権限を与え直すまで読めない（ここで尋ねて与え直す）
     if [ -n "$db" ]; then restrict_sqlite "$db"; fi
     step "起動"
     systemctl daemon-reload
@@ -889,14 +1296,17 @@ upgrade() {
       )
     else
       compose run --rm --no-deps looptrack migrate
-    fi || die "マイグレーションに失敗しました（前のイメージは $IMAGE:${S_VERSION}。compose.yaml の image を戻して up -d）"
-    check_store_access # 表が増えた更新では grants.sql を流し直すまで読めない
+    fi || die "マイグレーションに失敗しました（前のイメージは $IMAGE:${S_VERSION}。compose.yaml の image を戻して up -d）。上に「適用:」（英語では Applied:）の行があれば、前の版はその DB で起動しないので、DB もこの更新の前の控え（SQLite は上の「控え:」、MySQL は自分で取った控え）に戻してください"
+    check_store_access # 表が増えた更新では権限を与え直すまで読めない（ここで尋ねて与え直す）
     if [ -n "$db" ]; then restrict_sqlite "$db"; fi
     step "起動"
     compose up -d
   fi
   wait_health
+  ROLLBACK=0
   NO_START=0
+  warn_auto_mysql
+  apply_auto_upgrade # 設定どおりに timer を入れ直す / 外す（人が動かしたときは写しをこのスクリプトにそろえる）
   write_state
   say ""
   say "更新しました: $S_VERSION → ${NEW_VERSION}（データはそのままです）"
@@ -925,6 +1335,8 @@ uninstall() {
       compose down || true
     fi
   fi
+  AUTO=off
+  apply_auto_upgrade # 自動の置き換え（timer）も外す
   rm -f "$BIN" "$BIN.prev" "$STATE" "$CONF_DIR/proxy-examples.txt"
   if [ "$PURGE" = 1 ]; then
     if [ "$METHOD" = systemd ]; then
@@ -954,6 +1366,10 @@ uninstall() {
 install_main() {
   if load_state; then
     [ -z "$METHOD" ] || [ "$METHOD" = "$S_METHOD" ] || die "すでに $S_METHOD で入っています（${STATE}）。変えるときは --uninstall してから"
+    if [ -n "$AUTO_UPGRADE" ]; then
+      auto_upgrade_only
+      return
+    fi
     show_configured
     return
   fi
@@ -977,11 +1393,17 @@ install_main() {
     [ -n "$DIR" ] || DIR=$COMPOSE_DIR_DEFAULT
     case $DIR in /*) ;; *) die "--dir は絶対パスで指定してください" ;; esac
   fi
+  AUTO=${AUTO_UPGRADE:-off} # 既定は off（利用者の決定）
+  check_auto_upgrade
   get_binary
   if [ "$METHOD" = systemd ]; then
     install_systemd "$@"
   else
     install_compose "$@"
+  fi
+  if [ "$AUTO" = on ]; then
+    warn_auto_mysql
+    apply_auto_upgrade
   fi
   if [ "$LOCAL_MODE" != 1 ]; then
     t="$CONF_DIR/proxy-examples.txt.install-$$"
@@ -1007,6 +1429,8 @@ main() {
   parse_args "$@"
   # parse_args の後ろ（-- の後）を setup の引数として残す
   shift $(($# - SETUP_N))
+  # Linux 以外では、何かを尋ねたり変えたりする前に止める
+  detect_platform
   need_root
   umask 022
   TMP=$(mktemp -d "${TMPDIR:-/tmp}/looptrack-install.XXXXXX")

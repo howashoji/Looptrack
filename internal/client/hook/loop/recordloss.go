@@ -230,5 +230,5 @@ func StopRecordLoss(ev hookio.Event, e *Env) hookio.Result {
 		reason += "\n\n" + i18n.T(lang, "loop.handoff.lost.state_lost",
 			"path", recordKey(primary, r), "mirror", recordKey(mirror, r))
 	}
-	return hookio.Result{Block: reason}
+	return hookio.Result{Block: reason, Kind: "handoff: record_lost"}
 }

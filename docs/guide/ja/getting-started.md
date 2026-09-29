@@ -36,11 +36,12 @@ Windows でも同じです。
 
 リリースのページ（https://github.com/howashoji/looptrack/releases ）から次の 2 つを落とします。
 
-- `looptrack_<版>_<OS>_<CPU>`（サーバ・CLI・hook をまとめた実行ファイル）
+- `looptrack_<版>_<OS>_<CPU>_server.tar.gz`（Windows は `.zip`）: サーバ・CLI・hook をまとめた実行ファイル `looptrack` と、そのライセンス文を入れた書庫
 - `SHA256SUMS`（ハッシュの一覧）
 
 OS は `darwin`（macOS）・`linux`・`windows` のどれかで、CPU は `amd64`・`arm64` のどちらかです。
-Windows のファイルには `.exe` が付きます。
+書庫を展開すると `looptrack_<版>_<OS>_<CPU>_server/` というフォルダが 1 つでき、その中に `looptrack`（Windows は `looptrack.exe`）・`NOTICE`・`OFL-BIZUDGothic.txt`・`LICENSE` があります。
+展開する前に、書庫を `SHA256SUMS` で照合してください。
 置き場は管理者権限の要らない場所にしてください。
 
 ### macOS / Linux
@@ -49,12 +50,14 @@ Windows のファイルには `.exe` が付きます。
 VER=v1.0.0
 OS=darwin      # Linux は linux
 ARCH=arm64     # Intel / AMD の CPU は amd64
+NAME="looptrack_${VER}_${OS}_${ARCH}_server"
 BASE="https://github.com/howashoji/looptrack/releases/download/$VER"
 mkdir -p ~/.local/bin
 TMP="$(mktemp -d)" && cd "$TMP"
-curl -fsSL -O "$BASE/looptrack_${VER}_${OS}_${ARCH}" -O "$BASE/SHA256SUMS"
-grep -E " looptrack_${VER}_${OS}_${ARCH}\$" SHA256SUMS | shasum -a 256 -c -   # Linux は sha256sum -c -
-install -m 755 "looptrack_${VER}_${OS}_${ARCH}" ~/.local/bin/looptrack
+curl -fsSL -O "$BASE/$NAME.tar.gz" -O "$BASE/SHA256SUMS"
+grep -E " $NAME\.tar\.gz\$" SHA256SUMS | shasum -a 256 -c -   # Linux は sha256sum -c -
+tar -xzf "$NAME.tar.gz"
+install -m 755 "$NAME/looptrack" ~/.local/bin/looptrack
 ```
 
 `shasum` の結果が `OK` であることを確かめてください。
@@ -74,16 +77,17 @@ $Ver = 'v1.0.0'
 $Arch = 'amd64'   # ARM の PC は arm64
 $D = Join-Path $env:LOCALAPPDATA 'Programs\looptrack'
 New-Item -ItemType Directory -Force -Path $D | Out-Null
+$Name = "looptrack_${Ver}_windows_${Arch}_server"
 $Base = "https://github.com/howashoji/looptrack/releases/download/$Ver"
-Invoke-WebRequest -UseBasicParsing -Uri "$Base/looptrack_${Ver}_windows_$Arch.exe" -OutFile (Join-Path $D 'looptrack.exe')
-Invoke-WebRequest -UseBasicParsing -Uri "$Base/SHA256SUMS" -OutFile (Join-Path $D 'SHA256SUMS')
-Get-Content (Join-Path $D 'SHA256SUMS') | ForEach-Object {
-  $h, $n = $_ -split '\s+', 2
-  if ($n -match "^looptrack_${Ver}_windows_$Arch\.exe$") {
-    $f = Join-Path $D 'looptrack.exe'
-    if ((Get-FileHash -Algorithm SHA256 -Path $f).Hash -ne $h) { throw "SHA-256 が一致しません: $n" } else { "OK $n" }
-  }
-}
+$Tmp = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid())
+New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
+Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Name.zip" -OutFile (Join-Path $Tmp "$Name.zip")
+Invoke-WebRequest -UseBasicParsing -Uri "$Base/SHA256SUMS" -OutFile (Join-Path $Tmp 'SHA256SUMS')
+$Line = Get-Content (Join-Path $Tmp 'SHA256SUMS') | Where-Object { ($_ -split '\s+', 2)[1] -eq "$Name.zip" }
+if (-not $Line) { throw "SHA256SUMS に $Name.zip がありません" }
+if ((Get-FileHash -Algorithm SHA256 -Path (Join-Path $Tmp "$Name.zip")).Hash -ne ($Line -split '\s+', 2)[0]) { throw "SHA-256 が一致しません: $Name.zip" } else { "OK $Name.zip" }
+Expand-Archive -Path (Join-Path $Tmp "$Name.zip") -DestinationPath $Tmp -Force
+Copy-Item (Join-Path $Tmp "$Name\looptrack.exe") (Join-Path $D 'looptrack.exe') -Force
 $UserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if (($UserPath -split ';') -notcontains $D) { [Environment]::SetEnvironmentVariable('Path', "$UserPath;$D", 'User') }
 ```
@@ -100,18 +104,21 @@ PowerShell を開き直してから次に進んでください。
 ### Windows（Git Bash）
 
 Git Bash でも使えます。
-取得は macOS / Linux の手順と同じで、`OS=windows` にしてファイル名の末尾に `.exe` を付けます。
+取得は macOS / Linux の手順と同じで、`OS=windows` にします。Windows の書庫は `.zip` で、中の実行ファイルは `looptrack.exe` です。
+展開には `unzip` を使います。Git Bash に `unzip` が無いときは、PowerShell の手順を使ってください。
 
 ```bash
 VER=v1.0.0
 OS=windows
 ARCH=amd64     # ARM の PC は arm64
+NAME="looptrack_${VER}_${OS}_${ARCH}_server"
 BASE="https://github.com/howashoji/looptrack/releases/download/$VER"
 mkdir -p ~/.local/bin
 TMP="$(mktemp -d)" && cd "$TMP"
-curl -fsSL -O "$BASE/looptrack_${VER}_${OS}_${ARCH}.exe" -O "$BASE/SHA256SUMS"
-grep -E " looptrack_${VER}_${OS}_${ARCH}\.exe\$" SHA256SUMS | sha256sum -c -
-cp "looptrack_${VER}_${OS}_${ARCH}.exe" ~/.local/bin/looptrack.exe
+curl -fsSL -O "$BASE/$NAME.zip" -O "$BASE/SHA256SUMS"
+grep -E " $NAME\.zip\$" SHA256SUMS | sha256sum -c -
+unzip -q "$NAME.zip"
+cp "$NAME/looptrack.exe" ~/.local/bin/looptrack.exe
 ```
 
 Git Bash の `~/.local/bin` は PowerShell や AI から見えないことがあります。
@@ -213,31 +220,29 @@ PowerShell では `looptrack serve --env-file .\.env` です。
 ### まっさらな Linux サーバの場合（`install.sh`）
 
 まっさらな Ubuntu LTS や Debian のサーバなら、手順 1〜3 を手で進める必要はありません。
-スクリプト 1 つで、実行ファイルの取得・`looptrack setup`・systemd の unit か `compose.yaml` の作成・起動・動作確認まで進みます。
+1 行でインストーラが走り、サーバ版の書庫の取得・照合・展開・`looptrack setup`・systemd の unit か `compose.yaml` の作成・起動・動作確認まで進みます。
 
 ```bash
-VER=v1.0.0
-curl -fsSL -O "https://github.com/howashoji/looptrack/releases/download/$VER/install.sh"
-less install.sh   # 実行する前に中身を読む
-sudo sh install.sh --from "https://github.com/howashoji/looptrack/releases/download/$VER"
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
 ```
 
-`--from` は実行ファイルの取得元です。インストーラは `SHA256SUMS` と署名を確かめてから入れます。
+インストーラは最新のリリースの `looptrack_<版>_linux_<arch>_server.tar.gz` を取り、`SHA256SUMS`（サーバに `minisign` があればその署名も）で照合してから展開し、入れます。
+スクリプト自身は HTTPS で取るだけで、自分を照合できません。先に中身を読むなら、`curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh` で落として読み、`sudo sh install.sh` で実行します。
+オプションは `sh -s --` の後ろに置きます（版を固定するなら `… | sudo sh -s -- --version v1.0.0`）。
 手元で作った配布物から入れるときは、そのディレクトリを渡してください（`sudo sh deploy/install.sh --from /path/to/dist`）。
+インストーラは Linux 専用です。macOS や Windows でサーバを動かすときは[デスクトップ版](desktop.md)を使ってください。
 
 インストーラはまず systemd と Docker compose のどちらで動かすかを聞き、続けて `looptrack setup` と同じことを聞きます。
 終わると Nginx と Caddy の設定例・ブラウザの URL・CLI のログイン方法・MCP の接続設定が表示されます。設定例は `/etc/looptrack/proxy-examples.txt` にも書き出されます。
 リバースプロキシを前に置き、公開 URL でログインしてから手順 4 に進みましょう。
 
-保存先に MySQL を選び、`deploy/grants.sql` でアプリ用の DB 利用者に必要な権限だけを与える場合は順番に気をつけてください。表ごとの `GRANT` は表ができてからでないと流せません。
+保存先に MySQL を選び、`deploy/grants.sql` でアプリ用の DB 利用者に必要な権限だけを与える場合も、同じ 1 回の実行で進みます。
+表ごとの `GRANT` は表ができてからでないと流せないので、setup が表を作った後で、インストーラが MySQL の管理用の資格情報を端末で尋ねます（パスワードは表示しません。保存しません）。
+アプリ用の利用者が無ければ作り、`looptrack` に埋め込んだ権限を与え（中身は `looptrack grants print` で見られます）、アプリ用の利用者で読めることを確かめてから起動します。
+管理用の資格情報が合わなければ、何も起動せずに止まります。もう一度実行すると、尋ねるところから続きます。
+DB がまだ無ければ、setup が同じ管理用の資格情報を先に尋ね、作ってよいかを確かめてから DB も作ります（尋ねるのは 1 回だけです）。ただし、表を作る利用者（`LOOPTRACK_SETUP_MIGRATE_DSN`）と、その DB への `GRANT` は先に用意しておきます（無ければ従来どおり接続で止まります）。作らないと答えると何も作らずに止まり、自分で流す `CREATE DATABASE` の文を示します。
 
-1. インストーラを実行します。ここで setup が表を作ります。
-2. 管理用の資格情報で権限のファイルを流します。
-3. インストーラをもう一度実行します。今度は起動と動作確認だけです。
-
-インストーラは起動の前に、サービスと同じ利用者で保存先を読めるかを試します。読めなければ、起動しないサーバを待たずにこの順番を案内して止まります。
-
-更新は `sudo sh install.sh --upgrade --from <取得元>` です（詳しくは[更新](updating.md)）。アンインストールは `--uninstall` で、`--purge` を付けると設定とデータも消えます。
+更新は `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` です（詳しくは[更新](updating.md)）。アンインストールは `--uninstall` で、`--purge` を付けると設定とデータも消えます。
 
 ## 4. プロジェクトを作り、自分を参加させる
 

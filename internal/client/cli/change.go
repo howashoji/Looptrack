@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/client/api"
+	"github.com/howashoji/looptrack/internal/client/dashstdin"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/client/textenc"
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
@@ -34,6 +36,22 @@ func mustStr(o *jsonorder.Object, keys ...string) (string, error) {
 		v = x
 	}
 	return jsonorder.Str(v), nil
+}
+
+// dashArg は本文を取る引数の共通規則: 値がちょうど "-" なら標準入力を読む（`looptrack handoff append` と
+// 同じ規則。判定そのものは internal/client/dashstdin を共有し、コマンドごとに書き直さない）。
+// 標準入力を読んだ結果が空（空白だけ）なら要求を送らずに誤りにする。フラグを省略しただけの既定値の
+// 空文字列とは区別する（未指定はそのまま「コメント無し」として通す）。
+func (c *Ctx) dashArg(v string) (string, error) {
+	raw, used, err := dashstdin.Resolve(v, c.Stdin)
+	if err != nil {
+		return "", err
+	}
+	text := string(textenc.Decode(raw))
+	if used && trimSpace(text) == "" {
+		return "", i18n.Errorf("cli.err.stdin_body_empty")
+	}
+	return text, nil
 }
 
 // withAssignee は --assignee を指定したときだけ assignee を送る（古いサーバは未知のキーを拒否する）。
@@ -88,10 +106,14 @@ func cmdNew(c *Ctx, v *Values) error {
 	if err != nil {
 		return err
 	}
+	issueBody, err := c.dashArg(v.Str("body"))
+	if err != nil {
+		return err
+	}
 	body := jsonorder.NewObject().
 		Set("title", v.Str("title")).Set("type", v.Str("type")).Set("status", v.Str("status")).Set("priority", v.Str("priority")).
 		Set("labels", splitComma(v.Str("labels"))).Set("parent", v.Str("parent")).Set("blocked_by", splitIDs(v.Str("blocked_by"))).
-		Set("traces", splitIDs(v.Str("traces"))).Set("refs", splitIDs(v.Str("refs"))).Set("body", v.Str("body")).
+		Set("traces", splitIDs(v.Str("traces"))).Set("refs", splitIDs(v.Str("refs"))).Set("body", issueBody).
 		Set("override_reason", v.Str("override"))
 	res, err := c.send(cl, "POST", path, withAssignee(body, v.Str("assignee")))
 	if err != nil {
@@ -119,7 +141,11 @@ func cmdComment(c *Ctx, v *Values) error {
 	if err != nil {
 		return err
 	}
-	res, err := c.send(cl, "POST", path, jsonorder.NewObject().Set("text", v.Str("text")))
+	text, err := c.dashArg(v.Str("text"))
+	if err != nil {
+		return err
+	}
+	res, err := c.send(cl, "POST", path, jsonorder.NewObject().Set("text", text))
 	if err != nil {
 		return err
 	}
@@ -154,7 +180,11 @@ func (c *Ctx) changeStatus(v *Values, status string) error {
 		return err
 	}
 	id := v.Str("id")
-	body := withAssignee(jsonorder.NewObject().Set("status", status).Set("comment", v.Str("comment")).
+	comment, err := c.dashArg(v.Str("comment"))
+	if err != nil {
+		return err
+	}
+	body := withAssignee(jsonorder.NewObject().Set("status", status).Set("comment", comment).
 		Set("override_reason", v.Str("override")), v.Str("assignee"))
 	path, err := c.issuePath(id, "/status")
 	if err != nil {
@@ -234,10 +264,20 @@ func cmdAssign(c *Ctx, v *Values) error {
 		return err
 	}
 	c.Println(msg)
-	return nil
+	// 担当が変わったとき（サーバが issue_events に kind assign を書いたとき）だけ付ける。MCP の assign_issue と同じく、
+	// イベントを書く操作は付与の対象（付けないと、未付与の検知が assign を数えるので必ず未付与に出る）。
+	// op assign を知らない古いサーバは 400 で拒むが、付与は quiet なので操作の結果と終了コードは変わらない
+	if !truthy(res, "changed") {
+		return nil
+	}
+	issueID := getStr(res.Object("issue"), "id", "")
+	if issueID == "" {
+		return nil
+	}
+	return c.afterChange(res, issueID, "assign")
 }
 
-// cmdNext は次に着手するイシューを決めて In Progress にする（規則は DESIGN.md §5-5）。
+// cmdNext は次に着手するイシューを決めて In Progress にする（規則は DESIGN.md §5-2）。
 func cmdNext(c *Ctx, v *Values) error {
 	cl, err := c.RequireAPI("next")
 	if err != nil {
@@ -258,7 +298,11 @@ func cmdNext(c *Ctx, v *Values) error {
 	if err != nil {
 		return err
 	}
-	body := jsonorder.NewObject().Set("dry_run", v.Bool("dry_run")).Set("comment", v.Str("comment")).
+	comment, err := c.dashArg(v.Str("comment"))
+	if err != nil {
+		return err
+	}
+	body := jsonorder.NewObject().Set("dry_run", v.Bool("dry_run")).Set("comment", comment).
 		Set("override_reason", v.Str("override")).Set("types", ts)
 	res, err := c.send(cl, "POST", path, withAssignee(body, v.Str("assignee")))
 	if err != nil {

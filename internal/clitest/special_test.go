@@ -42,6 +42,23 @@ func special() []Case {
 		{Name: "verify/bad-timeout", Args: []string{"verify", "DEMO-0001", "--timeout", "0"},
 			Routes: []Route{r("GET", pIssue1+"/verify", ok(verifyPlan([]string{"echo ok"}, "")))}},
 
+		// ---- 本文を取る引数の "-"（handoff append と同じ規則で標準入力を読む。空なら要求を送らずに誤りにする）
+		{Name: "comment/dash-stdin", Args: []string{"comment", "DEMO-0001", "-"}, Stdin: "原因が分かった。\n設定の読み込み順。",
+			Routes: []Route{r("POST", pIssue1+"/comments", created(commentRes))}},
+		{Name: "comment/dash-stdin-empty", Args: []string{"comment", "DEMO-0001", "-"}, Stdin: "   \n"},
+		{Name: "new/dash-stdin", Args: []string{"new", "最小の起票", "--body", "-"}, Stdin: "再現手順:\n1. 保存する",
+			Routes: []Route{r("POST", pIssues, created(createRes))}},
+		{Name: "new/dash-stdin-empty", Args: []string{"new", "最小の起票", "--body", "-"}, Stdin: ""},
+		{Name: "status/dash-stdin", Args: []string{"status", "DEMO-0002", "In Progress", "--comment", "-"}, Stdin: "着手",
+			Routes: []Route{r("POST", pIssue2+"/status", ok(statusRes))}},
+		{Name: "status/dash-stdin-empty", Args: []string{"status", "DEMO-0002", "In Progress", "--comment", "-"}, Stdin: "\n"},
+		{Name: "close/dash-stdin", Args: []string{"close", "DEMO-0001", "--comment", "-"}, Stdin: "検証: go test が通った",
+			Routes: []Route{r("POST", pIssue1+"/status", ok(closeRes))}},
+		{Name: "close/dash-stdin-empty", Args: []string{"close", "DEMO-0001", "--comment", "-"}, Stdin: ""},
+		{Name: "next/dash-stdin", Args: []string{"next", "--comment", "-"}, Stdin: "着手します",
+			Routes: []Route{r("POST", pProj+"/next", ok(nextStarted))}},
+		{Name: "next/dash-stdin-empty", Args: []string{"next", "--comment", "-"}, Stdin: "  "},
+
 		// ---- 一覧の形
 		{Name: "list/empty", Args: []string{"list"}, Routes: []Route{r("GET", pIssues, ok(list()))}},
 		{Name: "list/has-feedback", Args: []string{"list", "--has-feedback"}, Routes: []Route{r("GET", pIssues, ok(list(item3)))}},

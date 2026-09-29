@@ -75,9 +75,15 @@ type Admin struct {
 	TwoFactor    string // required / optional
 }
 
+// NoDatabaseError は MySQL の接続先の DB がまだ無いこと（Backend.Inspect が返す。文面は元のエラーのまま）。
+type NoDatabaseError struct{ Err error }
+
+func (e *NoDatabaseError) Error() string { return e.Err.Error() }
+func (e *NoDatabaseError) Unwrap() error { return e.Err }
+
 // Backend は保存先の DB への操作。dsn は LOOPTRACK_DSN と同じ形（MySQL の DSN か sqlite:<パス>）。
 type Backend interface {
-	// Inspect は接続を確かめ、利用者の数を返す（テーブルがまだ無ければ 0）。
+	// Inspect は接続を確かめ、利用者の数を返す（テーブルがまだ無ければ 0。MySQL の DB が無ければ *NoDatabaseError）。
 	Inspect(ctx context.Context, dsn string) (users int, err error)
 	// Migrate はスキーマを最新にし、適用したマイグレーションの名前を返す。
 	Migrate(ctx context.Context, dsn string) (applied []string, err error)
@@ -124,6 +130,12 @@ type Options struct {
 	// Lang は画面に出す文面の言語。ゼロ値は日本語（対訳表の正本）。
 	// 利用者の言語は呼び出し元が i18n.FromEnv などで決めて渡す。
 	Lang i18n.Lang
+	// PrepareDatabase は MySQL の DB がまだ無いとき（Inspect が *NoDatabaseError を返したとき）に、アプリ用の接続先 dsn
+	// （.env の LOOPTRACK_DSN になるもの。DB 名・利用者・パスワードを取る）と、DB が無いと分かった接続先 setupDSN
+	// （このコマンドが繋ぐもの。宛先を取る）を渡して呼ぶ。管理用の資格情報を尋ね、確かめてから DB とアプリ用の利用者を作り、
+	// 表を作って権限を与える（looptrack grants apply と同じ処理。作らないと答えたら、何をすればよいかを示すエラーを返す）。
+	// nil なら呼ばず、接続できないとして止まる。
+	PrepareDatabase func(ctx context.Context, dsn, setupDSN string) error
 	// LinuxBinary は compose のイメージに載せる linux の実行ファイル。空なら置かず、
 	// 起動の案内で「自分で置く」ことを示す。scratch のコンテナは linux なので、
 	// macOS・Windows で動かしたときの自分自身を載せても動かない（呼び出し元が判断して渡す）。
@@ -267,6 +279,21 @@ func apply(ctx context.Context, o Options, plan *Plan, replacing bool) (res *Res
 	users, err := o.Backend.Inspect(ctx, plan.SetupDSN)
 	if err2 := interrupted(); err2 != nil {
 		return nil, err2
+	}
+	var noDB *NoDatabaseError
+	if err != nil && errors.As(err, &noDB) && o.PrepareDatabase != nil {
+		// MySQL の DB がまだ無い（migrate より前に接続で止まる）。管理用の資格情報を尋ねたついでに、確かめてから作る
+		fmt.Fprintln(w, i18n.T(o.Lang, "setupwiz.progress.no_database", "reason", noDB.Err.Error()))
+		if err := o.PrepareDatabase(ctx, plan.DSN, plan.SetupDSN); err != nil {
+			if err2 := interrupted(); err2 != nil {
+				return nil, err2
+			}
+			return nil, err
+		}
+		users, err = o.Backend.Inspect(ctx, plan.SetupDSN)
+		if err2 := interrupted(); err2 != nil {
+			return nil, err2
+		}
 	}
 	if err != nil {
 		return nil, i18n.Wrapf(err, "setupwiz.err.store_unreachable")
@@ -467,13 +494,6 @@ func storeLabel(lang i18n.Lang, s string) string {
 		return i18n.T(lang, "setupwiz.label.store.sqlite")
 	}
 	return i18n.T(lang, "setupwiz.label.store.mysql")
-}
-
-func twoFactorLabel(lang i18n.Lang, v string) string {
-	if v == TwoFactorRequired {
-		return i18n.T(lang, "setupwiz.label.two_factor.required")
-	}
-	return i18n.T(lang, "setupwiz.label.two_factor.optional")
 }
 
 func isTrue(v string) bool {

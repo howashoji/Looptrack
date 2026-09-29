@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/howashoji/looptrack/internal/store"
+	"github.com/howashoji/looptrack/internal/usage"
 )
 
 // トークン消費のスナップショットの受け取りと、イシューの段階別の消費。
@@ -145,6 +147,16 @@ func TestUsageSnapshots(t *testing.T) {
 	}
 	if code, _, _ := a.do("POST", "/projects/req/usage", usageBody("c9", "s9", "issue_op", "REQ-9999", "comment", 1, 1, 1)); code != http.StatusNotFound {
 		t.Errorf("無いイシュー: %d", code)
+	}
+
+	// 付与の hook・CLI が送る op（usage.Ops。issue_events の kind と同じ語）はすべて受け付ける。
+	// 付与の hook は 4xx を「再送しても直らない」として捨てるので、受け付けない op があると黙って未付与になる
+	// （対照は上の「op 不正」）
+	for i, op := range usage.Ops {
+		b := usageBody("c8", fmt.Sprintf("s8-%d", i), "issue_op", "REQ-0001", op, 1, 1, 1)
+		if code, _, body := a.do("POST", "/projects/req/usage", b); code != http.StatusCreated {
+			t.Errorf("op %s を受け付けない: %d %s", op, code, body)
+		}
 	}
 
 	// 追記専用: アプリの権限では書き換え・削除できない

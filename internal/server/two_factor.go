@@ -14,7 +14,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 二段階認証（TOTP）の必須 / 任意（設計は DESIGN.md §3・§5-3・§8）。
+// 二段階認証（TOTP）の必須 / 任意（設計は DESIGN.md §2-1「二段階認証の設定」・§3-1・§10）。
 //
 //   - 設定は system_settings の two_factor（required / optional）。未設定は必須として扱う。
 //   - 管理者は /im/admin/security で切り替える（管理者以外は 403）。必須 → 任意は操作する管理者の再認証

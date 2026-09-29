@@ -11,7 +11,7 @@ kit の取得元: サーバ（$API/api/v1/dist・SHA-256 を確認）
   更新         .claude/settings.json
       --- a/.claude/settings.json
       +++ b/.claude/settings.json
-      @@ -1 +1,86 @@
+      @@ -1 +1,98 @@
       -{"env": {"OTHER": "1"}, "permissions": {"allow": ["Bash(ls:*)"]}}
       +{
       +  "env": {
@@ -93,6 +93,18 @@ kit の取得元: サーバ（$API/api/v1/dist・SHA-256 を確認）
       +            "type": "command",
       +            "command": "looptrack hook usage --agent claude-code",
       +            "timeout": 10
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "PreToolUse": [
+      +      {
+      +        "matcher": "mcp__.*",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook issue-session-bind --agent claude-code",
+      +            "timeout": 5
       +          }
       +        ]
       +      }

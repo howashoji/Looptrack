@@ -193,3 +193,57 @@ func TestCheckAcceptanceProjectMessage(t *testing.T) {
 		}
 	}
 }
+
+// AcceptanceStartNotice: 雛形のままの着手だけに注意を返し、それ以外（誤検知の側）は空を返す。
+func TestAcceptanceStartNotice(t *testing.T) {
+	r, err := ParseRules([]byte(`{"acceptance": {"require_on_close": true}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := AcceptanceStart{ID: "X-1", From: "Todo", To: "In Progress", HasSection: true, Filled: false}
+
+	// 対照: 雛形のまま着手 → 注意（日英とも、ID・止められる状態・書くコマンドを含む）
+	for _, lang := range []i18n.Lang{i18n.JA, i18n.EN} {
+		got := r.AcceptanceStartNotice(lang, base)
+		if got == "" {
+			t.Fatalf("%s: 雛形のままの着手で注意が出ない", lang)
+		}
+		for _, want := range []string{"X-1", "Done", AcceptanceEditCommand("X-1")} {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s: 注意に %q が無い: %s", lang, want, got)
+			}
+		}
+	}
+	if ja, en := r.AcceptanceStartNotice(i18n.JA, base), r.AcceptanceStartNotice(i18n.EN, base); ja == en {
+		t.Errorf("日英で同じ文面: %q", ja)
+	}
+
+	// 誤検知の側: どれも空
+	off, err := ParseRules([]byte(`{"acceptance": {"require_on_close": false}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	onStart, err := ParseRules([]byte(`{"acceptance": {"require_on_close": true, "statuses": ["In Progress", "Done"]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var none *Rules
+	for _, tc := range []struct {
+		name string
+		r    *Rules
+		c    AcceptanceStart
+	}{
+		{"記入済み", r, AcceptanceStart{ID: "X-1", From: "Todo", To: "In Progress", HasSection: true, Filled: true}},
+		{"節なし", r, AcceptanceStart{ID: "X-1", From: "Todo", To: "In Progress", HasSection: false}},
+		{"In Progress のまま", r, AcceptanceStart{ID: "X-1", From: "In Progress", To: "In Progress", HasSection: true}},
+		{"Done へ", r, AcceptanceStart{ID: "X-1", From: "In Progress", To: "Done", HasSection: true}},
+		{"Todo へ", r, AcceptanceStart{ID: "X-1", From: "In Progress", To: "Todo", HasSection: true}},
+		{"require_on_close: false", off, base},
+		{"規則なし", none, base},
+		{"着手そのものに関門を掛けたプロジェクト", onStart, base},
+	} {
+		if got := tc.r.AcceptanceStartNotice(i18n.JA, tc.c); got != "" {
+			t.Errorf("%s: 注意が出た: %q", tc.name, got)
+		}
+	}
+}

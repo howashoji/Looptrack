@@ -1,7 +1,7 @@
 // Package mdformat は、イシュー Markdown（frontmatter + 本文）と構造化データを相互変換する。
 //
 // DB に保存した値から元ファイルをバイト単位で復元できることが要件。
-// 分割規則は実データ 681 件で往復一致を確認したもの（docs/server/DESIGN.md §3）:
+// 分割規則は実データ 681 件で往復一致を確認したもの（docs/server/DESIGN.md §2-1）:
 //
 //	---\n<frontmatter>\n---\n\n<BodyMain>{"\n"×GapNL}## コメント
 //	[\n\n<Preamble>]{\n\n### <TS>[\n\n<Content>]}…  → 末尾の改行を除き "\n"×TrailNL

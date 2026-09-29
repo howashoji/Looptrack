@@ -20,7 +20,7 @@ import (
 	"github.com/howashoji/looptrack/internal/usage"
 )
 
-// トークン消費のスナップショット（設計は docs/server/DESIGN.md §5-4）。
+// トークン消費のスナップショット（設計は docs/server/DESIGN.md §9-5）。
 // POST /projects/{slug}/usage … CLI 内蔵・フックが「会話の累計」を 1 件送る
 // GET  /issues/{id}/usage     … そのイシューの区間（段階）ごとの消費
 
@@ -28,6 +28,8 @@ const (
 	maxUsageJSON     = 256 << 10 // segments などの JSON 1 つあたり
 	maxUsageCount    = int64(1) << 50
 	usageFutureSlack = 24 * time.Hour
+	// maxResendDelay は resend_delay_sec の上限。クライアントは退避を 7 日で捨てるので、それに 1 日の余裕を足す
+	maxResendDelay = 8 * 24 * time.Hour
 )
 
 var clientRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,31}$`)
@@ -54,6 +56,10 @@ type usageRequest struct {
 	Branches       json.RawMessage `json:"branches"`
 	CwdName        string          `json:"cwd_name"`
 	Excluded       bool            `json:"excluded"`
+	// ResendDelaySec は、送信に失敗して手元に退避した payload を再送するときだけクライアントが付ける、
+	// 退避してから再送するまでの経過秒（クライアント自身の時計で測るので、時計のずれに左右されない）。
+	// 付けない古いクライアントの payload は従来どおり受け付ける（0 = 再送でない）
+	ResendDelaySec int64 `json:"resend_delay_sec"`
 }
 
 type usageTokens struct {
@@ -118,6 +124,10 @@ func (s *Server) apiPostUsage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if req.ResendDelaySec < 0 || req.ResendDelaySec > int64(maxResendDelay/time.Second) {
+		bad(i18n.T(lang, "server.api.err.usage_resend_delay", "max", int64(maxResendDelay/time.Second)))
+		return
+	}
 	if len(req.ClientVersion) > 64 || len(req.Branch) > 255 || len(req.CwdName) > 255 || len(req.ToolUseID) > 255 {
 		bad(i18n.T(lang, "server.api.err.usage_fields_long"))
 		return
@@ -144,6 +154,10 @@ func (s *Server) apiPostUsage(w http.ResponseWriter, r *http.Request) {
 		ByModel:  req.ByModel, IO: req.IO, Human: req.Human, Segments: req.Segments,
 		Branch: req.Branch, Branches: req.Branches, CwdName: req.CwdName, Excluded: req.Excluded,
 		ReceivedAt: s.svc.Now(), // issue_events.at と同じ時計で持つ（付与漏れの突き合わせ）
+	}
+	if req.ResendDelaySec > 0 {
+		// 再送: 最初に送ろうとした時刻（サーバの時計）。付与漏れの突き合わせはこの時刻で窓に入るかを見る
+		snap.AttemptedAt = snap.ReceivedAt.Add(-time.Duration(req.ResendDelaySec) * time.Second)
 	}
 	// issue_op は issue と op が必須。manual（looptrack issue usage attach）は issue だけ付けられる。それ以外は付けられない
 	if req.Trigger == usage.TriggerIssueOp && (strings.TrimSpace(req.Issue) == "" || !contains(usage.Ops, req.Op)) {
@@ -181,6 +195,13 @@ func (s *Server) apiPostUsage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.internalError(w, r, err)
 		return
+	}
+	// MCP の操作を、このスナップショットの会話に結ぶ（重複の再送でも元の行で結ぶ。何度呼んでも結果は変わらない）。
+	// 結べなくてもスナップショットの受信は成り立っているので、失敗は記録に残すだけで応答には出さない
+	if req.ToolUseID != "" {
+		if _, err := s.svc.LinkMCPEventSessions(r.Context(), snap.UserID, snap.DedupeKey, req.ToolUseID); err != nil {
+			s.cfg.Logger.Warn("usage", "action", "link_event_sessions", "err", err)
+		}
 	}
 	if duplicate {
 		writeJSON(w, http.StatusOK, map[string]any{"id": 0, "duplicate": true, "send_prompts": sendPrompts})
@@ -340,7 +361,7 @@ func issueUsageText(lang i18n.Lang, u issueUsageJSON) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// --- 付与漏れ（DESIGN.md §5-4「イベントとの突き合わせ」）
+// --- 付与漏れ（DESIGN.md §9-5「イベントとの突き合わせ」）
 
 // usageNotice は変更の応答に載せる付与の指示。失敗しても変更は成功しているので、記録して空を返す。
 func (s *Server) usageNotice(ctx context.Context, lang i18n.Lang, a service.Actor, pr store.Project, it *service.Issue, closing bool) string {

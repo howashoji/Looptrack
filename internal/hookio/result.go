@@ -37,10 +37,18 @@ type Result struct {
 	// 入力そのもの（JSON のオブジェクト 1 つを文字列で持つ。Result を比較できる形のままにするため map にしない）。
 	// 実物で確かめた AI・イベント（capabilities の update）でだけ出し、それ以外では捨てる（止めない）。
 	UpdatedInput string `json:"updated_input,omitempty"`
+	// Kind は判定の理由の種類の語（LOOPTRACK_LOOP_HOOK_LOG の記録にだけ書く。出力には出さない）。
+	// **必ずコード中の定数の集合から選ぶ。入力から切り出した文字列（コマンド・パス・プロンプト）を入れない**
+	// （記録に秘密が混ざらないことの担保）。形は "<hook の略>: <種類>"（例 "git-guard: reset_hard"）。
+	// Normalize は Kind を持ち越さず、IsZero は Kind を見ない（Kind だけの Result は何もしない Result）。
+	Kind string `json:"-"`
 }
 
-// IsZero は何もしない Result か。
-func (r Result) IsZero() bool { return r == Result{} }
+// IsZero は何もしない Result か（Kind は出力に出ないので見ない）。
+func (r Result) IsZero() bool {
+	r.Kind = ""
+	return r == Result{}
+}
 
 // RenderOptions は Render の条件。
 type RenderOptions struct {

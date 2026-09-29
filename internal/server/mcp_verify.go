@@ -11,7 +11,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// MCP の verify_issue と report_verify（DESIGN.md §5-8-2）。サーバはコマンドを実行しない。
+// MCP の verify_issue と report_verify（DESIGN.md §9-3-2）。サーバはコマンドを実行しない。
 // verify_issue は検証コマンドの一覧と直近の記録を返す（実行も記録もしない）。文言は GET /issues/{id}/verify と同じ
 // （service.PlanVerify）で、MCP では末尾に report_verify の使い方を足す。
 // report_verify は AI が手元で実行した結果を POST /issues/{id}/verify と同じ service.RecordVerify で記録する
@@ -44,7 +44,7 @@ func (s *Server) addVerifyMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.Tool
 	addTool(srv, lang, &mcp.Tool{Name: "verify_issue", Annotations: ro,
 		Description: i18n.T(lang, "server.mcp.tool.verify_issue")},
 		func(ctx context.Context, req *mcp.CallToolRequest, in issueIDArg) (*mcp.CallToolResult, any, error) {
-			c, err := mcpCallOf(req)
+			c, err := s.mcpCallOf(req)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -78,7 +78,7 @@ func (s *Server) addVerifyMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.Tool
 			for i, r := range in.Results {
 				res[i] = store.VerifyResult{Command: r.Command, Status: r.Status, ExitCode: r.ExitCode, DurationMS: r.DurationMS, OutputTail: r.OutputTail, Cached: r.Cached}
 			}
-			rec, err := s.svc.RecordVerify(ctx, c.actor, pr, row.ID, service.VerifyInput{BodySHA256: in.BodySHA256, Results: res, Host: in.Host, Workspace: in.Workspace})
+			rec, err := s.svc.RecordVerify(ctx, c.actor, pr, row.ID, service.VerifyInput{BodySHA256: in.BodySHA256, Results: res, Host: in.Host, Workspace: in.Workspace}, c.lang)
 			if err != nil {
 				return nil, nil, s.toolError(c.lang, "report_verify", err)
 			}

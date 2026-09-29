@@ -2,7 +2,7 @@
 
 サーバ（`looptrack serve`）の立ち上げ・更新・利用者の登録の手順をまとめます。
 新しく立ち上げるときは、対話のウィザード `looptrack setup` を使います。
-まっさらな Linux サーバなら `deploy/install.sh` が手軽です。取得 → setup → 起動 → 確認を 1 回で行います。
+まっさらな Linux サーバなら、1 行で走るインストーラ（`deploy/install.sh`）が手軽です。取得 → 照合 → 展開 → setup →（MySQL の権限）→ 起動 → 確認を 1 回で行います。
 URL の例では公開 URL を `https://example.com` とし、接頭辞（`LOOPTRACK_BASE_PATH`）は既定の `/looptrack` で書いています。
 
 ## コンテナ（setup が書く compose.yaml）
@@ -19,7 +19,8 @@ URL の例では公開 URL を `https://example.com` とし、接頭辞（`LOOPT
 MySQL を使うときは、アプリ用の DB 利用者にテーブル単位の権限だけを与えます。
 例は `deploy/grants.sql` にあります（DB 名 `im`・利用者 `im_app`）。
 スキーマの変更（migrate）は管理用の資格情報で行い、アプリ用の利用者には DDL 権限を与えません。
-**テーブル単位の `GRANT` はテーブルができてからしか流せません。** そのため流す順番は「migrate → grants.sql → 起動」になります。
+**テーブル単位の `GRANT` はテーブルができてからしか流せません。** そのため流す順番は「migrate → 権限 → 起動」になります。
+権限の中身は `looptrack` に埋め込んであり、`looptrack grants print` で DB 名・利用者名に合わせた GRANT 文を出し、`looptrack grants apply` で管理用の資格情報を尋ねて流せます。
 install.sh での順番は下の「保存先に MySQL を選ぶとき」を見てください。
 
 ## 秘密情報
@@ -85,6 +86,8 @@ looptrack setup --dir /opt/looptrack     # --dir を省くと今のディレク�
 非対話でも同じ結果になります。秘密はプロセスの一覧（`ps`）に出てしまうので、引数には取りません。
 
 - MySQL の接続先は `LOOPTRACK_SETUP_DSN` で渡します。テーブル作成用に別の利用者を使うなら `LOOPTRACK_SETUP_MIGRATE_DSN` も渡します。
+  DB がまだ無ければ、端末で MySQL の管理用の資格情報を尋ね、確かめてから DB とアプリ用の利用者を作ります（`--yes` でも確かめます。下の「保存先に MySQL を選ぶとき」）。
+  表を作る利用者と、その DB への `GRANT` は先に用意しておきます。
 - パスワードは `--admin-password-file <file>`（`-` で標準入力の 1 行）か `LOOPTRACK_SETUP_ADMIN_PASSWORD` で渡します。
 - `--yes` では `--two-factor` の指定が必須です。既定では決めません。
 
@@ -103,70 +106,82 @@ LOOPTRACK_SETUP_DSN='im_app:<pw>@tcp(mysql:3306)/im?parseTime=true' LOOPTRACK_SE
 - **2 回目は何も書き換えません。** `<dir>/.env` があるか保存先にすでに利用者がいれば、「設定済み」として今の設定と利用者の数を示して終わります。
   作り直すときは `--force` を付けます。`LOOPTRACK_SECRET_KEY` は引き継ぎ、前のファイルは `.env.bak-<日時>` に退避します。
   既存の利用者は消さず、同じログイン名がいればパスワードも変えません。
-- ローカル利用（SQLite・`LOOPTRACK_LOCAL_MODE=1`）は `looptrack serve --env-file <dir>/.env` で起動します（DESIGN.md §5-12）。
+- ローカル利用（SQLite・`LOOPTRACK_LOCAL_MODE=1`）は `looptrack serve --env-file <dir>/.env` で起動します（DESIGN.md §3-3）。
 - ローカル利用はターミナルなしでも始められます。`LOOPTRACK_LOCAL_MODE=1 LOOPTRACK_DSN=sqlite:<ファイル> looptrack serve` だけで起動すると、スキーマができます。
   鍵は `<ファイル>.secret-key`（本人だけが読める）に作られます。127.0.0.1 から開いたブラウザには初回設定の画面（④〜⑥）が出ます。
 
 ## まっさらな Linux サーバに入れる（deploy/install.sh）
 
-Ubuntu の LTS や Debian のサーバなら、`deploy/install.sh`（POSIX sh）1 つで取得 → 設定（`looptrack setup`）→ 起動 → 動作確認まで進みます。
+Ubuntu の LTS や Debian のサーバなら、`deploy/install.sh`（POSIX sh）1 つで取得 → 照合 → 展開 → 設定（`looptrack setup`）→（MySQL の権限）→ 起動 → 動作確認まで進みます。
 問いに答えるだけで、公開 URL（リバースプロキシの後ろ）からブラウザでログインできるようになります。MCP と CLI の接続設定も表示されます。
 
-まず install.sh を取ります。公開後は GitHub Releases に置きます。
-`<取得元>` は実行ファイルの取得元のことで、下の「取得元の規約」の接頭辞に当たります。
+インストーラは raw.githubusercontent.com の main から 1 行で取って走らせます（Homebrew の初期インストールと同じ形）。
+README の 1 行は版を含まないので、リリースのたびに変わりません。インストーラは既定で GitHub Releases の最新（`releases/latest`）の書庫を取ります。
 
 ```bash
-VER=v1.0.0
-curl -fsSL -O "https://github.com/howashoji/looptrack/releases/download/$VER/install.sh"
-less install.sh                                    # 実行する前に中身を読む
-sudo sh install.sh --from "https://github.com/howashoji/looptrack/releases/download/$VER"
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
 
-# 1 行で済ませるなら（取得元は同じものを 2 回指す）
-curl -fsSL "https://github.com/howashoji/looptrack/releases/download/$VER/install.sh" |
-  sudo sh -s -- --from "https://github.com/howashoji/looptrack/releases/download/$VER"
+# 先に中身を読むなら
+curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh
+less install.sh
+sudo sh install.sh
 
-# 手元で作った配布物（deploy/release/dist.sh の出力）から入れるとき
+# 手元で作った配布物（deploy/release/dist.sh build の出力）から入れるとき
 sudo sh deploy/install.sh --from /path/to/dist
 ```
 
+**インストーラのスクリプト自身は HTTPS で取るだけで、照合できません**（照合の鍵と手順をそのスクリプトが持つため）。
+照合するのは、スクリプトが取る書庫です（下の「取得元の規約」）。スクリプトを信用できないときは、取って読んでから実行してください。
+
 ```bash
 # 対話（動かし方 → setup の ①〜⑥。① は「チームのサーバ」を選ぶ）
-sudo sh install.sh --from https://example.com/looptrack/v1.0.0
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
 
 # 非対話（同じ結果になる。setup の引数は -- の後ろ。秘密は引数に取らない）
 printf '%s\n' '<管理者のパスワード>' > /root/pw && chmod 600 /root/pw
-sudo sh install.sh --from <取得元> --yes --method systemd -- \
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --yes --method systemd -- \
   --store sqlite --public-url https://im.example.com --admin-login alice --admin-password-file /root/pw --two-factor required \
   [--project web --project-name "Web サイト"]      # 最初のプロジェクト（--yes では指定したときだけ作る）
-#   MySQL なら --store mysql と環境変数 LOOPTRACK_SETUP_DSN（テーブル作成用に別の利用者なら LOOPTRACK_SETUP_MIGRATE_DSN）
+#   MySQL なら --store mysql と環境変数 LOOPTRACK_SETUP_DSN（テーブル作成用に別の利用者なら LOOPTRACK_SETUP_MIGRATE_DSN）。
+#   sudo は環境変数を落とすので、sudo -E か sudo env LOOPTRACK_SETUP_DSN=… sh -s -- … で渡す
 
-sudo sh install.sh --upgrade --from <取得元>     # 実行ファイルを入れ替え、migrate して再起動（データは保つ）
-sudo sh install.sh --uninstall                   # 外す（設定とデータは残す）。--purge で設定・データも消す
+… | sudo sh -s -- --upgrade                      # 実行ファイルを入れ替え、migrate して再起動（データは保つ）
+… | sudo sh -s -- --auto-upgrade on             # 自動の置き換え（1 日 1 回の systemd timer）を入れる。既定は off。外すのは off
+… | sudo sh -s -- --uninstall                    # 外す（設定とデータは残す）。--purge で設定・データも消す
 ```
 
 | オプション | 意味 |
 | -- | -- |
-| `--from <ディレクトリ \| URL の接頭辞>` | 取得元（環境変数 `LOOPTRACK_INSTALL_FROM`）。下の規約 |
-| `--version <版>`・`--sha256 <hash>` | 取得元に複数の版があるときの選択・別経路で知った SHA-256 での固定 |
+| `--from <ディレクトリ \| URL の接頭辞>` | 取得元（環境変数 `LOOPTRACK_INSTALL_FROM`）。省略すると GitHub Releases の `…/releases/latest/download`。下の規約 |
+| `--version <版>` | 入れる版（`…/releases/download/<版>` から取る）。`--from` を付けたときは、取得元に複数の版があるときの選択 |
+| `--sha256 <hash>` | 取るファイル（書庫か素の実行ファイル）の SHA-256 を別経路で知った値で固定する |
+| `--require-signature` | SHA256SUMS の署名を必須にする（`LOOPTRACK_INSTALL_REQUIRE_SIGNATURE=1`） |
 | `--method systemd\|compose` | 動かし方（対話では問う。`--yes` の既定は systemd） |
 | `--dir <dir>` | compose の置き場（既定 `/opt/looptrack`） |
 | `--no-start` | 設定まで行い、起動しない（compose ではイメージも作らない） |
+| `--auto-upgrade on\|off` | 自動の置き換え（`LOOPTRACK_INSTALL_AUTO_UPGRADE`）。**既定は off**。入れた後のサーバにだけ付けても効きます（入れ直しません）。下の「新しい版の知らせと自動の置き換え」 |
+| `--only-newer` | `--upgrade` で、取得した版が入っている版より新しいときだけ置き換える（自動の置き換えが使う） |
+| `--yes`（`--upgrade` で端末が無いとき） | 無人の更新。MySQL で新しい版に未適用の migrate があれば置き換えず、止めた後に失敗すれば前の版に戻して起動し直す（下の「新しい版の知らせと自動の置き換え」） |
 
 ### 取得元の規約
 
-`deploy/release/dist.sh` の出力をそのまま読みます。新しい名前は作りません。
+`--from` を付けなければ、取得元は GitHub Releases の `https://github.com/howashoji/looptrack/releases/latest/download` です（`--version <版>` なら `…/releases/download/<版>`）。
+Releases の最新は、公開側でプレリリースを Latest にしてあれば候補版も指します。
+`--from` には、次の並びのディレクトリか URL の接頭辞を渡します。
 
 ```
-<接頭辞>/SHA256SUMS                          sha256sum の形（<hash>  <名前>。dist.sh sums が作る）
-<接頭辞>/looptrack_<版>_linux_<amd64|arm64>    実行ファイル（dist.sh build が作る）
-<接頭辞>/SHA256SUMS.minisig                  SHA256SUMS の minisign の署名（公式の配布物にある。dist.sh sign-sums が作る）
-<接頭辞>/install.sh                          このインストーラ自身（dist.sh build が置く。取得の 1 行はここから取る）
-<接頭辞>/grants.sql                          MySQL の最小権限（dist.sh build が置く。下の「保存先に MySQL を選ぶとき」）
+<接頭辞>/SHA256SUMS                                        sha256sum の形（<hash>  <名前>。dist.sh sums が作る）
+<接頭辞>/looptrack_<版>_linux_<amd64|arm64>_server.tar.gz  書庫（GitHub Releases の形。dist.sh archive が作る）
+<接頭辞>/looptrack_<版>_linux_<amd64|arm64>                素の実行ファイル（dist.sh build の出力・サーバの配布ディレクトリ・1.0.0-rc.2 までの Releases）
+<接頭辞>/SHA256SUMS.minisig                                SHA256SUMS の minisign の署名（公式の配布物にある。dist.sh sign-sums が作る）
 ```
 
-- `uname -m` で amd64 / arm64 を選び、SHA256SUMS から `looptrack_*_linux_<arch>` の行を取ります。複数の版があれば `--version` の指定を求めます。
-  取った実行ファイルの SHA-256 が合わなければ何も入れ替えません。`looptrack version` が名前の版と違えば注意を出します。
-- 接頭辞にはローカルのディレクトリか `https://` の URL を使えます。GitHub Releases の `…/releases/download/<タグ>` もこの形です。
+- `uname -m` で amd64 / arm64 を選び、SHA256SUMS から `looptrack_*_linux_<arch>_server.tar.gz` と `looptrack_*_linux_<arch>` の行を取ります。
+  **同じ版に書庫があれば書庫を取ります**（公式の SHA256SUMS は書庫の中の実行ファイルを従来の名前にした行も持ちますが、その名前のファイルは Releases に並んでいません）。
+  書庫が無ければ素の実行ファイルを取ります（手元の配布物・古いリリースを入れられるように）。複数の版があれば `--version` の指定を求めます。
+- 取ったファイルの SHA-256 が合わなければ何も入れ替えません。**書庫は照合してから展開し**、中の `<書庫の名前>/looptrack` だけを取り出します。
+  取り出した looptrack が SHA256SUMS の `looptrack_<版>_linux_<arch>` の行と違うときも何も入れ替えません。`looptrack version` が名前の版と違えば注意を出します。
+- 接頭辞にはローカルのディレクトリか `https://` の URL を使えます。
   `http://` では改ざんを防げません。そのため `127.0.0.1`・`localhost` 以外では `LOOPTRACK_INSTALL_ALLOW_HTTP=1` を求めます。
 - SHA256SUMS の署名: 取得元に `SHA256SUMS.minisig` があり、サーバに `minisign` コマンドがあれば署名を確かめます（`apt-get install -y minisign` で入ります）。
   使う鍵は install.sh に埋め込んだ Looptrack の公開鍵で、鍵 ID は 29D707D7EBFF246B です。`deploy/release/minisign.pub` と同じもので、looptrack 本体とも同じです。
@@ -177,12 +192,11 @@ sudo sh install.sh --uninstall                   # 外す（設定とデータ�
   必須にすると「まっさらなサーバで 1 回で入る」が崩れるので、既定は「あれば確かめる」にしました。必須にするかは利用者が選べます。
 - 署名の無い取得元（自分で `dist.sh build` した配布物など）では、SHA256SUMS も取得元と同じ経路から来ます。防げるのは壊れたファイルまでです。
   取得元を信用できないときは、`--sha256` で別経路の値を固定してください。
-- 取得元を指定するのは `--from` だけです。自分でビルドするときは、手元で `dist.sh build` と `dist.sh sums` を実行します。その出力のディレクトリをサーバに送って渡してください。
+- 自分でビルドするときは、手元で `dist.sh build` と `dist.sh sums` を実行します。その出力のディレクトリをサーバに送って `--from` に渡してください。
   出力には install.sh 自身も入っているので、そのディレクトリから実行できます（`sudo sh /path/to/dist/install.sh --from /path/to/dist`）。
-  公式の配布物なら GitHub Releases の `--from https://…/releases/download/<タグ>` です。動いているサーバの配布口（`/api/v1/dist`）は認証が要るので、取得元には使いません。
-- install.sh が取りに行くのは `SHA256SUMS`・実行ファイル・`SHA256SUMS.minisig` だけです。
-  同じ接頭辞に並ぶ `install.sh`・`grants.sql` は人が `curl` で取るもので、無くても入ります。
-  どちらも `SHA256SUMS` には載っているので、取った install.sh の照合に使えます。
+  動いているサーバの配布口（`/api/v1/dist`）は認証が要るので、取得元には使いません。
+- install.sh が取りに行くのは `SHA256SUMS`・書庫か実行ファイル・`SHA256SUMS.minisig` だけです。GitHub Releases には install.sh も grants.sql も置いていません。
+- Linux 専用です。ほかの OS では、何かを尋ねたり変えたりする前に「Linux 専用です（この OS: …）」で止まります。macOS・Windows でサーバを動かすときはデスクトップ版を使ってください。
 
 ### 動かし方（systemd と compose）
 
@@ -216,23 +230,40 @@ sudo sh install.sh --uninstall                   # 外す（設定とデータ�
   第三者のライセンス文はイメージの `/NOTICE` に入ります。取得元から取るのではなく、入れる実行ファイル自身の `looptrack licenses` の出力を書き出します。なので実行ファイルと必ず同じ版になります。
   ホストの実行ファイルをマウントする形にはしていません。コンテナを読み取り専用・単一ファイルのまま保ち、`--upgrade` の前の版のイメージ `looptrack:<前の版>` を残して戻せるようにするためです。
 
-### 保存先に MySQL を選ぶとき（grants.sql を流す順番）
+### 保存先に MySQL を選ぶとき（権限を与える順番）
 
 アプリ用の DB 利用者を最小権限（`deploy/grants.sql`）にする構成では、権限を与える順番が決まっています。
 **テーブル単位の `GRANT` は、そのテーブルができてからしか流せません。** DB 単位で広く与えてから取り消す形が取れないので、テーブル単位にしています。
-一方で install.sh は setup（migrate）から起動まで続けて進むので、途中に grants.sql を流す隙がありません。そこで次の順に進めてください。
+install.sh はこの順番を 1 回の実行の中で進めます。
 
-1. DB（`im`）とアプリ用の利用者（`im_app`）を作ります。`LOOPTRACK_DSN` はアプリ用の利用者にします。
-   `LOOPTRACK_SETUP_DSN`（と必要なら `LOOPTRACK_SETUP_MIGRATE_DSN`）は、テーブルを作れる管理用の資格情報にします。
-2. `sudo sh install.sh --from <取得元> …` を実行します。setup がテーブルを作り、**起動の前の「保存先の確認」で止まります**。
-   アプリ用の利用者がまだ何も読めないからです。ここまでで `.env` とテーブルはできています。
-3. 管理用の資格情報で grants.sql を流します: `mysql -u root -p im < grants.sql`
-   grants.sql は取得元の接頭辞にも並んでいます（`curl -fsSL -O "<取得元>/grants.sql"`）。ソースから使うなら `deploy/grants.sql` です。
-   DB 名や利用者名が `im`・`im_app` と違うときは、中の `im.` と `'im_app'@'%'` を置き換えてから流してください。
-4. `sudo sh install.sh --from <取得元> …` をもう一度実行します。`.env` があるので setup は飛ばし、起動と動作確認だけを行います。
+1. `LOOPTRACK_SETUP_DSN` はアプリ用の利用者（`.env` の `LOOPTRACK_DSN` になる）にします。
+   テーブルを作る接続先（`LOOPTRACK_SETUP_MIGRATE_DSN`）は、テーブルを作れる利用者にします（`GRANT ALL ON <DB 名>.*` は DB を作る前に与えておけます）。
+   DB とアプリ用の利用者は先に作らなくてかまいません。
+2. install.sh を実行します。setup がテーブルを作り、起動の前の「保存先の確認」でアプリ用の利用者が読めるかを試します。
+   - **DB がまだ無ければ**、setup は接続の段（migrate の前）でそれに気づき、下の 3 と同じ処理（`looptrack grants apply`）を先に動かします。
+     MySQL の管理用の資格情報を端末で尋ね、**DB を作ってよいかを確かめてから**（`--yes` でも確かめます）DB とアプリ用の利用者を作り、テーブルを作って権限を与えます。
+     そのあと setup の続き（最初の管理者）に進み、「保存先の確認」はそのまま通ります。管理用の資格情報を尋ねるのはこの 1 回だけです。
+     DB が既にあれば、作り直しません（中の表と行はそのまま）。
+     **前提は、表を作る利用者（`LOOPTRACK_SETUP_MIGRATE_DSN`）と、その DB 名への `GRANT` を先に用意しておくことです。**
+     setup が「DB が無い」と分かるのは、その利用者が DB 名への権限を持っていて `Error 1049`（Unknown database）を受けたときだけです。
+     利用者が無ければ `Error 1045`、権限が無ければ `Error 1044` で、従来どおり接続の段で止まります。
+     管理用の接続と、アプリ用の利用者で読めることの確認は、この接続先（`LOOPTRACK_SETUP_MIGRATE_DSN`。無ければ `LOOPTRACK_SETUP_DSN`）の宛先で行います。
+   - 作らないと答えると、DB もアプリ用の利用者も作らず、`.env` も書かずに止まり、自分で流す文（`CREATE DATABASE <DB 名> CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`）を示します。
+     流してからもう一度実行すると、setup から進みます。端末が無い（自動化の）ときは尋ねられないので、同じ文を示して止まります。DB を先に作っておいてください。
+3. 読めなければ、install.sh が `looptrack grants apply` を動かし、**MySQL の管理用の資格情報（既定の利用者 root）を端末で尋ねます**。
+   パスワードは表示せず、接続にだけ使い、ファイル・`.env`・`install.conf`・ログに残しません（`curl … | sh` でも `/dev/tty` から読みます）。
+   - アプリ用の利用者が無ければ、確かめてから `LOOPTRACK_DSN` のパスワードで作ります（`--yes` なら確かめずに作ります）。DB が無ければ DB も同じように作ります。
+   - 権限の中身は looptrack の実行ファイルに埋め込んだ `deploy/grants.sql` です。DB 名と利用者名は `LOOPTRACK_DSN` のものに置き換えます（`im`・`im_app` でなくてよい）。
+     照合済みの実行ファイルから出るので、取得の鎖の外にある別のファイルを信用しなくて済みます。流す GRANT 文は `looptrack grants print` で見られます。
+   - 流した後で、アプリ用の利用者で読めることを確かめてから起動と動作確認に進みます。
+4. 管理用の資格情報が合わないときは、権限を与えず、サービスを起動せずに、何が合わなかったか（接続先・利用者・MySQL のエラー）を出して止まります。
+   `.env` とテーブルは残るので、もう一度実行すると setup を飛ばし、尋ねるところから続きます。
+   DB が無いときの 2 で合わなかったときは `.env` を書かずに止まるので、もう一度実行すると setup から進みます。
 
+端末が無い（自動化の）ときは、systemd の構成に限り `LOOPTRACK_INSTALL_DB_ADMIN_USER` と `LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE`（1 行目がパスワードのファイル。使った後は自分で消す）で渡せます。
+自分で流すなら、`sudo sh -c 'set -a; . /etc/looptrack/.env; exec looptrack grants print'` で GRANT 文を出し、管理用の資格情報で流してから install.sh をもう一度実行します。
 アプリ用の利用者に DB 単位の広い権限を与える構成なら、2 の確認では止まらずに最後まで進みます。
-**テーブルが増えた更新でも同じです。** `--upgrade` の `migrate` の後に grants.sql を流し直すまでは読めません（`--upgrade` も同じ場所で止まります）。
+**テーブルが増えた更新でも同じです。** `--upgrade` の `migrate` の後に読めなければ、同じように尋ねて権限を与え直してから起動します。
 この確認を入れる前は、権限が無いまま起動していました。`/healthz` が上がらず、60 秒待ってから「ログを見てください」で終わっていたのです。
 
 ### TLS はリバースプロキシが持つ
@@ -262,18 +293,59 @@ TLS をプロキシに任せる理由は次の 3 つです。
 
 ### 更新（--upgrade）
 
-更新は次の順に進みます。
+`curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` で、次の順に進みます
+（取得元は入れるときと同じで、`--from` なしなら GitHub Releases の最新・`--version <版>` でその版）。
 
-1. 新しい版を取得して確かめます。
+1. 新しい版を取得して確かめます（書庫は照合してから展開します）。
 2. 停止します。
 3. SQLite なら、止めた状態で `im.db`（と `-wal`・`-shm`）を `backup-<日時>/` に写します。
 4. 実行ファイルを入れ替えます。前の版は `looptrack.prev` に残ります（compose は新しいイメージを作ります）。
 5. `migrate` を流します。MySQL でテーブル作成用の利用者を別にするときは `LOOPTRACK_SETUP_MIGRATE_DSN` を使います。
-6. 起動して `/healthz` を待ちます。
+6. 起動して `/healthz` を待ちます。MySQL を最小権限で使っていて、5 の後にアプリ用の利用者が読めなければ、起動の前に管理用の資格情報を尋ねて権限を与え直します（上の「保存先に MySQL を選ぶとき」）。
 
 同じ版なら何もしません。MySQL のバックアップは各自で取ってください（`mysqldump` など）。
 
-install.sh で入れたサーバでは `looptrack self-update` は置き換えずにエラーで止まり、`--upgrade` を案内します。
+**前の版に戻すときは、実行ファイル（`looptrack.prev`・compose の前の版のイメージ）だけでは戻りません。** 手順 5 の migrate が 1 本でも適用していれば、前の版は「新しい版の looptrack で migrate した DB」と出して、migrate も serve も止まります（前の版がこの確かめを持つ版の場合）。古い版が新しい形の DB に書き込んで壊さないためです。前の版で動かすには、DB も手順 3 の控え（SQLite）か各自の控え（MySQL）に戻します。控えの後に書かれたデータは失われるので、戻すより新しい版のまま直すほうを先に考えてください。
+
+### 新しい版の知らせと自動の置き換え（--auto-upgrade）
+
+`looptrack serve` は起動時と 24 時間ごとに GitHub Releases を確かめ、新しい版（署名を確かめ、この OS・CPU のサーバ版の書庫があるもの）を次の 3 か所で知らせます。
+
+- **管理画面の帯**: role が admin の利用者の画面の上部（member には出しません）。新しい版・リリースのページ・更新の 1 行（`curl … | sudo sh -s -- --upgrade`）を出します
+- **`looptrack doctor`**: admin のトークンで実行すると、注意の行にサーバの新しい版と更新の 1 行が出ます
+- **起動時のログ**: `journalctl -u looptrack`（compose は `docker compose logs`）に、確認の結果の 1 行と、新しい版があれば更新の 1 行が出ます
+
+確認の控えは `/var/lib/looptrack/update-check.json`（compose の SQLite は `data/update-check.json`）です。確認を止めるには `.env` に `LOOPTRACK_UPDATE_CHECK=off` を書いて起動し直します（GitHub へ通信しなくなります）。
+
+**既定では自動で置き換えません。** 知らせを見て、上の `--upgrade` を実行します。systemd で動かしているサーバは、設定で自動の置き換えを有効にできます。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --auto-upgrade on    # 有効にする
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --auto-upgrade off   # 外す
+systemctl list-timers looptrack-upgrade.timer          # 次に動く時刻
+journalctl -u looptrack-upgrade                         # 自動の置き換えの記録
+```
+
+- on にすると、1 日 1 回（時刻は 1 時間の幅でずらします。止まっていた間の回は起動した後に 1 回）`looptrack-upgrade.timer` が、
+  手元に置いた install.sh の写し `/usr/local/lib/looptrack/install.sh`（root だけが書ける・0755）を `--upgrade --require-signature --yes --only-newer` で動かします。
+  手順は上の「更新」と同じです（控え・migrate・再起動・動作確認）。
+- **timer は install.sh を取り直しません。** 写しを新しくするのは、人が install.sh を動かしたとき（1 行か手元のファイルで、入れる・`--upgrade`・`--auto-upgrade on`）だけです。
+  1 行で動かしたときは同じ URL から取り直したものを、手元のファイルで動かしたときはそのファイルを写します。
+- **取るのは書庫だけで、署名を必須にします。** 書庫は SHA256SUMS と minisign の署名で確かめます。有効にするときに `minisign` が要ります（`apt-get install -y minisign`）。
+- **版を下げません。** `--only-newer` は、取得した版が入っている版より新しいときだけ置き換えます。
+- **サービスを止めたままにしません。** 止めた後に失敗すれば（migrate・権限・`/healthz`）、前の実行ファイル（SQLite は DB も止めた直後の控え）に戻して前の版で起動し直し、
+  理由を `journalctl -u looptrack-upgrade` に残して失敗として終わります。次の日の回も同じ理由なら同じく戻ります。
+- 取得元は GitHub Releases の最新です（`--from` で入れたサーバでも、自動の置き換えは GitHub Releases から取ります）。
+- 設定は `install.conf` の `AUTO_UPGRADE` に残り、`--upgrade` のたびに設定どおりに入れ直します。`--uninstall` で外れます。
+- **compose では有効にできません。** コンテナのイメージは自動では置き換えず、知らせるだけです（更新は `--upgrade`）。`--no-start` で入れたサーバも有効にできません。
+- **MySQL では、DB の形を変える版を自動では置き換えません。** 止める前に新しい版の `looptrack migrate --check` で未適用の migrate を確かめ、あれば置き換えずに失敗として終わります
+  （migrate の後に新しい表の権限を与え直す管理用の資格情報を無人では尋ねられず、MySQL の DB は控えから戻せないため）。サービスは今の版のまま動き、知らせは続きます。
+  `journalctl -u looptrack-upgrade` を見て、端末で `--upgrade` を実行してください（有効にするときにも注意を出します）。
+- 端末で動かす手動の `--upgrade` は変わりません（権限が足りなければ尋ねて与え直します）。
+
+install.sh で入れたサーバでは `looptrack self-update` は置き換えずにエラーで止まり、インストーラの 1 行の `--upgrade`（`curl … | sudo sh -s -- --upgrade`）を案内します。
+1.0.0-rc.1・rc.2 の install.sh で入れたサーバも同じ 1 行で上げられます（置いた `install.conf`・`.env`・unit / `compose.yaml` をそのまま読みます）。
+手元に残した古い install.sh を新しいリリースの Releases に `--from` で向けると、素の実行ファイルが Releases に無いので、何も入れ替えずに止まります。
 置き換えると migrate も再起動もされず、動いているサーバと版がずれるからです。更新があるかを見る `self-update --check` はそのまま使えます。
 ここでいう「install.sh で入れたサーバ」は、linux で `/usr/local/bin/looptrack` から動いていて次のどれかがあるものです。
 `/etc/looptrack/install.conf`・`/etc/looptrack/.env`・`/etc/systemd/system/looptrack.service`。
@@ -286,7 +358,9 @@ INSTALL_TEST_COMPOSE=1 bash deploy/install_test.sh     # compose の実起動も
 INSTALL_TEST_SYSTEMD=0 INSTALL_TEST_IMAGES=debian:12 bash deploy/install_test.sh
 ```
 
-材料は `deploy/release/dist.sh` で作った 2 つの版（Docker の CPU の linux/<arch>）です。`--from <ディレクトリ>` で渡します（`--upgrade` は一時 HTTP サーバの URL から）。
+材料は `deploy/release/dist.sh` で作った 2 つの版（Docker の CPU の linux/<arch>）です。素の形（`dist.sh build` の出力）は `--from <ディレクトリ>` で、
+GitHub Releases と同じ並び（書庫）は `LOOPTRACK_INSTALL_REPO`（`--from` なしのときの取得元のリポジトリ。テスト・ミラー用）で渡します。
+README の 1 行は、一時 HTTP サーバに置いた `raw/deploy/install.sh` と `gh/releases/…` に読み替えて通します（`--upgrade` の一部も一時 HTTP サーバの URL から）。
 確かめるのは次のことです。
 
 - SHA-256 の不一致・署名・setup の失敗・中断で何も残さない
@@ -306,7 +380,18 @@ INSTALL_TEST_SYSTEMD=0 INSTALL_TEST_IMAGES=debian:12 bash deploy/install_test.sh
 - compose の実起動・ログイン・`--upgrade`・`--purge`
 - MCP の接続設定が `looptrack setup` の案内と同じ形になる（`X-Looptrack-Project` 付き）。
   文字列の一致は、`go test ./internal/setupwiz/` が install.sh と `setupwiz.MCPConfigs` を突き合わせて確かめます。
-- アプリ用の利用者が保存先を読めない MySQL の構成では、起動せずに grants.sql の順番を案内して終わる（60 秒待たない）
+- README の 1 行（`curl … | sh`。`--from` なし）で最新のリリースの書庫を取り、起動まで進む
+- 書庫: 1 バイト変えた書庫・署名の不一致・中の実行ファイルが SHA256SUMS の行と違う書庫では何も入れない。Linux 以外では何も変えずに止まる
+- MySQL（テスト専用の MySQL のコンテナ。最小権限・DB 名 `ltdb`・利用者 `lt_app`）: 管理用の資格情報が合わなければ権限を与えず起動せずに止まり、
+  もう一度実行すると疑似端末で尋ねられた資格情報でアプリ用の利用者を作って権限を与え、起動まで 1 回で進む。尋ねたパスワードが設定・データの置き場・
+  インストーラの出力・シェルの履歴・`ps` の引数に残らない（対照: `SHOW GRANTS` に grants.sql と同じ権限が出る）。権限の欠けた表がある状態の `--upgrade` も与え直して起動する
+- 1.0.0-rc.2 の install.sh（開発側のタグ `v1.0.0-rc.2`）で入れたサーバを、新しいインストーラの `--upgrade --version` で上げる
+- 自動の置き換え（`--auto-upgrade`）: 既定は off で timer が無い。compose・`--no-start`・systemd なし・minisign なしの on は何も変えずに止まる。
+  1 行の on で timer が有効になり、install.sh の写し（root 755）を置く（service は写しを動かす）。timer の service を動かすと新しい版に上がる
+  （写しは書き換えない・もう一度動かしても何もしない・古い版の取得元では版を下げない）。人が `--upgrade` を動かすと写しをそろえる。
+  off と `--uninstall` で timer と写しが外れる（コンテナの minisign は呼び出しを確かめる偽物）
+- 無人の更新（MySQL の最小権限）: 新しい版に未適用の migrate があれば止めずに置き換えない。止めた後に失敗（権限の欠けた表）すれば前の版に戻して起動し直し、
+  0 でない終了コードで終わる。対照: 権限がそろっていれば置き換わる
 
 コンテナでは代えられないので、次は手で確かめます。
 実機（VM）の Ubuntu LTS・Debian で、本物の証明書（ACME）を使うリバースプロキシの後ろから通してください。
@@ -346,7 +431,7 @@ systemd で入れたときの管理コマンドの呼び方は、上の「動か
 
 ## プロジェクトの運用文書とルール（guide が返すもの）
 
-各プロジェクトの運用文書をサーバに登録します（DESIGN §5-5）。
+各プロジェクトの運用文書をサーバに登録します（DESIGN §5-2）。
 運用文書は `docs/projects/<slug>.md` のような Markdown で、雛形は [../templates/project-rules.md](../templates/project-rules.md) にあります。
 直したときも同じコマンドで置き換えます。プロジェクト別ルール（例 `deploy/rules/example.json`）も同じ形で入れます。
 
@@ -372,7 +457,7 @@ sudo docker compose exec -T looptrack /looptrack project rules set <slug> - < <s
 
 ## 管理者 0 人のときの「セットアップ未完了」
 
-有効な管理者が 1 人もいないサーバは、通常モードでも画面を「セットアップ未完了」にします。API・MCP には 503 を返します（DESIGN.md §5-12）。
+有効な管理者が 1 人もいないサーバは、通常モードでも画面を「セットアップ未完了」にします。API・MCP には 503 を返します（DESIGN.md §3-3）。
 **更新の前に、有効な管理者がいることを確かめてください。** `ROLE` が `admin` で `STATE` が `active` の行が 1 つ以上あれば大丈夫です。
 
 ```bash

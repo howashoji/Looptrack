@@ -67,7 +67,9 @@ func initCases() []Case {
 		{Name: "init/server-existing-files", Args: []string{"init", "--project", "demo", "--source", "server", "--mcp"}, Routes: withMe, Seeds: existing},
 		{Name: "init/server-dry-run", Args: []string{"init", "--project", "demo", "--source", "server", "--dry-run"}, Routes: withMe, Seeds: existing},
 		{Name: "init/server-codex-copilot", Args: []string{"init", "--project", "demo", "--source", "server", "--agent", "codex,copilot", "--no-loop"}, Routes: withMe},
-		{Name: "init/server-minimal", Args: []string{"init", "--project", "demo", "--source", "server", "--no-freshness", "--no-usage", "--no-summary", "--no-skill"}, Routes: withMe},
+		{Name: "init/server-minimal", Args: []string{"init", "--project", "demo", "--source", "server", "--no-freshness", "--no-usage", "--no-summary", "--no-session-bind", "--no-skill"}, Routes: withMe},
+		// 対照: --no-session-bind だけを外すと、MCP の呼び出しの合鍵の配線（PreToolUse mcp__.*）が 1 件だけ入る
+		{Name: "init/server-minimal-session-bind", Args: []string{"init", "--project", "demo", "--source", "server", "--no-freshness", "--no-usage", "--no-summary", "--no-skill"}, Routes: withMe},
 		{Name: "init/dist-url", Args: []string{"init", "--project", "demo", "--dist", APIPlaceholder + "/setup/tkt_golden"}, Env: map[string]string{"LOOPTRACK_TOKEN": ""},
 			Routes: distRoutes("/setup/tkt_golden", "")},
 		{Name: "init/dist-url-expired", Args: []string{"init", "--project", "demo", "--dist", APIPlaceholder + "/setup/tkt_old"}, Env: map[string]string{"LOOPTRACK_TOKEN": ""},

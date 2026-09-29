@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/howashoji/looptrack/internal/domain"
 	"github.com/howashoji/looptrack/internal/i18n"
+	"github.com/howashoji/looptrack/internal/store"
 )
 
 // サーバが作って返す文面のうち、internal/service・internal/domain が作るもの（ルール違反・next の見送り・
@@ -151,6 +153,66 @@ func TestVerifyTextFollowsRequestLang(t *testing.T) {
 		if text, _ := m.call("verify_issue", map[string]any{"id": id}, false); !strings.HasPrefix(text, plan(id, lang).Text) {
 			t.Errorf("%s: MCP verify_issue が GET の text で始まらない:\n%s", lang, text)
 		}
+	}
+}
+
+// verify の記録としてイシューに追記するコメントは、**記録した利用者の言語**で書く（DB に残る文面は書いた利用者の言語・DESIGN §9-6）。
+// 言語の決め方は表示と同じ langFor（REST は reqLang・MCP は mcpLang。利用者の設定 users.lang が Accept-Language より強い）。
+// 日本語の利用者の記録は日本語、英語の利用者の記録は英語で残り、後から英語で記録しても前の日本語の記録は書き換わらない。
+func TestVerifyRecordFollowsWriterLang(t *testing.T) {
+	v := newVerifyEnv(t, "lw", "")
+	id := v.create("with verify", verifyBody)
+	sha := v.plan(id).BodySHA256
+	body := map[string]any{"body_sha256": sha, "results": results([]string{"go test ./...", "make lint"}, "ok", "fail"), "host": "mac.local", "workspace": "im-wt"}
+	want := map[i18n.Lang]string{
+		i18n.JA: "検証コマンド: 1/2 成功・1 失敗（2.4 秒・本文 " + sha[:8] + "）\n- ok `go test ./...`（1.2 秒）\n- fail `make lint`（exit 2・1.2 秒）",
+		i18n.EN: "Verification commands: 1/2 passed, 1 failed (2.4s, body " + sha[:8] + ")\n- ok `go test ./...` (1.2s)\n- fail `make lint` (exit 2, 1.2s)",
+	}
+	mustDiffer(t, "verify の記録（REST）", want[i18n.JA], want[i18n.EN])
+	comments := func() []commentJSON {
+		t.Helper()
+		var d issueDetailJSON
+		v.ed.json(200, "GET", "/issues/"+id, nil, &d)
+		return d.Comments
+	}
+
+	// REST（POST /verify）: 要求の言語で記録する。日本語 → 英語の順に記録し、先の日本語の記録がそのまま残ることも見る
+	for _, lang := range []i18n.Lang{i18n.JA, i18n.EN} {
+		v.ed.json(201, "POST", "/issues/"+id+"/verify", body, nil, langHeaderOf(lang)...)
+		if c := comments(); c[len(c)-1].Content != want[lang] {
+			t.Errorf("%s: REST の記録 =\n%s\nwant\n%s", lang, c[len(c)-1].Content, want[lang])
+		}
+	}
+	if c := comments(); len(c) < 2 || c[len(c)-2].Content != want[i18n.JA] {
+		t.Errorf("英語で記録した後に、先の日本語の記録が変わった: %+v", c)
+	}
+
+	// MCP（report_verify）: 接続の言語で記録する（自己申告の印も同じ言語）
+	mcpWant := map[i18n.Lang]string{
+		i18n.JA: strings.Replace(want[i18n.JA], "検証コマンド:", "検証コマンド（MCP の自己申告）:", 1),
+		i18n.EN: strings.Replace(want[i18n.EN], "Verification commands:", "Verification commands (self-reported via MCP):", 1),
+	}
+	mustDiffer(t, "verify の記録（MCP）", mcpWant[i18n.JA], mcpWant[i18n.EN])
+	for _, lang := range []i18n.Lang{i18n.JA, i18n.EN} {
+		m := v.mcpAs(v.ed.token, map[string]string{"X-Looptrack-Project": "lw", "Accept-Language": string(lang)})
+		_, data := m.call("report_verify", map[string]any{"id": id, "body_sha256": sha, "results": body["results"], "host": "mac.local", "workspace": "im-wt"}, false)
+		if c := comments(); c[len(c)-1].Content != mcpWant[lang] || data["comment"] != mcpWant[lang] {
+			t.Errorf("%s: MCP の記録 =\n%s\n（応答の comment %q）\nwant\n%s", lang, c[len(c)-1].Content, data["comment"], mcpWant[lang])
+		}
+	}
+
+	// 利用者の設定（users.lang = en）は Accept-Language（mcpAs の既定は ja）より強い。表示と同じ決め方で記録の言語も決まる
+	u, err := store.UserByLogin(context.Background(), v.db, "lw-ed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetUserLang(context.Background(), v.db, u.ID, "en"); err != nil {
+		t.Fatal(err)
+	}
+	m := v.mcpAs(v.ed.token, map[string]string{"X-Looptrack-Project": "lw"})
+	m.call("report_verify", map[string]any{"id": id, "body_sha256": sha, "results": body["results"], "host": "mac.local", "workspace": "im-wt"}, false)
+	if c := comments(); c[len(c)-1].Content != mcpWant[i18n.EN] {
+		t.Errorf("利用者の設定が en なのに英語で記録されない:\n%s", c[len(c)-1].Content)
 	}
 }
 

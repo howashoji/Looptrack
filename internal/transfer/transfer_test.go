@@ -93,7 +93,7 @@ func TestImportVerifyFixtures(t *testing.T) {
 
 	// export したファイルが元とバイト一致（ファイル名のバイト列を含む）
 	out := t.TempDir()
-	n, err := Export(ctx, db, out, nil)
+	n, err := Export(ctx, db, out, nil, false)
 	if err != nil || n != files {
 		t.Fatalf("export: n=%d err=%v", n, err)
 	}
@@ -127,6 +127,68 @@ func TestImportRefusesLiveProject(t *testing.T) {
 	// 利用者に見せる文面は i18n.Text で作る（err.Error() は ID を返す）
 	if err == nil || !strings.Contains(i18n.Text(i18n.JA, err), "置き換えを拒否") {
 		t.Fatalf("err = %v, want 置き換えの拒否", err)
+	}
+}
+
+// TestExportExcludesArchivedProject は、アーカイブ済みのプロジェクトが export に既定で出ず、
+// includeArchived を立てたときだけ出ることを確かめる。
+func TestExportExcludesArchivedProject(t *testing.T) {
+	db := testutil.MigratedDB(t)
+	ctx := context.Background()
+	src := readSource(t)[:1]
+	if _, err := Import(ctx, db, src); err != nil {
+		t.Fatal(err)
+	}
+	projects, _ := store.ListProjects(ctx, db)
+	if _, err := store.SetProjectArchived(ctx, db, projects[0].ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	out := t.TempDir()
+	n, err := Export(ctx, db, out, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("既定でアーカイブ済みを外さなかった: n=%d", n)
+	}
+	if _, err := os.Stat(filepath.Join(out, src[0].Project.Slug)); !os.IsNotExist(err) {
+		t.Errorf("アーカイブ済みのディレクトリが出た（stat の結果: %v）", err)
+	}
+
+	n, err = Export(ctx, db, out, nil, true)
+	if err != nil || n == 0 {
+		t.Fatalf("includeArchived=true で書き出されなかった: n=%d err=%v", n, err)
+	}
+}
+
+// TestImportRefusesArchivedProject は、アーカイブ済みの slug への取り込みを拒否し、
+// 既存のイシュー・コメント・イベントを消さないことを確かめる（案 A のもう一方：import 側の穴を塞ぐ）。
+func TestImportRefusesArchivedProject(t *testing.T) {
+	db := testutil.MigratedDB(t)
+	ctx := context.Background()
+	src := readSource(t)[:1]
+	if _, err := Import(ctx, db, src); err != nil {
+		t.Fatal(err)
+	}
+	projects, _ := store.ListProjects(ctx, db)
+	var issuesBefore int
+	db.QueryRow("SELECT COUNT(*) FROM issues WHERE project_id = ?", projects[0].ID).Scan(&issuesBefore)
+	if issuesBefore == 0 {
+		t.Fatal("前提が崩れている: 取り込み済みのイシューがありません")
+	}
+	if _, err := store.SetProjectArchived(ctx, db, projects[0].ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Import(ctx, db, src); err == nil || !strings.Contains(i18n.Text(i18n.JA, err), "アーカイブ済み") {
+		t.Fatalf("err = %v, want アーカイブ済みの拒否", err)
+	}
+
+	var issuesAfter int
+	db.QueryRow("SELECT COUNT(*) FROM issues WHERE project_id = ?", projects[0].ID).Scan(&issuesAfter)
+	if issuesAfter != issuesBefore {
+		t.Errorf("拒否したのに中身が変わった: before=%d after=%d", issuesBefore, issuesAfter)
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 指示文の作業名を送るか（プロジェクト別ルール usage.send_prompts。設計は DESIGN.md §5-4「指示文」）。
+// 指示文の作業名を送るか（プロジェクト別ルール usage.send_prompts。設計は DESIGN.md §9-5「記録の単位と保存の方針」の「指示文」）。
 //
 // 管理者が Web のプロジェクト管理画面から切り替える（looptrack project rules set でも設定できる）。変えるのは
 // projects.rules の usage.send_prompts だけで、usage の他のキー（require_on_close・case_pattern など）と他のルールには触れない。

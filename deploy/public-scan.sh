@@ -21,7 +21,7 @@
 # （赤になったとき、原因が未追跡のファイルかどうかがその場で分かるように）。
 #
 # 例外（公開物に残してよいもの）:
-#   - 公開リポジトリとイメージの名前と、配布元の識別子: github.com/howashoji/looptrack・ghcr.io/howashoji/looptrack・net.howashoji.looptrack
+#   - 公開リポジトリとイメージの名前と、配布元の識別子: github.com/howashoji/looptrack（API の api.github.com/repos/howashoji/looptrack・インストーラを取る raw.githubusercontent.com/howashoji/looptrack も）・ghcr.io/howashoji/looptrack・net.howashoji.looptrack
 #   - 配布元・著作権者としての社名の表記: 行に「配布元」「copyright」「Developer ID」を含むもの
 set -euo pipefail
 
@@ -95,14 +95,24 @@ if [ "$overlay" = 1 ]; then
   fi
 fi
 echo "== 調べた対象: $scanned"
+# 書き出した木が空だと、下の語・リンク・設定の検査はどれも 0 件で緑になる（基準値を持つ ids_comments だけが落ちるが、
+# --only で絞ったときは走らない）。木の中のファイルの数を出し、0 なら検査の前に落とす。
+files_in_tree=$(find "$work" -type f | wc -l | tr -d ' ')
+echo "== 書き出した公開物のファイル: $files_in_tree 件"
+if [ "$files_in_tree" -eq 0 ]; then
+  echo "公開物として書き出したファイルが 0 件です（git archive か重ね合わせが空振りしています）。何も調べずに緑になるので止めます" >&2
+  exit 1
+fi
 
 # 語の境界: grep -E の \b は実装で差があるので、英数字以外（行頭・行末を含む）で囲む。
 w() { printf '(^|[^A-Za-z0-9_])(%s)([^A-Za-z0-9_]|$)' "$1"; }
 
 # 社内固有の語
 company="howashoji|宝和|153\.126\.|devnew|reqweave|dev-infra|$(w 'hpc|hpcm|issui')"
-# Python の名残
-python_left="$(w 'python[0-9.]*')|issue\.py|issue_freshness\.py|usage_hook\.py|usage_snapshot\.py|hookcmd\.py"
+# Python の名残: 旧 Python 実装（scripts/*.py 等）に固有のファイル名・環境変数名だけを狙う。
+# 素の「python」（語の境界つき）は、文書中の一般的な言及（「Python 製ツール」）・python.org のような URL・
+# 「Python3.12」のようなバージョン表記にも当たってしまうため、この検査の対象からは外した（実測して確認済み）。
+python_left="issue\.py|issue_freshness\.py|usage_hook\.py|usage_snapshot\.py|hookcmd\.py"
 python_left="$python_left|pyjson|\.pyc|__pycache__|PYTHONPATH|PYTHONUTF8|PYTHONIOENCODING|PYTHONDONTWRITEBYTECODE"
 python_left="$python_left|difflib|ReportLab"
 # 調べない場所（パスの前置きで外す）
@@ -141,7 +151,7 @@ names_skip="$names_skip"'|^\./internal/client/kitinit/texts_test\.go:' # kit に
 # 本番に適用済みで変更しない（COMMENT に旧名が残る）
 names_skip="$names_skip"'|^\./migrations/|^\./internal/store/testdata/legacy/'
 # 例外の語（行から取り除いてから判定する）
-allow='github\.com/howashoji/looptrack|ghcr\.io/howashoji/looptrack|net\.howashoji\.looptrack'
+allow='api\.github\.com/repos/howashoji/looptrack|raw\.githubusercontent\.com/howashoji/looptrack|github\.com/howashoji/looptrack|ghcr\.io/howashoji/looptrack|net\.howashoji\.looptrack'
 allow_line='配布元|[Cc]opyright|Developer ID'
 # 生成物だけの残骸の説明（利用者ガイド）。例として __pycache__ を挙げるのは Python の名残ではない
 allow_line="$allow_line"'|生成物だけの残骸'
@@ -171,16 +181,22 @@ scan() { # $1: 区分名 $2: パターン $3: 調べないパスの前置き（�
 }
 
 links() { # 公開物の Markdown の相対リンクの先が公開物にあるか（外部の URL・ページ内の #…・testdata の中は見ない）
-  local hits
-  hits=$(cd "$work" && find . -name '*.md' -type f -not -path '*/testdata/*' | sort | while IFS= read -r f; do
+  local out hits checked
+  # 調べたリンクごとに「checked」の行を 1 つ出し、調べた本数も数える（式が空振りすると 0 件で緑になるため。
+  # 本数の下限は、実物のリポジトリで回す internal/docscheck の TestPublicScan が確かめる）。
+  out=$(cd "$work" && find . -name '*.md' -type f -not -path '*/testdata/*' | sort | while IFS= read -r f; do
     grep -noE '\]\([^)#[:space:]]+' "$f" 2>/dev/null | while IFS=: read -r ln m; do
       target=${m#](}
       case "$target" in [a-zA-Z]*:*) continue ;; esac
+      printf 'checked\n'
       [ -e "$(dirname "$f")/$target" ] || printf '%s:%s: リンク先が公開物にありません: %s\n' "${f#./}" "$ln" "$target"
     done
   done || true)
+  checked=$(printf '%s\n' "$out" | grep -c '^checked$' || true)
+  hits=$(printf '%s\n' "$out" | grep -v '^checked$' | sed '/^$/d' || true)
   local n=0
   [ -n "$hits" ] && n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+  echo "== 調べた相対リンク: $checked 本"
   echo "== リンク切れ: $n 件"
   if [ "$n" -gt 0 ] && [ "$summary" = 0 ]; then printf '%s\n' "$hits"; fi
   [ "$n" -eq 0 ]

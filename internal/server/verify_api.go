@@ -9,7 +9,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 検証コマンド（A-1。DESIGN.md §5-8）。サーバはコマンドを実行しない。
+// 検証コマンド（A-1。DESIGN.md §9-3）。サーバはコマンドを実行しない。
 // GET は本文の節から取り出したコマンドと直近の記録を返し、POST は CLI（looptrack issue verify）が手元で実行した結果を記録する。
 // MCP の report_verify（mcp_verify.go）も POST と同じ service.RecordVerify を通る（経路 mcp は自己申告の印が付く）。
 
@@ -43,7 +43,7 @@ type nextVerifyJSON struct {
 	Last       *verifyLastJSON `json:"last"`
 	Command    string          `json:"command"`
 	Message    string          `json:"message"`
-	// SectionDrift は受け入れ条件の節が更新されたのに検証コマンドの節が起票時のままか（§5-8-4。false なら省く）
+	// SectionDrift は受け入れ条件の節が更新されたのに検証コマンドの節が起票時のままか（DESIGN.md §9-3-4。false なら省く）
 	SectionDrift bool `json:"section_drift,omitempty"`
 }
 
@@ -57,7 +57,7 @@ type verifyPlanJSON struct {
 	Command    string                `json:"command"`
 	Message    string                `json:"message"`
 	Text       string                `json:"text"`
-	// SectionDrift は受け入れ条件の節が更新されたのに検証コマンドの節が起票時のままか（§5-8-4。false なら省く）
+	// SectionDrift は受け入れ条件の節が更新されたのに検証コマンドの節が起票時のままか（DESIGN.md §9-3-4。false なら省く）
 	SectionDrift bool `json:"section_drift,omitempty"`
 	// Timezone は last.at を描く時間帯（IANA 名）。CLI はこれで時刻を描く（台帳・レポートと同じ形）。
 	Timezone string `json:"timezone"`
@@ -136,7 +136,7 @@ func (s *Server) apiPostVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a := actor(r)
-	rec, err := s.svc.RecordVerify(r.Context(), a, pr, row.ID, service.VerifyInput{BodySHA256: req.BodySHA256, Results: req.Results, Host: req.Host, Workspace: req.Workspace})
+	rec, err := s.svc.RecordVerify(r.Context(), a, pr, row.ID, service.VerifyInput{BodySHA256: req.BodySHA256, Results: req.Results, Host: req.Host, Workspace: req.Workspace}, reqLang(r))
 	if err != nil {
 		s.serviceError(w, r, err)
 		return

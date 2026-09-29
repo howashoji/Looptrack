@@ -119,8 +119,16 @@ func usageCases() []Case {
 			Routes: []Route{r("POST", pProj+"/next", ok(nextDry))}},
 		{Name: "push/with-transcript", Args: []string{"push", "DEMO-0001"}, Env: cc, Seeds: append(append([]Seed(nil), ccSeed...), workSeeds...),
 			Routes: []Route{r("PATCH", pIssue1, ok(pushRes)), r("POST", pUsage, created(usageAttached))}},
-		{Name: "assign/with-transcript", Args: []string{"assign", "DEMO-0001", "me"}, Env: cc, Seeds: ccSeed, // assign は付与しない（以前の CLI と同じ）
-			Routes: []Route{r("POST", pIssue1+"/assign", ok(assignRes))}},
+		// 担当が変わった assign は付与する（MCP の assign_issue と同じく、kind assign を書く操作は付与の対象）
+		{Name: "assign/with-transcript", Args: []string{"assign", "DEMO-0001", "me"}, Env: cc, Seeds: ccSeed,
+			Routes: []Route{r("POST", pIssue1+"/assign", ok(assignRes)), r("POST", pUsage, created(usageAttached))}},
+		// 担当が変わらなかった（イベントを書かなかった）assign は付与しない
+		{Name: "assign/unchanged-with-transcript", Args: []string{"assign", "DEMO-0001", "me"}, Env: cc, Seeds: ccSeed,
+			Routes: []Route{r("POST", pIssue1+"/assign", ok(assignUnchanged))}},
+		// op assign を知らない古いサーバは 400 で拒む。付与は quiet なので、担当の変更の出力と終了コード 0 は変わらない
+		{Name: "assign/old-server-rejects-op", Args: []string{"assign", "DEMO-0001", "me"}, Env: cc, Seeds: ccSeed,
+			Routes: []Route{r("POST", pIssue1+"/assign", ok(assignRes)), r("POST", pUsage,
+				ErrorResponse(400, "invalid_argument", "issue_op には issue（ID）と op（create / update / comment / status / verify）が要ります"))}},
 		{Name: "verify/with-transcript", Args: []string{"verify", "DEMO-0001"}, Env: cc, Seeds: ccSeed, Routes: []Route{
 			r("GET", pIssue1+"/verify", ok(verifyPlan([]string{"echo ok"}, ""))),
 			r("POST", pIssue1+"/verify", created(verifyPosted)), r("POST", pUsage, created(usageAttached))}},

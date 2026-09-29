@@ -1,5 +1,5 @@
 // Package guide は AI 向けの使い方（共通規則 + プロジェクト別ルール + 運用文書）を 1 つの Markdown にまとめる
-// （CLI の guide・REST の /guide・MCP の guide ツールが同じものを返す。設計は DESIGN.md §5-5）。
+// （CLI の guide・REST の /guide・MCP の guide ツールが同じものを返す。設計は DESIGN.md §5-2）。
 //
 // 共通規則（common.md）はサーバの版と一緒に変わる（ツール名・サブコマンドに依存する）ためバイナリに埋め込む。
 // 本文は日英の 2 言語で、日本語が正本・英語は en/ に同じファイル名で置く（kit の rules と同じ置き方。DESIGN.md §9-6）。
@@ -46,7 +46,7 @@ type Input struct {
 	Doc                string          // 運用文書（未登録は空）
 	DocSource          string
 	DocUpdated         string
-	// Agents は呼び出した利用者のこのプロジェクトへの導入済み通知（AI ごと 1 件。DESIGN.md §5-7）。
+	// Agents は呼び出した利用者のこのプロジェクトへの導入済み通知（AI ごと 1 件。DESIGN.md §8）。
 	// 「次に読むもの」を AI ごとの行で並べる（loop の有無は AI ごとに違う）。
 	// 空（通知が 1 件も無い）なら「次に読むもの」を出さない
 	Agents []AgentLoop
@@ -58,7 +58,15 @@ type AgentLoop struct {
 	Label   string // 表示名（Claude Code / Codex / その他の AI）
 	Loop    string // installed / declined / none（未選択・古い CLI）
 	Version string // loop の版（installed のとき。無ければ空）
+	// SelfRepo は正本として扱う導入か（looptrack 自身のリポジトリ（kit の正本）で loop が none / declined。
+	// 判定はサーバの selfRepoLoop）。loop 欄は「問わない・正本」の文言にし、回し方は SelfRepoSkill で決める
+	SelfRepo bool
 }
+
+// SelfRepoSkill は正本として扱う導入で、回し方を skill /iterate にする AI か。正本の .claude/ は kit/loop を指して
+// 手で配線してある（skill・rules）が、AGENTS.md は無いので Codex・Copilot は最小ループのまま。
+// guide の回し方とサーバの prompt「loop」の選択が同じこの判定を使う。
+func SelfRepoSkill(agent string) bool { return agent == "claude-code" }
 
 // Rule はプロジェクト別ルール 1 件の説明。
 type Rule struct {
@@ -127,6 +135,9 @@ func writeNextReading(b *strings.Builder, lang i18n.Lang, agents []AgentLoop) {
 }
 
 func loopCell(lang i18n.Lang, a AgentLoop) string {
+	if a.SelfRepo { // 未選択・辞退の文言を出さない（setup も問わない）
+		return i18n.T(lang, "guide.loop.self_repo")
+	}
 	switch a.Loop {
 	case "installed":
 		if a.Version != "" {
@@ -141,6 +152,12 @@ func loopCell(lang i18n.Lang, a AgentLoop) string {
 }
 
 func howToLoop(lang i18n.Lang, a AgentLoop) string {
+	if a.SelfRepo {
+		if SelfRepoSkill(a.Agent) {
+			return i18n.T(lang, "guide.how.skill")
+		}
+		return i18n.T(lang, "guide.how.minimal")
+	}
 	if a.Loop == "installed" {
 		switch a.Agent {
 		case "codex", "copilot": // どちらも AGENTS.md の loop 節
@@ -249,7 +266,7 @@ func DescribeRules(lang i18n.Lang, raw json.RawMessage) []Rule {
 				parts = append(parts, rawDesc())
 			}
 			d = strings.Join(parts, i18n.T(lang, "guide.rule.sep"))
-		case "verify": // 検証コマンド（§5-8-4）
+		case "verify": // 検証コマンド（DESIGN.md §9-3-4）
 			if !v.Require {
 				d = rawDesc()
 				break

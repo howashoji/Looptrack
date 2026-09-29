@@ -143,6 +143,46 @@ func TestDistBinaries(t *testing.T) {
 	}
 }
 
+// TestDistBinariesIgnoresServerArchives は、GitHub Releases の書庫（looptrack_<版>_<os>_<arch>_server.tar.gz・.zip）を
+// 配布ディレクトリに置いても binaries に出ず、/dist/bin/<書庫の名前> が 404 になることを確かめる（配布ディレクトリは素の実行ファイルだけを配る）。
+// 対照として、同じディレクトリの素の実行ファイル（SHA256SUMS に載る）は一覧に出て取れる。
+func TestDistBinariesIgnoresServerArchives(t *testing.T) {
+	e, _, ed := newAPIEnv(t)
+	dir := t.TempDir()
+	e.s.cfg.DistDir = dir
+	archives := []string{
+		"looptrack_v1.1.0_linux_amd64_server.tar.gz",
+		"looptrack_v1.1.0_darwin_arm64_server.tar.gz",
+		"looptrack_v1.1.0_windows_amd64_server.zip",
+	}
+	files := map[string]string{"looptrack_v1.1.0_linux_amd64": "linux-amd64"} // 対照（素の実行ファイル）
+	for _, a := range archives {
+		files[a] = "archive:" + a // SHA256SUMS にも載せる（Releases の SHA256SUMS をそのまま置いた形）
+	}
+	sums := writeDist(t, dir, files)
+
+	var got distListing
+	ed.json(200, "GET", "/dist", nil, &got)
+	var names []string
+	for _, b := range got.Binaries {
+		names = append(names, b.Name)
+	}
+	if strings.Join(names, ",") != "looptrack_v1.1.0_linux_amd64" {
+		t.Fatalf("binaries（素の実行ファイルだけのはず）: %v", names)
+	}
+	if got.Binaries[0].SHA256 != sums["looptrack_v1.1.0_linux_amd64"] {
+		t.Errorf("対照の SHA-256: %+v", got.Binaries[0])
+	}
+	if code, _, body := ed.do("GET", "/dist/bin/looptrack_v1.1.0_linux_amd64", nil); code != 200 || string(body) != "linux-amd64" {
+		t.Errorf("対照の本体: %d %q", code, body)
+	}
+	for _, a := range archives {
+		if code, _, _ := ed.do("GET", "/dist/bin/"+a, nil); code != 404 {
+			t.Errorf("%s: %d（404 のはず）", a, code)
+		}
+	}
+}
+
 // TestInstallGoClient は looptrack の通知（client {version, os, arch}）を版で判定し、client の無い通知（撤去した以前の CLI）は
 // looptrack への置き換えを求めることを確かめる。
 func TestInstallGoClient(t *testing.T) {
