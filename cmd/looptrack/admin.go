@@ -541,17 +541,31 @@ func projectAdminCmd(args []string, lang i18n.Lang, u string) int {
 		return 0
 	}
 	fs := flag.NewFlagSet("project create", flag.ExitOnError)
+	// prefix・表示名・並び順は省略できる（service.NewProjectDefaults が MCP・管理画面・setup と同じ既定値で埋める。
+	// width だけは既定を表示しておく。後から変えられないため、-h で見える形にする）。
 	prefix := fs.String("prefix", "", i18n.T(lang, "cmd.arg.project.prefix"))
 	width := fs.Int("width", store.DefaultProjectWidth, i18n.T(lang, "cmd.arg.project.width"))
 	name := fs.String("name", "", i18n.T(lang, "cmd.arg.display_name"))
 	desc := fs.String("description", "", i18n.T(lang, "cmd.arg.project.description"))
-	order := fs.Int("order", 100, i18n.T(lang, "cmd.arg.project.order"))
+	order := fs.Int("order", store.DefaultProjectSortOrder, i18n.T(lang, "cmd.arg.project.order"))
 	slug, err := oneArg(fs, args[1:], "slug")
 	if err != nil {
 		return fail(err)
 	}
-	p := store.Project{Slug: slug, Prefix: *prefix, Width: *width, Name: *name, Description: *desc, SortOrder: *order}
-	if _, err := store.CreateProject(ctx, db, p); err != nil {
+	// --width 0・--order 0 を明示したときは、その 0 をそのまま保存する（48a939ee まではここに既定値の
+	// 埋め方が無く、flag の値をそのまま store.CreateProject に渡していたので、明示した 0 は 0 のままだった。
+	// fs.Visit は実際に指定されたフラグだけを渡す。フラグの既定値が偶然 0 と同じでも「指定した」ことにはならない）。
+	var opts []service.ProjectDefaultOption
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "width":
+			opts = append(opts, service.WidthExplicit())
+		case "order":
+			opts = append(opts, service.SortOrderExplicit())
+		}
+	})
+	p, err := service.CreateProjectNoMember(ctx, db, store.Project{Slug: slug, Prefix: *prefix, Width: *width, Name: *name, Description: *desc, SortOrder: *order}, opts...)
+	if err != nil {
 		return fail(err)
 	}
 	fmt.Println(i18n.T(lang, "cmd.project.created", "slug", p.Slug, "first", fmt.Sprintf("%s-%0*d", p.Prefix, p.Width, 1)))

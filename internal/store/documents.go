@@ -59,7 +59,7 @@ type StoredIssue struct {
 	Assignee  Assignee // 担当者（サーバだけの項目。Doc の frontmatter には入らない）
 }
 
-// Assignee はイシューの担当者（DESIGN.md §5-1）。UserID が 0 なら未設定。
+// Assignee はイシューの担当者（DESIGN.md §9-2）。UserID が 0 なら未設定。
 type Assignee struct {
 	UserID int64
 	Login  string
@@ -137,7 +137,7 @@ type extraValue struct {
 	isList     bool
 }
 
-// decompose は保存規則（DESIGN.md §3）で Document を分ける: front_keys に出現順のキーを持ち、既知のスカラーは列、
+// decompose は保存規則（DESIGN.md §2-1）で Document を分ける: front_keys に出現順のキーを持ち、既知のスカラーは列、
 // 既知のリストは issue_values、それ以外（未知のキーや、既知のキーでも型が想定と違う値）は issue_extra に入れる。
 func decompose(doc *mdformat.Document) (decomposed, error) {
 	d := decomposed{cols: map[string]string{}}
@@ -233,6 +233,9 @@ type Author struct {
 	// SessionKind は session_id の種類（空なら記録しない）。issue_events.detail の "session_kind" に残す。
 	// 今は "host"（器のセッション ID。会話記録と結び付かないので未付与の検知から外す）だけ。
 	SessionKind string
+	// ToolUse は MCP のツール呼び出しの ID のハッシュ（空なら記録しない）。issue_events.detail の "tool_use" に残す
+	// （生の ID は残さない。後から届いたスナップショットの会話に操作を結ぶ突き合わせだけに使う。LinkEventSessions）。
+	ToolUse string
 }
 
 func nullID(id int64) any {
@@ -338,8 +341,8 @@ type Event struct {
 // InsertEvent は変更を監査ログに記録する。
 func InsertEvent(ctx context.Context, q execQuerier, e Event) error {
 	var detail any
-	if e.Author.Agent != "" || e.Author.SessionKind != "" {
-		// 接続してきた AI を detail の "agent"、セッション ID の種類を "session_kind" に残す
+	if e.Author.Agent != "" || e.Author.SessionKind != "" || e.Author.ToolUse != "" {
+		// 接続してきた AI を detail の "agent"、セッション ID の種類を "session_kind"、ツール呼び出しの ID のハッシュを "tool_use" に残す
 		// （列を足さずに済ませる。未付与の検知が Copilot の操作・器のセッション ID の操作を外すのに使う）
 		m := map[string]any{}
 		if e.Detail != nil {
@@ -356,6 +359,9 @@ func InsertEvent(ctx context.Context, q execQuerier, e Event) error {
 		}
 		if e.Author.SessionKind != "" {
 			m["session_kind"] = e.Author.SessionKind
+		}
+		if e.Author.ToolUse != "" {
+			m["tool_use"] = e.Author.ToolUse
 		}
 		e.Detail = m
 	}
@@ -697,6 +703,10 @@ func SetProjectName(ctx context.Context, q execQuerier, projectID int64, name st
 // 管理画面と MCP の作成で同じ）。作成後は変えられない。
 const DefaultProjectWidth = 4
 
+// DefaultProjectSortOrder は並び順の既定（省略されたときの値。looptrack project create・setup の最初のプロジェクト・
+// 管理画面と MCP の作成、旧形式の取り込み（config.json に order が無いとき）で同じ）。
+const DefaultProjectSortOrder = 100
+
 // SetProjectArchived はプロジェクトをアーカイブする（archived が true）か、使用中に戻す。
 // 変わったら true を返す（すでにその状態なら false）。行も、イシュー・コメント・イベントも消さない。
 // 規則と権限は呼ぶ側（service.SetProjectArchived と、その呼び出し側）が持つ。
@@ -882,19 +892,23 @@ ON DUPLICATE KEY UPDATE content = VALUES(content), source = VALUES(source), upda
 type Starter struct {
 	DisplayID string
 	UserID    int64
-	SessionID string
-	At        time.Time
+	SessionID string // issue_events.session_id（記録したままの値）
+	// LinkedSessionID は、MCP の着手を後から届いたスナップショットの会話に結んだ値（issue_event_sessions。無ければ空）。
+	// どちらで比べるかは service.StarterSession が決める（store は判定しない）。
+	LinkedSessionID string
+	At              time.Time
 }
 
 // InProgressStarters は、プロジェクトの In Progress のイシューごとに、最後に In Progress にしたイベント
 // （状態変更の to、または起票時の status）の主体を返す。取り込んだだけで該当イベントが無いイシューは含めない。
 func InProgressStarters(ctx context.Context, q execQuerier, projectID int64) ([]Starter, error) {
-	rows, err := q.QueryContext(ctx, `SELECT i.display_id, COALESCE(e.actor_user_id, 0), COALESCE(e.session_id, ''), e.at
+	rows, err := q.QueryContext(ctx, `SELECT i.display_id, COALESCE(e.actor_user_id, 0), COALESCE(e.session_id, ''), COALESCE(l.session_id, ''), e.at
 FROM issues i
 JOIN issue_events e ON e.id = (
   SELECT MAX(x.id) FROM issue_events x WHERE x.issue_id = i.id AND (
     (x.kind = 'status' AND JSON_UNQUOTE(JSON_EXTRACT(x.detail, '$.to')) = 'In Progress') OR
     (x.kind = 'create' AND JSON_UNQUOTE(JSON_EXTRACT(x.detail, '$.status')) = 'In Progress')))
+LEFT JOIN issue_event_sessions l ON l.event_id = e.id
 WHERE i.project_id = ? AND i.status = 'In Progress' ORDER BY i.display_id`, projectID)
 	if err != nil {
 		return nil, err
@@ -903,7 +917,7 @@ WHERE i.project_id = ? AND i.status = 'In Progress' ORDER BY i.display_id`, proj
 	var out []Starter
 	for rows.Next() {
 		var s Starter
-		if err := rows.Scan(&s.DisplayID, &s.UserID, &s.SessionID, &s.At); err != nil {
+		if err := rows.Scan(&s.DisplayID, &s.UserID, &s.SessionID, &s.LinkedSessionID, &s.At); err != nil {
 			return nil, err
 		}
 		out = append(out, s)

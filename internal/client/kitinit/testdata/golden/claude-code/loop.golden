@@ -25,7 +25,7 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
   作成         .claude/skills/token-report/SKILL.md
   作成         .gitignore
   作成         .claude/.looptrack-kit.json
-verify: 配線 27 件・looptrack dev（headless・test）・rules の注入 3 節 を確かめました
+verify: 配線 28 件・looptrack dev（headless・test）・rules の注入 3 節 を確かめました
 次に:
   1. Claude Code を再起動する（env とフックの反映）。フック・設定の確認を求められたら内容を見て承認する（デスクトップ版は確認を出さずに読み込む）
   2. トークンが未登録: looptrack issue login --browser --url http://127.0.0.1:9/im を実行し、開いたブラウザで利用者がログインと承認をする（AI が実行してよい。待ち受けは最長 5 分なので、コマンドのタイムアウトは 5 分より長くする。ブラウザの無い環境は http://127.0.0.1:9/im/account で発行して login --url http://127.0.0.1:9/im に貼る）
@@ -230,6 +230,16 @@ verify: 配線 27 件・looptrack dev（headless・test）・rules の注入 3 �
           }
         ],
         "PreToolUse": [
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-session-bind --agent claude-code",
+                "timeout": 5
+              }
+            ]
+          },
           {
             "matcher": "Edit|Write|NotebookEdit",
             "hooks": [

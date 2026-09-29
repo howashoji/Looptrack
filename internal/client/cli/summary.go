@@ -7,12 +7,14 @@ import (
 	"time"
 
 	"github.com/howashoji/looptrack/internal/client/api"
+	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/client/usagesnap"
 	"github.com/howashoji/looptrack/internal/hookio"
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// SessionStart 用の要約（DESIGN.md §5-8-7）。
+// SessionStart 用の要約（DESIGN.md §9-3-7）。
 
 // summaryTimeout は SessionStart を止めないための打ち切り（1 要求 2 秒）。
 const summaryTimeout = 2 * time.Second
@@ -109,6 +111,11 @@ func (c *Ctx) summaryBody(v *Values) error {
 	if truthy(res, "usage_missing") {
 		data.Set("usage_missing", get(res, "usage_missing", nil))
 	}
+	// 上の ProjectPath で解決できている
+	slug, _ := c.Project()
+	if local := localUsageFailure(c.Env, slug); local != nil { // この PC のフックの送信の失敗（サーバには届いていない）
+		data.Set("usage_send_failure", local)
+	}
 	if agent := v.Str("agent"); agent != "" {
 		// SessionStart のフックとして動いている = フックが承認されて動いている証拠。導入済みをサーバへ知らせる
 		if inst, err := c.reportInstall(cl, agent, "hook"); err == nil {
@@ -187,6 +194,9 @@ func (c *Ctx) printSummary(data *jsonorder.Object, limit int64) error {
 		} else {
 			c.Println(i18n.T(c.Lang, "cli.summary.usage_missing", "count", intOf(get(missing, "count", nil))))
 		}
+	}
+	if line := usageFailureText(c.Lang, asObject(get(data, "usage_send_failure", nil)), loc); line != "" {
+		c.Println(line)
 	}
 	if err := c.printUsageRequests(objects(get(data, "usage_requests", nil)), loc); err != nil {
 		return err
@@ -320,4 +330,54 @@ func otherSessionNote(lang i18n.Lang, items []*jsonorder.Object) string {
 		return ""
 	}
 	return i18n.T(lang, "cli.summary.other_session", "ids", strings.Join(ids, i18n.T(lang, "cli.sep.list")))
+}
+
+// localUsageFailure は、この PC の付与のフックが送れていないこと（最後の失敗と、このプロジェクトで再送を待っている件数）。
+// どちらも無ければ nil。フックの失敗はフックの中では誰にも見えない（操作を妨げないよう黙って 0 で終わる）ので、
+// 利用者と AI が毎セッション読む要約に出す（internal/client/usagesnap の failure.go）。再送はプロジェクトごとなので、
+// 数えるのはこのプロジェクト（API の URL + slug）の置き場だけ（ほかのプロジェクトの分は、そのプロジェクトの要約に出る）。
+func localUsageFailure(e env.Env, project string) *jsonorder.Object {
+	dir := usagesnap.StateDir(e)
+	f := usagesnap.ReadFailure(dir)
+	spooled := len(usagesnap.SpoolFiles(usagesnap.SpoolDir(dir, e.Value(env.APIURL), project)))
+	if f == nil && spooled == 0 {
+		return nil
+	}
+	o := jsonorder.NewObject().Set("spooled", spooled)
+	if f != nil {
+		o.Set("reason", f.Reason).Set("at", f.At.UTC().Format(time.RFC3339)).Set("count", f.Count)
+		if f.Status != 0 {
+			o.Set("status", f.Status)
+		}
+	}
+	return o
+}
+
+// usageFailureText は localUsageFailure の 1 行（無ければ ""）。
+func usageFailureText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) string {
+	if o == nil || len(o.Keys()) == 0 {
+		return ""
+	}
+	spooled := intOf(get(o, "spooled", int64(0)))
+	reason := getStr(o, "reason", "")
+	if reason == "" {
+		return i18n.T(lang, "cli.summary.usage_spooled", "count", spooled)
+	}
+	var why string
+	switch reason {
+	case usagesnap.FailUnreachable:
+		why = i18n.T(lang, "cli.summary.usage_fail.unreachable")
+	case usagesnap.FailRejected:
+		why = i18n.T(lang, "cli.summary.usage_fail.rejected", "status", intOf(get(o, "status", int64(0))))
+	case usagesnap.FailNoToken:
+		why = i18n.T(lang, "cli.summary.usage_fail.no_token")
+	case usagesnap.FailSpool:
+		why = i18n.T(lang, "cli.summary.usage_fail.spool_failed")
+	case usagesnap.FailClient:
+		why = i18n.T(lang, "cli.summary.usage_fail.client_error")
+	default:
+		why = reason // 新しい版が書いた知らないキーはそのまま出す
+	}
+	return i18n.T(lang, "cli.summary.usage_send_failed", "at", localTimeIn(getStr(o, "at", ""), loc), "reason", why,
+		"count", intOf(get(o, "count", int64(0))), "spooled", spooled)
 }

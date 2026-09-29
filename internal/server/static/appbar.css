@@ -95,6 +95,17 @@ button.appbar-action{background:transparent; font:inherit; font-size:13px; line-
   .appbar-action ~ .usermenu{margin-left:0}
 }
 
+/* 新しい版の帯（layout.html の update_notice。ヘッダの行の下に全幅で出す。デスクトップ版と、サーバ版の管理者。code は更新の 1 行） */
+.appbar-update{margin:0 0 8px; padding:6px 10px; border:1px solid var(--ab-line); border-left:4px solid var(--ab-accent);
+  border-radius:8px; background:var(--ab-bg-2); color:var(--ab-fg); overflow-wrap:anywhere}
+.appbar-update a{color:var(--ab-accent)}
+.appbar-update-hint{color:var(--ab-fg-2)}
+.appbar-update code{display:block; margin:4px 0; font-size:12px; user-select:all; white-space:pre; overflow-wrap:normal; overflow-x:auto}
+/* デスクトップ版の「更新する」（POST {base}/update/apply のフォーム）と、進行中・失敗の文面 */
+.appbar-update-form{display:inline; margin:0 0 0 4px}
+.appbar-update-form button{vertical-align:baseline}
+.appbar-update-state{font-weight:600}
+
 @media (max-width: 600px){
   .appbar{padding:0 12px}
   /* 画面の操作（レポート作成）は 2 行目の右端へ。高さ 0 の全幅の要素で 1 行目を利用者メニューの後ろで切る */

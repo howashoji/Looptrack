@@ -13,7 +13,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// 日本語フォント（§5-11 Q4）。
+// 日本語フォント（DESIGN.md §5-1 Q4）。
 //
 // 探す順: TOKEN_REPORT_FONT（TrueType のパス。指定は残す）→ 実行ファイルに埋め込んだフォント（fonts/ の *.ttf。
 // BIZ UDGothic を置いてビルドする）→ 手元の既定の置き場（以前の PDF の作り方と同じ並び）。

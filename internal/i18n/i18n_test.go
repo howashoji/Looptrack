@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -275,4 +276,25 @@ func TestEnglishCatalogHasNoJapanese(t *testing.T) {
 				id, catalogs[EN][id])
 		}
 	}
+}
+
+// 英語の自己申告の印は 1 つの語にそろえる（"self-reported via MCP"。利用者のガイドの記述と同じ）。
+// 同じ印が画面・CLI・記録のコメントで別の語になると、人が同じものと見分けられず、文面で探しても片方が漏れる。
+// "self-reported" を含む値を全部拾い、どれも印の語を含むことを見る。拾った件数が 0 なら、検査が空振りしている。
+func TestEnglishSelfReportedMarkIsUniform(t *testing.T) {
+	const mark = "self-reported via MCP"
+	n := 0
+	for id, v := range catalogs[EN] {
+		if !strings.Contains(strings.ToLower(v), "self-reported") {
+			continue
+		}
+		n++
+		if !strings.Contains(v, mark) {
+			t.Errorf("%s: 自己申告の印が %q になっていない: %q", id, mark, v)
+		}
+	}
+	if n == 0 {
+		t.Fatalf("前提が崩れている: en.json に \"self-reported\" を含む値が 1 つも無い（検査が空振りしている）")
+	}
+	t.Logf("self-reported を含む値: %d 件", n)
 }

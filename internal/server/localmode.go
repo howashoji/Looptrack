@@ -13,7 +13,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// ローカルモード（設計 DESIGN.md §5-12）と、管理者 0 人のときの「セットアップ未完了」。
+// ローカルモード（設計 DESIGN.md §3-3）と、管理者 0 人のときの「セットアップ未完了」。
 //
 // ローカルモードは 127.0.0.1 / ::1 / localhost だけで待ち受け、Web・REST API・MCP を認証なしで
 // 「最初の管理者」（無効化されていない管理者のうち ID が最小の人）として通す。

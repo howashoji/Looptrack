@@ -76,6 +76,12 @@ func TestVerifyFailureRollsBack(t *testing.T) {
 	}
 	os.RemoveAll(filepath.Join(ws, ".claude", ".looptrack-init-backup"))
 	beforeTree := tree(t, ws)
+	// 戻す前の木が空だと、下の「元に戻っている」は何も比べずに緑になる。準備で置いたものが入っていることを見る。
+	for _, want := range []string{"CLAUDE.md", ".claude/settings.json"} {
+		if _, ok := beforeTree[want]; !ok {
+			t.Fatalf("戻す前の木に %s がありません（tree が空振りしています）: %d 件", want, len(beforeTree))
+		}
+	}
 	fr.version = func() (string, int) { return "", 127 } // looptrack が動かない（壊れた実行ファイル）
 	r := runInit(t, root, "", "--project", "demo", "--loop")
 	if r.code != 1 || !strings.Contains(r.stderr, "verify に失敗したため導入を止めました（書いたものは元に戻しました）") ||

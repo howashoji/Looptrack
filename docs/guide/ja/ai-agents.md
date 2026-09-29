@@ -34,6 +34,11 @@ loop には次のものが入っています。
 | 背景プロセスの検知 | セッションが残した終わらない子プロセスを見つけて知らせます |
 | 別リポジトリ・別プロジェクトへの変更 | 変更する前に利用者の確認を求めます |
 
+規則文は日本語と英語の両方が同梱され、hook が実行時にどちらかを選びます。
+確認モードは、英語の依頼（check、investigate、review など / implement、fix、add など）と日本語の依頼（「確認して」 / 「実装して」）の両方に反応します。1 つの依頼に両方の語が入っているときは、日本語の語で決まります。
+独自の言い回しを足すには、エージェントの設定の `env` で `LOOPTRACK_LOOP_TASK_MODE_INVEST_RE` と `LOOPTRACK_LOOP_TASK_MODE_EXEC_RE` にパターンを足します。
+これらは Go の正規表現（RE2）なので、先読み・後読み（`(?!…)` など）は使えません。`LOOPTRACK_LOOP_RUNAWAY_ALLOW`（背景プロセスの検知から外すプロセス）も同じです。読めないパターンは無視されて既定の語だけで動き、hook が変数名と誤りをメッセージで知らせます。
+
 loop を入れるかどうかを決めるのは AI ではなく利用者です。
 
 ```bash
@@ -120,7 +125,7 @@ CLI も hook も入っていない PC でも、MCP の接続設定だけをし�
 
 1. AI に MCP の接続設定を入れ、ブラウザで許可します。AI に接続の追加から任せるなら、下の「プロンプトを貼るだけで導入する」のプロンプトを使います。
 2. AI に「イシュー管理を使えるようにして」と頼むと、AI が `setup` ツールを呼びます。
-3. setup は最初に「loop を入れるか」という問いだけを返します。AI はそれを利用者に尋ね、答えを付けて setup を呼び直します。返ってくるのは取得 → SHA-256 の確認 → init をまとめた 1 つのコマンドで、AI は利用者の承認を得てから実行します。
+3. setup は最初に「loop を入れるか」という問いだけを返します。AI はそれを利用者に尋ね、答えを付けて setup を呼び直します。返ってくるのは取得 → SHA-256 の確認 → init をまとめた 1 つのコマンドで、AI は利用者の承認を得てから実行します。`~/.local/bin/looptrack`（Windows は `%LOCALAPPDATA%\Programs\looptrack\looptrack.exe`）が既にあれば、取得も置き換えもせずその looptrack で init だけを行います。その版が古ければ、次の setup で `looptrack self-update` が案内されます。
 4. トークンが無ければ、AI が承認を得て `looptrack issue login --browser` を実行します。ブラウザでのログインと許可は利用者が行います。
 5. 利用者が AI を起動し直し、hook を承認します。
 6. 次のセッションの開始時に、hook が導入済みであることをサーバへ知らせます。これでツール結果の【導入が未完了】が消えます。
@@ -199,9 +204,9 @@ Codex の MCP の設定（`~/.codex/config.toml`）は PC 全体で 1 つです�
 そのとき引数 project が無いと、setup は接続のヘッダのプロジェクト（別のプロジェクト）向けの手順を返し、AI もそれに気づきません。
 そのため 4 で project を渡しています（省略したときだけ、setup はヘッダのプロジェクトを使います）。
 導入の後も、MCP のツールはヘッダのプロジェクトを使います。ヘッダが別のプロジェクトなら、MCP のツールを呼ぶたびに引数 project を渡します。
-Codex を起動し直す前は、setup が示すトークンの確認（`looptrack issue config`）が「イシュー管理サーバの URL（環境変数 LOOPTRACK_API_URL）がありません」（英語では `Error: the issue server URL …`）で落ちることがあります。
-init がリポジトリの `.codex/config.toml` に書く環境変数は、Codex を起動し直すまで効かないからです。
-そのときは `LOOPTRACK_API_URL` と `LOOPTRACK_PROJECT` を付けて実行し直します（実地の確認では AI が自分で気づいて付けました）。
+init がリポジトリの `.codex/config.toml` に書く環境変数は、Codex を起動し直すまで効きません。そのため setup は、
+Codex を起動し直す前でも動くよう、手順のコマンド（トークンの確認 `looptrack issue config` を含む）にサーバの URL と
+プロジェクトをあらかじめ付けて返します。
 
 ### GitHub Copilot（VS Code）に貼るプロンプト
 

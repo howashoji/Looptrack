@@ -8,7 +8,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// 下位がすべて完了した要件（DESIGN.md §5-10）。
+// 下位がすべて完了した要件（DESIGN.md §9-4）。
 //
 // 下位 = traces でその要件を指すイシュー（型は問わない）。次をすべて満たす要件を「検証して close する」対象にする:
 //   - 要件（type: requirement）が Backlog / Todo / In Progress（In Review は人の判断待ちとして ② に出るので除く。閉じていれば除く）

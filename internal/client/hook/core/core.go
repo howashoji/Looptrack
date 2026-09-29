@@ -1,5 +1,5 @@
-// Package core は core の hook（鮮度ガード・トークンの送信と spool・SessionStart の summary）の Go 版（
-// DESIGN.md §5-11）。元は以前の hook（1.0.0 より前）の鮮度ガード・トークンの送信と、以前の CLI の summary --agent / --hook-json。
+// Package core は core の hook（鮮度ガード・トークンの送信と spool・SessionStart の summary・MCP の呼び出しの合鍵）の Go 版（
+// DESIGN.md §5-1）。元は以前の hook（1.0.0 より前）の鮮度ガード・トークンの送信と、以前の CLI の summary --agent / --hook-json。
 //
 // 各 hook は hookio.Event を読んで hookio.Result を返す（AI ごとの入出力の違いは internal/hookio が吸収する）。
 // 名前 → 本体の登録表（Lookup・Names）を公開し、`looptrack hook <名前>` の配線（cmd/looptrack）は Main を呼ぶだけにする。
@@ -10,7 +10,8 @@
 //   - 鮮度ガード: <ルート>/.claude/.looptrack-freshness/（project.json と sessions/<session_id>/{session,engaged,work}）。
 //     ルートは CLAUDE_PROJECT_DIR、無ければ作業ディレクトリ（以前の hook の ROOT と同じ。git のルートは探さない）。
 //   - トークンの送信: looptrack の置き場（資格情報と同じ。internal/client/cred。Windows は %APPDATA%\looptrack、他は
-//     $XDG_CONFIG_HOME（無ければ ~/.config）/looptrack）の {usage-spool,usage-last}/。以前の実装と共有した
+//     $XDG_CONFIG_HOME（無ければ ~/.config）/looptrack）の {usage-spool,usage-last}/（usage-spool はプロジェクトの鍵ごとの
+//     下位の置き場に分ける。usagesnap.SpoolDir）。以前の実装と共有した
 //     置き場は読まない・移さない。作業名を送るかの記録（usage-send-prompts）は internal/client/usagesnap。
 //
 // 挙動は以前の実装（1.0.0 より前）に合わせて移した（撤去までは同じ入力・同じ状態ファイル・同じ偽 API から、出力・終了コード・
@@ -23,11 +24,11 @@
 //     --no-block（LOOPTRACK_LOOP_NO_BLOCK=1）なら差し戻さずに systemMessage で知らせる（loop の hook と同じ扱い）。
 //   - どの AI かは配線の --agent で決める（usage の --client も受ける）。鮮度ガードは Claude Code 以外のツール名
 //     （Copilot の edit・create・bash など）も hookio の種類で見分ける。
-//   - ファイルモード（.claude/issues の Markdown）は持たない（§5-11）。鮮度ガードは API モードだけで動く。
+//   - ファイルモード（.claude/issues の Markdown）は持たない（DESIGN.md §5-1）。鮮度ガードは API モードだけで動く。
 //   - 鮮度ガードは `looptrack issue …`・`looptrack issue-freshness ack|reset` も以前の CLI・hook の呼び方と同じに数える。
 //   - usage の送信の切り離しは、自分（looptrack）を子プロセスとして起動する（POSIX は setsid、Windows は DETACHED_PROCESS）。
 //     以前は fork した。子への引き継ぎは標準入力の JSON（usageJob）。
-//   - 利用者が渡す正規表現（LOOPTRACK_MCP_SERVER）は RE2 で解釈する。解釈できなければ一致しない（以前は正規表現の誤りで落ちた）。
+//   - 利用者が渡す正規表現（LOOPTRACK_MCP_SERVER）は RE2 で解釈する。解釈できなければ一致しないとして扱い、MCP のツールの呼び出しのときだけ、変数名と誤りを systemMessage で 1 行知らせる（以前は正規表現の誤りで落ちた）。
 package core
 
 import (
@@ -67,6 +68,7 @@ func init() {
 		{"issue-freshness-mark", "", 4 * time.Second, FreshnessMark},
 		{"issue-freshness-check", hookio.Stop, 9 * time.Second, FreshnessCheck},
 		{"usage", "", 9 * time.Second, Usage},
+		{"issue-session-bind", hookio.PreToolUse, 3 * time.Second, SessionBind},
 		{"summary", hookio.SessionStart, 9 * time.Second, Summary},
 	} {
 		registry[e.Name] = e
@@ -211,6 +213,9 @@ func mainWith(ctx context.Context, name string, args []string, stdin io.Reader, 
 		opts.Parse.Event = string(entry.Event)
 	}
 	opts.Timeout = entry.Timeout
+	opts.HookName = entry.Name
+	opts.LogPath = func(ev hookio.Event) string { return loop.HookLogPath(ev, e.Vars.Get, e.Getwd) }
+	opts.Now = e.Now
 	if adjust != nil {
 		adjust(&opts)
 	}

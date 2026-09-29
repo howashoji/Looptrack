@@ -10,7 +10,7 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
   作成         .claude/settings.json
       --- /dev/null
       +++ b/.claude/settings.json
-      @@ -0,0 +1,84 @@
+      @@ -0,0 +1,96 @@
       +{
       +  "env": {
       +    "LOOPTRACK_API_URL": "http://127.0.0.1:9/im",
@@ -84,6 +84,18 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
       +            "type": "command",
       +            "command": "looptrack hook usage --agent claude-code",
       +            "timeout": 10
+      +          }
+      +        ]
+      +      }
+      +    ],
+      +    "PreToolUse": [
+      +      {
+      +        "matcher": "mcp__.*",
+      +        "hooks": [
+      +          {
+      +            "type": "command",
+      +            "command": "looptrack hook issue-session-bind --agent claude-code",
+      +            "timeout": 5
       +          }
       +        ]
       +      }

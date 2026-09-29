@@ -10,7 +10,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 指示文の作業名を送るか（プロジェクト別ルール usage.send_prompts。設計は DESIGN.md §5-4「指示文」）。
+// 指示文の作業名を送るか（プロジェクト別ルール usage.send_prompts。設計は DESIGN.md §9-5「記録の単位と保存の方針」の「指示文」）。
 // Web のプロジェクト管理画面（POST /admin/projects/{slug}/send-prompts。管理者だけ）から切り替える。
 // looptrack project rules set で usage.send_prompts を書いても同じ。CLI / フックは POST /usage の応答の send_prompts で知る。
 

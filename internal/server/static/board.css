@@ -108,6 +108,7 @@ form.issue-form .actions button{border-color:var(--accent); color:var(--accent)}
 form.issue-form button:disabled{opacity:.5; cursor:default}
 form.issue-form .form-error{flex-basis:100%; margin:0; padding:6px 10px; border:1px solid var(--p0); border-radius:6px; color:var(--p0); font-size:12.5px; white-space:pre-wrap}
 form.issue-form .form-error[hidden]{display:none}
+form.issue-form .form-notice{flex-basis:100%; margin:0; padding:6px 10px; border:1px solid var(--line); border-radius:6px; font-size:12.5px; white-space:pre-wrap}
 .dbody form.issue-form{border-top:1px solid var(--line-2); padding-top:12px}
 .empty{color:var(--fg-3); font-size:12px; padding:8px 4px}
 /* 取得の失敗（ボードの見直し・本文の検索・詳細の本文）。成功すると消える */

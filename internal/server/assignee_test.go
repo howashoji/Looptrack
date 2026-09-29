@@ -17,7 +17,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 担当者（assignee）。設計は DESIGN.md §5-1。受け入れ条件ごとに確かめる。
+// 担当者（assignee）。設計は DESIGN.md §9-2。受け入れ条件ごとに確かめる。
 
 type assigneeEnv struct {
 	e                         *env

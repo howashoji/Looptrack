@@ -35,23 +35,37 @@ mkdir "$S/src" && tar xf "$S/looptrack-src.tar" -C "$S/src"
 ## 1. 取得元（GitHub Releases の代わり）を作る 【CI 可】
 
 公開前なので Releases がありません。**代わりに `deploy/release/dist.sh` の出力のディレクトリを「取得元」として使います。**
-`install.sh` の `--from` もガイドの `curl` の取得先も、この読み替えで通ります。
+取得元は 2 つ作ります。`$S/release` は GitHub Releases と同じ形（書庫）で、ガイドの `curl` の取得先はこれに読み替えます。
+`$S/dist` は `dist.sh build` の出力（素の実行ファイル）で、サーバの配布ディレクトリと同じ形です。
 
 ```sh
 cd "$S/src/looptrack"
-RELEASE_TARGETS="linux/amd64 linux/arm64" bash deploy/release/dist.sh build v1.0.0 "$S/dist"
+export RELEASE_TARGETS="linux/amd64 linux/arm64"
+bash deploy/release/dist.sh build v1.0.0 "$S/dist"
 bash deploy/release/dist.sh sums "$S/dist"
 bash deploy/release/dist.sh verify "$S/dist"
+# GitHub Releases と同じ形（書庫・NOTICE・OFL-BIZUDGothic.txt・SHA256SUMS）
+bash deploy/release/dist.sh archive v1.0.0 "$S/dist" "$S/release"
+bash deploy/release/dist.sh check-archives v1.0.0 "$S/release" "$S/dist"
+cp "$S/dist/NOTICE" "$S/dist/OFL-BIZUDGothic.txt" "$S/release/"
+bash deploy/release/dist.sh sums "$S/release"
+bash deploy/release/dist.sh check-release v1.0.0 "$S/release"
+bash deploy/release/dist.sh verify "$S/release"
+unset RELEASE_TARGETS
 ```
 
-期待する結果（`SHA256SUMS` に 6 行）:
+期待する結果（`$S/dist/SHA256SUMS` に 6 行・`$S/release/SHA256SUMS` に 6 行）:
 
 ```
-NOTICE / OFL-BIZUDGothic.txt / grants.sql / install.sh
-looptrack_v1.0.0_linux_amd64 / looptrack_v1.0.0_linux_arm64
+$S/dist:    NOTICE / OFL-BIZUDGothic.txt / grants.sql / install.sh
+            looptrack_v1.0.0_linux_amd64 / looptrack_v1.0.0_linux_arm64
+$S/release: NOTICE / OFL-BIZUDGothic.txt
+            looptrack_v1.0.0_linux_amd64_server.tar.gz / looptrack_v1.0.0_linux_arm64_server.tar.gz
+            looptrack_v1.0.0_linux_amd64 / looptrack_v1.0.0_linux_arm64（書庫の中の実行ファイル。$S/release には並ばない）
 ```
 
-`install.sh` は 0755、`grants.sql` は 0644 です。`verify` はすべて `OK` になります。
+`install.sh` は 0755、`grants.sql` は 0644 です。`$S/release` に `install.sh`・`grants.sql`・素の実行ファイルはありません。
+`verify` はすべて `OK` になります（書庫の中の実行ファイルの行は「OK（<書庫> の中）」）。
 手元では署名しないので、`SHA256SUMS.minisig` が無いという注意は出て構いません。
 
 ## 2. まっさらなコンテナを用意する 【CI 可】
@@ -85,7 +99,7 @@ EOF
 箱を起こしたら、まず素性を確かめます。**ここが汚れていると確認の意味がありません。**
 
 ```sh
-docker run -d --name ltcheck-a --network ltcheck-net -v "$S/dist:/dist:ro" ltcheck-base:v1 sleep infinity
+docker run -d --name ltcheck-a --network ltcheck-net -v "$S/dist:/dist:ro" -v "$S/release:/release:ro" ltcheck-base:v1 sleep infinity
 docker exec ltcheck-a sh -c 'env | grep -E "LOOPTRACK|^IM_" || echo "(none) OK"'
 docker exec ltcheck-a grep PRETTY_NAME /etc/os-release
 ```
@@ -95,16 +109,18 @@ docker exec ltcheck-a grep PRETTY_NAME /etc/os-release
 ## 3. ローカル + SQLite（ウィザード） 【CI 可】
 
 利用者ガイドの「1. Download the binaries」→「2. Set up the server」→「3. Start the server」をなぞります。
-`curl` の取得先だけを `/dist` に読み替えてください。
+`curl` の取得先だけを `/release` に読み替えてください。
 
 ```sh
 docker exec -i ltcheck-a sudo -u dev bash -s <<'EOF'
 set -eu
-VER=v1.0.0; OS=linux; ARCH=arm64; BASE=/dist     # 読み替え: releases/download/$VER
+VER=v1.0.0; OS=linux; ARCH=arm64; BASE=/release     # 読み替え: releases/download/$VER
+NAME="looptrack_${VER}_${OS}_${ARCH}_server"
 mkdir -p ~/.local/bin; TMP=$(mktemp -d); cd "$TMP"
-cp "$BASE/looptrack_${VER}_${OS}_${ARCH}" "$BASE/SHA256SUMS" .
-grep -E " looptrack_${VER}_${OS}_${ARCH}\$" SHA256SUMS | sha256sum -c -
-install -m 755 "looptrack_${VER}_${OS}_${ARCH}" ~/.local/bin/looptrack
+cp "$BASE/$NAME.tar.gz" "$BASE/SHA256SUMS" .
+grep -E " $NAME\.tar\.gz\$" SHA256SUMS | sha256sum -c -
+tar -xzf "$NAME.tar.gz"
+install -m 755 "$NAME/looptrack" ~/.local/bin/looptrack
 export PATH="$HOME/.local/bin:$PATH"; looptrack version
 mkdir -p ~/looptrack-server && cd ~/looptrack-server
 # 対話の答えの順: ①使い方 ②保存先 SQLite の場所 ③ポート 接頭辞
@@ -163,56 +179,80 @@ EOF
 
 ## 5. サーバ + MySQL（install.sh・systemd・二段階認証は必須） 【CI 可】
 
-`docs/server/DEPLOY.md`「保存先に MySQL を選ぶとき（grants.sql を流す順番）」のとおりに進めます。
-**一度必ず止まる**ところまでが確認の対象です。
+`docs/server/DEPLOY.md`「保存先に MySQL を選ぶとき（権限を与える順番）」のとおりに、**README の 1 行を 1 回実行するだけで**起動まで進むことを確かめます。
+読み替えは 2 つです。1 行が取る `raw.githubusercontent.com/…/main/deploy/install.sh` は展開した木の `deploy/install.sh` に、
+インストーラが既定で取る `https://github.com/howashoji/looptrack/releases/latest/download` は 1 章の `$S/release` にします
+（`LOOPTRACK_INSTALL_REPO=/gh` と、`$S/release` を `/gh/releases/latest/download` に入れる）。
 
 ```sh
 docker run -d --name ltcheck-mysql --network ltcheck-net \
-  -e MYSQL_ROOT_PASSWORD=qscheckroot -e MYSQL_DATABASE=im mysql:8.4
+  -e MYSQL_ROOT_PASSWORD=qscheckroot mysql:8.4
 docker run -d --name ltcheck-b --network ltcheck-net \
   --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
-  -v "$S/dist:/dist:ro" ltcheck-systemd:v1
-# 1. DB とアプリ用の利用者を作る（権限はまだ与えない）
+  -v "$S/src/looptrack/deploy/install.sh:/raw/install.sh:ro" -v "$S/release:/gh/releases/latest/download:ro" \
+  ltcheck-systemd:v1
+# 1. 人が先に用意するのは、表を作る利用者だけ（DB im とアプリ用の利用者 im_app はインストーラが作る。
+#    GRANT ALL ON im.* は DB を作る前に流せる）
 docker exec -i ltcheck-mysql mysql -uroot -pqscheckroot <<'SQL'
-CREATE DATABASE IF NOT EXISTS im CHARACTER SET utf8mb4;
-CREATE USER IF NOT EXISTS 'im_app'@'%' IDENTIFIED BY 'qscheckapp';
+CREATE USER IF NOT EXISTS 'im_migrate'@'%' IDENTIFIED BY 'qscheckmig';
+GRANT ALL ON im.* TO 'im_migrate'@'%';
 SQL
-# 2. install.sh（ここで止まるのが正しい）
-docker exec -i ltcheck-b bash -s <<'EOF'
-printf '%s\n' 'Quickstart-2026-pass' > /root/pw && chmod 600 /root/pw
-export LOOPTRACK_SETUP_DSN='im_app:qscheckapp@tcp(ltcheck-mysql:3306)/im?parseTime=true'
-export LOOPTRACK_SETUP_MIGRATE_DSN='root:qscheckroot@tcp(ltcheck-mysql:3306)/im?parseTime=true'
-sh /dist/install.sh --from /dist --yes --method systemd -- \
+# 2. README の 1 行（読み替え: curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- …）。
+#    端末で尋ねられたら、管理用の利用者に root、パスワードに qscheckroot を答え（表示されない）、
+#    DB im とアプリ用の利用者 im_app を作るかの確認には y を答える
+docker exec -it ltcheck-b bash -c '
+export LOOPTRACK_LANG=ja      # looptrack の文面を下の期待する結果と同じ日本語にする（既定は英語）
+printf "%s\n" Quickstart-2026-pass > /root/pw && chmod 600 /root/pw
+export LOOPTRACK_SETUP_DSN="im_app:qscheckapp@tcp(ltcheck-mysql:3306)/im?parseTime=true"
+export LOOPTRACK_SETUP_MIGRATE_DSN="im_migrate:qscheckmig@tcp(ltcheck-mysql:3306)/im?parseTime=true"
+cat /raw/install.sh | LOOPTRACK_INSTALL_REPO=/gh sh -s -- --yes --method systemd -- \
   --store mysql --public-url https://im.example.test \
   --admin-login admin --admin-password-file /root/pw --two-factor required \
-  --project demo --project-prefix DEMO --project-name Demo
-EOF
+  --project demo --project-prefix DEMO --project-name Demo'
 ```
 
-期待する結果（**終了コード 1 で止まる**）:
+期待する結果（**1 回の実行で最後まで進む**）:
 
 ```
+==> 実行ファイルを取得します（/gh/releases/latest/download・linux/<arch>）
+  looptrack_v1.0.0_linux_<arch>_server.tar.gz（SHA-256 一致: …）
+==> 設定（looptrack setup）
+保存先に接続しています…
+  DB がまだありません（Error 1049 (42000): Unknown database 'im'）。管理用の資格情報を尋ね、確かめてから DB とアプリ用の利用者を作り、表を作って権限を与えます（looptrack grants apply と同じ）
+MySQL の権限を与えます（接続先 ltcheck-mysql:3306・DB im・アプリ用の利用者 im_app）
+管理用の利用者（DB と利用者を作り、権限を与えられるもの） [root]: root
+root のパスワード（表示しません。保存しません）:
+DB im がありません。作りますか (y/n) [y]: y
+  作成: DB im
+アプリ用の利用者 im_app がありません。LOOPTRACK_DSN のパスワードで作りますか (y/n) [y]: y
+  作成: 利用者 im_app
+  表がまだありません。管理用の資格情報で作ります（migrate）
+適用: 0001_init.sql
+…
+  権限を与えました（GRANT 23 件。deploy/grants.sql と同じ）
+  アプリ用の利用者 im_app で読めました
+スキーマを最新にしています（マイグレーション）…
+  最新です
+最初の管理者を作っています…
+…
 ==> 保存先の確認（サービスと同じ利用者で読めるか）
-エラー: Error 1044 (42000): Access denied for user 'im_app'@'%' to database 'im'
-install.sh: エラー: MySQL の保存先をアプリ用の利用者で読めません（…）。サービスは起動していません。
-… (1) 表への権限がまだ無い（最小権限（grants.sql）の構成）。… 1. setup が表を作る 2. grants.sql を流す 3. もう一度
+  読めました
+==> 動作確認（/looptrack/healthz）
+  200 OK
+インストールが終わりました（systemd・v1.0.0）。
 ```
 
-`.env` とテーブルはここまででできています（作り直しは要りません）。続けて 3・4 を実行します。
-
-```sh
-docker exec -i ltcheck-b bash -s <<'EOF'
-cp /dist/grants.sql /root/          # 読み替え: curl -fsSL -O "<取得元>/grants.sql"
-mysql -h ltcheck-mysql -u root -pqscheckroot im < /root/grants.sql
-sh /dist/install.sh --from /dist --yes --method systemd
-EOF
-```
-
-期待する結果:
-
-- 2 回目は最後まで進み、`systemctl is-active looptrack` が `active`・`is-enabled` が `enabled`
+- `systemctl is-active looptrack` が `active`・`is-enabled` が `enabled`
 - `/etc/looptrack/.env` が 600、`/looptrack/healthz` が 200
-- **3 回目**を実行すると「設定済みです（/etc/looptrack/install.conf）。何も変えていません。」
+- `docker exec ltcheck-mysql mysql -uroot -pqscheckroot -e "SHOW GRANTS FOR 'im_app'@'%'"` に `deploy/grants.sql` と同じ表ごとの権限が出る
+- `grep -rF qscheckroot /etc/looptrack /var/lib/looptrack` が何も出さない（管理用のパスワードを残さない）
+- **2 回目**を実行すると「設定済みです（/etc/looptrack/install.conf）。何も変えていません。」
+- 管理用の資格情報を尋ねるのは 1 回だけ（「保存先の確認」では尋ねない）
+- 管理用のパスワードを間違えると、`管理用の資格情報で ltcheck-mysql:3306 に接続できません（利用者 root）` と出て、起動せずに止まる。
+  `.env` は書かないので、もう一度実行すると setup から進む
+- この手順は DB が無い経路を通ります。「DB があり、アプリ用の利用者だけが無い」経路は `deploy/install_test.sh` の `mysql-bad`・`mysql-good` が通しています
+- DB を作るかの確認に `n` と答えると、`DB im を作らずに止めました` と自分で流す `CREATE DATABASE im CHARACTER SET utf8mb4 COLLATE utf8mb4_bin` が出て、
+  DB も `im_app` も作らずに止まる
 
 ### リバースプロキシ（設定例をそのまま使う）
 
@@ -352,7 +392,9 @@ docker inspect looptrack --format '{{.State.Health.Status}} restarts={{.RestartC
 
 | 代えたもの | 実物 |
 | -- | -- |
-| `--from /dist`（`dist.sh` の出力） | GitHub Releases の URL の接頭辞 |
+| `--from /dist`（`dist.sh build` の出力） | サーバの配布ディレクトリ・手元の配布物 |
+| `/release`・`/gh/releases/latest/download`（`dist.sh archive` の出力と NOTICE・OFL・SHA256SUMS） | GitHub Releases の `…/releases/latest/download` |
+| `cat /raw/install.sh \| sh -s -- …` | `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh \| sudo sh -s -- …` |
 | 自己署名の証明書 | 公開の CA の証明書（`certbot`・Caddy の自動取得） |
 | `oathtool` で作った確認コード | 認証アプリ（QR の読み取り） |
 | ホストの `claude -p` + トークン | 別の PC からの `claude mcp add` の OAuth・`issue login --browser` |

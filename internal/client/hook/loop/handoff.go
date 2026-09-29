@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/howashoji/looptrack/internal/client/hook/hookcmd"
 	"github.com/howashoji/looptrack/internal/hookio"
 	"github.com/howashoji/looptrack/internal/i18n"
 )
@@ -46,14 +47,36 @@ var (
 // （その中の本体は `do` / `)` で切れた次の区間に出るので、この表だけで届く）。同じ理由で
 // `done` / `fi` / `esac` / `}` / `in` のような閉じ・つなぎの語も入れない。
 //
-// `function` は入れるが、`function f { looptrack …` は名前が挟まるので、この剥がしだけでは届かない。
-// 前置きの語（sudo・env・xargs のような、後ろにコマンドを取る**コマンド**）まで剥がすと届くが、
-// それは通す側を広げる変更で、実際には実行されない引数（`xargs -I{} looptrack …` の雛形）まで
-// 完了として積んでしまうので採らない。
+// `function` は直後に関数名が挟まる（`function f { looptrack …`）ので、剥がすときは名前の 1 語も一緒に外す
+// （PostWorkCompleteHandoffMark の剥がしのループ）。
+//
+// 前置きの語（sudo・env・xargs のような、後ろにコマンドを取る**コマンド**）と入れ子のシェル（bash -c・eval）は
+// ここでは扱わない。git ガード・秘密のガードと同じ hookcmd の共通の段で先にほどく（normalizeHandoffCmd）。
 var shellKeywords = map[string]bool{
 	"do": true, "then": true, "else": true, "elif": true,
 	"if": true, "while": true, "until": true, "{": true,
 	"!": true, "time": true, "coproc": true, "function": true,
+}
+
+// normalizeHandoffCmd は、完了のコマンドを探す前のコマンド文字列を作る（git ガード・秘密のガード・鮮度ガードと同じ hookcmd の段）。
+//
+// 区間の先頭の語がコマンドの位置という前提で探すので、`sudo looptrack issue close …`・`env X=1 looptrack …`・
+// `bash -c "looptrack issue close …"`・`eval "…"` のように包んだ形は、先頭の語が sudo・bash になって 1 件も積まれない。
+// 行末の継続（`looptrack issue \` + 改行 + `close …`）は、つながないと改行で区間が分かれて同じく消える。
+//
+//   - 行末の継続をつなぐ（hookcmd.JoinContinuations）
+//   - 入れ子のシェルを 1 段ほどき、前置の語を落とす（hookcmd.Normalize）
+//
+// ほどく位置は**コマンドの位置だけ**（hookcmd.HeadOnly。git ガードと同じ）。この hook は積んだら Stop で差し戻す側で、
+// 差し戻しはその場で人が通せない。`echo bash -c 'looptrack issue close …'` のように何も実行されない形まで積むと、
+// していない完了について引き継ぎを求めてしまう。
+//
+// **限界**: 前置の語が落とせるのは選択肢の形（`-x`・`VAR=v`・数）までで、値を別の語で取る選択肢
+// （`sudo -u me looptrack …`）は読み切れず、残った値の語が先頭になって積まれない（git ガードと同じ限界。取りこぼす側）。
+// `xargs -I{} looptrack issue close {}` は雛形で、入力が空なら 1 回も実行されないが、積む側に倒す
+// （ID は展開できないので literalID が ? にする。xargs の後ろのコマンドは実行されるのが通常の使い方のため）。
+func normalizeHandoffCmd(cmd string) string {
+	return hookcmd.Normalize(hookcmd.JoinContinuations(cmd), hookcmd.HeadOnly)
 }
 
 // markHeredocs はヒアドキュメントの本文を外す（bash 版の post-work-complete-handoff-mark の strip_heredocs。
@@ -220,7 +243,7 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 	if ev.Tool == nil {
 		return hookio.Result{}, nil
 	}
-	r, state := root(ev, e), stateDir(ev, e)
+	state := stateDir(ev, e)
 	ti := toolInput(ev)
 	resp := toolResponseText(ev)
 	tool := ev.Tool.RawName
@@ -248,10 +271,13 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 			dir = e.Getwd()
 		}
 		commitDir := ""
-		for _, seg := range commandSegments(toStr(ti["command"])) {
+		for _, seg := range commandSegments(normalizeHandoffCmd(toStr(ti["command"]))) {
 			// 環境変数の代入と、直後がコマンドの位置になる予約語を、先頭から剥がす
 			// （`do FOO=1 looptrack …` のように混ざるので、1 つのループで両方見る）。
 			for len(seg) > 0 && (envAssignRe.MatchString(seg[0]) || shellKeywords[seg[0]]) {
+				if seg[0] == "function" && len(seg) > 1 {
+					seg = seg[1:] // 関数名（`function f { … }` の f）も外す
+				}
 				seg = seg[1:]
 			}
 			if len(seg) == 0 {
@@ -303,7 +329,7 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 				continue
 			}
 			// addEvent が重複を畳むので "commit" は高々 1 件
-			if commitCounts(ctx, ev, e, r, resp) {
+			if commitCounts(ctx, ev, e, commitDir, resp) {
 				events[i] = append([]string{"commit"}, commitFields(ctx, e, commitDir, resp)...)
 			} else {
 				events = append(events[:i:i], events[i+1:]...)
@@ -357,7 +383,7 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 			msg += "\n" + i18n.T(lang, "loop.handoff.mark.howto", "mark", writerMark(sid))
 		}
 	}
-	return hookio.Result{Context: msg}, nil
+	return hookio.Result{Context: msg, Kind: "handoff: detected"}, nil
 }
 
 // literalID は、展開されていないシェルの変数・コマンド置換を含む ID を「不明」（"?"）に倒す。
@@ -366,8 +392,10 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 // `for i in A B C; do looptrack issue status $i Done; done` のソーステキストに現れる ID は `$i` そのものなので、
 // そのまま書くと「`$i` を Done にした」という、次のセッションには読めない記録が残る。**展開後の値は原理的に
 // 追えない**ので、分からないことが分かる形にする（`?` は ID の無い close と同じ表し方）。
+//
+// `xargs -I{} looptrack issue close {}` の `{}`（xargs の置き換えの印）も同じく展開前の文字列なので ? にする。
 func literalID(id string) string {
-	if strings.ContainsAny(id, "$`") {
+	if strings.ContainsAny(id, "$`") || strings.Contains(id, "{}") {
 		return "?"
 	}
 	return id
@@ -441,17 +469,26 @@ func hasOutcome(r *hookio.Response) bool {
 // commitCounts は、見つけた git commit を「積む価値のある完了」と見るかを返す。
 //
 // 出力から失敗が分かるとき（nothing to commit・成功の形が無い）と、引き継ぎのファイルだけのコミットのときは false。
-// 出力が無いときは判定できないので積む側に倒す。
-func commitCounts(ctx context.Context, ev hookio.Event, e *Env, r, resp string) bool {
+// 出力が無いとき・コミットした場所（dir。cd・-C を追った commitDir）が分からないときは判定できないので積む側に倒す。
+//
+// git へは commitDir（実際にコミットした場所）を問う。本体のルートを問うと、別の作業ツリーでのコミットのときに
+// 本体側の HEAD（そのコミットとは無関係）の diff を見てしまい、除外の判定を誤る。
+// 引き継ぎのファイルの相対パス（relHandoff）は本体のルートから見た形のままでよい。引き継ぎのファイルは
+// 全セッションで同じ 1 つ（本体のルートの下）で、別の作業ツリーにも同じリポジトリ相対パスの実体があるため、
+// git の diff-tree の出力（コミットした場所の git top-level から見た相対パス）とそのまま比べられる。
+func commitCounts(ctx context.Context, ev hookio.Event, e *Env, dir, resp string) bool {
 	// 成功したコミットだけ（出力がある場合。無いときは積む）
 	if trimSpace(resp) != "" {
 		if notCommitted.MatchString(resp) || !commitSuccess.MatchString(resp) {
 			return false
 		}
 	}
-	relHandoff := relpath(realpath(handoffFile(ev, e)), realpath(r))
+	if dir == "" {
+		return true
+	}
+	relHandoff := relpath(realpath(handoffFile(ev, e)), realpath(root(ev, e)))
 	c, cancel := context.WithTimeout(ctx, 5*time.Second)
-	out, _, err := e.run(c, e.Getwd(), nil, "git", "-C", r, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
+	out, _, err := e.run(c, e.Getwd(), nil, "git", "-C", dir, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
 	cancel()
 	var files []string
 	if err == nil {
@@ -592,6 +629,9 @@ func StopHandoffFreshness(ctx context.Context, ev hookio.Event) (hookio.Result, 
 	// 本体以外の作業ツリーに取り残された引き継ぎを知らせる（止めない）
 	if res.SystemMessage == "" {
 		res.SystemMessage = strayHandoffNotice(ev, e)
+		if res.SystemMessage != "" && res.Kind == "" {
+			res.Kind = "handoff: stray"
+		}
 	}
 	return res, nil
 }
@@ -720,7 +760,7 @@ func stopHandoffFreshness(ctx context.Context, ev hookio.Event, e *Env) (hookio.
 		}
 	}
 	// LOOPTRACK_LOOP_NO_BLOCK=1（--no-block）のときは hookio.Render が systemMessage に回す
-	return hookio.Result{Block: reason}, nil
+	return hookio.Result{Block: reason, Kind: "handoff: stale"}, nil
 }
 
 // 引き継ぎを「誰が書いたか」の判定（LOOPTRACK_LOOP_HANDOFF_WRITER）。

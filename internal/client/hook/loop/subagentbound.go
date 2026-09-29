@@ -1,11 +1,14 @@
 package loop
 
 // pre-tool-subagent-bound: サブエージェントの起動（PreToolUse の Task / Agent）の指示文に、サブエージェントへの共通の注意
-// （背景で待つループの上限・scratchpad の共有と計測用ファイルの衝突しない命名）をそのまま追記する（hookSpecificOutput.updatedInput）。
+// （背景で待つループの上限・scratchpad の共有と計測用ファイルの衝突しない命名・指示文に出てくる識別子を実物と照合すること）を
+// そのまま追記する（hookSpecificOutput.updatedInput）。
 //
 // なぜ要るか: rules（background-process.md）は**親セッションにしか注入されない**。親が毎回書き写さないと子へ降りず、
 // 子は「親の完了マーカーを待つ」ために上限の無い until / while を自然に書く。実測では 1 日で 3 本作られ、うち 1 本は
 // 待機対象のパスがそもそも存在しなかった。書き写しの手間を規律で埋めるのはもう試したので、配線で降ろす。
+// 識別子の照合も同じ理由で降ろす: 報告に出てきた変数名・SHA・行番号を実物に当てずに次の指示文へ写すと、誤りが中継のたびに
+// 伝わる。実測で止まったのは、担当が git show / git grep で実物に当てたときだけだった（中継する親は気づかなかった）。
 //
 // 何もしないとき（この hook は**止めない**。追記だけ）:
 //   - ツールがサブエージェントの起動でない
@@ -63,7 +66,7 @@ func PreToolSubagentBound(ctx context.Context, ev hookio.Event) (hookio.Result, 
 		return hookio.Result{}, nil
 	}
 	return hookio.Result{UpdatedInput: string(b),
-		SystemMessage: i18n.T(lang, "loop.subagentbound.notice", "mark", backgroundBoundMarker)}, nil
+		SystemMessage: i18n.T(lang, "loop.subagentbound.notice", "mark", backgroundBoundMarker), Kind: "subagent-bound: appended"}, nil
 }
 
 // hasBackgroundBound は指示文に既に印が入っているか。

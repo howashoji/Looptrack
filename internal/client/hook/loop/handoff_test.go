@@ -131,7 +131,10 @@ func TestHandoff(t *testing.T) {
 	}
 	mark := func(tool, sid, arg, resp string) func(*sandbox) call {
 		return func(s *sandbox) call {
-			return call{hook: "post-work-complete-handoff-mark", env: map[string]string{"CLAUDE_PROJECT_DIR": R(s)}, input: pj(tool, sid, arg, resp)}
+			// cwd を明示する（本体の実際の作業ツリー）。実物の Bash ツールは常に cwd を渡すため、
+			// これは実際の呼び出しに合わせているだけ。そろえないと commitCounts が場所を追えず、
+			// hook プロセス自身の cwd（サンドボックスの一時ディレクトリ）に落ちてしまう。
+			return call{hook: "post-work-complete-handoff-mark", env: map[string]string{"CLAUDE_PROJECT_DIR": R(s)}, cwd: R(s), input: pj(tool, sid, arg, resp)}
 		}
 	}
 	clearPending := func(s *sandbox) {
@@ -687,9 +690,8 @@ func TestHandoffMarkAccumulates(t *testing.T) {
 // `for d in a b; do git commit -m x; done` の形では数えられていなかった（巻き添え）。
 //
 // handoff.go の shellKeywords の剥がしを外すと、下の 17 段（「予約語」の表と、ループ・波括弧の形）が red になる。
-// 末尾の「誤検出」の段は、剥がす対象を予約語より広げていないこと（前置きの語 sudo・env・xargs や
-// 入れ子のシェルは剥がさないこと）を固定する。広げると、実際には実行されない引数（xargs の雛形）まで
-// 完了として積むので、ここを red にせずに広げることはできない。
+// 末尾の「誤検出」の段は、予約語の剥がしが引数の位置まで広がっていないこと（echo の引数・引用符の中）を固定する。
+// 前置きの語と入れ子のシェルは TestHandoffMarkWrappedCommands が見る。
 func TestHandoffMarkShellKeywords(t *testing.T) {
 	needGit(t)
 	R := func(s *sandbox, parts ...string) string { return s.p(append([]string{"repo"}, parts...)...) }
@@ -733,9 +735,9 @@ func TestHandoffMarkShellKeywords(t *testing.T) {
 		{name: "予約語のあとに環境変数の代入が挟まっても届く", do: clear,
 			mk:   mark("for i in a; do LOOPTRACK_LANG=ja looptrack issue close TST-0001; done", "x"),
 			want: all(wantMark("OUT"), wantRecord("issue.close\tTST-0001"))},
-		// 届かないことが分かっている形（案を広げずに残した穴。別のイシューで扱う）
-		{name: "function の宣言は名前が挟まるので届かない（既知の穴）", do: clear,
-			mk: mark("function f { looptrack issue close TST-0001; }", "x"), want: wantNothing},
+		{name: "function の宣言の中の close も届く（名前の 1 語も一緒に外す）", do: clear,
+			mk:   mark("function f { looptrack issue close TST-0001; }", "x"),
+			want: all(wantMark("OUT"), wantRecord("issue.close\tTST-0001"))},
 		// 誤検出が増えていないこと（通す側を広げていないことの確認）
 		{name: "誤検出: echo の引数の looptrack は完了にしない", do: clear,
 			mk: mark("echo looptrack issue close TST-0001", "x"), want: wantNothing},
@@ -746,10 +748,6 @@ func TestHandoffMarkShellKeywords(t *testing.T) {
 		{name: "誤検出: 引用符の中の do looptrack は完了にしない（コミットだけ残る）", do: clear,
 			mk:   mark(`git commit -m "do looptrack issue close TST-0001"`, okResp),
 			want: all(wantMark("OUT"), wantRecord("commit\t061e38aeb\tmain\t?"))},
-		{name: "誤検出: 前置きの語（sudo・xargs・入れ子のシェル）は剥がさない", do: clear,
-			mk: mark("sudo -u me looptrack issue close TST-0001", "x"), want: wantNothing},
-		{name: "誤検出: xargs の雛形は実際には実行されないので完了にしない", do: clear,
-			mk: mark("xargs -I{} looptrack issue close {}", "x"), want: wantNothing},
 	}
 	// 予約語それぞれについて、`<予約語> looptrack …` が届くことを表で押さえる。
 	// 入れるのは「直後がコマンドの位置になる」語だけ（for / select / case は直後が変数名・被検査語なので入れない）。
@@ -866,4 +864,76 @@ func TestHandoffFreshnessWriterMarkTime(t *testing.T) {
 			},
 			mk: stop("B"), want: all(wantStop("PASS"), wantExists(pend("B"), false))},
 	}}.run(t)
+}
+
+// TestHandoffMarkWrappedCommands は、前置きの語（sudo・env・nohup・xargs）・入れ子のシェル（bash -c・eval）・
+// function の宣言・行末の継続で包んだ完了のコマンドも、素の形と同じく積まれることを確かめる。
+//
+// 区間の先頭の語がコマンドの位置という前提で探すので、包んだ形は先頭の語が sudo・bash になって 1 件も
+// 積まれなかった。表は実バイナリで取った実測の全行（届く形・届かない形）で、ほどくのは git ガード・秘密のガードと
+// 同じ hookcmd の共通の段。
+//
+// 対照として、ほどく位置を広げていないこと（echo の引数の `bash -c '…'`・引用符の中の文字列・git status は積まない）
+// を同じ表に置く。ここが積まれるなら、ほどく位置が HeadOnly から AnyPos に広がっている。
+func TestHandoffMarkWrappedCommands(t *testing.T) {
+	needGit(t)
+	R := func(s *sandbox, parts ...string) string { return s.p(append([]string{"repo"}, parts...)...) }
+	pend := func(s *sandbox) string { return R(s, ".claude", "handoff-pending.d", "s1") }
+	setup := func(s *sandbox) {
+		s.git("init", "-q", "-b", "main", R(s))
+		s.mkdir("repo", ".claude", "memories")
+		s.write(R(s, "src", "a.txt"), "a\n")
+		s.git("-C", R(s), "add", "src/a.txt")
+		s.git("-C", R(s), "commit", "-qm", "base")
+	}
+	mark := func(cmd, resp string) func(*sandbox) call {
+		return func(s *sandbox) call {
+			return call{hook: "post-work-complete-handoff-mark", env: map[string]string{"CLAUDE_PROJECT_DIR": R(s)},
+				input: jsonInput(map[string]any{"session_id": "s1", "tool_name": "Bash",
+					"tool_input": map[string]any{"command": cmd}, "tool_response": resp})}
+		}
+	}
+	clear := func(s *sandbox) { os.RemoveAll(R(s, ".claude", "handoff-pending.d")) }
+	wantRecord := func(want ...string) func(*testing.T, *sandbox, got) {
+		return all(wantMark("OUT"), wantRecordLines(pend, want...))
+	}
+	wantNothing := all(wantMark("QUIET"), wantExists(pend, false))
+	const commit = "commit\t061e38aeb\tmain\t?"
+
+	rows := []struct {
+		name, cmd, resp string
+		want            func(*testing.T, *sandbox, got)
+	}{
+		// 届くようになっていた形（退行させない）
+		{"for の中の status Done", "for i in ABC-0123 ABC-0124; do looptrack issue status $i Done; done", "x", wantRecord("issue.status\tDone\t?")},
+		{"for の中の git commit", "for d in a b; do git commit -m x; done", okResp, wantRecord(commit)},
+		{"素の close", "looptrack issue close ABC-0123", "x", wantRecord("issue.close\tABC-0123")},
+		{"素の git commit", "git commit -m x", okResp, wantRecord(commit)},
+		// 届かなかった形（本件）
+		{"env の前置", "env LOOPTRACK_LANG=ja looptrack issue close ABC-0123", "x", wantRecord("issue.close\tABC-0123")},
+		{"nohup の前置", "nohup looptrack issue close ABC-0123", "x", wantRecord("issue.close\tABC-0123")},
+		{"xargs の前置（雛形の ID は展開できないので ?）", "xargs -I{} looptrack issue close {}", "x", wantRecord("issue.close\t?")},
+		{"bash -c の二重引用符", `bash -c "looptrack issue close ABC-0123"`, "x", wantRecord("issue.close\tABC-0123")},
+		{"eval の二重引用符", `eval "looptrack issue close ABC-0123"`, "x", wantRecord("issue.close\tABC-0123")},
+		{"function の宣言", "function f { looptrack issue close ABC-0123; }", "x", wantRecord("issue.close\tABC-0123")},
+		// 表に無いが同じ段で届く形
+		{"sudo の前置（選択肢なし）", "sudo looptrack issue close ABC-0123", "x", wantRecord("issue.close\tABC-0123")},
+		{"bash -c の git commit", `bash -c 'git commit -m "x"'`, okResp, wantRecord(commit)},
+		{"sudo bash -c の status Done", `sudo bash -c 'looptrack issue status ABC-0123 Done'`, "x", wantRecord("issue.status\tDone\tABC-0123")},
+		{"行末の継続で分かれた close", "looptrack issue \\\n  close ABC-0123", "x", wantRecord("issue.close\tABC-0123")},
+		{"行末の継続で分かれた git commit", "git \\\n  commit -m x", okResp, wantRecord(commit)},
+		// 限界（値を別の語で取る選択肢は読み切れない。git ガードと同じ共通の段の限界で、取りこぼす側）
+		{"限界: sudo -u me は値の語が先頭に残る", "sudo -u me looptrack issue close ABC-0123", "x", wantNothing},
+		// 誤検知しない形（対照）
+		{"対照: echo の引数の bash -c は積まない", `echo bash -c 'looptrack issue close ABC-0123'`, "x", wantNothing},
+		{"対照: 引数の中の git commit は積まない", `echo 'git commit -m x'`, okResp, wantNothing},
+		{"対照: 引用符の中の eval は積まない", `echo "eval 'looptrack issue close ABC-0123'"`, "x", wantNothing},
+		{"対照: git status は積まない", "git status", "On branch main", wantNothing},
+		{"対照: sudo の後ろが looptrack issue でなければ積まない", "sudo looptrack issue show ABC-0123", "x", wantNothing},
+	}
+	var steps []step
+	for _, r := range rows {
+		steps = append(steps, step{name: r.name, do: clear, mk: mark(r.cmd, r.resp), want: r.want})
+	}
+	scenario{name: "包んだ形の完了", setup: setup, steps: steps}.run(t)
 }

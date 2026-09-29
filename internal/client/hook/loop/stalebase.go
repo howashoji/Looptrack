@@ -84,7 +84,7 @@ func UserPromptStaleBase(ctx context.Context, ev hookio.Event) (hookio.Result, e
 		return hookio.Result{}, nil
 	}
 	b.Behind = staleBaseBehind(ctx, e, top, b.Full, b.Ref) // 数えるのは出すときだけ（毎ターンの git を増やさない）
-	return hookio.Result{Context: staleBaseNote(e.lang(), b, limit)}, nil
+	return hookio.Result{Context: staleBaseNote(e.lang(), b, limit), Kind: "stale-base"}, nil
 }
 
 // measureStaleBase は作業ツリー top の基点を測る（基準が無い・git が失敗するときは ok = false）。

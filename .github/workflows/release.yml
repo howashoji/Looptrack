@@ -1,6 +1,8 @@
-# リリース物を作る: 6 対象の実行ファイル・SHA256SUMS・コンテナイメージ（linux/amd64・arm64）。
-# 実行ファイルに添えて NOTICE・OFL-BIZUDGothic.txt と、インストーラ install.sh・MySQL の最小権限 grants.sql も資産にする
-# （install.sh は「Releases から 1 行で取得して実行する」入口。どれも SHA256SUMS に載る）。
+# リリース物を作る: 6 対象の書庫（looptrack_<版>_<os>_<arch>_server.tar.gz・windows は .zip）・SHA256SUMS・コンテナイメージ（linux/amd64・arm64）。
+# 書庫の中身は最上位のディレクトリ looptrack_<版>_<os>_<arch>_server/ の下の looptrack[.exe]・NOTICE・OFL-BIZUDGothic.txt・LICENSE。
+# Releases の資産は 書庫 6・デスクトップ版 7・単独の NOTICE・OFL-BIZUDGothic.txt・SHA256SUMS・SHA256SUMS.minisig だけにする
+# （素の実行ファイル・install.sh・grants.sql は上げない。SHA256SUMS には書庫の中の実行ファイルを従来の名前にした行も載る）。
+# 素の実行ファイルは中間物として作り（dist.sh build）、macOS の署名とコンテナイメージの材料に使う。書庫は署名の後に作る。
 # 手順は docs/server/RELEASE.md。
 #
 # 起動:
@@ -10,11 +12,17 @@
 #
 # 署名: 変数 RELEASE_SIGN が "true" のとき、
 #   sign-macos（macOS の runner）: darwin の実行ファイルに Developer ID で署名し公証する（deploy/release/sign-macos.sh）
-#   sums     : 署名の後の最終ファイルから SHA256SUMS を作る（署名しないときも、このジョブが作る）
+#   sums     : 署名の後の最終ファイルから書庫を作り、Releases に上げるものを release/ に集めて SHA256SUMS を作る（署名しないときも、このジョブが作る）
 #   sign-sums: SHA256SUMS を minisign で署名する（SHA256SUMS.minisig。公開鍵は deploy/release/minisign.pub）
 # 署名と公開のジョブは Environment「release」（タグ v* のみ。承認者は置かない）の Secrets を使う。Secrets が無ければ、そのジョブは何もせずにエラーで止まる。
 # 公開（publish）は署名を必須にする（RELEASE_SIGN が "true" でないと meta で止まる。self-update は署名の無い配布から更新しないため）。
 # Windows は当面署名しない（公開後に SignPath Foundation）。
+#
+# artifact の保持日数（private リポジトリの Actions の保存容量は artifact の積み上げで数えられ、無料枠が小さい）:
+#   1 日 : 同じ run の後のジョブが download-artifact で読むだけのもの（build-・unsigned-macos-app-・signed-macos-・desktop-*・binaries-）。
+#          人が中身を確かめるときは release-<版> から取る。失敗したジョブを 1 日より後に再実行すると、これらが無く落ちるので、新しく run を起こす
+#   3 日 : 人が手元で確かめに取りに行くもの（release-・sums-signature-・image-。docs/server/RELEASE.md「リリースの手順」の 4）
+#   7 日 : 失敗のときだけ人が読む小さなログ（installer-log-）
 #
 # デスクトップ版（deploy/release/desktop.sh・RELEASE.md「デスクトップ版」）:
 #   desktop-macos  : macOS の runner で universal の Looptrack.app（cgo・lipo）と、署名なしの dmg を作る
@@ -79,6 +87,8 @@ jobs:
           IN_PUBLISH: ${{ inputs.publish }}
           VAR_PUBLISH: ${{ vars.RELEASE_PUBLISH }}
           VAR_SIGN: ${{ vars.RELEASE_SIGN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           semver='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
           publish=false
@@ -105,8 +115,26 @@ jobs:
             echo "::error::公開する版は署名が要ります（リポジトリ変数 RELEASE_SIGN を true にし、Environment「release」に Secrets を登録する。RELEASE.md「署名」）"
             exit 1
           fi
+          # プレリリース（Pre-release）の判定。利用者の決定（2026-09-28）: rc（版に `-` を含む）でも、
+          # 同じリポジトリに正式版のタグ（vX.Y.Z、`-` を含まない）がまだ無い間は Latest として扱う
+          # （Releases を Pre-release にせず、GHCR の latest タグも付ける）。正式版のタグが既にあれば、
+          # 以後の rc は Pre-release に戻す（Latest は正式版のまま）。
+          # 判定は「正式版のタグが存在するか」だけを見る（公開済みの Releases の有無ではない。gh api の
+          # /tags は公開設定に関わらずタグの一覧を返すので、これが最も単純で確かな判定になる）。
+          # fail-closed にする: gh api が失敗（権限・通信・レート制限）したら判定できないので release.yml を
+          # 止める。標準エラーは捨てない。ここで fail-open にすると、v1.0.0 の後に取得が失敗しただけで
+          # rc が黙って Latest のまま残り、GHCR の latest も rc に移る（落ちないまま静かに悪くなる）。
+          # タグの一覧が空（0 件）は失敗ではない（正式版がまだ無いリポジトリの初回はこれが正しい状態）。
           prerelease=false
-          [[ "$version" == *-* ]] && prerelease=true
+          if [[ "$version" == *-* ]]; then
+            if ! tags="$(gh api "repos/$GH_REPO/tags" --paginate --jq '.[].name')"; then
+              echo "::error::正式版のタグの一覧を取れませんでした（gh api repos/$GH_REPO/tags）。rc を Latest にするか Pre-release にするか判定できないので止めます"
+              exit 1
+            fi
+            if grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' <<<"$tags"; then
+              prerelease=true
+            fi
+          fi
           {
             echo "version=$version"
             echo "publish=$publish"
@@ -139,7 +167,7 @@ jobs:
           case "$got" in "looptrack $VERSION"*) ;; *) echo "::error::looptrack version が $got"; exit 1 ;; esac
           test -s dist/OFL-BIZUDGothic.txt || { echo "::error::OFL-BIZUDGothic.txt がありません"; exit 1; }
           test -s dist/NOTICE || { echo "::error::NOTICE（第三者のライセンス文）がありません"; exit 1; }
-          # インストーラと MySQL の最小権限（取得の 1 行の入口。リポジトリの写しと同じであること）
+          # インストーラと MySQL の最小権限（dist.sh build の出力は --from の取得元にもなるので写しは続ける。Releases には上げない）
           for f in install.sh grants.sql; do
             test -s "dist/$f" || { echo "::error::$f がありません（リリースの資産）"; exit 1; }
             cmp -s "deploy/$f" "dist/$f" || { echo "::error::dist/$f がリポジトリの deploy/$f と違います"; exit 1; }
@@ -151,7 +179,7 @@ jobs:
           name: build-${{ needs.meta.outputs.version }}
           path: dist/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   desktop-macos:
     name: デスクトップ版（macOS の .app・dmg）
@@ -189,13 +217,13 @@ jobs:
           name: unsigned-macos-app-${{ needs.meta.outputs.version }}
           path: Looptrack.app.zip
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-macos-${{ needs.meta.outputs.version }}
           path: dmg/*.dmg
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   desktop-linux:
     name: デスクトップ版（Linux の AppImage・${{ matrix.arch }}）
@@ -248,7 +276,7 @@ jobs:
           name: desktop-linux-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
           path: out/*.AppImage
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   desktop-windows:
     name: デスクトップ版（Windows の zip・${{ matrix.arch }}）
@@ -285,7 +313,7 @@ jobs:
           name: desktop-windows-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
           path: out/*.zip
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   desktop-windows-installer:
     name: デスクトップ版（Windows の zip の起動確認とインストーラ・${{ matrix.arch }}）
@@ -431,7 +459,7 @@ jobs:
           name: desktop-windows-installer-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
           path: out/*_setup.exe
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   sign-macos:
     name: macOS の署名と公証（darwin の実行ファイル・デスクトップ版の .app と dmg）
@@ -539,7 +567,7 @@ jobs:
             dist/*_darwin_arm64
             dist/*.dmg
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
       - name: 片付け（一時キーチェーン・証明書・API キー）
         if: ${{ always() }}
         run: |
@@ -610,29 +638,75 @@ jobs:
             "Looptrack_${VERSION}_windows_amd64_setup.exe" "Looptrack_${VERSION}_windows_arm64_setup.exe"; do
             [ -f "dist/$f" ] || { echo "::error::$f がありません"; exit 1; }
           done
-      - name: 添えるファイルがそろっていることを確かめる
+      # 書庫は署名の後の実行ファイルから作る（署名でバイト列が変わるため。dist の darwin は上で署名済みのものに置き換えてある）
+      - name: 書庫（looptrack_<版>_<os>_<arch>_server）
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          # ライセンス文と、取得の 1 行の入口（install.sh・grants.sql）。binaries ジョブが置いたものがここまで来ていること
-          for f in NOTICE OFL-BIZUDGothic.txt install.sh grants.sql; do
+          bash deploy/release/dist.sh archive "$VERSION" dist release
+          # 中身が looptrack・NOTICE・OFL-BIZUDGothic.txt・LICENSE だけで（install.sh・grants.sql は無い）、
+          # NOTICE・OFL・LICENSE がリポジトリのものと、実行ファイルが dist の（署名の後の）ものとバイト列で一致すること
+          bash deploy/release/dist.sh check-archives "$VERSION" release dist
+      - name: 書庫の中の darwin の実行ファイルが署名済みのものと同じことを確かめる
+        if: ${{ needs.meta.outputs.sign == 'true' }}
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          for arch in amd64 arm64; do
+            base="looptrack_${VERSION}_darwin_${arch}_server"
+            tar -xzOf "release/$base.tar.gz" "$base/looptrack" | cmp -s - "signed/looptrack_${VERSION}_darwin_${arch}" ||
+              { echo "::error::$base.tar.gz の looptrack が署名済みのもの（signed-macos）と違います"; exit 1; }
+          done
+          echo "darwin の書庫 2 つの looptrack は署名済みのものと同じ"
+      - name: 書庫から出した looptrack の版を確かめる（linux/amd64）
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          x="$RUNNER_TEMP/archive-check"
+          rm -rf "$x" && mkdir -p "$x"
+          tar -xzf "release/looptrack_${VERSION}_linux_amd64_server.tar.gz" -C "$x"
+          got=$("$x/looptrack_${VERSION}_linux_amd64_server/looptrack" version)
+          case "$got" in "looptrack $VERSION"*) ;; *) echo "::error::書庫の looptrack version が $got"; exit 1 ;; esac
+          echo "$got"
+      - name: Releases に上げるものを release/ に集める
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          # ライセンス文（デスクトップ版にも掛かるので、書庫を開かずに読めるよう単独でも上げる）
+          for f in NOTICE OFL-BIZUDGothic.txt; do
             test -s "dist/$f" || { echo "::error::$f がありません（リリースの資産）"; exit 1; }
           done
-          for f in install.sh grants.sql; do
-            cmp -s "deploy/$f" "dist/$f" || { echo "::error::dist/$f がリポジトリの deploy/$f と違います"; exit 1; }
-          done
+          cmp -s NOTICE dist/NOTICE || { echo "::error::dist/NOTICE がリポジトリの NOTICE と違います"; exit 1; }
+          cmp -s internal/client/report/pdf/fonts/OFL.txt dist/OFL-BIZUDGothic.txt || { echo "::error::dist/OFL-BIZUDGothic.txt がリポジトリのものと違います"; exit 1; }
+          cp dist/NOTICE dist/OFL-BIZUDGothic.txt release/
+          cp dist/Looptrack_"${VERSION}"_* release/
+          ls -l release/
       - name: SHA256SUMS
-        run: bash deploy/release/dist.sh sums dist
-      - name: SHA256SUMS に載っていることを確かめる
+        run: bash deploy/release/dist.sh sums release
+      - name: 上げるものと SHA256SUMS を名前で確かめる
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          # install.sh は取得した後に SHA-256 で確かめられること（Releases から 1 行で取る経路）
-          for f in NOTICE OFL-BIZUDGothic.txt install.sh grants.sql; do
-            grep -qE "^[0-9a-f]{64} [ *]?$f\$" dist/SHA256SUMS || { echo "::error::SHA256SUMS に $f がありません"; exit 1; }
-          done
+          # 書庫 6・デスクトップ版 7・NOTICE・OFL がある／素の実行ファイル・install.sh・grants.sql が無い／小文字にそろえても重ならない／
+          # SHA256SUMS は上げるものと、書庫の中の実行ファイル（従来の名前 6 つ）の行だけ
+          bash deploy/release/dist.sh check-release "$VERSION" release
+          n=$(wc -l <release/SHA256SUMS)
+          [ "$n" -eq 21 ] || { echo "::error::SHA256SUMS が $n 行（書庫 6・デスクトップ版 7・NOTICE・OFL・書庫の中の実行ファイル 6 で 21 行のはず）"; exit 1; }
+          bash deploy/release/dist.sh verify release
+      # 素の実行ファイル（中間物）。コンテナイメージの材料に使う。Releases には上げない
       - uses: actions/upload-artifact@v7
         with:
           name: binaries-${{ needs.meta.outputs.version }}
           path: dist/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
+      # Releases に上げるもの（署名する SHA256SUMS もここ）
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ needs.meta.outputs.version }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 3
 
   sign-sums:
     name: SHA256SUMS の署名（minisign）
@@ -665,8 +739,8 @@ jobs:
           ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
       - uses: actions/download-artifact@v8
         with:
-          name: binaries-${{ needs.meta.outputs.version }}
-          path: dist
+          name: release-${{ needs.meta.outputs.version }}
+          path: release
       - name: minisign を入れる
         run: |
           sudo apt-get update -qq
@@ -682,23 +756,23 @@ jobs:
           printf '%s\n' "$MINISIGN_SECRET_KEY" >"$key"
           # パスワードは標準入力の 1 行で渡す（minisign は端末が無ければ標準入力から読む）
           printf '%s\n' "$MINISIGN_PASSWORD" | MINISIGN_SECRET_KEY_FILE="$key" \
-            bash deploy/release/dist.sh sign-sums dist "looptrack $VERSION SHA256SUMS"
+            bash deploy/release/dist.sh sign-sums release "looptrack $VERSION SHA256SUMS"
           rm -f "$key"
       - name: 確かめる（SHA256SUMS の照合と、リポジトリの公開鍵での署名の確認）
-        run: bash deploy/release/dist.sh verify dist
+        run: bash deploy/release/dist.sh verify release
       - uses: actions/upload-artifact@v7
         with:
           name: sums-signature-${{ needs.meta.outputs.version }}
-          path: dist/SHA256SUMS.minisig
+          path: release/SHA256SUMS.minisig
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
       - name: 片付け（秘密鍵）
         if: ${{ always() }}
         run: rm -f "$RUNNER_TEMP/looptrack-minisign.key"
 
   image:
     name: コンテナイメージ（linux/${{ matrix.arch }}）
-    # linux の looptrack だけを使うので署名とは独立。sums の最終ファイル（SHA256SUMS に載っているものと同じバイト列）から作る
+    # linux の looptrack だけを使うので署名とは独立。sums の素の実行ファイル（書庫の中のもの・SHA256SUMS の従来の名前の行と同じバイト列）から作る
     needs: [meta, sums]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -721,12 +795,20 @@ jobs:
         with:
           name: binaries-${{ needs.meta.outputs.version }}
           path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-${{ needs.meta.outputs.version }}
+          path: release
       # deploy/build.sh と同じ内容: deploy/Dockerfile（scratch）に、リリースと同じ linux 向けの looptrack を置くだけ（ENTRYPOINT /looptrack・CMD serve）。
       # イメージの中の実行ファイルは SHA256SUMS に載っているものと同じバイト列になる。
       - name: ビルドの材料
         run: |
           bash deploy/release/dist.sh image-context "$VERSION" "$ARCH" dist "ctx-$ARCH"
           test -s "ctx-$ARCH/NOTICE" || { echo "::error::イメージの材料に NOTICE がありません"; exit 1; }
+          # イメージの looptrack は、Releases の同じ arch の書庫の中の looptrack と同じバイト列であること
+          base="looptrack_${VERSION}_linux_${ARCH}_server"
+          tar -xzOf "release/$base.tar.gz" "$base/looptrack" | cmp -s - "ctx-$ARCH/looptrack" ||
+            { echo "::error::イメージの材料の looptrack が $base.tar.gz の中のものと違います"; exit 1; }
       - uses: docker/setup-buildx-action@v4
       - name: GHCR にログイン（公開するときだけ）
         if: ${{ needs.meta.outputs.publish == 'true' }}
@@ -762,7 +844,7 @@ jobs:
           name: image-${{ needs.meta.outputs.version }}-${{ matrix.arch }}
           path: image-${{ matrix.arch }}.tar
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 3
 
   publish:
     name: 公開（GHCR の multi-arch・Releases の下書き）
@@ -787,27 +869,28 @@ jobs:
           ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
       - uses: actions/download-artifact@v8
         with:
-          name: binaries-${{ needs.meta.outputs.version }}
-          path: dist
+          name: release-${{ needs.meta.outputs.version }}
+          path: release
       - uses: actions/download-artifact@v8
         with:
           name: sums-signature-${{ needs.meta.outputs.version }}
-          path: dist
+          path: release
       - name: 公開する前に確かめる（SHA256SUMS と minisign の署名）
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq minisign >/dev/null
-          bash deploy/release/dist.sh verify dist
-          # Releases の資産に入れるもの（install.sh は「1 行で取得して実行する」入口。grants.sql は install.sh が案内する順番で流す）
-          for f in NOTICE OFL-BIZUDGothic.txt install.sh grants.sql; do
-            test -s "dist/$f" || { echo "::error::$f がありません（Releases の資産）"; exit 1; }
-          done
+          bash deploy/release/dist.sh verify release
+      - name: 上げるものを名前で確かめる（素の実行ファイル・install.sh・grants.sql が無い）
+        run: |
+          bash deploy/release/dist.sh check-release "$VERSION" release
+          test -s release/SHA256SUMS.minisig || { echo "::error::SHA256SUMS.minisig がありません"; exit 1; }
+          ls -1 release/
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: multi-arch のタグ（<版>、正式版なら latest も）
+      - name: multi-arch のタグ（<版>、Latest として扱う版なら latest も）
         env:
           OWNER: ${{ github.repository_owner }}
         run: |
@@ -824,5 +907,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           flags=(--draft --verify-tag --title "$VERSION" --generate-notes)
-          [ "$PRERELEASE" = true ] && flags+=(--prerelease)
-          gh release create "$VERSION" "${flags[@]}" dist/*
+          # PRERELEASE=false のとき（正式版、または v1.0.0 の前の rc）は明示的に Latest にする
+          # （既定の自動判定に任せず、利用者の決定どおりに固定する）
+          if [ "$PRERELEASE" = true ]; then
+            flags+=(--prerelease)
+          else
+            flags+=(--latest)
+          fi
+          gh release create "$VERSION" "${flags[@]}" release/*

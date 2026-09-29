@@ -12,7 +12,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// Autostart はログイン時の自動起動の登録（DESIGN.md §5-14）。どれも管理者権限は要らない。
+// Autostart はログイン時の自動起動の登録（DESIGN.md §5-4）。どれも管理者権限は要らない。
 //
 //	macOS  : ~/Library/LaunchAgents/<BundleID>.plist（RunAtLoad。次のログインから効く）
 //	Linux  : $XDG_CONFIG_HOME/autostart/looptrack.desktop（既定 ~/.config/autostart。XDG Autostart）

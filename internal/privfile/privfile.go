@@ -1,7 +1,7 @@
 // Package privfile は本人だけが読み書きできるファイル（.env・秘密鍵のファイル・SQLite の DB）を書く・確かめる。
 //
 // unix ではパーミッション 0600。Windows では DACL を「本人に全権」の 1 つだけにし、親からの継承を切る
-// （PROTECTED_DACL。internal/client/cred の Windows の保護と同じ方式・DESIGN.md §5-11 Q7）。
+// （PROTECTED_DACL。internal/client/cred の Windows の保護と同じ方式・DESIGN.md §5-1 Q5）。
 // 書くときは同じディレクトリの一時ファイルを先に保護してから中身を書き、rename で置く（rename しても保護は保たれる）。
 package privfile
 

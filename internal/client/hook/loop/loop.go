@@ -1,4 +1,4 @@
-// Package loop は kit/loop の hook と gates の Go 版（DESIGN.md §5-11）。
+// Package loop は kit/loop の hook と gates の Go 版（DESIGN.md §5-1）。
 //
 // 各 hook は `func(ctx, hookio.Event) (hookio.Result, error)` の関数で、AI ごとの入出力の違いは internal/hookio が吸収する。
 // 名前 → 関数の登録表（Registry）を公開し、`looptrack hook <名前>` の配線（cmd/）は Main を呼ぶだけにする。
@@ -137,6 +137,9 @@ func mainWith(ctx context.Context, name string, args []string, stdin io.Reader, 
 		opts.Parse.Event = string(entry.Event)
 	}
 	opts.Timeout = entry.Timeout
+	opts.HookName = entry.Name
+	opts.LogPath = func(ev hookio.Event) string { return HookLogPath(ev, e.Getenv, e.Getwd) }
+	opts.Now = e.Now
 	if adjust != nil {
 		adjust(&opts)
 	}

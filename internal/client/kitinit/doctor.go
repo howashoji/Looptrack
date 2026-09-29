@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/howashoji/looptrack/internal/client/api"
+	"github.com/howashoji/looptrack/internal/client/cli"
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/client/hook/core"
 	"github.com/howashoji/looptrack/internal/client/hook/loop"
@@ -21,7 +22,7 @@ import (
 	"github.com/howashoji/looptrack/internal/relver"
 )
 
-// looptrack doctor（DESIGN.md §5-11 の Q2「解決できなければ手元専用の設定に絶対パス（looptrack doctor で確かめる）」）。
+// looptrack doctor（DESIGN.md §5-1 の Q2「解決できなければ手元専用の設定に絶対パス（looptrack doctor で確かめる）」）。
 //
 //	looptrack doctor [--dir <プロジェクト>] [--offline]
 //
@@ -31,7 +32,7 @@ import (
 //  3. プロジェクトの配線（.claude/settings.json・settings.local.json・.codex/hooks.json・.github/hooks/looptrack.json（旧名 im.json も））:
 //     looptrack hook の実行ファイル（PATH の名前なら PATH に・絶対パスならそのファイルがあるか）・hook の名前・--agent
 //  4. .claude/.looptrack-kit.json（置き方・loop）と API の設定（URL・トークンの有無）
-//  5. 配布の最新の版（--offline でなく、URL とトークンがあるとき）
+//  5. 配布の最新の版（--offline でなく、URL とトークンがあるとき）と、サーバ自身の新しい版（admin のトークンのときだけサーバが返す server_update）
 //
 // 問題（NG）が 1 つでもあれば終了コード 1。注意だけなら 0。
 
@@ -209,6 +210,8 @@ func Doctor(args []string, o DoctorOptions) int {
 		} else {
 			r.bad(i18n.T(o.Lang, "kitinit.doctor.err.read_file", "file", kitJSON, "reason", err))
 		}
+	} else if cli.IsSelfRepo(dir) {
+		r.ok(i18n.T(o.Lang, "kitinit.doctor.kit.self_repo", "file", kitJSON))
 	} else if wired > 0 {
 		r.note(i18n.T(o.Lang, "kitinit.doctor.kit.missing", "file", kitJSON))
 	}
@@ -250,7 +253,22 @@ func Doctor(args []string, o DoctorOptions) int {
 	default:
 		r.ok(i18n.T(o.Lang, "kitinit.doctor.dist.latest", "latest", b.Version, "local", o.Version))
 	}
+	if msg := serverUpdateNote(o.Lang, l.ServerUpdate); msg != "" {
+		r.note(msg)
+	}
 	return r.finish(o.Stdout)
+}
+
+// serverUpdateNote はサーバ自身の新しい版の注意（GET /api/v1/dist の server_update。admin のトークンのときだけサーバが付ける）。
+// 無ければ空。更新の 1 行（install.sh で入れたサーバ）があれば添える。
+func serverUpdateNote(lang i18n.Lang, su *selfupdate.ServerUpdate) string {
+	if su == nil || su.Version == "" {
+		return ""
+	}
+	if su.Command != "" {
+		return i18n.T(lang, "kitinit.doctor.server_update.command", "version", su.Version, "current", orDash(su.Current), "command", su.Command)
+	}
+	return i18n.T(lang, "kitinit.doctor.server_update", "version", su.Version, "current", orDash(su.Current))
 }
 
 func (r *doctorReport) finish(w io.Writer) int {

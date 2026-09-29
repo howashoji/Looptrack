@@ -1,4 +1,4 @@
-// Package kit は各プロジェクトへ配る hook / rules / skill（kit/core・kit/loop）を持つ（DESIGN.md §5-7）。
+// Package kit は各プロジェクトへ配る hook / rules / skill（kit/core・kit/loop）を持つ（DESIGN.md §8）。
 // サーバ（looptrack serve）は配布用に埋め込み、GET /api/v1/dist と /im/setup/<券>/ の一覧に「kit/core/skills/…」のような
 // リポジトリからの相対名で SHA-256 つきで出す。looptrack issue init（--source server）はこの一覧から取る。
 //

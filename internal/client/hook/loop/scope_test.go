@@ -110,6 +110,13 @@ func TestSessionScope(t *testing.T) {
 			mk: run("sg11", "Another Claude session sent a message:\n"+
 				`<cross-session-message from="local_89abcdef" name="2. 別の作業">ABC-0123 を live で確認してください。</cross-session-message>`,
 				"big.jsonl", ""), want: wantScope("QUIET")},
+		// サブエージェントの最終報告。同じく利用者の発話ではないので対象にしない（notificationRe を共有している）
+		{name: "サブエージェントの報告は対象外",
+			mk: run("sg12", "Another Claude session sent a message:\n"+
+				`<agent-message from="worker-1">差分を確認しました。</agent-message>`,
+				"big.jsonl", ""), want: wantScope("QUIET")},
+		{name: "対照: 報告でない同じ文は膨らんだセッションで警告する",
+			mk: run("sg13", "差分を確認しました。", "big.jsonl", ""), want: wantScope("OUT")},
 	}}.run(t)
 }
 

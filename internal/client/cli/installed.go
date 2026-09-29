@@ -12,7 +12,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// 導入済み通知（DESIGN.md §5-6）。
+// 導入済み通知（DESIGN.md §6）。
 
 // installFiles は (置き方, {配布ファイル名: SHA-256})。
 //

@@ -83,7 +83,7 @@ func StopToolMarkupGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 	}
 	for _, rx := range markupRes {
 		if rx.MatchString(text) {
-			return hookio.Result{Block: i18n.T(envFrom(ctx).lang(), "loop.markup.reason")}, nil
+			return hookio.Result{Block: i18n.T(envFrom(ctx).lang(), "loop.markup.reason"), Kind: "markup"}, nil
 		}
 	}
 	return hookio.Result{}, nil

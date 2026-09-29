@@ -1,13 +1,16 @@
 package selfupdate
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -417,7 +420,7 @@ func TestInstalledServer(t *testing.T) {
 	}
 }
 
-// TestSelfUpdateInstalledServer は install.sh で入れたサーバの self-update: 置き換えずに install.sh --upgrade を案内する。--check は動く。
+// TestSelfUpdateInstalledServer は install.sh で入れたサーバの self-update: 置き換えずに、インストーラの 1 行の --upgrade を案内する。--check は動く。
 func TestSelfUpdateInstalledServer(t *testing.T) {
 	withoutKey(t)
 	f := &fakeDist{}
@@ -434,7 +437,7 @@ func TestSelfUpdateInstalledServer(t *testing.T) {
 	}
 	s, bin := fakeInstall(t, "etc/looptrack/install.conf")
 	for _, args := range [][]string{nil, {"--force"}} {
-		if r := run(s, bin, args...); r.code != 1 || content(t, bin) != "old-binary" || !strings.Contains(r.stderr, "install.sh --upgrade") {
+		if r := run(s, bin, args...); r.code != 1 || content(t, bin) != "old-binary" || !strings.Contains(r.stderr, "main/deploy/install.sh | sudo sh -s -- --upgrade") {
 			t.Errorf("%v: %+v", args, r)
 		}
 	}
@@ -472,5 +475,198 @@ func TestDefaultServerInstall(t *testing.T) {
 	want := []string{"/etc/looptrack/install.conf", "/etc/looptrack/.env", "/etc/systemd/system/looptrack.service"}
 	if strings.Join(DefaultServerInstall.Markers, ",") != strings.Join(want, ",") {
 		t.Errorf("Markers: %v", DefaultServerInstall.Markers)
+	}
+}
+
+// TestSignedVersionRejectsDowngrade は、一覧の version を署名で守られた版（SHA256SUMS の中の名前と、リリースの
+// trusted comment "looptrack <版> SHA256SUMS"）と照らし合わせることを確かめる。署名の正しい古い版の SHA256SUMS に
+// 新しく見せかけた version を組にした一覧からは置き換えず、正直に古い版を配る一覧からは --force のときだけ置き換える。
+// 対照として、名前・trusted comment・version がそろって手元より新しければ置き換えることも確かめる。
+func TestSignedVersionRejectsDowngrade(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	keyID := []byte{1, 2, 3, 4, 5, 6, 7, 8}
+	orig := MinisignPublicKey
+	MinisignPublicKey = base64.StdEncoding.EncodeToString(append(append([]byte("Ed"), keyID...), pub...))
+	t.Cleanup(func() { MinisignPublicKey = orig })
+
+	f := &fakeDist{}
+	srv := f.serve(t)
+	base := srv.URL + "/im"
+	oldBody, newBody := []byte("old-release"), []byte("new-release")
+	// dist に置くのはリリースと同じ形: 名前 looptrack_<版>_<os>_<arch>・trusted comment "looptrack <版> SHA256SUMS"
+	release := func(name, listed string, body []byte, trusted string) {
+		f.listing = Listing{SumsURL: base + "/api/v1/dist/bin/SHA256SUMS", MinisigURL: base + "/api/v1/dist/bin/SHA256SUMS.minisig"}
+		f.bins = nil
+		f.add(base, name, listed, "linux", "arm64", body)
+		f.sums = []byte(sum(body) + "  " + name + "\n")
+		f.sig = minisignSign(priv, keyID, f.sums, trusted)
+	}
+	run := func(lang, local string, args ...string) (result, string) {
+		t.Helper()
+		exe := placeExe(t, "local-binary")
+		home := t.TempDir()
+		var out, errb bytes.Buffer
+		code := Main(args, Options{
+			Env:    env.FromMap(map[string]string{"LOOPTRACK_API_URL": base, "LOOPTRACK_TOKEN": "tok", "LOOPTRACK_LANG": lang, "HOME": home, "XDG_CONFIG_HOME": filepath.Join(home, ".config")}),
+			Stdout: &out, Stderr: &errb, Version: local, GOOS: "linux", GOARCH: "arm64", Exe: exe,
+		})
+		return result{code, out.String(), errb.String()}, content(t, exe)
+	}
+
+	// 対照: 名前・trusted comment・version がそろい、手元より新しい → 置き換える
+	release("looptrack_v1.1.0_linux_arm64", "v1.1.0", newBody, "looptrack v1.1.0 SHA256SUMS")
+	if r, got := run("ja", "v1.0.0"); r.code != 0 || got != "new-release" || !strings.Contains(r.stdout, "v1.0.0 → v1.1.0") {
+		t.Fatalf("対照（一致して新しい）で置き換わらない。前提が崩れている: %+v %q", r, got)
+	}
+
+	// 攻撃: 署名の正しい v1.0.0 の SHA256SUMS に、新しく見せかけた version v9.9.9 を組にした一覧 → 置き換えない（--force でも）
+	release("looptrack_v1.0.0_linux_arm64", "v9.9.9", oldBody, "looptrack v1.0.0 SHA256SUMS")
+	for _, args := range [][]string{nil, {"--force"}} {
+		r, got := run("ja", "v1.1.0", args...)
+		if r.code != 1 || got != "local-binary" || !strings.Contains(r.stderr, "配布の一覧の版 v9.9.9（linux/arm64）の名前ではありません") {
+			t.Errorf("version の偽装 %v: %+v %q", args, r, got)
+		}
+	}
+	r, got := run("en", "v1.1.0")
+	if r.code != 1 || got != "local-binary" || !strings.Contains(r.stderr, "is not the name for the listed version v9.9.9 (linux/arm64)") {
+		t.Errorf("version の偽装（en）: %+v %q", r, got)
+	}
+	// 名前も新しく見せかけると、リリースの trusted comment の版で止まる
+	f.listing.Binaries[0].Name = "looptrack_v9.9.9_linux_arm64"
+	if r, got := run("ja", "v1.1.0"); r.code != 1 || got != "local-binary" || !strings.Contains(r.stderr, "SHA256SUMS の署名に書かれた版 v1.0.0 が、配布の一覧の版 v9.9.9 と違います") {
+		t.Errorf("名前の偽装（リリースの trusted comment）: %+v %q", r, got)
+	}
+	// trusted comment が版を持たない形（dist.sh sign-sums の既定）でも、署名された SHA256SUMS に載っていないので置き換えない
+	release("looptrack_v1.0.0_linux_arm64", "v9.9.9", oldBody, "looptrack SHA256SUMS dist")
+	f.listing.Binaries[0].Name = "looptrack_v9.9.9_linux_arm64"
+	if r, got := run("ja", "v1.1.0"); r.code != 1 || got != "local-binary" || !strings.Contains(r.stderr, "署名された SHA256SUMS に looptrack_v9.9.9_linux_arm64 がありません") {
+		t.Errorf("名前の偽装（版の無い trusted comment）: %+v %q", r, got)
+	}
+	f.listing.Binaries[0].Name = "looptrack_v1.0.0_linux_arm64"
+	if r, got := run("ja", "v1.1.0"); r.code != 1 || got != "local-binary" || !strings.Contains(r.stderr, "配布の一覧の版 v9.9.9（linux/arm64）の名前ではありません") {
+		t.Errorf("version の偽装（版の無い trusted comment）: %+v %q", r, got)
+	}
+
+	// trusted comment の版と一覧の version が食い違う → 置き換えない
+	release("looptrack_v1.1.0_linux_arm64", "v1.1.0", newBody, "looptrack v1.0.0 SHA256SUMS")
+	if r, got := run("ja", "v1.0.0"); r.code != 1 || got != "local-binary" || !strings.Contains(r.stderr, "SHA256SUMS の署名に書かれた版 v1.0.0 が、配布の一覧の版 v1.1.0 と違います") {
+		t.Errorf("trusted comment の食い違い: %+v %q", r, got)
+	}
+	if r, got := run("en", "v1.0.0"); r.code != 1 || got != "local-binary" || !strings.Contains(r.stderr, "The version v1.0.0 in the SHA256SUMS signature differs from the listed version v1.1.0") {
+		t.Errorf("trusted comment の食い違い（en）: %+v %q", r, got)
+	}
+
+	// 正直に古い版を配る一覧（署名・名前・version がそろう）: 手元より古いので置き換えない。戻すのは --force のときだけ
+	release("looptrack_v1.0.0_linux_arm64", "v1.0.0", oldBody, "looptrack v1.0.0 SHA256SUMS")
+	if r, got := run("ja", "v1.1.0"); r.code != 0 || got != "local-binary" || !strings.Contains(r.stdout, "最新です") {
+		t.Errorf("古い版: %+v %q", r, got)
+	}
+	if r, got := run("ja", "v1.1.0", "--force"); r.code != 0 || got != "old-release" {
+		t.Errorf("古い版 --force: %+v %q", r, got)
+	}
+}
+
+// TestSignedVersion は signedVersion の判定: 名前の形（windows は .exe）と、trusted comment のうちリリースの形だけを見ること。
+func TestSignedVersion(t *testing.T) {
+	win := &Binary{Name: "looptrack_v1.1.0_windows_amd64.exe", OS: "windows", Arch: "amd64", Version: "v1.1.0"}
+	lin := &Binary{Name: "looptrack_v1.1.0_linux_amd64", OS: "linux", Arch: "amd64", Version: "v1.1.0"}
+	for _, c := range []struct {
+		trusted string
+		b       *Binary
+		ok      bool
+	}{
+		{"looptrack v1.1.0 SHA256SUMS", win, true},
+		{"looptrack v1.1.0 SHA256SUMS", lin, true},
+		{"looptrack SHA256SUMS dist", lin, true},          // dist.sh sign-sums の既定（版を持たない）は名前だけで確かめる
+		{"timestamp:1 file:SHA256SUMS hashed", lin, true}, // minisign の既定
+		{"looptrack v1.0.0 SHA256SUMS", lin, false},       // リリースの形で版が違う
+		{"looptrack v1.1.0 SHA256SUMS", &Binary{Name: "looptrack_v1.1.0_windows_amd64", OS: "windows", Arch: "amd64", Version: "v1.1.0"}, false}, // .exe が無い
+		{"looptrack v1.1.0 SHA256SUMS", &Binary{Name: "looptrack_v1.1.0_linux_arm64", OS: "linux", Arch: "amd64", Version: "v1.1.0"}, false},     // CPU が違う
+		{"t", &Binary{Name: "looptrack__linux_amd64", OS: "linux", Arch: "amd64"}, false},                                                        // 版が空
+	} {
+		if err := signedVersion(c.trusted, c.b); (err == nil) != c.ok {
+			t.Errorf("%q %s: %v", c.trusted, c.b.Name, err)
+		}
+	}
+}
+
+// TestSelfUpdateFromReleaseArchive は、GitHub Releases の形（書庫 looptrack_<版>_<os>_<arch>_server.tar.gz と、書庫の行に加えて
+// 書庫の中の実行ファイルを従来の名前にした行を持つ署名つき SHA256SUMS）から、書庫の中の looptrack を従来の名前で配布ディレクトリに
+// 置けば、鍵を持つビルドの self-update が署名と SHA-256 を確かめて置き換えることを確かめる（SHA256SUMS は Releases のものをそのまま置く）。
+// 対照として、書庫の行しか無い SHA256SUMS（従来の名前の行が無い）からは置き換えない。
+func TestSelfUpdateFromReleaseArchive(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	keyID := []byte{8, 7, 6, 5, 4, 3, 2, 1}
+	orig := MinisignPublicKey
+	MinisignPublicKey = base64.StdEncoding.EncodeToString(append(append([]byte("Ed"), keyID...), pub...))
+	t.Cleanup(func() { MinisignPublicKey = orig })
+
+	// Releases の書庫（dist.sh archive と同じ並び: 最上位のディレクトリの下に looptrack・NOTICE・OFL・LICENSE）
+	const ver, base0 = "v1.1.0", "looptrack_v1.1.0_linux_arm64_server"
+	bin := []byte("release-binary-in-archive")
+	var tgz bytes.Buffer
+	gz := gzip.NewWriter(&tgz)
+	tw := tar.NewWriter(gz)
+	for _, e := range []struct {
+		name string
+		mode int64
+		body []byte
+	}{{base0 + "/LICENSE", 0o644, []byte("MIT")}, {base0 + "/NOTICE", 0o644, []byte("notices")},
+		{base0 + "/OFL-BIZUDGothic.txt", 0o644, []byte("ofl")}, {base0 + "/looptrack", 0o755, bin}} {
+		if err := tw.WriteHeader(&tar.Header{Name: e.name, Mode: e.mode, Size: int64(len(e.body)), Typeflag: tar.TypeReg}); err != nil {
+			t.Fatal(err)
+		}
+		tw.Write(e.body)
+	}
+	tw.Close()
+	gz.Close()
+	archive := tgz.Bytes()
+
+	// 配布ディレクトリに置く looptrack は書庫から取り出したもの
+	zr, err := gzip.NewReader(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(zr)
+	var extracted []byte
+	for {
+		h, err := tr.Next()
+		if err != nil {
+			break
+		}
+		if h.Name == base0+"/looptrack" {
+			extracted, _ = io.ReadAll(tr)
+		}
+	}
+	if !bytes.Equal(extracted, bin) {
+		t.Fatalf("書庫から取り出せない: %q", extracted)
+	}
+
+	f := &fakeDist{}
+	srv := f.serve(t)
+	base := srv.URL + "/im"
+	publish := func(sums string) {
+		f.listing = Listing{SumsURL: base + "/api/v1/dist/bin/SHA256SUMS", MinisigURL: base + "/api/v1/dist/bin/SHA256SUMS.minisig"}
+		f.bins = nil
+		f.add(base, "looptrack_v1.1.0_linux_arm64", ver, "linux", "arm64", extracted)
+		f.sums = []byte(sums)
+		f.sig = minisignSign(priv, keyID, f.sums, "looptrack "+ver+" SHA256SUMS")
+	}
+	archiveLine := sum(archive) + "  " + base0 + ".tar.gz\n"
+	rawLine := sum(bin) + "  looptrack_v1.1.0_linux_arm64\n"
+	noticeLine := sum([]byte("notices")) + "  NOTICE\n"
+
+	// 対照: 書庫の行しか無い SHA256SUMS からは置き換えない
+	publish(noticeLine + archiveLine)
+	exe := placeExe(t, "old")
+	if r := selfUpdate(t, srv.URL, exe, "v1.0.0"); r.code != 1 || !strings.Contains(r.stderr, "署名された SHA256SUMS に looptrack_v1.1.0_linux_arm64 がありません") || content(t, exe) != "old" {
+		t.Fatalf("対照（書庫の行だけ）で止まらない。前提が崩れている: %+v", r)
+	}
+
+	// Releases と同じ形（書庫の行 + 書庫の中の実行ファイルの行）: 置き換える
+	publish(noticeLine + archiveLine + rawLine)
+	exe = placeExe(t, "old")
+	if r := selfUpdate(t, srv.URL, exe, "v1.0.0"); r.code != 0 || content(t, exe) != "release-binary-in-archive" || !strings.Contains(r.stdout, "v1.0.0 → v1.1.0") {
+		t.Errorf("書庫から出した実行ファイルで置き換わらない: %+v %q", r, content(t, exe))
 	}
 }

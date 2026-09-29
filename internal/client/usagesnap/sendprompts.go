@@ -26,18 +26,28 @@ import (
 
 const sendPromptsDir = "usage-send-prompts"
 
-// sendPromptsFile は覚えた値のファイル。API の URL かプロジェクトが無ければ ""。
-func sendPromptsFile(o Options) string {
-	base, _ := o.Env.Setting(env.APIURL)
-	base = strings.TrimRight(trimSpace(base), "/")
+// ProjectKey はプロジェクト（API の URL（前後の空白・末尾の / と /api/v1 を除く）+ slug）ごとの鍵（16 進 32 桁）。
+// 作業名を送るかの記録と、送れなかった payload の置き場（SpoolDir）がこの鍵でプロジェクトを分ける。
+// API の URL かプロジェクトが無ければ ""。
+func ProjectKey(apiURL, project string) string {
+	base := strings.TrimRight(trimSpace(apiURL), "/")
 	base = strings.TrimSuffix(base, "/api/v1")
-	project, _ := o.Env.Setting(env.Project)
 	project = trimSpace(project)
 	if base == "" || project == "" {
 		return ""
 	}
 	sum := sha256.Sum256([]byte(base + "|" + project))
-	key := hex.EncodeToString(sum[:])[:32]
+	return hex.EncodeToString(sum[:])[:32]
+}
+
+// sendPromptsFile は覚えた値のファイル。API の URL かプロジェクトが無ければ ""。
+func sendPromptsFile(o Options) string {
+	base, _ := o.Env.Setting(env.APIURL)
+	project, _ := o.Env.Setting(env.Project)
+	key := ProjectKey(base, project)
+	if key == "" {
+		return ""
+	}
 	var dir string
 	if runtime.GOOS == "windows" {
 		appdata := o.Env.Get("APPDATA")

@@ -162,9 +162,14 @@ func TestSetupThenBrowserCreatesIssue(t *testing.T) {
 		if !strings.Contains(r.stdout, "プロジェクト: main（MAIN-nnnn）") || !strings.Contains(r.stdout, "admin で参加させました") {
 			t.Errorf("setup の表示:\n%s", r.stdout)
 		}
-		srv, _ := startServe(t, filepath.Join(dir, setupwiz.EnvFile), server.Config{})
+		srv, db := startServe(t, filepath.Join(dir, setupwiz.EnvFile), server.Config{})
 		if code, body := newBrowser(t, srv.URL).createIssueFromBoard("main"); code != http.StatusCreated || !strings.Contains(body, "MAIN-0001") {
 			t.Fatalf("起票: %d %s", code, body)
+		}
+		// setup の最初のプロジェクトも、CLI の project create・MCP・管理画面と同じ並び順の既定値（100）を持つ
+		p, err := store.ProjectBySlug(ctx, db, "main")
+		if err != nil || p.SortOrder != store.DefaultProjectSortOrder {
+			t.Errorf("setup で作った最初のプロジェクトの並び順: %+v %v（want %d）", p, err, store.DefaultProjectSortOrder)
 		}
 	})
 

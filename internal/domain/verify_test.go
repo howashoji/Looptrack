@@ -10,7 +10,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// 検証コマンド節の抽出（§5-8-1）とマスク（§5-8-2）。例は testdata/verify_commands.json。
+// 検証コマンド節の抽出（DESIGN.md §9-3-1）とマスク（§9-3-2）。例は testdata/verify_commands.json。
 
 type verifyExamples struct {
 	Extract []struct {

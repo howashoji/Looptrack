@@ -406,6 +406,18 @@ func openSQLite(path string) (*sql.DB, error) {
 	return db, nil
 }
 
+// BackupSQLite は、開いている SQLite の DB の一貫した写しを dst に書く（VACUUM INTO。読み取りのトランザクションの中で
+// 取るので、稼働中の DB をファイルとして写すのと違い、-wal に残っている分も含めて途中の書き込みが混ざらない）。
+// dst は無いか空のファイルでなければならない（SQLite の VACUUM INTO の制約）。権限を本人だけにしたいときは、
+// 先に privfile.CreateEmpty で空のファイルを作っておく（中身を書いても作った時の権限のまま）。
+func BackupSQLite(ctx context.Context, db *sql.DB, dst string) error {
+	if !IsSQLite(db) {
+		return i18n.Errorf("store.err.sqlite.backup_not_sqlite")
+	}
+	_, err := db.ExecContext(ctx, "VACUUM INTO ?", dst)
+	return err
+}
+
 // SQLiteFiles は SQLite の DB が使うファイル（本体・-wal・-shm）のパスを返す。
 //
 // 権限: 中身にはパスワードのハッシュ・暗号化した TOTP の秘密・トークンのハッシュ・イシューの本文が入るので本人だけにする。

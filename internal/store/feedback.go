@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// 3 層のループの ②③（DESIGN.md §5-8-6・§5-8-7）。どちらもプロジェクト単位で 1 クエリ。
+// 3 層のループの ②③（DESIGN.md §9-3-6・§9-3-7）。どちらもプロジェクト単位で 1 クエリ。
 // summary（SessionStart の 2 秒の制限の内側）・一覧・ボードで共用するため、本文・コメントの全件は読まない。
 
 // PendingFeedback は未応答のフィードバック（先頭が「フィードバック:」のコメント）1 件。
@@ -21,7 +21,7 @@ type PendingFeedback struct {
 // 応答済み = それより後（seq が大きい）に先頭語が「フィードバック」でないコメントがある、または
 // それより後（at > created_at）に状態変更がある。コメントは editor 以上しか書けないので役割は引かない。
 // 取り込み分（created_at が NULL）は対象外。LIKE の照合順序は utf8mb4_bin（テーブルの既定）。
-// 先頭語の規則は domain.LeadWord と同じ（先頭の空白は許さない）。英語の別名「Feedback:」（大小を問わない・§5-13）も含める。
+// 先頭語の規則は domain.LeadWord と同じ（先頭の空白は許さない）。英語の別名「Feedback:」（大小を問わない・DESIGN.md §9-6）も含める。
 func PendingFeedbacks(ctx context.Context, q execQuerier, projectID int64) ([]PendingFeedback, error) {
 	rows, err := q.QueryContext(ctx, `SELECT c.issue_id, i.display_id, c.seq, c.created_at, LEFT(c.content, 200)
   FROM comments c

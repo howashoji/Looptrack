@@ -196,8 +196,20 @@ func removedIDFiles(t *testing.T) []string {
 // ここは実装の出力ではなく一覧と照らすので緑にならない。
 func TestNoRemovedIDs(t *testing.T) {
 	ids := removedIDsByLength()
+	files := removedIDFiles(t)
+	// 調べる場所が実在しても、中身が空（置き場の移動・golden の作り直しの途中）だと何も見ずに緑になる。
+	// 全体の下限は実物（2026-09 に 601 ファイル）よりずっと下にし、場所ごとにも 1 ファイル以上あることを見る
+	// （1 つの場所だけが空になっても、全体の件数では気づけない）。
+	if len(files) < 200 {
+		t.Fatalf("調べたファイルが %d 件しかありません（調べる場所の中身が空振りしています）", len(files))
+	}
+	for _, root := range removedIDRoots {
+		if !slices.ContainsFunc(files, func(f string) bool { return f == root || strings.HasPrefix(f, root+"/") }) {
+			t.Errorf("調べる場所 %s からファイルを 1 つも拾えていません（中身が空か、走査が空振りしています）", root)
+		}
+	}
 	var hits []removedIDHit
-	for _, rel := range removedIDFiles(t) {
+	for _, rel := range files {
 		b, err := os.ReadFile(filepath.Join(repoRoot, rel))
 		if err != nil {
 			t.Fatal(err)
@@ -216,7 +228,7 @@ func TestNoRemovedIDs(t *testing.T) {
 		t.Log("撤去した ID の残骸です。その場所を今の仕様に直すか、" +
 			"残してよい場所なら removedids_test.go の allow にパスと理由を足してください")
 	}
-	t.Logf("撤去した ID %d 件を %d ファイルで調べました", len(removedIDs), len(removedIDFiles(t)))
+	t.Logf("撤去した ID %d 件を %d ファイルで調べました", len(removedIDs), len(files))
 }
 
 // TestRemovedIDsList は一覧そのものの形を確かめる（一覧が壊れると検査が黙って効かなくなる）。

@@ -13,15 +13,17 @@ import (
 
 // 案 B: 結果キャッシュの印が付いた記録は、コメントの見出しと該当の行に注記を残す（失敗にはしない）。
 func TestVerifyCommentCachedNote(t *testing.T) {
+	// 記録の文面は記録した利用者の言語で決まるので、日本語に固定して確かめる
+	cachedLabel, selfReportedLabel := i18n.T(i18n.JA, "service.verify.last.cached"), i18n.T(i18n.JA, "service.verify.last.self_reported")
 	zero := 0
 	d := store.VerifyDetail{BodySHA256: "abcdef0123456789", OK: true, Passed: 2, Cached: true, Results: []store.VerifyResult{
 		{Command: "go test ./internal/docscheck/", Status: "ok", ExitCode: &zero, DurationMS: 30, Cached: true},
 		{Command: "shellcheck -S error deploy/dev/up.sh", Status: "ok", ExitCode: &zero, DurationMS: 120},
 	}}
-	got := verifyComment(d)
+	got := verifyComment(i18n.JA, d)
 	for _, want := range []string{
-		"検証コマンド（" + CachedLabel + "）: 2/2 成功",
-		"- ok `go test ./internal/docscheck/`（0.0 秒・" + CachedLabel + "）",
+		"検証コマンド（" + cachedLabel + "）: 2/2 成功",
+		"- ok `go test ./internal/docscheck/`（0.0 秒・" + cachedLabel + "）",
 		"- ok `shellcheck -S error deploy/dev/up.sh`（0.1 秒）",
 	} {
 		if !strings.Contains(got, want) {
@@ -34,28 +36,29 @@ func TestVerifyCommentCachedNote(t *testing.T) {
 
 	// 注記が無い記録の文面は変わらない（既存の記録の読み方を壊さない）
 	d.Cached, d.Results[0].Cached = false, false
-	if got := verifyComment(d); strings.Contains(got, CachedLabel) {
+	if got := verifyComment(i18n.JA, d); strings.Contains(got, cachedLabel) {
 		t.Errorf("印が無いのに注記が付いています:\n%s", got)
 	}
 
 	// MCP の自己申告と両方付いたら「・」で並べる
 	d.Cached, d.SelfReported = true, true
-	if want := "検証コマンド（" + SelfReportedLabel + "・" + CachedLabel + "）"; !strings.Contains(verifyComment(d), want) {
-		t.Errorf("コメントに %q がありません:\n%s", want, verifyComment(d))
+	if want := "検証コマンド（" + selfReportedLabel + "・" + cachedLabel + "）"; !strings.Contains(verifyComment(i18n.JA, d), want) {
+		t.Errorf("コメントに %q がありません:\n%s", want, verifyComment(i18n.JA, d))
 	}
 }
 
 // 直近の記録の 1 行にも注記を出す（next・verify --last・MCP で共通の文面）。
 func TestVerifyLastLineCachedNote(t *testing.T) {
+	cachedLabel := i18n.T(i18n.JA, "service.verify.last.cached")
 	s := &Service{Loc: time.UTC}
 	ev := &store.VerifyEvent{At: time.Date(2026, 9, 21, 1, 2, 0, 0, time.UTC),
 		VerifyDetail: store.VerifyDetail{OK: true, Passed: 1, Cached: true}}
 	got := s.lastLine(i18n.JA, &VerifyPlan{Last: ev, Current: true})
-	if !strings.Contains(got, CachedLabel) {
+	if !strings.Contains(got, cachedLabel) {
 		t.Errorf("1 行に注記がありません: %s", got)
 	}
 	ev.Cached = false
-	if got := s.lastLine(i18n.JA, &VerifyPlan{Last: ev, Current: true}); strings.Contains(got, CachedLabel) {
+	if got := s.lastLine(i18n.JA, &VerifyPlan{Last: ev, Current: true}); strings.Contains(got, cachedLabel) {
 		t.Errorf("印が無いのに注記が付いています: %s", got)
 	}
 }
@@ -162,6 +165,41 @@ func TestVerifyLinesFollowLang(t *testing.T) {
 	for _, lang := range []i18n.Lang{i18n.JA, i18n.EN} {
 		if m, _ := s.verifyText(lang, &VerifyPlan{ID: "EX-2"}); m != domain.NoVerifyCommandsMsg("EX-2").In(lang) {
 			t.Errorf("%s: 節なし = %q", lang, m)
+		}
+	}
+}
+
+// 記録のコメントは記録した利用者の言語で書く（DB に残る文面は書いた利用者の言語・DESIGN §9-6）。
+// 同じ記録を日本語と英語で組み立て、全文が各言語の形になり、英語の側に日本語が 1 文字も残らないことを見る。
+func TestVerifyCommentFollowsWriterLang(t *testing.T) {
+	zero, two := 0, 2
+	d := store.VerifyDetail{BodySHA256: "abcdef0123456789", Passed: 1, Failed: 2, SelfReported: true, Cached: true, Results: []store.VerifyResult{
+		{Command: "go test ./...", Status: "ok", ExitCode: &zero, DurationMS: 1200, Cached: true},
+		{Command: "make lint", Status: "fail", ExitCode: &two, DurationMS: 300},
+		{Command: "sleep 99", Status: "timeout", DurationMS: 5000},
+	}}
+	want := map[i18n.Lang]string{
+		i18n.JA: "検証コマンド（MCP の自己申告・結果キャッシュあり）: 1/3 成功・2 失敗（6.5 秒・本文 abcdef01）\n" +
+			"- ok `go test ./...`（1.2 秒・結果キャッシュあり）\n- fail `make lint`（exit 2・0.3 秒）\n- timeout `sleep 99`（5.0 秒）",
+		i18n.EN: "Verification commands (self-reported via MCP, results cached): 1/3 passed, 2 failed (6.5s, body abcdef01)\n" +
+			"- ok `go test ./...` (1.2s, results cached)\n- fail `make lint` (exit 2, 0.3s)\n- timeout `sleep 99` (5.0s)",
+	}
+	for _, lang := range []i18n.Lang{i18n.JA, i18n.EN} {
+		if got := verifyComment(lang, d); got != want[lang] {
+			t.Errorf("%s:\n%s\nwant\n%s", lang, got, want[lang])
+		}
+	}
+	for _, r := range verifyComment(i18n.EN, d) {
+		if r > 0x2FFF {
+			t.Errorf("英語の記録に日本語の文字 %q が残っています:\n%s", r, verifyComment(i18n.EN, d))
+			break
+		}
+	}
+	// 終了コードが無い失敗（exit ?）と、印の無い記録も各言語の形
+	d.Results[1].ExitCode, d.SelfReported, d.Cached, d.Results[0].Cached = nil, false, false, false
+	for lang, w := range map[i18n.Lang]string{i18n.JA: "検証コマンド: 1/3 成功・2 失敗（", i18n.EN: "Verification commands: 1/3 passed, 2 failed ("} {
+		if got := verifyComment(lang, d); !strings.HasPrefix(got, w) || !strings.Contains(got, "exit ?") {
+			t.Errorf("%s: 印の無い記録・exit ? の形でない:\n%s", lang, got)
 		}
 	}
 }

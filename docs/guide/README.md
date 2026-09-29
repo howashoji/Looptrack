@@ -1,6 +1,8 @@
 # Looptrack User Guide
 
-Looptrack lets coding agents and people run their work around issues.
+Looptrack is an issue tracker serving as external memory for AI coding agents, enabling loop engineering.
+It records the work items an AI plans, apart from your project's own issues, shows the plans and decisions behind them, and logs the tokens each task consumed so you can report on them.
+Coding agents and people run their work around the same issues.
 This guide is for **people who use it**.
 Server design and deployment details live in separate documents for developers and operators.
 
@@ -19,6 +21,7 @@ Server design and deployment details live in separate documents for developers a
 | 7 | [FAQ / Troubleshooting](faq.md) | Common messages and what to do about them |
 | 8 | [Desktop app](desktop.md) | Using it alone on one PC without a terminal: download, first launch, tray, connect an AI agent by chat, update, uninstall |
 | 9 | [Updating](updating.md) | Updating the CLI, the desktop app, and the server: what is automatic and what is manual, `self-update`, `install.sh --upgrade`, the looptrack you distribute to users |
+| 10 | [Token reports](token-report.md) | What token usage is recorded and what is not, how it is attributed to issues, and how to make the PDF report and record it in the ledger |
 
 If you are new, read 1 → 3 → 4.
 To use it by yourself on one PC without a terminal, start with 8.

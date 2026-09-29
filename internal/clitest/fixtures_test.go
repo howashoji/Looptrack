@@ -86,8 +86,9 @@ var (
 		`,"messages":["DEMO-0002: Todo → In Progress","担当: alice"],"to":"In Progress"}`
 	closeRes = `{"from":"In Progress","issue":` + item("DEMO-0001", "task", "Done", "P1", "ログイン画面を作る", nil, `"assignee":"alice"`) +
 		`,"messages":["DEMO-0001: In Progress → Done","コメント追記: DEMO-0001","要件 DEMO-0003 の下位がすべて完了しました。受け入れ条件を検証して close してください"],"to":"Done"}`
-	assignRes = `{"changed":true,"from":"alice","issue":` + item1 + `,"message":"DEMO-0001 の担当: alice → bob","to":"bob"}`
-	pushRes   = strings.Replace(detail1, `"version":3`, `"version":4`, 1)
+	assignRes       = `{"changed":true,"from":"alice","issue":` + item1 + `,"message":"DEMO-0001 の担当: alice → bob","to":"bob"}`
+	assignUnchanged = `{"changed":false,"from":"bob","issue":` + item1 + `,"message":"担当は変わりません: DEMO-0001（bob）","to":"bob"}`
+	pushRes         = strings.Replace(detail1, `"version":3`, `"version":4`, 1)
 )
 
 // 409（版の競合）で返る current（サーバの最新）

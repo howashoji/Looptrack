@@ -17,7 +17,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 検証コマンド（A-1。DESIGN.md §5-8）の API・規則・next・MCP。
+// 検証コマンド（A-1。DESIGN.md §9-3）の API・規則・next・MCP。
 
 const verifyBody = "説明\n\n## 検証コマンド\n\n```bash\ngo test ./...\n# コメント行は読まない\nmake lint\n```\n"
 
@@ -309,7 +309,7 @@ func TestVerifyNextAndMCP(t *testing.T) {
 	}
 }
 
-// サーバがコマンドを実行する経路が無いこと（プロセスを起動する関数を本番のコードから呼ばない。DESIGN.md §5-8-2）。
+// サーバがコマンドを実行する経路が無いこと（プロセスを起動する関数を本番のコードから呼ばない。DESIGN.md §9-3-2）。
 func TestServerNeverExecutes(t *testing.T) {
 	root := filepath.Join("..", "..")
 	// プロセスを起動する import と関数（syscall 自体はシグナルの受け取りに使うので、起動系の関数だけを禁じる）
@@ -328,7 +328,7 @@ func TestServerNeverExecutes(t *testing.T) {
 					return filepath.SkipDir
 				}
 				// クライアント側（CLI・hook。git や ps を起動する）は internal/client に置く。
-				// サーバ側のパッケージがそれを import しないことを下で確かめる（DESIGN.md §5-11）
+				// サーバ側のパッケージがそれを import しないことを下で確かめる（DESIGN.md §5-1）
 				if filepath.ToSlash(path) == filepath.ToSlash(filepath.Join(root, "internal", "client")) {
 					return filepath.SkipDir
 				}

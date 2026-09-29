@@ -438,3 +438,55 @@ JOIN issues i ON i.id = e.issue_id WHERE i.display_id = 'REQ-0001' AND e.kind = 
 		t.Errorf("記録: session_id=%q detail=%q", sid, detail)
 	}
 }
+
+// TestUsageResendAfterWindow は、送り損ねて後で再送したスナップショットが、届いたのが付与の窓（10 分）を過ぎていても、
+// 最初に送ろうとした時刻（受け取った時刻 - resend_delay_sec）が窓に入っていれば元の操作に付くこと。
+// 対照として、同じ遅れで resend_delay_sec を付けない（古いクライアントの）再送は従来どおり付かないことを同じテストで見る。
+func TestUsageResendAfterWindow(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	pr := e.project("req")
+	u := e.user("editor", "editor-password-1", "member")
+	store.SetMember(ctx, e.db, pr.ID, u.ID, "editor")
+	api := e.apiAs(u)
+	ai := e.apiAs(u)
+	ai.header["X-Looptrack-Client"], ai.header["X-Looptrack-Session"] = "cli", "sess-a"
+	ai.json(201, "POST", "/projects/req/issues", map[string]any{"title": "再送で付く"}, nil)
+	ai.json(201, "POST", "/projects/req/issues", map[string]any{"title": "古いクライアントの再送"}, nil)
+	ai.json(201, "POST", "/projects/req/issues", map[string]any{"title": "遅れを付けても窓の外"}, nil)
+
+	// 3 件の起票の 1 分後に送ろうとして失敗し、15 分後に再送が届いた（届いた時点で窓の 10 分は過ぎている）
+	e.clock.Add(15 * time.Minute)
+	resend := func(issue string, delay int64, total int64) {
+		t.Helper()
+		b := usageBody("c1", "sess-a", "issue_op", issue, "create", total, 1, total)
+		if delay >= 0 {
+			b["resend_delay_sec"] = delay
+		}
+		ai.json(201, "POST", "/projects/req/usage", b, nil)
+	}
+	resend("REQ-0001", 14*60, 100) // 最初に送ろうとした時刻は起票の 1 分後 → 付く
+	resend("REQ-0002", -1, 200)    // 経過秒なし（古いクライアント）→ 付かない（対照）
+	resend("REQ-0003", 2*60, 300)  // 最初に送ろうとした時刻も起票の 13 分後 → 付かない
+
+	var cov coverageResp
+	api.json(200, "GET", "/projects/req/usage/coverage?mine=1", nil, &cov)
+	if cov.Target != 3 || cov.Attached != 1 || cov.Missing != 2 {
+		t.Errorf("付与の状況（3 件中 REQ-0001 だけ付くはず）: %+v", cov)
+	}
+	if got := strings.Join(cov.Issues, ","); got != "REQ-0003,REQ-0002" {
+		t.Errorf("未付与の一覧（REQ-0001 は付くはず）: %s", got)
+	}
+
+	// 経過秒の範囲: 負・8 日を超えるものは拒む（0 は再送でない扱いで受け付ける）
+	for _, d := range []int64{-5, 8*24*3600 + 1} {
+		b := usageBody("c2", "sess-a", "stop", "", "", 1, 1, 1)
+		b["resend_delay_sec"] = d
+		if code, _, body := ai.do("POST", "/projects/req/usage", b); code != 400 {
+			t.Errorf("resend_delay_sec=%d: %d %s", d, code, body)
+		}
+	}
+	b := usageBody("c2", "sess-a", "stop", "", "", 2, 2, 2)
+	b["resend_delay_sec"] = 0
+	ai.json(201, "POST", "/projects/req/usage", b, nil)
+}

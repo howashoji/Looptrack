@@ -16,11 +16,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/howashoji/looptrack/internal/guide"
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 導入セットの loop（設計 DESIGN.md §5-7）: setup ツールの loop の問い・導入済み通知の core / loop 別の比較・
+// 導入セットの loop（設計 DESIGN.md §8）: setup ツールの loop の問い・導入済み通知の core / loop 別の比較・
 // prompt loop の切り替え・guide の loop 対応。kit/loop の中身に依らないよう fixture の kit/loop に差し替えて試す。
 
 // loopFixture は fixture の kit/loop（hook 2 本・rules 1 本・skill 1 本）。looptrack issue init --loop が受け付ける manifest を持つ
@@ -288,6 +289,75 @@ func TestSetupLoopStep(t *testing.T) {
 
 func second(_ string, data map[string]any) map[string]any { return data }
 
+// TestSetupLoopSelfRepo: looptrack 自身のリポジトリ（kit の正本）からの通知（self_repo）では、loop が未選択でも問わず、
+// 引数 loop を付けても init のコマンドを返さない（クライアントが「自身です」と拒否するので、答えても実行できない）。
+// 対照として、同じ中身で印の無い通知（普通のプロジェクト）では従来どおり問いが出て、答えると init --loop が返ることを同じテストで確かめる。
+func TestSetupLoopSelfRepo(t *testing.T) {
+	withLoopKit(t, loopFixture())
+	e, _, ed := newAPIEnv(t)
+	withFakeDist(t, e)
+	m := e.mcpAsClient(ed.token, map[string]string{"X-Looptrack-Project": "req"}, "claude-code", "2.1.0", "2025-06-18")
+	latest, _ := latestDist()
+	post := func(body map[string]any) installStateJSON {
+		t.Helper()
+		var st installStateJSON
+		ed.json(200, "POST", "/projects/req/install", body, &st)
+		return st
+	}
+	// hasInit は手順のコマンドか本文に init のコマンドがあるか
+	hasInit := func(out loopSetupOut) bool {
+		for _, s := range out.Steps {
+			if strings.Contains(s.Command+s.CommandWindows, "issue init") {
+				return true
+			}
+		}
+		return strings.Contains(out.Text, "issue init")
+	}
+	unmarked := installBody("claude-code", "hook", "server", latest.Core, map[string]any{"installed": false})
+
+	// 対照（印なし・未選択）: 1 回目は問いだけ、答えると init --loop の 1 つ
+	if st := post(unmarked); st.SelfRepo || st.Loop != "none" || st.State != "current" {
+		t.Fatalf("前提が崩れています（印なしの通知が current・未選択にならない）: %+v", st)
+	}
+	if out := loopSetupOf(t, second(m.call("setup", map[string]any{}, false))); out.Ask != "loop" {
+		t.Fatalf("前提が崩れています（印なしで loop の問いが出ない）: ask=%q\n%s", out.Ask, out.Text)
+	}
+	yes := loopSetupOf(t, second(m.call("setup", map[string]any{"loop": "yes"}, false)))
+	if i, step := loopStepOf(yes); i < 0 || !strings.Contains(step.Command, "issue init") || !strings.HasSuffix(step.Command, " --loop") || !hasInit(yes) {
+		t.Fatalf("前提が崩れています（印なしで答えても init --loop が返らない）: %+v", yes.Steps)
+	}
+
+	// 正本（self_repo・未選択）: 問わない。loop を付けても使わず、init のコマンドを返さない
+	self := installBody("claude-code", "hook", "server", latest.Core, map[string]any{"installed": false})
+	self["self_repo"] = true
+	if st := post(self); !st.SelfRepo || st.Loop != "none" || st.State != "current" {
+		t.Fatalf("self_repo の通知: %+v", st)
+	}
+	for _, args := range []map[string]any{{}, {"loop": "yes"}, {"loop": "no"}} {
+		out := loopSetupOf(t, second(m.call("setup", args, false)))
+		if i, _ := loopStepOf(out); i >= 0 || out.Ask != "" || out.LoopAnswer != "" || hasInit(out) || strings.Contains(out.Text, "を入れますか？") {
+			t.Errorf("self_repo（%v）に loop の問いか init が出た: ask=%q answer=%q steps=%+v\n%s", args, out.Ask, out.LoopAnswer, out.Steps, out.Text)
+		}
+		if !strings.Contains(out.Install.Message, "loop）: 問わない") || strings.Contains(out.Install.Message, "setup ツールの手順で利用者に問う") {
+			t.Errorf("self_repo（%v）の loop の文: %s", args, out.Install.Message)
+		}
+	}
+
+	// 正本で辞退の記録が残っていても、init --loop を勧めない
+	decl := installBody("claude-code", "hook", "server", latest.Core, map[string]any{"installed": false, "declined": true})
+	decl["self_repo"] = true
+	post(decl)
+	if out := loopSetupOf(t, second(m.call("setup", map[string]any{}, false))); out.Install.Loop != "declined" || hasInit(out) ||
+		!strings.Contains(out.Install.Message, "loop）: 問わない") {
+		t.Errorf("self_repo・declined: loop=%s\n%s\n%s", out.Install.Loop, out.Install.Message, out.Text)
+	}
+
+	// 英語の文面も同じ判定（i18n の en に足した文）
+	if got := loopPhrase(i18n.EN, installStateJSON{Loop: "none", SelfRepo: true}); !strings.Contains(got, "not asked") {
+		t.Errorf("en の文面: %q", got)
+	}
+}
+
 // TestInstallKitStale: core と loop のハッシュは別々に比べる。loop 未導入のプロジェクトに loop の更新指示は出ない。
 func TestInstallKitStale(t *testing.T) {
 	fix := loopFixture()
@@ -476,6 +546,141 @@ func TestGuideLoop(t *testing.T) {
 	}
 	if g = md(); !strings.Contains(g, "**次に読むもの（AI ごと）**") {
 		t.Errorf("撤去したキーが残るプロジェクト:\n%s", g)
+	}
+}
+
+// TestSelfRepoLoopGuidePrompt: 正本（self_repo）の導入で loop が none / declined なら、guide の「次に読むもの」の loop 欄は
+// 「問わない・正本」の文言（未選択・辞退とは書かない）で、回し方は Claude Code だけ skill /iterate（Codex・Copilot は最小ループ）。
+// prompt「loop」は Claude Code に /iterate の版（英語の接続は英語版）、Codex に最小ループを返す。
+// 対照として同じテストで、印なしの none は未選択・最小ループ、印なしの installed は /iterate を出すことを確かめる
+// （正本の分岐が効かなくても通るテストにしない）。
+func TestSelfRepoLoopGuidePrompt(t *testing.T) {
+	withLoopKit(t, loopFixture())
+	e, _, ed := newAPIEnv(t)
+	ctx := context.Background()
+	latest, _ := latestDist()
+	post := func(agent string, self bool, loop map[string]any) {
+		t.Helper()
+		b := installBody(agent, "hook", "server", latest.Core, loop)
+		if self {
+			b["self_repo"] = true
+		}
+		ed.json(200, "POST", "/projects/req/install", b, nil)
+	}
+	none := func() map[string]any { return map[string]any{"installed": false} }
+	declined := func() map[string]any { return map[string]any{"installed": false, "declined": true} }
+	installed := func() map[string]any { return map[string]any{"installed": true, "bundle_sha256": latest.Loop} }
+
+	md := func() string {
+		t.Helper()
+		_, body := e.get(ed.c, "/im/api/v1/projects/req/guide?format=md", "Authorization", "Bearer "+ed.token)
+		return body
+	}
+	row := func(g, label string) string {
+		for _, l := range strings.Split(g, "\n") {
+			if strings.HasPrefix(l, "| "+label+" |") {
+				return l
+			}
+		}
+		return ""
+	}
+	want := func(label, cell, how string) string {
+		return fmt.Sprintf("| %s | %s | %s |", label, i18n.T(i18n.JA, cell), i18n.T(i18n.JA, how))
+	}
+	hdr := map[string]string{"X-Looptrack-Project": "req"}
+	cc := e.mcpAsClient(ed.token, hdr, "claude-code", "2.1.0", "2025-06-18")
+	ccEN := e.mcpAsClient(ed.token, map[string]string{"X-Looptrack-Project": "req", langHeader: "en"}, "claude-code", "2.1.0", "2025-06-18")
+	cx := e.mcpAsClient(ed.token, hdr, "codex-mcp-client", "1", "")
+	prompt := func(m *mcpClient) string {
+		t.Helper()
+		res, err := m.cs.GetPrompt(ctx, &mcp.GetPromptParams{Name: "loop"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.Messages[0].Content.(*mcp.TextContent).Text
+	}
+	minimal := fmt.Sprintf(loopPromptText, projectSuffix(i18n.JA, "req"))
+	iterate := fmt.Sprintf(loopIteratePromptText, projectSuffix(i18n.JA, "req"))
+	iterateEN := fmt.Sprintf(loopIteratePromptTextEN, projectSuffix(i18n.EN, "req"))
+	if minimal == iterate || iterateEN == iterate {
+		t.Fatal("前提が崩れています（最小ループと /iterate の版、または日英の /iterate の版が同じ文面）")
+	}
+	selfCell := i18n.T(i18n.JA, "guide.loop.self_repo")
+	if selfCell == "guide.loop.self_repo" || i18n.T(i18n.EN, "guide.loop.self_repo") == "guide.loop.self_repo" || i18n.T(i18n.EN, "guide.loop.self_repo") == selfCell {
+		t.Fatalf("guide.loop.self_repo が ja.json / en.json に無いか、日英が同じ文面: ja=%q en=%q", selfCell, i18n.T(i18n.EN, "guide.loop.self_repo"))
+	}
+
+	// 対照 1（印なし・未選択）: 未選択・最小ループ・最小ループの prompt
+	post("claude-code", false, none())
+	post("codex", false, none())
+	g := md()
+	if got := row(g, "Claude Code"); got != want("Claude Code", "guide.loop.none", "guide.how.minimal") {
+		t.Errorf("前提が崩れています（印なし・未選択の Claude Code の行）: %q\n%s", got, g)
+	}
+	if got := prompt(cc); got != minimal {
+		t.Errorf("前提が崩れています（印なし・未選択の Claude Code に最小ループが出ない）:\n%s", got)
+	}
+	if got := prompt(cx); got != minimal {
+		t.Errorf("前提が崩れています（印なし・未選択の Codex に最小ループが出ない）:\n%s", got)
+	}
+
+	// 正本・未選択（Claude Code・Codex）と正本・辞退（Copilot）
+	post("claude-code", true, none())
+	post("codex", true, none())
+	post("copilot", true, declined())
+	g = md()
+	for _, c := range []struct{ label, how string }{
+		{"Claude Code", "guide.how.skill"}, {"Codex", "guide.how.minimal"}, {"GitHub Copilot", "guide.how.minimal"},
+	} {
+		if got := row(g, c.label); got != want(c.label, "guide.loop.self_repo", c.how) {
+			t.Errorf("正本の %s の行: %q（want %q）", c.label, got, want(c.label, "guide.loop.self_repo", c.how))
+		}
+	}
+	if strings.Contains(g, i18n.T(i18n.JA, "guide.loop.none")) || strings.Contains(g, i18n.T(i18n.JA, "guide.loop.declined")) {
+		t.Errorf("正本の guide に未選択・辞退の文言が出た:\n%s", g)
+	}
+	if got := prompt(cc); got != iterate {
+		t.Errorf("正本・未選択の Claude Code の prompt が /iterate の版でない:\n%s", got)
+	}
+	if got := prompt(ccEN); got != iterateEN {
+		t.Errorf("正本・未選択の Claude Code（英語）の prompt が /iterate の英語版でない:\n%s", got)
+	}
+	if got := prompt(cx); got != minimal {
+		t.Errorf("正本・未選択の Codex の prompt が最小ループでない:\n%s", got)
+	}
+
+	// 正本・辞退の Claude Code も同じ扱い
+	post("claude-code", true, declined())
+	if got := row(md(), "Claude Code"); got != want("Claude Code", "guide.loop.self_repo", "guide.how.skill") {
+		t.Errorf("正本・辞退の Claude Code の行: %q", got)
+	}
+	if got := prompt(cc); got != iterate {
+		t.Errorf("正本・辞退の Claude Code の prompt が /iterate の版でない:\n%s", got)
+	}
+
+	// 対照 2（印なし・辞退）: 辞退・最小ループ
+	post("claude-code", false, declined())
+	if got := row(md(), "Claude Code"); got != want("Claude Code", "guide.loop.declined", "guide.how.minimal") {
+		t.Errorf("前提が崩れています（印なし・辞退の Claude Code の行）: %q", got)
+	}
+	if got := prompt(cc); got != minimal {
+		t.Errorf("前提が崩れています（印なし・辞退の Claude Code に最小ループが出ない）:\n%s", got)
+	}
+
+	// 対照 3（印なし・installed）: skill /iterate・/iterate の prompt
+	post("claude-code", false, installed())
+	if got := row(md(), "Claude Code"); !strings.HasSuffix(got, " | "+i18n.T(i18n.JA, "guide.how.skill")+" |") || strings.Contains(got, selfCell) {
+		t.Errorf("前提が崩れています（印なし・installed の Claude Code の行）: %q", got)
+	}
+	if got := prompt(cc); got != iterate {
+		t.Errorf("前提が崩れています（印なし・installed の Claude Code に /iterate の版が出ない）:\n%s", got)
+	}
+
+	// 英語の guide の欄（Compose を直接）
+	en := guide.Compose(i18n.EN, guide.Input{Slug: "req", Name: "req", Prefix: "REQ", Width: 4,
+		Agents: []guide.AgentLoop{{Agent: "claude-code", Label: "Claude Code", Loop: "none", SelfRepo: true}}})
+	if !strings.Contains(en.Markdown, "| Claude Code | "+i18n.T(i18n.EN, "guide.loop.self_repo")+" | "+i18n.T(i18n.EN, "guide.how.skill")+" |") {
+		t.Errorf("英語の guide の正本の行:\n%s", en.Markdown)
 	}
 }
 

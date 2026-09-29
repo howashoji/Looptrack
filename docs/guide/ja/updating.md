@@ -3,16 +3,16 @@
 [ガイドの目次](README.md) · 関連: [始め方](getting-started.md) · [デスクトップ版](desktop.md) · [FAQ / トラブルシュート](faq.md)
 
 Looptrack の更新は、手元の CLI・デスクトップ版・サーバの 3 つで手順が違います。
-どれも**新しい版に自動で置き換わることはありません。** 置き換えは利用者か管理者が行います。
-自動で行われるのは、新しい版の知らせ（CLI だけ）と、置き換えた後の後始末です。
+**既定では、どれも新しい版に自動で置き換わることはありません。** デスクトップ版（macOS・Linux）はトレイのメニューを選べば自分で置き換わり、設定で入れた人だけ自動で置き換わります。サーバは、管理者が設定で自動の置き換えを有効にできます（既定は無効）。それ以外の置き換えは利用者か管理者が行います。
+自動で行われるのは、新しい版の知らせ（CLI・デスクトップ版・サーバ）と、置き換えた後の後始末です。
 
 ## 何が自動で、何が手動か
 
 | 対象 | 自動で行われること | 自分で行うこと |
 | -- | -- | -- |
-| CLI（`looptrack`） | 手元の版が古いと、AI のセッションの開始時と MCP のツールの結果に【配布スクリプトの更新】が付きます。サーバが `looptrack` を配っているか、対応する最低の版を決めているときだけです | `looptrack self-update` で置き換えます。続けて各プロジェクトで `looptrack issue init` を実行し直します |
-| デスクトップ版 | 新しい版を最初に起動したとき、データが新しい形に変わります。ログイン時の起動の登録と CLI の置き場も、今のアプリに合わせて直ります | 新しい版に気づくことと、アプリごとの置き換えです。新しい版を知らせる仕組みはありません |
-| サーバ | ありません | 管理者が `install.sh --upgrade` などで入れ替えます。利用者に配る `looptrack` も、管理者が配布ディレクトリに置き直します |
+| CLI（`looptrack`） | 手元の版が古いと、AI のセッションの開始時と MCP のツールの結果に【配布スクリプトの更新】が付きます。サーバが `looptrack` を配っているか、対応する最低の版を決めているときだけです。CLI は GitHub のリリースを自分では確かめません | `looptrack self-update` で置き換えます。続けて各プロジェクトで `looptrack issue init` を実行し直します |
+| デスクトップ版 | 新しい版が出ると、トレイのメニューのいちばん上と画面の帯で知らせます（起動したときと 24 時間ごとに確かめます）。新しい版を最初に起動したとき、データが新しい形に変わります。ログイン時の起動の登録と CLI の置き場も、今のアプリに合わせて直ります。「新しい版を自動で入れる」にチェックを入れた人だけ（既定はチェックなし）、置き換えと起動し直しも自動です（macOS・Linux） | macOS・Linux はトレイの「新しい版 <版> に更新する」を選びます。Windows はアプリごとの置き換えです |
+| サーバ | 新しい版が出ると、管理者の画面の帯・`looptrack doctor`・サーバのログで知らせます（起動したときと 24 時間ごとに確かめます）。`install.sh` で入れた systemd のサーバは、設定で有効にしたときだけ（既定は無効）1 日 1 回自動で置き換えます | 管理者が `install.sh --upgrade` などで入れ替えます。利用者に配る `looptrack` も、管理者が配布ディレクトリに置き直します |
 
 CLI のログインの期限（アクセストークン）も自動で延びますが、これは版の更新とは別の仕組みです。
 
@@ -43,10 +43,11 @@ looptrack self-update --url <サーバの URL>           # 置き換える
 プロジェクトの中なら、`--url` は環境変数 `LOOPTRACK_API_URL` から取れます。
 `self-update` はサーバの配布の一覧から、この OS と CPU に合う最新の `looptrack` を取ります。
 取ったファイルは配布の一覧の SHA-256 と照らし合わせます。公式のビルドは `SHA256SUMS` の minisign の署名も確かめます。
+一覧の版が署名された版であることも確かめます。`SHA256SUMS` の中のファイル名（`looptrack_<版>_<os>_<arch>`）と、リリースなら署名の trusted comment に書かれた版が、どちらも一覧の版と同じでなければなりません。
 合わなければ何も置き換えません。
 Windows では実行中のファイルを消せないので、元のファイルを `looptrack.exe.old` に改名してから新しいものを置きます。`.old` は次の `self-update` で消えます。
 
-手元の版が配布の版と同じか新しければ、何もしません。
+手元の版が配布の版と同じか新しければ、何もしません。古い版へ戻すときは `--force` を付けます。
 自分でビルドした版（`dev` など）は配布の版と比べられないので、置き換えるには `--force` を付けます。
 
 ### self-update が置き換えないもの
@@ -72,11 +73,15 @@ kit が古いときも、【配布スクリプトの更新】の案内にこの�
 
 ## デスクトップ版
 
-デスクトップ版は `self-update` を使わず、アプリごと置き換えます。新しい版を知らせる仕組みはありません。
-[リリースのページ](https://github.com/howashoji/looptrack/releases)で新しい版を確かめ、OS に合うファイルを取得してください。
+デスクトップ版は `self-update` を使わず、アプリごと置き換えます。
+新しい版が出ると、トレイのメニューのいちばん上に「新しい版 <版> に更新する」（置き換えられないときは「新しい版 <版> があります」）が出て、画面の上部にも帯が出ます。確認をやめるときは、トレイのメニューの「新しい版を確認する」のチェックを外します（[デスクトップ版のトレイ / メニューバー](desktop.md#トレイ--メニューバー)）。
+macOS の .app と Linux の AppImage は、知らせを選ぶと取得・確認・置き換え・起動し直しまで行います。前の版は `.prev` の付いた名前で 1 つだけ残ります（[デスクトップ版の「更新」](desktop.md#更新)）。
+画面の帯の「更新する」ボタンでも同じ置き換えを行えます（トレイを出していないときも使えます）。
+トレイの「新しい版を自動で入れる」にチェックを入れると、新しい版を見つけたときに同じ手順を自分で行います（既定はチェックなし。macOS の .app と Linux の AppImage でだけ出ます）。
+Windows と、トレイから置き換えられないときは、知らせを選ぶか[リリースのページ](https://github.com/howashoji/looptrack/releases)を開き、OS に合うファイルを取得してください。
 手元の版は、アプリの中の `looptrack` で `looptrack version` を実行すると分かります（下の[更新を確かめる](#更新を確かめる)）。
 
-先にトレイのメニューで「終了」を選び、次の手順で置き換えてから起動し直します。
+手で置き換えるときは、先にトレイのメニューで「終了」を選び、次の手順で置き換えてから起動し直します。
 
 | OS | 置き換え方 |
 | -- | -- |
@@ -88,7 +93,10 @@ kit が古いときも、【配布スクリプトの更新】の案内にこの�
 置き換えた後に自動で行われることは次のとおりです。
 
 - **データは残ります。** データはアプリとは別の場所にあり、新しい版を最初に起動したときに新しい形に変わります。
-- 「ログイン時に起動する」の登録は、次の起動で今のアプリの場所に合わせて直ります。
+  新しい形に変わった後は、前の版のアプリに戻しても「新しい版の looptrack で migrate した DB」と出て起動しません（この確かめが入る前の版は止まらずに動くので、なおさら戻さないでください）。
+  新しい版は、形を変える前に DB をデータのフォルダの `backups` に自分で控えます（新しいものから 2 つを残します。控えを作れないときは形を変えず、起動を止めます）。
+  前の版に戻すなら、アプリを前の版に戻し、`looptrack.db` を `backups` の最も新しい控えで置き換えます（[デスクトップ版の「更新」](desktop.md#更新)）。
+- 「ログイン時に起動する」の登録は、次の起動で今のアプリの場所に合わせて直ります。Linux のアプリ一覧の登録（`~/.local/share/applications/looptrack.desktop`）とアイコンも同じです。
 - CLI の置き場も直ります。macOS と Linux のリンクはそのままアプリを指し、Windows の CLI の写しは次の起動で新しくなります。
   ただし `self-update` などで自分で新しくした写しには触りません。
 
@@ -96,20 +104,22 @@ kit が古いときも、【配布スクリプトの更新】の案内にこの�
 
 ## サーバ
 
-サーバは自動では更新されません。管理者が入れ替えます。
+サーバは既定では自動で更新されません。管理者が入れ替えます（新しい版は知らせます。下の「新しい版の知らせと自動の置き換え」）。
 チームのサーバは起動しても DB の移行（migrate）を行わないので、入れ替えと一緒に migrate を実行します。
 下の手順はどれも、止める → DB を控える → 実行ファイルを入れ替える → migrate → 起動、の順です。
 
 ### install.sh で入れたサーバ
 
 ```bash
-sudo sh install.sh --upgrade --from <取得元>
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade
 ```
 
-`--from` は新しい版の取得元で、入れたときと同じ形です（GitHub Releases の `…/releases/download/<版>` か、手元の配布物のディレクトリ）。
+`--from` を付けなければ、新しい版は GitHub Releases の最新のリリースです（`--version <版>` で選べます）。
+ほかの場所から取るときは `--from <取得元>` を付けます（`deploy/release/dist.sh build` の出力のディレクトリか、同じ形の URL の接頭辞）。
+1.0.0-rc.1・rc.2 の `install.sh` で入れたサーバも、同じ 1 行で上げられます。それらが置いた `/etc/looptrack/install.conf`・`.env`・unit（か `compose.yaml`）をそのまま読みます。
 `--upgrade` は次の順に進めます。
 
-1. 新しい版を取得し、SHA-256 を確かめます。サーバに `minisign` があれば署名も確かめます。
+1. 新しい版（GitHub Releases の `looptrack_<版>_linux_<arch>_server.tar.gz`）を取得し、展開する前に SHA-256 を確かめます。サーバに `minisign` があれば署名も確かめます。
 2. サービスを止めます。
 3. SQLite なら、止めた状態で DB を `backup-<日時>/` に写します。MySQL の控えは自分で取ってください（`mysqldump` など）。
 4. 実行ファイルを入れ替えます。前の版は `/usr/local/bin/looptrack.prev` に残ります。compose なら新しいイメージを作り、前の版のイメージも残ります。
@@ -117,8 +127,33 @@ sudo sh install.sh --upgrade --from <取得元>
 6. 起動し、`/healthz` が応えるのを待ちます。
 
 同じ版なら何も変えません。
-MySQL で表が増えた版では、migrate の後にアプリ用の DB 利用者の権限（`grants.sql`）を流し直すまで読めないので、`--upgrade` はそこで止まって順番を案内します。
+MySQL を最小権限で使っていて表が増えた版では、migrate の後にアプリ用の DB 利用者に権限を与え直すまで読めません。`--upgrade` はそこで MySQL の管理用の資格情報を端末で尋ね（表示しません。保存しません）、権限を与え直してから起動します。
 詳しくは運用者向けの [DEPLOY.md の「更新（--upgrade）」](../../server/DEPLOY.md)を見てください。
+
+### 新しい版の知らせと自動の置き換え
+
+サーバは起動したときと 24 時間ごとに GitHub Releases を確かめ、新しい版があれば次の 3 か所で知らせます。
+
+- 管理者（role が admin の利用者）の画面の上部の帯。更新の 1 行も出ます。member には出ません
+- 管理者のトークンで実行した `looptrack doctor` の注意の行
+- サーバのログ（`journalctl -u looptrack`、compose なら `docker compose logs`）
+
+確認を止めるには、サーバの `.env` に `LOOPTRACK_UPDATE_CHECK=off` を書いて起動し直します（ほかの設定は下の[新しい版の確認](#新しい版の確認デスクトップ版とサーバ)）。
+
+`install.sh` で入れた systemd のサーバは、設定で自動の置き換えを有効にできます。**既定は無効です。**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --auto-upgrade on    # 有効にする（off で外す）
+systemctl list-timers looptrack-upgrade.timer    # 次に動く時刻
+journalctl -u looptrack-upgrade                  # 自動の置き換えの記録（置き換えなかった理由も出る）
+```
+
+有効にすると、1 日 1 回、上の `--upgrade` と同じ手順で新しい版に置き換えます。動かすのは有効にしたときに手元に置いた `install.sh` の写しで、毎回取り直すことはしません（写しは、管理者が `install.sh` を動かしたときに新しくなります）。
+取るのは新しい版の書庫だけで、署名を必ず確かめ（サーバに `minisign` が要ります）、版を下げることはしません。
+途中で失敗したときは前の版に戻して起動し直すので、サービスが止まったままにはなりません。
+compose（コンテナのイメージ）は自動では置き換えません。知らせを見て `--upgrade` を実行します。
+MySQL では、新しい版が DB の形を変える（migrate がある）ときは自動では置き換えず、今の版のまま動かします。そのときは端末で `--upgrade` を実行します。
+詳しくは [DEPLOY.md の「新しい版の知らせと自動の置き換え」](../../server/DEPLOY.md)を見てください。
 
 ### looptrack setup だけで立ち上げたサーバ
 
@@ -147,19 +182,60 @@ systemd（`--service systemd`）で動かしているときも同じ順番です
 新しい版を配るときは、管理者が配布ディレクトリの中身を置き換えます。
 
 1. 各 OS 向けの `looptrack_<版>_<OS>_<CPU>`（Windows は末尾に `.exe`）を置きます。
-2. 続けて `SHA256SUMS` を置きます。公式の配布物なら `SHA256SUMS.minisig` も置きます。公式のビルドの `self-update` は、署名が無いと置き換えないからです。
+   GitHub Releases に上がっているのは素の実行ファイルではなく書庫です。各 `looptrack_<版>_<OS>_<CPU>_server.tar.gz`（Windows は `.zip`）から `looptrack` を取り出し、上の名前で置きます。
+   書庫そのものは配布ディレクトリに置きません（サーバが配るのは素の実行ファイルだけです）。
+2. 続けて `SHA256SUMS` を置きます。公式の配布物なら、リリースの `SHA256SUMS` と `SHA256SUMS.minisig` をそのまま置きます。公式のビルドの `self-update` は、署名が無いと置き換えないからです。
+   公式の `SHA256SUMS` には、書庫の中の実行ファイルを `looptrack_<版>_<OS>_<CPU>[.exe]` の名前にした行も載っています。取り出した実行ファイルは、署名された一覧で照合されます。
 3. 前の版のファイルを消します。
+
+公式のリリースから置くときの例（サーバの Linux で）:
+
+```bash
+VER=v1.0.0
+BASE="https://github.com/howashoji/looptrack/releases/download/$VER"
+cd /path/to/dist            # LOOPTRACK_DIST_DIR
+curl -fsSL -O "$BASE/SHA256SUMS" -O "$BASE/SHA256SUMS.minisig"
+for t in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64 windows_arm64; do
+  n="looptrack_${VER}_${t}_server"
+  case $t in
+    windows_*) curl -fsSL -O "$BASE/$n.zip" && grep -E " $n\.zip\$" SHA256SUMS | sha256sum -c - &&
+                 unzip -p "$n.zip" "$n/looptrack.exe" >"looptrack_${VER}_${t}.exe" && rm "$n.zip" ;;
+    *) curl -fsSL -O "$BASE/$n.tar.gz" && grep -E " $n\.tar\.gz\$" SHA256SUMS | sha256sum -c - &&
+         tar -xzOf "$n.tar.gz" "$n/looptrack" >"looptrack_${VER}_${t}" && rm "$n.tar.gz" ;;
+  esac || break
+done
+sha256sum -c --ignore-missing SHA256SUMS   # 取り出した実行ファイルの照合（書庫の行はここにファイルが無いので飛ばす）
+```
 
 サーバは OS と CPU の組ごとに最新の版を配ります。`SHA256SUMS` に載っていないファイルやハッシュが違うファイルは配りません。
 `.env` に `LOOPTRACK_CLIENT_MIN_VERSION=v…` を書くと、それより古い `looptrack` に「対応する最低の版より古い」という案内が付きます。
 置き方の詳細は [RELEASE.md の「サーバの配布ディレクトリから配る」](../../server/RELEASE.md)にあります。
+
+## 新しい版の確認（デスクトップ版とサーバ）
+
+デスクトップ版とサーバ（`looptrack serve`）は、起動したときと 24 時間ごとに GitHub のリリースの一覧を確かめます。
+CLI（`looptrack`）は確かめません。CLI への知らせは、サーバが付ける【配布スクリプトの更新】だけです。
+
+- 知らせるのは、`SHA256SUMS` の署名を確かめられて、この OS と CPU 向けのファイル（デスクトップ版は dmg・AppImage・zip、サーバはサーバ版の書庫）がリリースにある版だけです。
+- 追うのは今の版と同じ種類の版です。今の版が rc なら rc も知らせ、正式版なら正式版だけを知らせます。
+- 確認に失敗した回（オフラインなど）は、前に知らせた版の知らせを残します。
+- 自分でビルドした版（`dev` など、配布の版と比べられないもの）は確かめません。
+
+次の環境変数で変えられます。デスクトップ版はアプリを起動する環境に渡し、サーバは `.env` に書いて起動し直します。
+分からない値を書くと確かめません（取り違えた設定のまま通信しないためです）。
+
+| 環境変数 | 働き |
+| -- | -- |
+| `LOOPTRACK_UPDATE_CHECK=off` | 確かめません（GitHub へ通信しません）。デスクトップ版は、トレイの「新しい版を確認する」のチェックを外しても同じです。どちらかが off なら確かめません |
+| `LOOPTRACK_UPDATE_CHANNEL` | 追う版を `stable`（正式版だけ）か `prerelease`（rc も）に決めます。書かなければ今の版で決まります |
+| `LOOPTRACK_UPDATE_URL` | 確認先を差し替えます。GitHub の API と同じ形の JSON を返す `https://` の URL だけを受けます |
 
 ## 更新を確かめる
 
 ```bash
 looptrack version                # 手元の版（headless か desktop か・OS/CPU も出る）
 looptrack self-update --check    # サーバが配っている最新の版と比べる（置き換えない）
-looptrack doctor                 # PATH・配線に加え、配布の最新の版と手元の版を比べる
+looptrack doctor                 # PATH・配線に加え、配布の最新の版と手元の版を比べる（admin のトークンならサーバの新しい版も出る）
 ```
 
 デスクトップ版の版は、アプリの中の `looptrack`（`Looptrack.app/Contents/MacOS/looptrack`・AppImage のファイル・Windows の `cli\looptrack.exe`）で `version` を実行して確かめます。
@@ -174,6 +250,9 @@ looptrack doctor                 # PATH・配線に加え、配布の最新の�
 | `self-update` が「手元の版 … は配布の版 … と比べられません」と出す | 自分でビルドした版です。置き換えるなら `--force` を付けます |
 | `self-update` が署名（`.minisig`）が無いと言って止まる | 配布ディレクトリに `SHA256SUMS.minisig` がありません。管理者に置いてもらいます |
 | デスクトップ版で `self-update` がエラーになる | デスクトップ版はアプリごと置き換えます（[デスクトップ版](#デスクトップ版)） |
-| サーバで `self-update` がエラーになり `install.sh --upgrade` を案内する | `install.sh` で入れたサーバです。`sudo sh install.sh --upgrade --from <取得元>` で更新します |
+| サーバで `self-update` がエラーになり、インストーラの `--upgrade` を案内する | `install.sh` で入れたサーバです。`curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh \| sudo sh -s -- --upgrade` で更新します |
 | 更新したのに【配布スクリプトの更新】が消えない | 次のセッションの開始時に知らせ直されるまで残ります。kit が古いと出ている場合は `looptrack issue init` も実行します |
-| `install.sh --upgrade` の migrate が失敗した | systemd なら前の実行ファイルが `/usr/local/bin/looptrack.prev` にあり、compose なら前の版のイメージが残っています。戻し方はエラーの文に出ます |
+| `install.sh --upgrade` の migrate が失敗した | systemd なら前の実行ファイルが `/usr/local/bin/looptrack.prev` にあり、compose なら前の版のイメージが残っています。戻し方はエラーの文に出ます。migrate が 1 本でも適用していれば（出力に「適用:」の行があれば）、DB も更新の前の控えに戻します |
+| `install.sh --auto-upgrade on` が「何も変えていません」で止まる | 自動の置き換えを入れられないサーバです。compose のサーバ・`--no-start` で入れたサーバ・systemd が動いていないサーバでは使えません。`minisign`（`apt-get install -y minisign`）と、`curl` か `wget` も要ります |
+| 自動の置き換えを有効にしたのに新しい版にならない | `journalctl -u looptrack-upgrade` に理由が出ます。MySQL で新しい版が DB の形を変えるときは自動では置き換えないので、端末で `--upgrade` を実行します。途中で失敗した回は前の版に戻して動いています |
+| 前の版に戻したら「新しい版の looptrack で migrate した DB」と出て起動しない | 新しい版が DB を新しい形に変えた後です。前の版はその DB を使いません（書き込みで壊さないため）。新しい版に戻すか、前の版で使うなら、DB（デスクトップ版はデータのフォルダ）を新しい版で migrate する前の控えに戻します（デスクトップ版はデータのフォルダの `backups` に控えがあります） |

@@ -120,7 +120,7 @@ func (e *TimeoutError) Unwrap() error {
 	return i18n.Errorf("api.err.timeout_not_number", "var", e.Var, "value", e.Value)
 }
 
-// LocalModeHeader は、サーバがローカルモード（DESIGN §5-12）であることを告げる /healthz の応答ヘッダ
+// LocalModeHeader は、サーバがローカルモード（DESIGN §3-3）であることを告げる /healthz の応答ヘッダ
 // （サーバ側は internal/server の healthz。値は "1"）。
 const LocalModeHeader = "X-Looptrack-Local-Mode"
 
@@ -284,7 +284,7 @@ func (c *Client) Do(r Request) (*Response, error) {
 	return c.once(r, base, fresh)
 }
 
-// LocalMode は、その URL のサーバがローカルモード（DESIGN §5-12）か。ローカルモードのサーバは
+// LocalMode は、その URL のサーバがローカルモード（DESIGN §3-3）か。ローカルモードのサーバは
 // 「同じ機械の本人だけが使う」前提で画面・MCP・REST API の認証を省くので、CLI もトークンなしで呼べる。
 // 確かめ方は、認証の要らない /healthz の応答ヘッダ X-Looptrack-Local-Mode（サーバが名乗らなければ通常モード）。
 // 引くのはこの機械のループバックの http（LocalURL）のときだけで、結果は Client に覚えて 1 回しか引かない。

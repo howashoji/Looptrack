@@ -4,6 +4,7 @@ package loop
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -121,7 +122,7 @@ func TestTaskMode(t *testing.T) {
 		}},
 	}}.run(t)
 
-	// 英語の別名（DESIGN.md §5-13）。単語の境界・大小を問わない
+	// 英語の別名（DESIGN.md §9-6）。単語の境界・大小を問わない
 	scenario{name: "英語の依頼", setup: setup, steps: []step{
 		{name: "please check → 確認", mk: say("E1", "Please check the memory files."), want: wantKind("investigate")},
 		{name: "implement → 実行", mk: say("E1", "Implement A and B"), want: wantKind("execute")},
@@ -166,6 +167,48 @@ func TestTaskMode(t *testing.T) {
 		{name: "英語の連絡（review を含む）も判定しない", mk: say("X", crossEn), want: wantKind("quiet")},
 		{name: "連絡の後でも利用者の依頼は効く", mk: say("X", "push の前に確認して"), want: wantKind("investigate")},
 		{name: "利用者の依頼なので編集は止まる", mk: edit("X", doc), want: wantEdit("block")},
+	}}.run(t)
+
+	// サブエージェントの最終報告（<agent-message>）も利用者の依頼ではないので判定しない（記録を作らず、既存の記録を変えない）。
+	// 形は他セッションからの連絡と同じ（値は架空）。除外を外すと、この 3 つが落ちる
+	agentReport := func(body string) string {
+		return "Another Claude session sent a message:\n" + `<agent-message from="worker-1">` + body + "</agent-message>\n"
+	}
+	markerOf := func(sid string) func(*sandbox) string {
+		return path("proj", ".claude", "task-mode.d", sid)
+	}
+	scenario{name: "サブエージェントの報告は判定しない", setup: setup, steps: []step{
+		{name: "報告の「確認して」では記録が作られず、出力が空", mk: say("G", agentReport("差分を確認して、問題は見つかりませんでした。")),
+			want: all(wantKind("quiet"), func(t *testing.T, s *sandbox, _ got) {
+				if _, err := os.Stat(markerOf("G")(s)); err == nil {
+					t.Errorf("記録が作られている: %s", markerOf("G")(s))
+				}
+			})},
+		{name: "対照: 報告でない「確認して」は確認モードになる", mk: say("G", "差分を確認して"),
+			want: all(wantKind("investigate"), wantFileFirstLine(markerOf("G"), "investigate"))},
+		{name: "確認モード中に届いた報告の「実装して」で記録が上書きされない", mk: say("G", agentReport("修正を実装して push しました。")),
+			want: all(wantKind("quiet"), wantFileFirstLine(markerOf("G"), "investigate"))},
+		{name: "対照: 報告でない「実装して」は実行モードになる", mk: say("G", "では実装して"),
+			want: all(wantKind("execute"), wantFileFirstLine(markerOf("G"), "execute"))},
+		{name: "英語の報告（review・implement）も判定しない", mk: say("G", agentReport("Please review the diff, then implement the fix.")),
+			want: all(wantKind("quiet"), wantFileFirstLine(markerOf("G"), "execute"))},
+	}}.run(t)
+
+	// 除外は 1 行目か 2 行目の行頭の <agent-message from=… だけ。利用者が自分の文に書いたものは判定する
+	scenario{name: "利用者が書いたタグの名前・貼った報告は判定する", setup: setup, steps: []step{
+		{mk: say("H", "差分を確認して")},
+		{name: "前提: 確認モード", mk: edit("H", doc), want: wantEdit("block")},
+		{name: "「<agent-message> の除外を実装して」は実行モードになる", mk: say("H", "<agent-message> の除外を実装して"),
+			want: all(wantKind("execute"), wantFileFirstLine(markerOf("H"), "execute"))},
+		{mk: say("H", "差分を確認して")},
+		{name: "報告を 3 行目以降に貼った「直して」は実行モードになる",
+			mk:   say("H", "次の報告のとおりに\n直して\n"+`<agent-message from="worker-1">差分を確認して、問題は見つかりませんでした。</agent-message>`),
+			want: all(wantKind("execute"), wantFileFirstLine(markerOf("H"), "execute"))},
+		{mk: say("H", "差分を確認して")},
+		{name: "対照: 1 行目の定型文の次の行の報告は判定しない", mk: say("H", agentReport("修正を実装して push しました。")),
+			want: all(wantKind("quiet"), wantFileFirstLine(markerOf("H"), "investigate"))},
+		{name: "対照: 定型文が無く先頭に来る報告も判定しない", mk: say("H", `<agent-message from="worker-1">修正を実装して push しました。</agent-message>`),
+			want: all(wantKind("quiet"), wantFileFirstLine(markerOf("H"), "investigate"))},
 	}}.run(t)
 
 	scenario{name: "2 セッションが同じフォルダにいる・通知・例外・24 時間・環境変数・session_id が無いとき・記録先", setup: setup, steps: []step{

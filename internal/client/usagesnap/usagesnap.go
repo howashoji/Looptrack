@@ -1,7 +1,7 @@
 // Package usagesnap は、コーディング AI の会話記録から「会話の累計」のスナップショット（POST /projects/{slug}/usage の本文）を作る
-// （DESIGN.md §5-4・§5-11）。
+// （DESIGN.md §9-5・§5-1）。
 //
-// サーバ側の集計（internal/usage）と名前が重ならないよう usagesnap とした。設計は docs/server/DESIGN.md §5-4・§5-11。
+// サーバ側の集計（internal/usage）と名前が重ならないよう usagesnap とした。設計は docs/server/DESIGN.md §9-5・§5-1。
 //
 //   - claude-code … ~/.claude/projects/<slug>/<session>.jsonl の assistant 行の usage（同じ message.id の複数行は 1 回。
 //     サブエージェントは <session>/subagents/*.jsonl）

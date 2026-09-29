@@ -14,7 +14,7 @@ import (
 )
 
 // usage の読み取り系（show・usage report・usage ledger list・usage missing・usage requests。
-// DESIGN.md §5-4）。attach と ledger add は別のファイル。
+// DESIGN.md §9-5）。attach と ledger add は別のファイル。
 
 // usageAPI は usage のサブコマンドの前提（API モードだけ）。
 func (c *Ctx) usageAPI() (*api.Client, error) {

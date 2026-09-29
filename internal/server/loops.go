@@ -14,7 +14,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 3 層のループの ②「人の判断待ち」と ③「外からの反応」（DESIGN.md §5-8-6・§5-8-7）。
+// 3 層のループの ②「人の判断待ち」と ③「外からの反応」（DESIGN.md §9-3-6・§9-3-7）。
 // summary（REST・MCP）・一覧の has_feedback・ボードで共用する。
 // 表示の文言は以前の CLI（1.0.0 より前）の summary と同じ（loops_test.go で突き合わせる）。
 

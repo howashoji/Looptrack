@@ -9,7 +9,7 @@ import (
 	"github.com/howashoji/looptrack/internal/mdformat"
 )
 
-// 見出しの英語の別名（DESIGN.md §5-13）。## Acceptance criteria / ## Verify commands は英字の大小を問わず、
+// 見出しの英語の別名（DESIGN.md §9-6）。## Acceptance criteria / ## Verify commands は英字の大小を問わず、
 // 日本語の見出しと同じ規則（前後の空白・コードブロックの中は見出しでない・次の ## まで・最初の 1 つだけ）で読む。
 
 func TestHeadingAliases(t *testing.T) {

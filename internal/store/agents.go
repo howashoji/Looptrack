@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// MCP 接続の記録と導入済み通知（設計は DESIGN.md §5-6）。
+// MCP 接続の記録と導入済み通知（設計は DESIGN.md §6）。
 
 // MCPConnection は MCP の initialize で受け取った接続の情報。
 type MCPConnection struct {
@@ -80,7 +80,7 @@ type AgentInstall struct {
 	FirstAt    time.Time
 	ReportedAt time.Time
 	HookAt     *time.Time // フックからの通知が無ければ nil
-	// 導入セット（DESIGN.md §5-7）。.claude/.looptrack-kit.json の控え。空は通知に無い（古い CLI）
+	// 導入セット（DESIGN.md §8）。.claude/.looptrack-kit.json の控え。空は通知に無い（古い CLI）
 	CoreBundle  string // core.bundle_sha256
 	LoopState   string // installed / declined / none / ""
 	LoopBundle  string // loop が installed のときの bundle_sha256

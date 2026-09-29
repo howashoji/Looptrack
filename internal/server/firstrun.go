@@ -15,7 +15,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 画面版の初回設定（設計 DESIGN.md §5-12）。
+// 画面版の初回設定（設計 DESIGN.md §3-3）。
 //
 // ローカルモードで有効な管理者が 0 人の間だけ、画面の経路を初回設定のフォームにする（API・MCP は 503 の setup_required のまま）。
 // 答え（④最初の管理者 ⑤二段階認証 ⑥最初のプロジェクト）は looptrack setup と同じ検査（setupwiz.PlanFirstRun）と

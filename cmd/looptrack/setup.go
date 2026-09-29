@@ -17,6 +17,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"golang.org/x/term"
 
+	"github.com/howashoji/looptrack/internal/dbgrants"
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/setupwiz"
 	"github.com/howashoji/looptrack/internal/store"
@@ -43,12 +44,13 @@ func setupCmd(args []string) int {
 			return string(b), err
 		}
 	}
-	return runSetup(ctx, args, os.Getenv, os.Stdin, os.Stdout, os.Stderr, secret, setupBackend{})
+	return runSetup(ctx, args, os.Getenv, os.Stdin, os.Stdout, os.Stderr, secret, setupBackend{}, terminalPrompter)
 }
 
 // runSetup は引数を読んでウィザードを動かす（テストから呼ぶ）。
+// ask は MySQL の DB がまだ無いときに管理用の資格情報と作るかの確認を尋ねるもの（looptrack grants apply と同じ。nil なら尋ねずに止まる）。
 func runSetup(ctx context.Context, args []string, getenv func(string) string, stdin io.Reader, stdout, stderr io.Writer,
-	secret func() (string, error), backend setupwiz.Backend) int {
+	secret func() (string, error), backend setupwiz.Backend, ask prompter) int {
 	// 画面に出す文面の言語。渡された getenv から決める（os.Getenv を直に読むと、
 	// 環境変数を差し替えて動かす呼び出し元とテストで結果が変わる）
 	lang := i18n.FromEnv(getenv)
@@ -118,9 +120,36 @@ func runSetup(ctx context.Context, args []string, getenv func(string) string, st
 			linuxBinary = self
 		}
 	}
+	var prepare func(context.Context, string, string) error
+	if ask != nil {
+		// DB がまだ無いときは、looptrack grants apply と同じ処理で DB とアプリ用の利用者を作り、表を作って権限を与える。
+		// 作るかの確認は --yes でも省かない（--yes は setup の問いに答えないことで、DB を作ることへの同意ではない）
+		prepare = func(ctx context.Context, dsn, setupDSN string) error {
+			cfg, err := store.NormalizeDSN(dsn)
+			if err != nil {
+				return err
+			}
+			// 管理用の接続と、アプリ用の利用者で読めることの確認は、DB が無いと分かった接続先（setupDSN）の宛先で行う。
+			// アプリ用の接続先の宛先は、サービスから見たもの（compose の mysql:3306 など）で、ここからは届かないことがある
+			if setupDSN != "" && setupDSN != dsn {
+				scfg, err := store.NormalizeDSN(setupDSN)
+				if err != nil {
+					return err
+				}
+				cfg.Net, cfg.Addr = scfg.Net, scfg.Addr
+			}
+			err = applyGrants(ctx, grantsApplyOptions{target: cfg, appDSN: cfg.FormatDSN()}, stdout, lang, ask)
+			var ie *i18n.Error
+			if errors.As(err, &ie) && ie.Msg.ID == "cmd.err.grants_no_terminal" && dbgrants.ValidDBName(cfg.DBName) {
+				// 端末が無い（自動化）。setup には管理用の資格情報を渡す引数が無いので、先に作る方法を示す
+				return i18n.Errorf("cmd.err.setup_no_db_no_terminal", "db", cfg.DBName, "sql", dbgrants.CreateDatabaseSQL(cfg.DBName))
+			}
+			return err
+		}
+	}
 	_, err := setupwiz.Run(ctx, setupwiz.Options{
 		Dir: *dir, Yes: *yes, Force: *force, In: in, Out: stdout, ReadSecret: secret, Preset: pre, Backend: backend,
-		LinuxBinary: linuxBinary, Lang: lang,
+		PrepareDatabase: prepare, LinuxBinary: linuxBinary, Lang: lang,
 	})
 	switch {
 	case errors.Is(err, setupwiz.ErrInterrupted):
@@ -169,6 +198,10 @@ func (setupBackend) open(ctx context.Context, dsn string) (*sql.DB, error) {
 func (b setupBackend) Inspect(ctx context.Context, dsn string) (int, error) {
 	db, err := b.open(ctx, dsn)
 	if err != nil {
+		var me *mysql.MySQLError
+		if errors.As(err, &me) && me.Number == 1049 { // ER_BAD_DB_ERROR: 接続先の DB が無い
+			return 0, &setupwiz.NoDatabaseError{Err: err}
+		}
 		return 0, err
 	}
 	defer db.Close()

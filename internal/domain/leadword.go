@@ -5,10 +5,10 @@ import (
 	"unicode/utf8"
 )
 
-// コメントの先頭語（DESIGN.md §5-8-6）。
+// コメントの先頭語（DESIGN.md §9-3-6）。
 // 本文の**先頭**が「フィードバック:」「判断:」「差し戻し:」（コロンは半角・全角のどちらでも）なら、その種別。
 // 先頭の空白・改行は許さない（SQL の LIKE 'フィードバック:%' で引けるようにするため）。
-// 英語の別名（§5-13）: 「Feedback:」「Decision:」「Changes requested:」。英字の大小を問わない（ASCII だけで畳む。
+// 英語の別名（DESIGN.md §9-6）: 「Feedback:」「Decision:」「Changes requested:」。英字の大小を問わない（ASCII だけで畳む。
 // SQL の LOWER / UPPER と同じ結果にするため Unicode の畳み込みは使わない）。コロンは半角だけ。
 // 例は testdata/leadword.json（leadword_test.go が読む。英語の別名の例は lead_en・excerpt_en・sequences_en）。
 

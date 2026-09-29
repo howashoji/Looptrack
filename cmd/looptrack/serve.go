@@ -10,16 +10,19 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/howashoji/looptrack/internal/auth"
+	"github.com/howashoji/looptrack/internal/client/selfupdate"
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/localserve"
 	"github.com/howashoji/looptrack/internal/relver"
 	"github.com/howashoji/looptrack/internal/server"
 	"github.com/howashoji/looptrack/internal/store"
+	"github.com/howashoji/looptrack/migrations"
 )
 
 // serve は HTTP サーバを起動する。設定は環境変数から読む（秘密を引数に取らない）。
@@ -35,7 +38,9 @@ import (
 //	LOOPTRACK_TOTP_ISSUER      TOTP の発行者名（認証アプリに表示される名前。既定 Looptrack。登録済みの表示を保つときは以前の名前を設定する）
 //	LOOPTRACK_DIST_DIR         looptrack の配布ディレクトリ（dist.sh の成果物と SHA256SUMS。GET /api/v1/dist の binaries）
 //	LOOPTRACK_CLIENT_MIN_VERSION 対応する looptrack の最低の版（これより古い導入に【配布スクリプトの更新】を出す。空なら判定しない）
-//	LOOPTRACK_LOCAL_MODE       1 でローカルモード（DESIGN.md §5-12）。待ち受けは 127.0.0.1 / ::1 / localhost だけ（それ以外は起動しない）。
+//	LOOPTRACK_UPDATE_CHECK     off で新しい版を確認しない（既定は起動時と 24 時間ごとに GitHub Releases を確かめ、新しい版を
+//	                    起動時のログ・管理者の帯・doctor で知らせる。LOOPTRACK_UPDATE_CHANNEL・LOOPTRACK_UPDATE_URL も効く。serve_update.go）
+//	LOOPTRACK_LOCAL_MODE       1 でローカルモード（DESIGN.md §3-3）。待ち受けは 127.0.0.1 / ::1 / localhost だけ（それ以外は起動しない）。
 //	                    Web・REST API・MCP を認証なしで最初の管理者として通す。起動時にスキーマを最新にし、管理者が 0 人なら
 //	                    画面に初回設定を出す
 
@@ -63,6 +68,13 @@ func serve() int {
 		db.SetConnMaxLifetime(30 * time.Minute)
 	}
 
+	// 新しい版の確認（起動時と 24 時間ごと。結果は起動時のログ・管理者の帯・doctor へ。LOOPTRACK_UPDATE_CHECK=off で止める）
+	updates := newServerUpdates(serverUpdateOptions{
+		Version: version, PublicKey: selfupdate.MinisignPublicKey, GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
+		Getenv: os.Getenv, Lang: cmdLang(),
+	}, logger)
+	cfg.UpdateNotice, cfg.UpdateServer = updates.current, true
+
 	h, err := server.New(cfg, db)
 	if err != nil {
 		return fail(err)
@@ -79,6 +91,7 @@ func serve() int {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	go server.Housekeeping(ctx, db, logger)
+	go updates.run(ctx)
 
 	errc := make(chan error, 1)
 	go func() {
@@ -176,12 +189,15 @@ func warnSQLitePerms(dsn string, logger *slog.Logger) {
 }
 
 // prepareDB は起動前の DB の準備。ローカルモードではスキーマを最新にする（LOOPTRACK_DSN だけで起動する未設定のデスクトップ版で
-// テーブルが無いため）。チームのサーバは従来どおり looptrack migrate を別に行う。
+// テーブルが無いため）。チームのサーバは従来どおり looptrack migrate を別に行い、ここでは適用記録を突き合わせるだけにする
+// （新しい版で migrate した DB を、前の版に戻した実行ファイルで動かさないため）。
+// ローカルモードの SQLite では、適用するものがあれば適用の前に DB の控えを取る（localserve.Migrate。デスクトップ版と同じ）。
 func prepareDB(ctx context.Context, cfg server.Config, db *sql.DB, logger *slog.Logger) error {
 	if !cfg.LocalMode {
-		return nil
+		return store.CheckApplied(ctx, db, migrations.FS)
 	}
-	return localserve.Migrate(ctx, db, logger)
+	path, _ := store.SQLitePath(os.Getenv("LOOPTRACK_DSN"))
+	return localserve.Migrate(ctx, db, path, logger)
 }
 
 func envOr(key, def string) string {

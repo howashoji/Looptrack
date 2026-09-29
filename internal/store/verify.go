@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// VerifyResult は verify の 1 コマンドの結果（issue_events kind verify の detail.results[]。DESIGN.md §5-8-3）。
+// VerifyResult は verify の 1 コマンドの結果（issue_events kind verify の detail.results[]。DESIGN.md §9-3-3）。
 type VerifyResult struct {
 	Command    string `json:"command"`
 	Status     string `json:"status"` // ok / fail / timeout / skipped
@@ -43,7 +43,7 @@ type VerifyEvent struct {
 }
 
 // LastVerify はイシューの直近 1 件の verify の記録を返す（無ければ nil）。
-// 規則 verify.require_on_close は直近の 1 件だけを見る（§5-8-4。k_issue_events_issue_at を使う）。
+// 規則 verify.require_on_close は直近の 1 件だけを見る（DESIGN.md §9-3-4。k_issue_events_issue_at を使う）。
 func LastVerify(ctx context.Context, q execQuerier, issueID int64) (*VerifyEvent, error) {
 	var ev VerifyEvent
 	var detail []byte
@@ -92,7 +92,7 @@ func SelfReportedInReview(ctx context.Context, q execQuerier, projectID int64) (
 }
 
 // BaselineSections は、イシューの「本文の節ごとのハッシュ（detail.sections）を持つ最初の記録」の
-// sections の JSON を返す（DESIGN.md §5-8-4）。無ければ nil（この仕組みより前に
+// sections の JSON を返す（DESIGN.md §9-3-4）。無ければ nil（この仕組みより前に
 // 起票されたイシューは create のイベントに sections が無いので、これから create / update される
 // ものから効く）。中身の読み取りは domain.SectionHashes（規則は domain の 1 か所）。
 //

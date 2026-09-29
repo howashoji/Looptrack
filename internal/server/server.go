@@ -21,6 +21,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/service"
 	"github.com/howashoji/looptrack/internal/store"
+	"github.com/howashoji/looptrack/internal/updatecheck"
 )
 
 // 埋め込むのは実際に配信するものだけに絞る。static/* （中身を丸ごと）だと、node --test で回す
@@ -38,16 +39,47 @@ type Config struct {
 	TrustedProxies []netip.Prefix // X-Real-IP を信用する接続元（ホスト Nginx → Docker ブリッジ）
 	Issuer         string         // TOTP の発行者名（認証アプリに表示される名前。LOOPTRACK_TOTP_ISSUER。空なら DefaultTOTPIssuer）
 	PublicURL      string         // 外から見た URL の基点（例 https://example.com）。OAuth のメタデータで使う
-	// 実行ファイルの配布と版の判定（DESIGN.md §5-11）
+	// 実行ファイルの配布と版の判定（DESIGN.md §5-1）
 	DistDir          string // looptrack の配布ディレクトリ（LOOPTRACK_DIST_DIR。空なら binaries は空の一覧）
 	ClientMinVersion string // 対応する looptrack の最低の版（LOOPTRACK_CLIENT_MIN_VERSION。空なら判定しない）
 	Logger           *slog.Logger
 	Now              func() time.Time // テスト用
-	// LocalMode はローカルモード（§5-12）。127.0.0.1 固定の待ち受け（serve が検査）で、Web・API・MCP を
+	// LocalMode はローカルモード（DESIGN.md §3-3）。127.0.0.1 固定の待ち受け（serve が検査）で、Web・API・MCP を
 	// 認証なしで最初の管理者として通す。Host・Origin の検査でブラウザ経由の攻撃を止める
 	LocalMode bool
 	// AllowNoAdmin は管理者 0 人でも「セットアップ未完了」にしない（テスト用。本番の serve は常に false）
 	AllowNoAdmin bool
+	// UpdateNotice は画面の共通ヘッダの帯に出す新しい版（nil を返せば出さない）。デスクトップ版と looptrack serve が
+	// 確認の結果を渡す（internal/updatecheck）。nil なら帯を出さない
+	UpdateNotice func() *updatecheck.Notice
+	// UpdateStopInTray は帯の止め方の案内をトレイのメニュー（デスクトップ版の「新しい版を確認する」）にするか。
+	// false・nil なら環境変数 LOOPTRACK_UPDATE_CHECK=off を案内する（トレイを出していない headless・--no-tray）
+	UpdateStopInTray func() bool
+	// UpdateServer は帯をサーバ版の知らせにするか（looptrack serve が true にする）。true なら帯は role が admin の利用者にだけ出し、
+	// 案内は install.sh で入れたサーバの更新の 1 行（updatecheck.ServerUpgradeCommand）と止め方（.env の LOOPTRACK_UPDATE_CHECK=off）。
+	// GET /api/v1/dist の server_update（admin のときだけ）にも更新の 1 行を載せる
+	UpdateServer bool
+	// UpdateApplier は帯の「更新する」ボタン（POST {base}/update/apply）が呼ぶ置き換え。デスクトップ版だけが渡す
+	// （localserve.Options.UpdateApplier）。nil ならボタンを出さず、POST {base}/update/apply は 404
+	UpdateApplier UpdateApplier
+}
+
+// UpdateApplier は新しい版への置き換えを画面の帯から始める部品（デスクトップ版の App が満たす。手順はトレイの
+// 「新しい版 <版> に更新する」と同じ: 取得・照合・置き換え・起動し直し・失敗したら戻す）。
+type UpdateApplier interface {
+	// UpdateReplaceable は知らせている新しい版に 1 クリックで置き換えられるか（false ならボタンを出さない）
+	UpdateReplaceable() bool
+	// StartUpdate は置き換えを背景で始める。始めたら true（置き換えられない・進行中なら false で何もしない）
+	StartUpdate() bool
+	// UpdateApplyState は置き換えの状態（進行中か・直近の失敗の版と理由。失敗が無ければ空）
+	UpdateApplyState() (running bool, failedVersion, failedReason string)
+}
+
+// updateApplyView は帯の「更新する」の表示（layout.html の update_notice が使う）。
+type updateApplyView struct {
+	Ready                       bool // ボタンを出せる（置き換えられて、進行中でない）
+	Running                     bool
+	FailedVersion, FailedReason string
 }
 
 // セッション・ログイン制限の時間。
@@ -75,6 +107,8 @@ type Server struct {
 	// mcpServersBuilt は MCP のサーバ（ツール定義）を組んだ回数。言語ごとに起動時の 1 回だけで、
 	// 要求ごとには組み直さない（テストがこれを数える）
 	mcpServersBuilt atomic.Int64
+	// binds は MCP の呼び出しを会話のセッションに結ぶ合鍵の置き場（session_binds.go）。メモリだけに持つ
+	binds *sessionBinds
 }
 
 // DefaultTOTPIssuer は TOTP の発行者名の既定（認証アプリに表示される）。
@@ -108,6 +142,28 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 		},
 		// localMode はローカルモードか（ログアウトを出さない）
 		"localMode": func() bool { return cfg.LocalMode },
+		// updateNotice は共通ヘッダの帯に出す新しい版（無ければ nil で、帯を出さない）
+		"updateNotice": func() *updatecheck.Notice {
+			if cfg.UpdateNotice == nil {
+				return nil
+			}
+			return cfg.UpdateNotice()
+		},
+		// updateStopInTray は帯の止め方の案内をトレイのメニューにするか（しないなら環境変数）
+		"updateStopInTray": func() bool { return cfg.UpdateStopInTray != nil && cfg.UpdateStopInTray() },
+		// updateServer は帯をサーバ版の知らせ（管理者だけ・更新の 1 行）にするか。updateCommand はその 1 行
+		"updateServer":  func() bool { return cfg.UpdateServer },
+		"updateCommand": func() string { return updatecheck.ServerUpgradeCommand },
+		// updateApply は帯の「更新する」の表示（デスクトップ版が UpdateApplier を渡したときだけ。サーバ版の帯では nil）
+		"updateApply": func() *updateApplyView {
+			if cfg.UpdateApplier == nil || cfg.UpdateServer {
+				return nil
+			}
+			v := &updateApplyView{}
+			v.Running, v.FailedVersion, v.FailedReason = cfg.UpdateApplier.UpdateApplyState()
+			v.Ready = !v.Running && cfg.UpdateApplier.UpdateReplaceable()
+			return v
+		},
 		// who は画面に出す利用者名（表示名。無ければログイン名）
 		"who": func(u store.User) string {
 			if strings.TrimSpace(u.DisplayName) != "" {
@@ -127,7 +183,8 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{cfg: cfg, db: db, tmpl: tmpl, mux: http.NewServeMux(), svc: service.New(db, cfg.Now), hashSlot: make(chan struct{}, 2)}
+	s := &Server{cfg: cfg, db: db, tmpl: tmpl, mux: http.NewServeMux(), svc: service.New(db, cfg.Now), hashSlot: make(chan struct{}, 2),
+		binds: newSessionBinds(cfg.Now)}
 	s.routes()
 	return s, nil
 }
@@ -144,7 +201,7 @@ func (s *Server) routes() {
 			return
 		}
 		if s.cfg.LocalMode {
-			// 認証を省いているサーバであることを、認証の要らないこの口で名乗る（§5-12）。
+			// 認証を省いているサーバであることを、認証の要らないこの口で名乗る（DESIGN.md §3-3）。
 			// 同梱の CLI は、資格情報が無いときこれを見てトークンなしで呼ぶ（api.LocalModeHeader）。
 			// ここに届くのは Host が loopback の名前の要求だけ（gate の DNS rebinding の検査）。
 			w.Header().Set("X-Looptrack-Local-Mode", "1")
@@ -160,6 +217,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+b+"/login/totp/setup", s.pending(s.totpSetupPage))
 	s.mux.HandleFunc("POST "+b+"/login/totp/setup", s.pending(s.totpSetupSubmit))
 	s.mux.HandleFunc("POST "+b+"/logout", s.web(s.logout))
+	s.mux.HandleFunc("POST "+b+"/update/apply", s.web(s.updateApply)) // 帯の「更新する」（デスクトップ版だけ。update_apply.go）
 
 	api := http.NewServeMux()
 	api.HandleFunc("GET "+b+"/api/v1/me", s.apiMe)
@@ -190,6 +248,8 @@ func (s *Server) routes() {
 	api.HandleFunc("GET "+b+"/api/v1/issues/{id}/verify", s.apiGetVerify)   // 検証コマンドと直近の記録
 	api.HandleFunc("POST "+b+"/api/v1/issues/{id}/verify", s.apiPostVerify) // CLI が手元で実行した結果の記録
 	api.HandleFunc("POST "+b+"/api/v1/issues/{id}/assign", s.apiAssign)     // 担当者の変更
+	// MCP の呼び出しを会話に結ぶ合鍵（PreToolUse の hook が送る・session_binds.go）
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/session-binds", s.apiPostSessionBind)
 	api.HandleFunc("GET "+b+"/api/v1/activity", s.apiActivity)
 	api.HandleFunc("GET "+b+"/api/v1/projects/{slug}/guide", s.apiGuide) // 使い方とルール
 	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/next", s.apiNext)  // ループ運用の着手

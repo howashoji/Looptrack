@@ -434,6 +434,24 @@ func (g *guard) reset() {
 
 // ------------------------------------------------------------------ mark
 
+// normalizeBash は、実作業と参照の判定に掛ける前のコマンド文字列を作る（git ガード・秘密のガードと同じ hookcmd の段）。
+//
+// 判定は「引用符の中はデータ」という前提で組んであるので、`bash -c 'git commit …'`・`eval "git push …"` のように
+// **実際に実行されるコマンドが引用符の中にある形**は、そのままでは判定の対象から消える（実作業も参照も 1 件も
+// 記録されず、Stop の検査は len(events) == 0 で黙って通る）。行末の継続（`git \` + 改行 + `commit`）も、
+// つながないと `git` と `commit` が別の行に分かれて同じく消える。
+//
+//   - 行末の継続をつなぐ（hookcmd.JoinContinuations）
+//   - 入れ子のシェルを 1 段ほどき、前置の語を落とす（hookcmd.Normalize）
+//
+// ほどく位置は**コマンドの位置だけ**（hookcmd.HeadOnly。git ガードと同じ）。この hook は記録する側で、
+// 積んだ記録は Stop の差し戻しになる。差し戻しは ask と違ってその場で人が通せないので、`echo bash -c 'git commit …'`
+// のように**何も実行されない形**まで実作業に数えると、していない作業について更新を求めてしまう。
+// AnyPos（秘密のガード）のように広く取る理由はここには無い。
+func normalizeBash(cmd string) string {
+	return hookcmd.Normalize(hookcmd.JoinContinuations(cmd), hookcmd.HeadOnly)
+}
+
 // escapeSubcmds は逃げ道のサブコマンド。
 var escapeSubcmds = map[string]bool{"ack": true, "reset": true}
 
@@ -589,7 +607,15 @@ func workLabel(text string, start int) string {
 	for _, cut := range []string{`"`, "'", "$("} {
 		seg, _, _ = strings.Cut(seg, cut)
 	}
-	rs := []rune(strings.Join(hookcmd.Fields(seg), " "))
+	// `eval "git commit -m \"x\""` をほどくと、引用を落とした後に打ち消しのバックスラッシュだけが語として残る。
+	// 素の形（`git commit -m "x"`）のラベルとそろえるため、その語は外す。
+	var words []string
+	for _, w := range hookcmd.Fields(seg) {
+		if w != `\` {
+			words = append(words, w)
+		}
+	}
+	rs := []rune(strings.Join(words, " "))
 	if len(rs) > 120 {
 		rs = rs[:120]
 	}
@@ -614,10 +640,10 @@ func subagent(ev hookio.Event) bool {
 }
 
 // harnessTags は、AI の harness が利用者のプロンプトに混ぜるブロックのタグ。
-// 他のセッションからの連絡・system の注意書き・タスクの通知がこの形で入る。ここに名前が出ただけの
+// 他のセッションからの連絡・サブエージェントの報告・system の注意書き・タスクの通知がこの形で入る。ここに名前が出ただけの
 // イシューは「利用者が言及した」とは数えない（数えると、読んでもいないイシューを毎ターン外すことになる）。
 // 当たるタグが無い AI では何も変わらない。
-var harnessTags = []string{"cross-session-message", "system-reminder", "task-notification", "ci-monitor-event"}
+var harnessTags = []string{"cross-session-message", "agent-message", "system-reminder", "task-notification", "ci-monitor-event"}
 
 // userPrompt は UserPromptSubmit の本文のうち、利用者が書いた部分。
 // 取り除くタグは LOOPTRACK_FRESHNESS_IGNORE_TAGS（空白かカンマ区切り）で置き換えられる。
@@ -699,7 +725,7 @@ func FreshnessMark(ctx context.Context, c *Call, ev hookio.Event) (hookio.Result
 	}
 	switch t.Kind {
 	case hookio.KindBash:
-		cmd := t.Command()
+		cmd := normalizeBash(t.Command())
 		// ack / reset を含むコマンドは参照を登録しない（同じコマンドの comment で ack した ID が戻るため）
 		if !isEscapeCmd(cmd) {
 			if err := g.addEngaged(bashEngagedIDs(cmd, pat)); err != nil {
@@ -842,7 +868,7 @@ func FreshnessCheck(ctx context.Context, c *Call, ev hookio.Event) (hookio.Resul
 		return hookio.Result{}, nil
 	}
 	cli, ack := escapeCommands(c.root())
-	return hookio.Result{Block: staleMessage(c.lang(), events, stale, cli, ack)}, nil
+	return hookio.Result{Block: staleMessage(c.lang(), events, stale, cli, ack), Kind: "issue-freshness: stale"}, nil
 }
 
 // escapeCommands は差し戻しの文に出す CLI と逃げ道の呼び方。

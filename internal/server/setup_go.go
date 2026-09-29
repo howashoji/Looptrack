@@ -7,7 +7,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
-// setup ツールの手順（looptrack。DESIGN.md §5-11「配布と更新」）。
+// setup ツールの手順（looptrack。DESIGN.md §5-1「配布と更新」）。
 //
 // 以前は 1.0.0 より前の CLI の手順が既定で、looptrack は引数 cli: "looptrack" かサーバの LOOPTRACK_SETUP_GO のときだけ
 // だった。以前の CLI は撤去し、手順は looptrack だけにした（LOOPTRACK_SETUP_GO も廃止）。
@@ -159,9 +159,13 @@ func (g *goSetup) posixFetch(tail string) string {
 	}
 	cases = append(cases, fmt.Sprintf(`*) echo "%s: $(uname -s)/$(uname -m)" >&2; false;;`,
 		i18n.T(g.lang, "server.mcp.setup.fetch.no_dist_platform")))
-	return fmt.Sprintf(`D="%s" && mkdir -p "$D" && case "$(uname -s)/$(uname -m)" in %s esac && curl -fsSL "$U" -o "$D/looptrack.part" && `+
-		`echo "$S  $D/looptrack.part" | sum -c - && chmod 755 "$D/looptrack.part" && mv -f "$D/looptrack.part" "$D/looptrack" && %s %s`,
-		goPosixDir, strings.Join(cases, " "), goPosixBin, tail)
+	// 置き場に looptrack が既にあれば取得も置き換えもせず、その looptrack で init だけを行う。配布の版と比べずに
+	// 置き換えると、配布が手元より古いとき手元の新しい版を古い版に戻してしまう。版の比較はここでは書かない:
+	// init の後の導入済み通知をサーバが relver で比べ、古ければ次の setup で self-update を案内する（比較を 1 か所に保つ）
+	return fmt.Sprintf(`D="%s" && if [ -x "$D/looptrack" ]; then echo "%s: $D/looptrack" >&2; else mkdir -p "$D" && `+
+		`case "$(uname -s)/$(uname -m)" in %s esac && curl -fsSL "$U" -o "$D/looptrack.part" && `+
+		`echo "$S  $D/looptrack.part" | sum -c - && chmod 755 "$D/looptrack.part" && mv -f "$D/looptrack.part" "$D/looptrack"; fi && %s %s`,
+		goPosixDir, i18n.T(g.lang, "server.mcp.setup.fetch.skip_existing"), strings.Join(cases, " "), goPosixBin, tail)
 }
 
 // winFetch は PowerShell の取得と init（CPU は PROCESSOR_ARCHITECTURE。ARM64 に arm64 が無ければ amd64 をエミュレーションで使う）。
@@ -179,12 +183,15 @@ func (g *goSetup) winFetch(tail string) string {
 	}
 	cases = append(cases, fmt.Sprintf(`default { throw "%s: $env:PROCESSOR_ARCHITECTURE" }`,
 		i18n.T(g.lang, "server.mcp.setup.fetch.no_dist_cpu")))
+	// 既にあれば取得も置き換えもしない（posixFetch と同じ理由）
 	return fmt.Sprintf(`$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'; `+
-		`$D = Join-Path $env:LOCALAPPDATA 'Programs\looptrack'; New-Item -ItemType Directory -Force -Path $D | Out-Null; `+
+		`$D = Join-Path $env:LOCALAPPDATA 'Programs\looptrack'; $B = Join-Path $D 'looptrack.exe'; `+
+		`if (Test-Path -PathType Leaf $B) { Write-Host "%s: $B" } else { New-Item -ItemType Directory -Force -Path $D | Out-Null; `+
 		`switch ($env:PROCESSOR_ARCHITECTURE) { %s }; $P = Join-Path $D 'looptrack.part'; Invoke-WebRequest -UseBasicParsing -Uri $U -OutFile $P; `+
 		`if ((Get-FileHash -Algorithm SHA256 -Path $P).Hash -ne $S) { Remove-Item $P; throw '%s' }; `+
-		`Move-Item -Force $P (Join-Path $D 'looptrack.exe'); %s %s`,
-		strings.Join(cases, " "), i18n.T(g.lang, "server.mcp.setup.fetch.sha_mismatch"), goWinBin, tail)
+		`Move-Item -Force $P $B }; %s %s`,
+		i18n.T(g.lang, "server.mcp.setup.fetch.skip_existing"), strings.Join(cases, " "),
+		i18n.T(g.lang, "server.mcp.setup.fetch.sha_mismatch"), goWinBin, tail)
 }
 
 // fetch は取得 + init の (主のコマンド, Windows のコマンド)。OS が分かっていれば 2 つ目は空。
@@ -262,8 +269,8 @@ func goUpdateSteps(lang i18n.Lang, agent string, st installStateJSON) []setupSte
 func (g *goSetup) baseSteps(lang i18n.Lang, agent, slug, base, dist string, st installStateJSON) []setupStepJSON {
 	lc, lw := g.run("issue login --browser --url " + base)
 	cc, cw := g.run("issue config")
-	if agent == agentCopilot { // Copilot には環境変数を付けて渡す
-		cc, cw = copilotEnv(cc, base, slug, g.os == "windows"), copilotEnv(cw, base, slug, true)
+	if needsEnvPrefix(agent) { // Copilot・Codex には環境変数を付けて渡す
+		cc, cw = agentEnvPrefix(cc, base, slug, g.os == "windows"), agentEnvPrefix(cw, base, slug, true)
 	}
 	login := g.step("ai", i18n.T(lang, "server.mcp.setup.step.login", "check", joinOS(lang, cc, cw), "url", base), lc, lw)
 	confirm := setupStepJSON{Who: "ai", Title: i18n.T(lang, "server.mcp.setup.step.confirm")}

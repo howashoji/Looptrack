@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// 英語の見出し（## Acceptance criteria / ## Verify commands。大小を問わない・DESIGN.md §5-13）の本文で、
+// 英語の見出し（## Acceptance criteria / ## Verify commands。大小を問わない・DESIGN.md §9-6）の本文で、
 // next の受け入れ条件・verify の一覧（GET・MCP verify_issue）・verify.require_on_close の判定が日本語の見出しと同じ結果になる。
 // コードブロックの中の見出しは、どちらの言語でも見出しとしない。
 func TestEnglishHeadingsSameAsJapanese(t *testing.T) {

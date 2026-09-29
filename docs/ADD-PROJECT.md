@@ -104,7 +104,7 @@ init はスクリプトを 1 つも置きません。フックは `looptrack hoo
   - Windows では `powershell` / `windows` のフィールドに `command` と同じ `looptrack hook …` が入ります（実物は未確認）。詳しくは [AI-GUIDE.md](AI-GUIDE.md) §7-3 にあります。
 - 組み合わせるなら `--agent claude-code,codex,copilot` です。それ以外の AI は `--agent other`（案内文だけ）を使います。
 - MCP の接続設定も入れるなら `--mcp` を付けます（`.mcp.json` の `looptrack`）。
-- 入れたくないものがあれば `--no-freshness` / `--no-usage` / `--no-summary` / `--no-skill` で外せます。
+- 入れたくないものがあれば `--no-freshness` / `--no-usage` / `--no-summary` / `--no-session-bind` / `--no-skill` で外せます。
 - Looptrack のリポジトリが手元に無い端末では、トークンを `login` してから `--source server` を付けます。サーバの `/api/v1/dist` から取得し、SHA-256 を確かめて置きます。MCP だけを接続した端末は §4-2（setup ツール）を見てください。
 - **手で配線したプロジェクト**も一度 `init` を通してください。SessionStart の `summary` に `--agent claude-code` が付き、導入済みであることがサーバへ通知されます。付かないと、MCP のツール結果に【導入が未完了】が出続けます。
 - **ルールの強制を hook で作らないでください。** サーバのプロジェクト別ルール（§1）に置けば、CLI・MCP のどの経路でも同じ判定になります。

@@ -155,7 +155,7 @@ func TestFailOpenTimeout(t *testing.T) {
 
 // TestRegistry は core の名前が loop の名前と重ならないこと（cmd/looptrack は core を先に引く）。
 func TestRegistry(t *testing.T) {
-	want := []string{"issue-freshness-check", "issue-freshness-mark", "summary", "usage"}
+	want := []string{"issue-freshness-check", "issue-freshness-mark", "issue-session-bind", "summary", "usage"}
 	if got := Names(); strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("Names = %v", got)
 	}

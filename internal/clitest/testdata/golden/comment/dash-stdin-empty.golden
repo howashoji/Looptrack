@@ -1,0 +1,14 @@
+# comment/dash-stdin-empty
+$ issue comment DEMO-0001 -
+stdin "   \n"
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 本文が空です（引数か標準入力で渡してください）。
+
+#### requests (0)
+
+#### files (0)

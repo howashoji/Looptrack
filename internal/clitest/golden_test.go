@@ -149,10 +149,12 @@ func TestGoldenFilesHaveCases(t *testing.T) {
 		names[c.Name] = true
 	}
 	var stale []string
+	seen := 0
 	err := filepath.Walk(goldenDir, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".golden") {
 			return err
 		}
+		seen++
 		rel, _ := filepath.Rel(goldenDir, p)
 		name := strings.TrimSuffix(filepath.ToSlash(rel), ".golden")
 		if !names[name] {
@@ -162,6 +164,12 @@ func TestGoldenFilesHaveCases(t *testing.T) {
 	})
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
+	}
+	// golden を 1 つも見ずに「残りは無い」と緑になるのを塞ぐ（置き場の移動・拡張子の変更で走査が空振りする）。
+	// 下限は実物（2026-09 に golden 482 本）の半分より下。
+	t.Logf("golden %d 本・ケース %d 件", seen, len(names))
+	if seen < 200 {
+		t.Fatalf("%s の golden を %d 本しか見ていません（走査が空振りしています）", goldenDir, seen)
 	}
 	sort.Strings(stale)
 	if len(stale) > 0 {

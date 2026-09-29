@@ -123,7 +123,7 @@ var condSecretExtRe = regexp.MustCompile(`(?i)\.(?:pem|key|asc)$`)
 // .ssh / .gnupg は鍵そのものの置き場、.aws はクラウドの認証情報の置き場、private / secrets / keys / pki /
 // letsencrypt は TLS の秘密鍵を置く慣習の名前（/etc/ssl/private・/etc/letsencrypt/live）。
 // 大小は区別しない（Private/・Secrets/・Keys/・.SSH/ のような大文字始まりの置き場も同じ慣習の名前）。
-var secretDirRe = regexp.MustCompile(`(?i)(?:^|[/\\])(?:\.ssh|\.gnupg|\.aws|private|secrets|keys|pki|letsencrypt)[/\\]`)
+var secretDirRe = regexp.MustCompile(`(?i)(?:^|[/\\])(\.ssh|\.gnupg|\.aws|private|secrets|keys|pki|letsencrypt)[/\\]`)
 
 // macPrivateRootRe は macOS の実パスの頭。/tmp・/var・/etc の実体は /private/tmp・/private/var・/private/etc なので、
 // 実パス（realpath の出力・一時ディレクトリ）を書くと必ず先頭に private/ が現れ、置き場の判定が誤発火する
@@ -141,6 +141,61 @@ var macPrivateRootRe = regexp.MustCompile(`(?i)^/private/(?:tmp|var|etc)/`)
 func inSecretDir(p string) bool {
 	return secretDirRe.MatchString(macPrivateRootRe.ReplaceAllString(p, "/"))
 }
+
+// secretDirKind は p が当たった秘密の置き場の種類（判定の記録の kind）。当たらなければ ""。
+// 値は secretDirKinds の定数から引く（入力から切り出した文字列をそのまま返さない）。
+func secretDirKind(p string) string {
+	m := secretDirRe.FindStringSubmatch(macPrivateRootRe.ReplaceAllString(p, "/"))
+	if m == nil {
+		return ""
+	}
+	if k, ok := secretDirKinds[strings.ToLower(m[1])]; ok {
+		return k
+	}
+	return secretKindDir
+}
+
+// 秘密と見なした規則の種類（判定の記録の kind。PreToolSecretsGuard が "secrets: <操作> <種類>" の形で使う）。
+// 記録に秘密が混ざらないよう、**ここの定数だけ**を使う（パス・ファイル名そのものは入れない）。
+const (
+	secretKindEnv      = ".env"
+	secretKindCredJSON = "credentials.json"
+	secretKindNetrc    = ".netrc"
+	secretKindPgpass   = ".pgpass"
+	secretKindNpmrc    = ".npmrc"
+	secretKindHtpasswd = ".htpasswd"
+	secretKindSSHKey   = "id_*"
+	secretKindKeystore = "keystore" // .p12・.pfx・.p8・.jks・.keystore・.gpg
+	secretKindGlob     = "glob"     // 末尾のグロブを落とした残りが名前だけで秘密（.env*・id_rsa*）
+	secretKindCreds    = "credentials"
+	secretKindDir      = "dir"
+	secretKindPem      = ".pem"
+	secretKindKey      = ".key"
+	secretKindAsc      = ".asc"
+)
+
+// secretDirKinds は置き場の語（小文字）→ 記録の kind。
+var secretDirKinds = map[string]string{
+	".ssh": "dir:.ssh", ".gnupg": "dir:.gnupg", ".aws": "dir:.aws", "private": "dir:private",
+	"secrets": "dir:secrets", "keys": "dir:keys", "pki": "dir:pki", "letsencrypt": "dir:letsencrypt",
+}
+
+// secretNameKinds は名前だけで秘密と分かるもの（secretFileRe に当たったもの）の細かい種類。上から順に見る。
+var secretNameKinds = []struct {
+	re   *regexp.Regexp
+	kind string
+}{
+	{regexp.MustCompile(`(?i)^\.env`), secretKindEnv},
+	{regexp.MustCompile(`(?i)credentials\.json$`), secretKindCredJSON},
+	{regexp.MustCompile(`(?i)^[._]netrc$`), secretKindNetrc},
+	{regexp.MustCompile(`(?i)^\.pgpass$`), secretKindPgpass},
+	{regexp.MustCompile(`(?i)^\.npmrc$`), secretKindNpmrc},
+	{regexp.MustCompile(`(?i)^\.htpasswd$`), secretKindHtpasswd},
+	{regexp.MustCompile(`(?i)^id_`), secretKindSSHKey},
+}
+
+// secretCondKinds は条件つきの拡張子（小文字）→ 記録の kind。
+var secretCondKinds = map[string]string{".pem": secretKindPem, ".key": secretKindKey, ".asc": secretKindAsc}
 
 // pubStemRe は公開の証明書・署名に使う慣習の名前。
 //
@@ -262,48 +317,69 @@ var fileURLRe = regexp.MustCompile(`(?i)^file://`)
 // 名前を伏せる形は拾わない）。
 // **限界**: 慣習から外れた名前の秘密鍵を慣習から外れた置き場に置くと（例: backup/2026.pem）拾えない。
 // 名前で見分ける方式の限界なので、rules の secrets-discipline.md に明記してある。
-func secretPath(p string) bool {
+func secretPath(p string) bool { return secretRule(p) != "" }
+
+// secretRule は p が秘密を持つファイルなら、当たった規則の種類（secretKind* か secretDirKinds の値）を返す。
+// 秘密でなければ ""。判定は secretPath と同じ（secretPath はこれが "" でないかだけを見る）。
+// 返すのは定数だけで、p から切り出した文字列は返さない（判定の記録に秘密を混ぜないため）。
+func secretRule(p string) string {
 	p = fileURLRe.ReplaceAllString(p, "")
 	b := p
 	if i := strings.LastIndexAny(b, `/\`); i >= 0 {
 		b = b[i+1:]
 	}
 	if b == "" || secretFileAllowRe.MatchString(b) {
-		return false
+		return ""
 	}
 	if secretFileRe.MatchString(b) {
-		return true
+		for _, k := range secretNameKinds {
+			if k.re.MatchString(b) {
+				return k.kind
+			}
+		}
+		return secretKindKeystore
 	}
 	if secretGlobPath(p) {
-		return true
+		return secretKindGlob
 	}
 	if credsBareRe.MatchString(b) {
-		return inSecretDir(p)
+		if inSecretDir(p) {
+			return secretKindCreds
+		}
+		return ""
 	}
 	if !condSecretExtRe.MatchString(b) {
-		return false
+		return ""
 	}
 	stem := b
 	if i := strings.LastIndexByte(stem, '.'); i > 0 {
 		stem = stem[:i]
 	}
-	if inSecretDir(p) {
-		return true
+	if k := secretDirKind(p); k != "" {
+		return k
 	}
-	if strings.HasSuffix(strings.ToLower(b), ".key") {
+	ext := strings.ToLower(b[len(b)-len(".pem"):]) // condSecretExtRe に当たったので末尾の 4 文字が拡張子
+	extKind := secretCondKinds[ext]
+	hit := func(ok bool) string {
+		if ok {
+			return extKind
+		}
+		return ""
+	}
+	if ext == ".key" {
 		// .key は鍵そのものを名乗る拡張子。公開の語（cert・chain・bundle…）も TLS の鍵の名前なので秘密の側。
-		return keyStemRe.MatchString(stem) || pubStemRe.MatchString(stem) || compoundKeyStem(stem, false)
+		return hit(keyStemRe.MatchString(stem) || pubStemRe.MatchString(stem) || compoundKeyStem(stem, false))
 	}
 	// 公開の語があるときだけ、重なりやすい語を秘密の語から降ろす。**降ろすのは片方だけ**。
 	// key を降ろす正当な理由があるのは public / pubkey のときだけで（public-key は公開鍵）、
 	// cert・chain・bundle で降ろすと key-cert.pem・ca-key-bundle.pem（CA の秘密鍵）が通ってしまう。
 	if pubKeyStemRe.MatchString(stem) {
-		return keyStemNoKeyRe.MatchString(stem) || compoundKeyStem(stem, true)
+		return hit(keyStemNoKeyRe.MatchString(stem) || compoundKeyStem(stem, true))
 	}
 	if pubStemRe.MatchString(stem) {
-		return keyStemNoCaRe.MatchString(stem) || compoundKeyStem(stem, false)
+		return hit(keyStemNoCaRe.MatchString(stem) || compoundKeyStem(stem, false))
 	}
-	return keyStemRe.MatchString(stem) || compoundKeyStem(stem, false)
+	return hit(keyStemRe.MatchString(stem) || compoundKeyStem(stem, false))
 }
 
 // secretsAllowed は LOOPTRACK_LOOP_SECRETS_ALLOW の語のどれかが s に含まれるか（例外の指定）。
@@ -379,17 +455,6 @@ func wordsIn(run string) []wordAt {
 // 位置と大小の扱いは showCmdRe / showCmdHeadRe と同じ。
 var copyCmdRe = regexp.MustCompile(cmdAnyPos + cmdPath + `(?:cp|install)` + cmdEnd)
 var copyCmdHeadRe = regexp.MustCompile(cmdHeadPos + cmdPath + `(?i:cp|install|copy|copy-item|cpi|xcopy)` + cmdEnd)
-
-// lineContRe は行末の継続（バックスラッシュ + 改行）と、コマンドの末尾に残るバックスラッシュ。
-//
-// シェルはこの 2 文字を取り除いて行をつなぐが、取り除かずに判定すると語が `.env\` になり、
-// secretPath の basename の切り出し（LastIndexAny(b, "/\\")）が末尾のバックスラッシュを区切りとして拾って
-// basename が空になる（＝必ず「秘密ではない」と答える）。長いコマンドを読みやすく折り返しただけで
-// ガードが黙るので、シェルと同じ規則でつないでから判定する。
-//
-// 取り除くのは**改行（か文字列の終わり）が直後に来るバックスラッシュだけ**。Windows のパスの区切り
-// （C:\tmp\x.txt）は後ろに改行が無いので壊れない。
-var lineContRe = regexp.MustCompile(`\\(?:\r?\n|$)`)
 
 // runSegments は引用符の外の区切り（; & | 改行 かっこ）でコマンド文字列を単純コマンドに分ける。
 // 引用符の中の区切りでは切らない。閉じていない引用符があるときは ok = false（呼ぶ側は分けずに扱う）。
@@ -559,7 +624,7 @@ func PreToolSecretsGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 		if p == "" || !secretPath(p) || secretsAllowed(p, e.env) {
 			return hookio.Result{}, nil
 		}
-		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.open_file", "path", p) + note}, nil
+		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.open_file", "path", p) + note, Kind: "secrets: open_file " + secretRule(p)}, nil
 	case hookio.KindBash:
 	default:
 		return hookio.Result{}, nil
@@ -570,7 +635,9 @@ func PreToolSecretsGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 		return hookio.Result{}, nil
 	}
 	// 行末の継続（バックスラッシュ + 改行）をシェルと同じようにつないでから判定する。
-	cmd = lineContRe.ReplaceAllString(cmd, "")
+	// つながないと語が `.env\` になり、secretPath の basename の切り出し（LastIndexAny(b, "/\\")）が
+	// 末尾のバックスラッシュを区切りとして拾って basename が空になる（＝必ず「秘密ではない」と答える）。
+	cmd = hookcmd.JoinContinuations(cmd)
 	// 判定に掛ける文字列は hookcmd の共通の段で作る（git ガードと同じものを呼ぶ）。
 	// 入れ子のシェルをほどき、前置の語（sudo・env・xargs …）を落とす。
 	// 位置を問わない（hookcmd.AnyPos）のは、`ask` は人がその場で通せるので、広く当てて
@@ -586,7 +653,7 @@ func PreToolSecretsGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 		if secretsAllowed(run, e.env) {
 			return hookio.Result{}, nil
 		}
-		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.store", "match", strings.TrimSpace(m)) + note}, nil
+		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.store", "match", strings.TrimSpace(m)) + note, Kind: "secrets: store"}, nil
 	}
 	// パスは引用符の中も見る（ヒアドキュメントの本文だけ落とす）。数えるのは中身がパスそのものの組だけ。
 	// 単純コマンドごとに数え、雛形からの複写であるコマンドだけを除く（ほかのコマンドは通常どおり判定する）。
@@ -615,11 +682,12 @@ func PreToolSecretsGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 		return hookio.Result{}, nil
 	}
 	list := strings.Join(paths, i18n.T(lang, "loop.secrets.sep"))
+	rule := secretRule(paths[0]) // 記録の kind は最初のパスの規則の種類（定数）だけ。パスそのものは入れない
 	if gitStageRe.MatchString(run) {
-		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.git_stage", "list", list)}, nil
+		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.git_stage", "list", list), Kind: "secrets: git_stage " + rule}, nil
 	}
 	if redirect || showCmdRe.MatchString(run) || showCmdHeadRe.MatchString(run) {
-		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.show", "list", list) + note}, nil
+		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.show", "list", list) + note, Kind: "secrets: show " + rule}, nil
 	}
 	return hookio.Result{}, nil
 }

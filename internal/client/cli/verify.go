@@ -22,7 +22,7 @@ type Exit struct{ Code int }
 
 func (e *Exit) Error() string { return fmt.Sprintf("exit %d", e.Code) }
 
-// cmdVerify は受け入れ条件の検証コマンドを実行して記録する（DESIGN §5-8-2）。
+// cmdVerify は受け入れ条件の検証コマンドを実行して記録する（DESIGN §9-3-2）。
 // 終了コード: 全成功 0・失敗あり 1・節なし 2（何も記録しない）・記録の送信に失敗 1（手元の結果は表示する）。
 func cmdVerify(c *Ctx, v *Values) error {
 	cl, err := c.Client()
@@ -77,7 +77,7 @@ func cmdVerify(c *Ctx, v *Values) error {
 		return i18n.Errorf("cli.err.verify_timeout")
 	}
 
-	// 受け入れ条件の節が更新されたのに検証コマンドの節が起票時のままなら、走らせる前に注記を出す（§5-8-4）
+	// 受け入れ条件の節が更新されたのに検証コマンドの節が起票時のままなら、走らせる前に注記を出す（DESIGN.md §9-3-4）
 	if x, _ := plan.Get("section_drift"); jsonorder.Truthy(x) && !v.Bool("json") {
 		c.Println(i18n.T(c.Lang, "domain.verify.section_drift", "id", issueID, "command", "looptrack issue verify "+issueID))
 	}

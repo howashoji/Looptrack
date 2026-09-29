@@ -52,6 +52,20 @@ the fixed marker `[looptrack:background-bound]` goes in front of them, instructi
 The parent **verifies, from the report, that the background processes were stopped, and only then integrates the result**. If that one line is missing,
 run `ps -eo pid,ppid,etime,command | grep -E 'until|while' | grep -v grep` yourself before integrating, and kill whatever is still there.
 
+**The same vessel also carries a line on cross-checking identifiers.** Whether or not the work waits on anything in the background,
+`pre-tool-subagent-bound` appends the line below after the same marker every time a subagent is launched (the marker is not multiplied).
+Copy an identifier that turned up in an earlier session's or a subagent's report into the next instruction without checking it against the real thing, and the mistake travels with every relay.
+Measured: the same wrong variable name was relayed three times in a single day. Each time it stopped only when the child checked it against the real thing with `git show`, and the parent never noticed once.
+The only place the word gets corrected is where the child looks at the real thing, so the line is pushed down to the child. **On the agents where nothing reaches the child by itself, the parent copies this line across verbatim too.**
+
+```text
+Before you use an identifier that appears in your instructions (a variable name, a function name, a commit SHA, a line number,
+a file path), cross-check it against the real thing with git show / git grep. Where they disagree, go with what you measured,
+and put one line in your report on the discrepancy between the word you were handed and what you measured.
+```
+
+The parent reads that line in the report and, where there is a discrepancy, corrects the word before it goes into any later instruction or issue.
+
 ## Detection (before it starts, right after a child finishes, at the end of a turn)
 
 - **Before it starts** (`pre-tool-wait-loop-guard` on PreToolUse): a wait loop with no bound (`until` / `while` whose body holds a `sleep`

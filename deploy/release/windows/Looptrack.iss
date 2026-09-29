@@ -1,4 +1,4 @@
-; Looptrack のデスクトップ版（Windows）のインストーラ（DESIGN.md §5-14・RELEASE.md「デスクトップ版」）。
+; Looptrack のデスクトップ版（Windows）のインストーラ（DESIGN.md §5-4・RELEASE.md「デスクトップ版」）。
 ;
 ; Inno Setup 7（ISCC）でコンパイルする。Windows でしか動かないので、組み立ては release.yml の
 ; desktop-windows-installer ジョブ（windows-2025 / windows-11-arm）で行う。手元からは
@@ -90,6 +90,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 japanese.TaskGroup=追加の設定:
 english.TaskGroup=Additional options:
+japanese.AppComment=AI コーディングエージェントの外部記憶となり、ループエンジニアリングを実現するイシュー管理ツール
+english.AppComment=Issue tracker serving as external memory for AI coding agents, enabling loop engineering
 japanese.TaskStartup=ログイン時に起動する
 english.TaskStartup=Start Looptrack when you log in
 japanese.TaskCLI=CLI を使えるようにする（端末・AI から looptrack を呼べるようにする）
@@ -114,7 +116,7 @@ Source: "{#MySourceDir}\OFL-BIZUDGothic.txt"; DestDir: "{app}"; Flags: ignorever
 
 [Icons]
 ; スタートメニューだけ（デスクトップのショートカットは出さない）。lowest なので {autoprograms} = {userprograms}
-Name: "{group}\Looptrack"; Filename: "{app}\Looptrack.exe"; Comment: "Looptrack"
+Name: "{group}\Looptrack"; Filename: "{app}\Looptrack.exe"; Comment: "{cm:AppComment}"
 
 [Run]
 ; 選択肢（Tasks）は、アプリを起動する前に済ませる。どちらも管理者権限は要らず、サーバも上げない

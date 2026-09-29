@@ -13,7 +13,7 @@
 //   - VS Code の Copilot はセッション ID を渡さないが、エージェント用のターミナルにだけ AI_AGENT=github_copilot_vscode_agent と
 //     COPILOT_AGENT=1 を付ける。セッション ID なしの AI の操作（X-Looptrack-Agent: copilot）として送る。
 //
-// 推測（状態ファイル・作業ディレクトリ）では読まない（DESIGN.md §5-4「Copilot のセッション ID」）。
+// 推測（状態ファイル・作業ディレクトリ）では読まない（DESIGN.md §9-5「Copilot のセッション ID」）。
 package session
 
 import (

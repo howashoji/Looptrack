@@ -200,6 +200,14 @@ func TestRunawayLoopThreshold(t *testing.T) {
 			[]string{" 26084 " + parent + " 00:12:00 " + snap(`eval 'while read -r l; do echo "$l"; done < /tmp/list'`)}),
 		st("除外の一覧は形より先に効く（docker・12 分）", "allow",
 			[]string{" 26085 " + parent + " 00:12:00 " + snap(`eval 'docker compose logs -f; until false; do sleep 1; done'`)}),
+		// ps が -c の引数の引用符を落として表示する行（実際に ps の command 列に出る形。
+		// bash -c '…' で起動しても、argv を空白でつなぐ ps の表示には引用符が残らない）。
+		st("引用符の付かない ps の行でも上限の無い待ちループは 12 分で捕まえる", "block",
+			[]string{" 26089 " + parent + " 00:12:00 /bin/bash -c while true; do sleep 1; done"}),
+		st("対照: 引用符の付かない待ちループでない長時間のシェルは 12 分では鳴らない（30 分のまま）", "allow",
+			[]string{" 26090 " + parent + " 00:12:00 /bin/bash -c sleep 3000"}),
+		st("対照: 引用符の付かない上限のある待ちループは 12 分では鳴らない（30 分のまま）", "allow",
+			[]string{" 26091 " + parent + " 00:12:00 /bin/bash -c n=0; until [ -f /tmp/x ]; do n=$((n+1)); [ $n -ge 60 ] && break; sleep 5; done"}),
 		// 環境変数で変えられる
 		st("LOOPTRACK_LOOP_RUNAWAY_LOOP_THRESHOLD_MIN で形別の閾値を上げられる", "allow", []string{loop12},
 			"LOOPTRACK_LOOP_RUNAWAY_LOOP_THRESHOLD_MIN", "20"),

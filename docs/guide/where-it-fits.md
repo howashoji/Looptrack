@@ -73,7 +73,7 @@ The reason is recorded on the server.
 CLI write operations and hooks send the agent conversation's token usage to the server.
 Usage accumulates per stage, for each operation on the issue (creating it, commenting, changing status, and so on).
 `looptrack issue usage show <ID>` shows the breakdown by stage.
-You can also aggregate by period and produce a report (PDF).
+You can also aggregate by period and produce a report (PDF); see [Token reports](token-report.md).
 
 ## Kit hooks (core and loop)
 

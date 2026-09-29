@@ -114,7 +114,7 @@ jobs:
             exit 1
           fi
       - name: go test ./...
-        # -v の全文は長いので go-test.log に置き、画面にはパッケージの結果と失敗だけを出す（失敗時は全文を artifact に残す）。
+        # -v の全文は長いので go-test.log に置き、画面にはパッケージの結果と失敗だけを出す（run の成否に関わらず全文を artifact に残す）。
         run: |
           rc=0
           go test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
@@ -129,10 +129,17 @@ jobs:
             echo "::error::CI で省略してはいけないテストが省略されました"
             exit 1
           fi
-          echo "省略された主なテスト（参考）:"
-          grep -E -- '--- SKIP' go-test.log | sed 's/ (.*//' | sort | uniq -c | sort -rn | head -20 || true
-      - name: 失敗時に go test の全文を残す
-        if: failure()
+          list=$(grep -E -- '--- SKIP' go-test.log | sed 's/ (.*//' | sort | uniq -c | sort -rn || true)
+          total=$(printf '%s\n' "$list" | grep -c . || true)
+          echo "省略された主なテスト（参考。全 $total 件）:"
+          if [ "$total" -gt 0 ]; then
+            printf '%s\n' "$list" | head -20
+          fi
+          if [ "$total" -gt 20 ]; then
+            echo "ほか $((total - 20)) 件"
+          fi
+      - name: go test の全文を artifact に残す
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: go-test-log
@@ -164,7 +171,33 @@ jobs:
           echo "TEMP=$tmp" >> "$GITHUB_ENV"
       - name: go test ./...
         # DB を使うテストは既定で SQLite で走る。Windows でも省略しない。
-        run: go test -count=1 ./...
+        # -v の全文は長いので go-test.log に置き、画面にはパッケージの結果と失敗だけを出す（run の成否に関わらず全文を artifact に残す。linux のジョブと同じ形）。
+        run: |
+          rc=0
+          go test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
+          grep -E '^(ok|FAIL|panic:)' go-test.log || true
+          if [ "$rc" -ne 0 ]; then
+            grep -n -B2 -A30 -E -- '--- FAIL|^panic:' go-test.log | head -400 || true
+            exit "$rc"
+          fi
+      - name: 省略された主なテスト（参考）
+        run: |
+          list=$(grep -E -- '--- SKIP' go-test.log | sed 's/ (.*//' | sort | uniq -c | sort -rn || true)
+          total=$(printf '%s\n' "$list" | grep -c . || true)
+          echo "省略された主なテスト（参考。全 $total 件）:"
+          if [ "$total" -gt 0 ]; then
+            printf '%s\n' "$list" | head -20
+          fi
+          if [ "$total" -gt 20 ]; then
+            echo "ほか $((total - 20)) 件"
+          fi
+      - name: go test の全文を artifact に残す
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-test-log-windows
+          path: go-test.log
+          retention-days: 7
 
   # macOS は重いので、毎回は回さない（週次と手動の full だけ）。
   go-test-macos:
@@ -181,7 +214,33 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - name: go test ./...
         # DB を使うテストは既定で SQLite で走る。
-        run: go test -count=1 ./...
+        # -v の全文は長いので go-test.log に置き、画面にはパッケージの結果と失敗だけを出す（run の成否に関わらず全文を artifact に残す。linux のジョブと同じ形）。
+        run: |
+          rc=0
+          go test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
+          grep -E '^(ok|FAIL|panic:)' go-test.log || true
+          if [ "$rc" -ne 0 ]; then
+            grep -n -B2 -A30 -E -- '--- FAIL|^panic:' go-test.log | head -400 || true
+            exit "$rc"
+          fi
+      - name: 省略された主なテスト（参考）
+        run: |
+          list=$(grep -E -- '--- SKIP' go-test.log | sed 's/ (.*//' | sort | uniq -c | sort -rn || true)
+          total=$(printf '%s\n' "$list" | grep -c . || true)
+          echo "省略された主なテスト（参考。全 $total 件）:"
+          if [ "$total" -gt 0 ]; then
+            printf '%s\n' "$list" | head -20
+          fi
+          if [ "$total" -gt 20 ]; then
+            echo "ほか $((total - 20)) 件"
+          fi
+      - name: go test の全文を artifact に残す
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-test-log-macos
+          path: go-test.log
+          retention-days: 7
 
   # 6 対象のクロスビルドは 6 分かかる。日常はデスクトップ版の linux/amd64 のビルドで代わりにし、週次と手動の full だけで回す。
   cross-build:
@@ -204,6 +263,21 @@ jobs:
         run: |
           got=$("./dist/looptrack_ci-${GITHUB_SHA::12}_linux_amd64" version)
           case "$got" in "looptrack ci-${GITHUB_SHA::12}"*) ;; *) echo "::error::looptrack version が $got"; exit 1 ;; esac
+      # Releases に上げる書庫（release.yml の sums と同じ作り方・同じ中身の検査）
+      - name: 書庫（dist.sh archive・check-archives）
+        run: |
+          v="ci-${GITHUB_SHA::12}"
+          bash deploy/release/dist.sh archive "$v" dist release
+          bash deploy/release/dist.sh check-archives "$v" release dist
+          cp dist/NOTICE dist/OFL-BIZUDGothic.txt release/
+          bash deploy/release/dist.sh sums release
+          bash deploy/release/dist.sh check-release "$v" release
+          bash deploy/release/dist.sh verify release
+          x="$RUNNER_TEMP/archive-check"
+          mkdir -p "$x"
+          tar -xzf "release/looptrack_${v}_linux_amd64_server.tar.gz" -C "$x"
+          got=$("$x/looptrack_${v}_linux_amd64_server/looptrack" version)
+          case "$got" in "looptrack $v"*) ;; *) echo "::error::書庫の looptrack version が $got"; exit 1 ;; esac
 
   # デスクトップ版（-tags desktop）のビルドの回帰を拾う。ビルドと vet と、desktop タグのテスト
   # （トレイのメニューの並びなど。通常のビルドに入らないので、ここで回さないと誰も回さない）。

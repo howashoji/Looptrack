@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/howashoji/looptrack/internal/auth"
+	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/privfile"
 	"github.com/howashoji/looptrack/internal/setupwiz"
 	"github.com/howashoji/looptrack/internal/store"
@@ -72,7 +73,7 @@ func doSetup(ctx context.Context, t *testing.T, env map[string]string, stdin str
 		}
 		return ""
 	}
-	code := runSetup(ctx, args, getenv, strings.NewReader(stdin), &out, &errOut, nil, b)
+	code := runSetup(ctx, args, getenv, strings.NewReader(stdin), &out, &errOut, nil, b, nil)
 	return setupRun{code, out.String(), errOut.String()}
 }
 
@@ -337,4 +338,132 @@ func TestSetupSQLiteLocal(t *testing.T) {
 	if r2.code != 0 || string(before) != string(after) {
 		t.Errorf("2 回目で書き換わった: code=%d\n%s", r2.code, r2.errOut)
 	}
+}
+
+// 受け入れ条件: MySQL の DB がまだ無いと、setup は接続（migrate の前）で止まっていた。いまは管理用の資格情報を尋ね、
+// 確かめてから DB とアプリ用の利用者を作り、表を作って権限を与え、続きから管理者を作る（looptrack grants apply と同じ処理）。
+// 「作らない」と答えたら、DB も利用者も作らずに、自分で流す文を示して止まる（.env も書かない）。
+func TestSetupCreatesMissingMySQLDatabase(t *testing.T) {
+	dsn := os.Getenv("LOOPTRACK_TEST_DSN")
+	if dsn == "" {
+		t.Skip("LOOPTRACK_TEST_DSN が未設定のため DB を使うテストを省略（deploy/dev/compose.yaml を参照）")
+	}
+	ctx := context.Background()
+	root, err := store.NormalizeDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootDB, err := sql.Open("mysql", root.FormatDSN())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { rootDB.Close() })
+	dbExists := func(name string) bool {
+		var n int
+		if err := rootDB.QueryRow("SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?", name).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n > 0
+	}
+	userExists := func(name string) bool {
+		var n int
+		if err := rootDB.QueryRow("SELECT COUNT(*) FROM mysql.user WHERE User = ? AND Host = '%'", name).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n > 0
+	}
+	// setup を 1 回動かす。管理用の資格情報は LOOPTRACK_TEST_DSN のもので答え、作るかの確認には answer で答える
+	// appAddr が空でなければ、アプリ用の接続先（.env の LOOPTRACK_DSN）だけをその宛先にする
+	// （表を作る接続先と宛先が分かれる構成。例: アプリはコンテナの中から mysql:3306、setup は手元から 127.0.0.1:3306）
+	setup := func(t *testing.T, answer, appAddr string) (name, user string, r setupRun, prompts []string) {
+		b := make([]byte, 6)
+		rand.Read(b)
+		name, user = "im_test_nodb_"+hex.EncodeToString(b), "lt_t_"+hex.EncodeToString(b)
+		t.Cleanup(func() {
+			rootDB.Exec("DROP DATABASE IF EXISTS " + name)
+			rootDB.Exec("DROP USER IF EXISTS '" + user + "'@'%'")
+		})
+		app := root.Clone()
+		app.User, app.Passwd, app.DBName = user, "app-"+hex.EncodeToString(b), name
+		if appAddr != "" {
+			app.Addr = appAddr
+		}
+		mig := root.Clone()
+		mig.DBName = name // 表を作る接続先（DB が無いので繋げない）
+		ask := func(_ i18n.Lang, prompt string, secret bool) (string, bool, error) {
+			prompts = append(prompts, prompt)
+			switch {
+			case secret:
+				return root.Passwd, true, nil
+			case strings.Contains(prompt, "管理用の利用者"):
+				return root.User, true, nil
+			case strings.Contains(prompt, "作りますか"):
+				return answer, true, nil
+			}
+			t.Errorf("想定外の問い: %q", prompt)
+			return "", false, nil
+		}
+		env := map[string]string{"LOOPTRACK_LANG": "ja", setupwiz.EnvDSN: app.FormatDSN(), setupwiz.EnvMigrateDSN: mig.FormatDSN(), setupwiz.EnvAdminPassword: setupPW}
+		var out, errOut strings.Builder
+		code := runSetup(ctx, []string{"--dir", filepath.Join(t.TempDir(), "srv"), "--yes", "--mode", "team", "--store", "mysql",
+			"--public-url", "https://im.example.com", "--admin-login", "alice", "--admin-name", "Alice", "--two-factor", "required"},
+			func(k string) string { return env[k] }, strings.NewReader(""), &out, &errOut, nil, setupBackend{}, ask)
+		return name, user, setupRun{code, out.String(), errOut.String()}, prompts
+	}
+
+	t.Run("作る", func(t *testing.T) {
+		name, user, r, prompts := setup(t, "y", "")
+		if r.code != 0 {
+			t.Fatalf("%d\n%s\n%s", r.code, r.stdout, r.errOut)
+		}
+		for _, want := range []string{"DB がまだありません", "作成: DB " + name, "作成: 利用者 " + user, "権限を与えました", "アプリ用の利用者 " + user + " で読めました"} {
+			if !strings.Contains(r.stdout, want) {
+				t.Errorf("%q が無い:\n%s", want, r.stdout)
+			}
+		}
+		if len(prompts) != 4 || !strings.Contains(prompts[2], "DB "+name+" がありません。作りますか") {
+			t.Errorf("管理用の利用者・パスワード・DB の確認・利用者の確認の 4 つを 1 回ずつ尋ねる: %q", prompts)
+		}
+		if strings.Contains(r.stdout+r.errOut, root.Passwd) && root.Passwd != "" {
+			t.Error("管理用のパスワードが出力に出た")
+		}
+		app := root.Clone()
+		app.DBName = name
+		db, err := store.Open(app.FormatDSN())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close()
+		checkAdmin(t, db, "required")
+	})
+	// 表を作る接続先（1049 を受けた宛先）と、アプリ用の接続先の宛先が違う構成でも、管理用の接続と読めることの確認は
+	// 表を作る接続先の宛先で行う（アプリ用の宛先 127.0.0.1:1 には何も待ち受けていない。そこへ繋ぎにいくと止まる）
+	t.Run("接続先の宛先が分かれる", func(t *testing.T) {
+		name, user, r, _ := setup(t, "y", "127.0.0.1:1")
+		if r.code != 0 {
+			t.Fatalf("%d\n%s\n%s", r.code, r.stdout, r.errOut)
+		}
+		for _, want := range []string{"接続先 " + root.Addr, "作成: DB " + name, "作成: 利用者 " + user, "アプリ用の利用者 " + user + " で読めました"} {
+			if !strings.Contains(r.stdout, want) {
+				t.Errorf("%q が無い:\n%s", want, r.stdout)
+			}
+		}
+		if !dbExists(name) || !userExists(user) {
+			t.Errorf("DB %v・利用者 %v", dbExists(name), userExists(user))
+		}
+	})
+	t.Run("作らない", func(t *testing.T) {
+		name, user, r, _ := setup(t, "n", "")
+		if r.code == 0 {
+			t.Fatalf("作らないと答えたのに通った:\n%s", r.stdout)
+		}
+		for _, want := range []string{"DB " + name + " を作らずに止めました", "CREATE DATABASE " + name + " CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"} {
+			if !strings.Contains(r.errOut, want) {
+				t.Errorf("%q が無い:\n%s", want, r.errOut)
+			}
+		}
+		if dbExists(name) || userExists(user) {
+			t.Errorf("作らないと答えたのに作った（DB %v・利用者 %v）", dbExists(name), userExists(user))
+		}
+	})
 }

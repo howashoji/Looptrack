@@ -114,6 +114,15 @@ func UserPromptCombined(ctx context.Context, ev hookio.Event) (hookio.Result, er
 	return runCombined(ctx, ev, true)
 }
 
+// partShowsOutput は、部分の結果が合成の出力に実際に残る何かを持つか。文脈と systemMessage は常に残り、
+// Block / Deny は keepBlock のときだけ残る（そうでないときは捨てられる）。kind を記録に並べるかの判定に使う。
+func partShowsOutput(r hookio.Result, keepBlock bool) bool {
+	if strings.TrimSpace(r.Context) != "" || strings.TrimSpace(r.SystemMessage) != "" {
+		return true
+	}
+	return keepBlock && (strings.TrimSpace(r.Block) != "" || strings.TrimSpace(r.Deny) != "")
+}
+
 // runCombined は --parts の hook を並行に動かし、文脈（keepBlock なら差し戻しの理由も）を --parts の順に 1 つにまとめる。
 func runCombined(ctx context.Context, ev hookio.Event, keepBlock bool) (hookio.Result, error) {
 	e := envFrom(ctx)
@@ -161,7 +170,7 @@ func runCombined(ctx context.Context, ev hookio.Event, keepBlock bool) (hookio.R
 			ch <- ret{r, true}
 		}(p)
 	}
-	var contexts, msgs, blocks []string
+	var contexts, msgs, blocks, kinds []string
 	for i, p := range runs {
 		wait := p.timeout - time.Since(start)
 		if wait < 0 {
@@ -171,6 +180,9 @@ func runCombined(ctx context.Context, ev hookio.Event, keepBlock bool) (hookio.R
 		select {
 		case got := <-chans[i]:
 			if got.ok {
+				if got.r.Kind != "" && partShowsOutput(got.r, keepBlock) {
+					kinds = append(kinds, got.r.Kind) // 部分の kind（どれも定数の語）を並べる。出力に残らない部分の kind は記録にも残さない
+				}
 				if s := strings.TrimSpace(got.r.Context); s != "" {
 					contexts = append(contexts, s)
 				}
@@ -192,5 +204,6 @@ func runCombined(ctx context.Context, ev hookio.Event, keepBlock bool) (hookio.R
 		}
 		t.Stop()
 	}
-	return hookio.Result{Context: strings.Join(contexts, "\n\n"), SystemMessage: strings.Join(msgs, "\n\n"), Block: strings.Join(blocks, "\n\n")}, nil
+	return hookio.Result{Context: strings.Join(contexts, "\n\n"), SystemMessage: strings.Join(msgs, "\n\n"), Block: strings.Join(blocks, "\n\n"),
+		Kind: strings.Join(kinds, ", ")}, nil
 }

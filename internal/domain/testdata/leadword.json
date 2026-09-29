@@ -1,5 +1,5 @@
 {
-  "_": "コメントの先頭語（DESIGN.md §5-8-6）。Go の internal/domain/leadword_test.go・internal/server/feedback_test.go と Python の scripts/issue_feedback_test.py が同じ例を通す",
+  "_": "コメントの先頭語（DESIGN.md §9-3-6）。Go の internal/domain/leadword_test.go・internal/server/feedback_test.go と Python の scripts/issue_feedback_test.py が同じ例を通す",
   "lead": [
     {"name": "半角コロン", "content": "フィードバック: テスター A（9/18）: 保存ボタンが見つからない", "kind": "feedback"},
     {"name": "全角コロン", "content": "フィードバック：B", "kind": "feedback"},
@@ -17,7 +17,7 @@
     {"name": "判断の途中", "content": "判断材料: …", "kind": ""},
     {"name": "空", "content": "", "kind": ""}
   ],
-  "_en": "英語の別名（DESIGN.md §5-13）。Go だけが読む（Python の issue.py は機能凍結で別名を足さない）。lead_en・excerpt_en は leadword_test.go、sequences_en は internal/server/loops_test.go（MySQL と SQLite の両方）",
+  "_en": "英語の別名（DESIGN.md §9-6）。Go だけが読む（Python の issue.py は機能凍結で別名を足さない）。lead_en・excerpt_en は leadword_test.go、sequences_en は internal/server/loops_test.go（MySQL と SQLite の両方）",
   "lead_en": [
     {"name": "Feedback", "content": "Feedback: tester A (9/18): cannot find the save button", "kind": "feedback"},
     {"name": "feedback（小文字）", "content": "feedback: x", "kind": "feedback"},
@@ -49,7 +49,7 @@
     {"name": "切り詰め", "content": "フィードバック: あいうえおかきくけこ", "n": 5, "out": "あいうえお…"},
     {"name": "ちょうど", "content": "フィードバック: あいうえお", "n": 5, "out": "あいうえお"}
   ],
-  "_sequences": "判定の例（§5-8-6 の表の 6 つ）。steps は古い順。comment は本文、status は状態変更（コメントなし）。pending は未応答のコメントの番号（1 始まり・comment だけを数える）",
+  "_sequences": "判定の例（DESIGN.md §9-3-6 の表の 6 つ）。steps は古い順。comment は本文、status は状態変更（コメントなし）。pending は未応答のコメントの番号（1 始まり・comment だけを数える）",
   "sequences": [
     {"name": "1. 未応答", "steps": [{"comment": "作業メモ"}, {"comment": "フィードバック: テスター A（9/18）: 保存ボタンが見つからない"}], "pending": [2]},
     {"name": "2. コメントで応答", "steps": [{"comment": "フィードバック: テスター B: 一覧が遅い"}, {"comment": "REQ-0090 で起票。ボタンを右上に移す"}], "pending": []},

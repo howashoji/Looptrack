@@ -344,18 +344,33 @@ func hasForcedRefspec(args []string) bool {
 	return false
 }
 
-// gitGuardReason は words が止めるべき git の操作なら、その理由と、deny か（false なら ask）を返す。
+// 止めた操作の種類（判定の記録の kind。i18n のキーの末尾と同じ語）。記録には入力から切り出した文字列を入れないので、
+// ここの定数だけを使う。
+const (
+	gitKindOtherWorktree = "other_worktree"
+	gitKindAddAll        = "add_all"
+	gitKindAddDot        = "add_dot"
+	gitKindCommitAll     = "commit_all"
+	gitKindPushForce     = "push_force"
+	gitKindResetHard     = "reset_hard"
+	gitKindCleanForce    = "clean_force"
+	gitKindSwitchForce   = "switch_force"
+	gitKindCheckoutDot   = "checkout_dot"
+	gitKindCheckoutPath  = "checkout_path"
+)
+
+// gitGuardReason は words が止めるべき git の操作なら、その種類（gitKind*）と理由と、deny か（false なら ask）を返す。
 // cwd はそのコマンドが動く場所（`-C` の解決と、パスの実在の判定に使う）。
-func gitGuardReason(lang i18n.Lang, cwd string, words []string) (reason string, deny bool) {
+func gitGuardReason(lang i18n.Lang, cwd string, words []string) (kind, reason string, deny bool) {
 	c, ok := parseGitCmd(words)
 	if !ok {
-		return "", false
+		return "", "", false
 	}
 	// ほかの作業ツリーを指した書き込み（サブコマンドの種類より先に見る。読むだけのものは通す）
 	if !gitReadsOnly(c.sub, c.args) {
 		for _, d := range c.dirs {
 			if dirOutsideWorktree(cwd, d) {
-				return i18n.T(lang, "loop.gitguard.other_worktree", "dir", d, "sub", c.sub), true
+				return gitKindOtherWorktree, i18n.T(lang, "loop.gitguard.other_worktree", "dir", d, "sub", c.sub), true
 			}
 		}
 	}
@@ -376,45 +391,45 @@ func gitGuardReason(lang i18n.Lang, cwd string, words []string) (reason string, 
 	switch c.sub {
 	case "add":
 		if hasShortFlag(c.args, 'A') || hasLongFlag(c.args, "--all", "--no-ignore-removal") {
-			return stage(i18n.T(lang, "loop.gitguard.add_all")), false
+			return gitKindAddAll, stage(i18n.T(lang, "loop.gitguard.add_all")), false
 		}
 		if hasWholeTreePath(c.args) {
-			return stage(i18n.T(lang, "loop.gitguard.add_dot")), false
+			return gitKindAddDot, stage(i18n.T(lang, "loop.gitguard.add_dot")), false
 		}
 	case "commit":
 		if hasShortFlag(c.args, 'a') || hasLongFlag(c.args, "--all") {
-			return stage(i18n.T(lang, "loop.gitguard.commit_all")), false
+			return gitKindCommitAll, stage(i18n.T(lang, "loop.gitguard.commit_all")), false
 		}
 	case "push":
 		if hasLongFlag(c.args, "--force-with-lease", "--force-if-includes") {
-			return "", false
+			return "", "", false
 		}
 		if hasShortFlag(c.args, 'f') || hasLongFlag(c.args, "--force") || hasForcedRefspec(c.args) {
-			return i18n.T(lang, "loop.gitguard.push_force"), true
+			return gitKindPushForce, i18n.T(lang, "loop.gitguard.push_force"), true
 		}
 	case "reset":
 		if hasLongFlag(c.args, "--hard") {
-			return i18n.T(lang, "loop.gitguard.reset_hard"), true
+			return gitKindResetHard, i18n.T(lang, "loop.gitguard.reset_hard"), true
 		}
 	case "clean":
 		if hasShortFlag(c.args, 'f') || hasLongFlag(c.args, "--force") {
-			return i18n.T(lang, "loop.gitguard.clean_force"), true
+			return gitKindCleanForce, i18n.T(lang, "loop.gitguard.clean_force"), true
 		}
 	case "switch":
 		if hasLongFlag(c.args, "--discard-changes", "--force") || hasShortFlag(c.args, 'f') {
-			return i18n.T(lang, "loop.gitguard.switch_force"), true
+			return gitKindSwitchForce, i18n.T(lang, "loop.gitguard.switch_force"), true
 		}
 	case "checkout", "restore":
 		p := gitDiscardPaths(c.sub, dir, c.args)
 		if len(p) == 0 {
-			return "", false
+			return "", "", false
 		}
 		if hasWholeTreePath(p) {
-			return i18n.T(lang, "loop.gitguard.checkout_dot", "sub", c.sub), true
+			return gitKindCheckoutDot, i18n.T(lang, "loop.gitguard.checkout_dot", "sub", c.sub), true
 		}
-		return i18n.T(lang, "loop.gitguard.checkout_path", "sub", c.sub, "path", p[0]), true
+		return gitKindCheckoutPath, i18n.T(lang, "loop.gitguard.checkout_path", "sub", c.sub, "path", p[0]), true
 	}
-	return "", false
+	return "", "", false
 }
 
 // PreToolGitGuard は `looptrack hook pre-tool-git-guard`。
@@ -455,11 +470,11 @@ func PreToolGitGuard(ctx context.Context, ev hookio.Event) (hookio.Result, error
 			continue
 		}
 		for _, words := range cmds {
-			if reason, deny := gitGuardReason(lang, cwd, words); reason != "" {
+			if kind, reason, deny := gitGuardReason(lang, cwd, words); reason != "" {
 				if deny {
-					return hookio.Result{Deny: i18n.T(lang, "loop.gitguard.deny", "reason", reason)}, nil
+					return hookio.Result{Deny: i18n.T(lang, "loop.gitguard.deny", "reason", reason), Kind: "git-guard: " + kind}, nil
 				}
-				return hookio.Result{Ask: i18n.T(lang, "loop.gitguard.ask", "reason", reason)}, nil
+				return hookio.Result{Ask: i18n.T(lang, "loop.gitguard.ask", "reason", reason), Kind: "git-guard: " + kind}, nil
 			}
 		}
 	}

@@ -128,6 +128,7 @@ Every override (`--override "reason"`) is recorded on the server.
 ## Token reports
 
 Agent token usage accumulates on the server per issue and per stage.
+What is recorded, how it is added up and how the report is made are described in [Token reports](token-report.md).
 You can aggregate it by period, produce a PDF report, and record it in a ledger.
 
 1. On the project board (`<server URL>/p/<slug>/`), use the report-request button to request a report for a period

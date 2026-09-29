@@ -1,4 +1,4 @@
-// Package cred は API のアクセストークン（資格情報）のファイルを扱う（DESIGN.md §5-11）。
+// Package cred は API のアクセストークン（資格情報）のファイルを扱う（DESIGN.md §5-1）。
 //
 // 置き場: Windows は %APPDATA%\looptrack\credentials.json、他は $XDG_CONFIG_HOME/looptrack/credentials.json
 // （XDG_CONFIG_HOME が無ければ ~/.config）。

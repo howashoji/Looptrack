@@ -10,7 +10,7 @@ Out of the token usage the issue management server has collected, build a PDF re
 **Take every figure from the server's aggregation as it stands; the AI writes only the prose — what the figures mean and what to do about them.** Keep the PDF on this machine; never put it on the server.
 Once it is built, add one row to the ledger (that row is where the next "since the last one" starts, and a request made from the web UI is completed by it).
 
-Design: `docs/server/DESIGN.md` §5-4 of Looptrack, "Report figures and the ledger" and "Report requests".
+Design: `docs/server/DESIGN.md` §9-5 of Looptrack, "Report figures and the ledger" and "Report requests".
 
 ## Prerequisites
 

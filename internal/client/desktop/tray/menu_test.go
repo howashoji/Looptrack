@@ -18,7 +18,7 @@ func TestMenuOrder(t *testing.T) {
 	for _, it := range menuOrder(i18n.JA) {
 		got = append(got, it.Label)
 	}
-	want := []string{"画面を開く", "設定", "AI の接続設定をコピー", "CLI を使えるようにする", "ログイン時に起動する", "終了"}
+	want := []string{"画面を開く", "設定", "AI の接続設定をコピー", "CLI を使えるようにする", "アプリ一覧に登録する", "ログイン時に起動する", "新しい版を確認する", "新しい版を自動で入れる", "終了"}
 	if strings.Join(got, " / ") != strings.Join(want, " / ") {
 		t.Errorf("メニューの並び:\n got %v\nwant %v", got, want)
 	}
@@ -37,7 +37,8 @@ func TestMenuSettingsOpensAccountPage(t *testing.T) {
 // TestMenuLabelsUnique は、同じ文面の項目が 2 つ並ばないことを確かめる（下位のメニューも含める）。
 func TestMenuLabelsUnique(t *testing.T) {
 	seen := map[string]bool{}
-	all := append(menuOrder(i18n.JA), miShowMCP(i18n.JA))
+	all := append(menuOrder(i18n.JA), miShowMCP(i18n.JA), miUpdate(i18n.JA, "v1.0.0-rc.3"),
+		miUpdateInstall(i18n.JA, "v1.0.0-rc.3"), miUpdateBusy(i18n.JA, "v1.0.0-rc.3"))
 	for _, it := range all {
 		if it.Label == "" {
 			t.Error("文面の無い項目がある")
@@ -112,5 +113,39 @@ func TestAvailable(t *testing.T) {
 	}
 	if !ok && why == "" {
 		t.Error("出せないのに理由が空（ログから原因が分からない）")
+	}
+}
+
+// TestUpdateItemLabel は、メニューの先頭の新しい版の知らせ（miUpdate）が版をそのまま含むことと、「新しい版を確認する」の
+// 文面を日本語・英語の両方で確かめる。
+func TestUpdateItemLabel(t *testing.T) {
+	for _, c := range []struct {
+		lang                       i18n.Lang
+		update, chk, install, auto string
+	}{
+		{i18n.JA, "新しい版 v1.0.0-rc.3 があります", "新しい版を確認する", "新しい版 v1.0.0-rc.3 に更新する", "新しい版を自動で入れる"},
+		{i18n.EN, "New version v1.0.0-rc.3 available", "Check for updates", "Update to version v1.0.0-rc.3", "Install updates automatically"},
+	} {
+		if got := miUpdateInstall(c.lang, "v1.0.0-rc.3").Label; got != c.install {
+			t.Errorf("miUpdateInstall(%v) = %q, want %q", c.lang, got, c.install)
+		}
+		if got := miUpdateAuto(c.lang).Label; got != c.auto {
+			t.Errorf("miUpdateAuto(%v) = %q, want %q", c.lang, got, c.auto)
+		}
+		if tip := miUpdateInstall(c.lang, "v1.0.0-rc.3").Tip; !strings.Contains(tip, ".prev") {
+			t.Errorf("miUpdateInstall(%v) の説明に前の版の残し方（.prev）が無い: %q", c.lang, tip)
+		}
+		if got := miUpdate(c.lang, "v1.0.0-rc.3").Label; got != c.update {
+			t.Errorf("miUpdate(%v) = %q, want %q", c.lang, got, c.update)
+		}
+		if got := miUpdate(c.lang, "v1.0.0-rc.3").Tip; got == "" {
+			t.Errorf("miUpdate(%v) の説明が空", c.lang)
+		}
+		if got := miUpdateCheck(c.lang).Label; got != c.chk {
+			t.Errorf("miUpdateCheck(%v) = %q, want %q", c.lang, got, c.chk)
+		}
+		if tip := updateCheckEnvOffTip(c.lang); !strings.Contains(tip, "LOOPTRACK_UPDATE_CHECK=off") {
+			t.Errorf("環境変数で止めているときの説明に変数の名前が無い: %q", tip)
+		}
 	}
 }

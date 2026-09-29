@@ -39,6 +39,9 @@ type UsageSnapshot struct {
 	Excluded       bool
 	DedupeKey      string
 	ReceivedAt     time.Time // 0 なら DB の現在時刻。通常の受信はサーバの時計（svc.Now）を入れ issue_events.at と突き合わせる。過去分の取り込みだけ at と同じ時刻を入れる
+	// AttemptedAt は再送されたスナップショットの「最初に送ろうとした時刻」（サーバの時計。received_at - resend_delay_sec）。
+	// 0 なら NULL（再送でない）。付与漏れの突き合わせは COALESCE(attempted_at, received_at) で見る
+	AttemptedAt time.Time
 }
 
 // InsertUsageSnapshot は 1 行足す。同じ dedupe_key の行が既にあれば何もせず duplicate = true を返す。
@@ -46,15 +49,15 @@ func InsertUsageSnapshot(ctx context.Context, q execQuerier, s UsageSnapshot) (i
 	res, err := q.ExecContext(ctx, `INSERT INTO usage_snapshots (project_id, user_id, token_id, client, client_version,
   session_id, conversation_id, trigger_kind, issue_id, op, issue_status, via, at,
   main_input, main_cache_create, main_cache_read, main_output, sub_input, sub_cache_create, sub_cache_read, sub_output,
-  responses, sub_responses, by_model, io, human, segments, branch, branches, cwd_name, excluded, dedupe_key, received_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP(6)))`,
+  responses, sub_responses, by_model, io, human, segments, branch, branches, cwd_name, excluded, dedupe_key, received_at, attempted_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP(6)), ?)`,
 		s.ProjectID, s.UserID, nullInt(s.TokenID), s.Client, s.ClientVersion,
 		s.SessionID, s.ConversationID, s.Trigger, nullInt(s.IssueID), nullStr(s.Op), nullStr(s.IssueStatus), nullStr(s.Via), s.At.UTC(),
 		s.Counters.Main.Input, s.Counters.Main.CacheCreate, s.Counters.Main.CacheRead, s.Counters.Main.Output,
 		s.Counters.Sub.Input, s.Counters.Sub.CacheCreate, s.Counters.Sub.CacheRead, s.Counters.Sub.Output,
 		s.Counters.Responses, s.Counters.SubResponses,
 		nullJSON(s.ByModel), nullJSON(s.IO), nullJSON(s.Human), nullJSON(s.Segments),
-		s.Branch, nullJSON(s.Branches), s.CwdName, s.Excluded, s.DedupeKey, nullTime(s.ReceivedAt))
+		s.Branch, nullJSON(s.Branches), s.CwdName, s.Excluded, s.DedupeKey, nullTime(s.ReceivedAt), nullTime(s.AttemptedAt))
 	if err != nil {
 		if IsDuplicateKey(err) { // 重複キー
 			return 0, true, nil
@@ -147,7 +150,7 @@ func HasRecentHookUsage(ctx context.Context, q execQuerier, projectID, userID in
 
 // UsageOptInAgents は、利用者が計測を有効にしたときだけトークンを測れる AI（MCP の clientInfo からの判定。名前は usage_snapshots.client と同じ）。
 // GitHub Copilot は OpenTelemetry のファイル出力（既定で無効）を有効にしたときだけ、hook（looptrack hook usage）がトークンを読んで client = copilot で送る
-// （DESIGN.md §5-4「Copilot のトークン」）。有効にしていない利用者の操作は付けようがないので、付与の指示・クローズ時の必須・
+// （DESIGN.md §9-5「Copilot のトークン」）。有効にしていない利用者の操作は付けようがないので、付与の指示・クローズ時の必須・
 // 未付与の検知の対象にしない。有効かどうかは「その利用者の、その AI のスナップショットが直近 UsageOptInWindow 以内に届いているか」で決める。
 var UsageOptInAgents = []string{"copilot"}
 
@@ -183,7 +186,7 @@ func usageOptInCond() string {
 	agent := `COALESCE(JSON_UNQUOTE(JSON_EXTRACT(e.detail, '$.agent')), '')`
 	return fmt.Sprintf(` AND NOT (e.via IN ('mcp', 'cli') AND %s IN (%s)
   AND NOT EXISTS (SELECT 1 FROM usage_snapshots m WHERE m.project_id = e.project_id AND m.user_id = e.actor_user_id AND m.client = %s
-    AND m.received_at >= e.at - INTERVAL %d SECOND AND m.received_at < e.at + INTERVAL %d SECOND))`,
+    AND COALESCE(m.attempted_at, m.received_at) >= e.at - INTERVAL %d SECOND AND COALESCE(m.attempted_at, m.received_at) < e.at + INTERVAL %d SECOND))`,
 		agent, strings.Join(q, ", "), agent, int(UsageOptInWindow/time.Second), int(UsageAttachWindow/time.Second))
 }
 
@@ -219,19 +222,38 @@ type UsageEvent struct {
 	Attached  bool
 }
 
-// usageCountedKinds は未付与の検知で数える issue_events の kind（SQL の IN の右辺。**ここ 1 か所だけに書く**）。
+// usageCountedKinds は未付与の検知で数える issue_events の kind（SQL の IN の右辺）。
 //
-// assign を入れているのは、担当者だけを変えた操作（MCP の assign_issue と、assignee を伴う update_issue）が
+// 一覧は usage.Ops から作る（サーバが受け付ける op・付与の hook が送る op と同じ集合。**ここには書き写さない**）。
+// 書き写すと、hook が拾うようにした操作が未付与の検知には数えられない、というずれが黙って起きる。
+//
+// assign が入っているのは、担当者だけを変えた操作（MCP の assign_issue と、assignee を伴う update_issue）が
 // kind assign を書くから。数えないと、その取りこぼしは未付与の一覧にすら現れず、
 // 「未付与に出ていないから漏れは無い」という読み方が成り立たなくなる。
 //
 // 対象（AI の操作）と humans（人がターミナルから打った操作）の両方で同じ集合を使う。
 // 片方だけを変えると充足率の分母と分子で数える操作が変わり、率だけが黙ってずれる。
-const usageCountedKinds = `('create', 'update', 'comment', 'status', 'verify', 'assign')`
+var usageCountedKinds = sqlStringList(usage.Ops)
+
+// sqlStringList は語の一覧を SQL の IN の右辺（('a', 'b')）にする。語は英小文字と _ だけ（それ以外は起動時に止める）。
+func sqlStringList(words []string) string {
+	quoted := make([]string, len(words))
+	for i, w := range words {
+		for _, r := range w {
+			if !(r >= 'a' && r <= 'z' || r == '_') {
+				panic("store: word unsafe for SQL: " + w)
+			}
+		}
+		quoted[i] = "'" + w + "'"
+	}
+	return "(" + strings.Join(quoted, ", ") + ")"
+}
 
 // UsageCoverage は、期間 [since, now) の変更操作のうち AI からのもの（via = mcp、または via = cli でセッション ID あり）と、
 // それぞれにトークン情報が付いたかを新しい順に返す。計測を有効にしていない利用者の UsageOptInAgents（Copilot）の MCP の操作は含めない。付いた＝同じイシュー・同じ利用者のスナップショットが操作の後
-// UsageAttachWindow 以内に届いた（CLI 内蔵・フック）か、操作の後に手動の付与（usage attach・回収）が届いた。humans は対象外（人がターミナルから打った操作）の件数。
+// UsageAttachWindow 以内に届いた（CLI 内蔵・フック）か、操作の後に手動の付与（usage attach・回収）が届いた。
+// 送り損ねて後で再送したものは、届いた時刻ではなく最初に送ろうとした時刻（attempted_at）で窓に入るかを見る
+// （再送が窓を過ぎても元の操作に付く。trigger は issue_op のままなので、手動の付与のような上限なしにはしない）。humans は対象外（人がターミナルから打った操作）の件数。
 // セッション ID なしでも AI と分かる CLI の操作（detail の "agent"。VS Code の Copilot のエージェント用ターミナル）は humans に数えない。
 // 器のセッション ID で送られた操作（detail の "session_kind" = host）は、経路によらず、トークン情報を付けようがないので events にも humans にも数えない
 // （計測を有効にしていない利用者の Copilot の操作と同じ扱い）。
@@ -245,7 +267,8 @@ func UsageCoverage(ctx context.Context, q execQuerier, projectID, userID int64, 
 	rows, err := q.QueryContext(ctx, `SELECT e.id, e.issue_id, i.display_id, i.title,
   e.kind, e.via, e.at, COALESCE(e.session_id, ''), COALESCE(e.actor_user_id, 0), COALESCE(u.login, ''),
   EXISTS (SELECT 1 FROM usage_snapshots s WHERE s.issue_id = e.issue_id AND s.user_id = e.actor_user_id
-    AND s.received_at >= e.at AND (s.received_at < e.at + INTERVAL ? SECOND OR s.trigger_kind = 'manual'))
+    AND COALESCE(s.attempted_at, s.received_at) >= e.at
+    AND (COALESCE(s.attempted_at, s.received_at) < e.at + INTERVAL ? SECOND OR s.trigger_kind = 'manual'))
 FROM issue_events e JOIN issues i ON i.id = e.issue_id LEFT JOIN users u ON u.id = e.actor_user_id
 WHERE e.project_id = ? AND e.at >= ? AND e.kind IN `+usageCountedKinds+`
   AND (e.via = 'mcp' OR (e.via = 'cli' AND e.session_id IS NOT NULL))`+usageOptInCond()+usageHostSessionCond()+userCond+`

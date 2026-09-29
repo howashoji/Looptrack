@@ -353,7 +353,7 @@ func askPlan(q *prompter, dir string, pre Preset, env map[string]string) (*Plan,
 	}
 	q.say(i18n.T(q.lang, "setupwiz.confirm.listen", "value", listenLabel(q.lang, p), "url", p.URL()))
 	q.say(i18n.T(q.lang, "setupwiz.confirm.admin", "login", p.Admin.Login, "name", p.Admin.Name))
-	q.say(i18n.T(q.lang, "setupwiz.confirm.two_factor", "value", twoFactorLabel(q.lang, p.Admin.TwoFactor)))
+	q.say(i18n.T(q.lang, "setupwiz.confirm.two_factor", "value", store.TwoFactorLabel(q.lang, p.Admin.TwoFactor)))
 	q.say(i18n.T(q.lang, "setupwiz.confirm.project", "value", projectLabel(q.lang, p.Project)))
 	files := filepath.Join(dir, EnvFile)
 	if p.compose() {

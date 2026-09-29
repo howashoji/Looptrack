@@ -67,6 +67,33 @@ func (r *Rules) CheckAcceptance(lang i18n.Lang, c AcceptanceCheck) (*Override, *
 	return nil, v
 }
 
+// AcceptanceStart は着手（In Progress への遷移）の時点の受け入れ条件の判定材料。
+type AcceptanceStart struct {
+	ID         string
+	From, To   string
+	HasSection bool
+	Filled     bool
+}
+
+// AcceptanceStartNotice は、close の関門（acceptance.require_on_close）に後で止められるイシューを
+// 着手の時点で知らせる文面を返す。対象外なら空。
+//
+// 止めずに知らせるだけにする。着手を拒むと、調査・記録のように条件を先に書きにくいイシューで上書きの常用を招く。
+// 一方、close の直前に初めて気づくと、実装の後追いで条件を書くことになる（条件は実物より先に書く）。
+// 関門が有効なプロジェクトだけに出すのは、関門の無いプロジェクトでは close で止められず、知らせても手戻りを防がないため。
+// 判定は CheckAcceptance と同じ材料（節の有無・AcceptanceFilled）を使う（着手で黙って close で止まる、を作らない）。
+// statuses に In Progress を入れたプロジェクトでは関門そのものが着手で効くので、重ねて知らせない。
+func (r *Rules) AcceptanceStartNotice(lang i18n.Lang, c AcceptanceStart) string {
+	if r == nil || r.Acceptance == nil || !r.Acceptance.RequireOnClose || r.RequiresAcceptance(c.To) {
+		return ""
+	}
+	if c.To != "In Progress" || c.From == c.To || !c.HasSection || c.Filled {
+		return ""
+	}
+	return i18n.T(lang, "domain.rules.acceptance_template_on_start", "id", c.ID,
+		"statuses", strings.Join(r.Acceptance.Statuses, " / "), "command", AcceptanceEditCommand(c.ID))
+}
+
 // AcceptanceFilled は「## 受け入れ条件」節に中身のある行が 1 行以上あるか。節が無ければ false
 // （節の有無は HasAcceptanceSection で別に見る）。
 func AcceptanceFilled(body string) bool {

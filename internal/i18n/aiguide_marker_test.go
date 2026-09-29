@@ -114,7 +114,27 @@ func TestAIGuidesDoNotKeyOnLocalizedText(t *testing.T) {
 		}
 	}
 
-	for _, text := range aiGuideTexts(t) {
+	texts := aiGuideTexts(t)
+	// Go の走査が空振りすると、Markdown（aiGuideMDs）だけを見て緑になる。Go の文字列リテラルを十分な数だけ集め、
+	// 案内文の置き場として分かっているファイル（MCP の instructions・init が置く案内節）が入っていることを見る。
+	// 下限は実物（2026-09 に 1 万件を超える）よりずっと下。
+	goLits, places := 0, map[string]bool{}
+	for _, text := range texts {
+		if file, _, ok := strings.Cut(text.where, ".go:"); ok {
+			goLits++
+			places[file+".go"] = true
+		}
+	}
+	t.Logf("案内文の候補: %d 件（うち Go の文字列リテラル %d 件）", len(texts), goLits)
+	if goLits < 1000 {
+		t.Fatalf("Go の文字列リテラルを %d 件しか集められません（走査が空振りしています）", goLits)
+	}
+	for _, want := range []string{"internal/server/mcp.go", "internal/client/kitinit/texts.go"} {
+		if !places[want] {
+			t.Errorf("%s の文字列リテラルが走査に入っていません", want)
+		}
+	}
+	for _, text := range texts {
 		for _, m := range jaOnlyMarkers {
 			if !strings.Contains(text.body, m.literal) {
 				continue

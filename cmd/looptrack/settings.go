@@ -11,7 +11,7 @@ import (
 	"github.com/howashoji/looptrack/internal/store"
 )
 
-// 二段階認証（TOTP）の必須 / 任意（DESIGN.md §3・§8）。
+// 二段階認証（TOTP）の必須 / 任意（DESIGN.md §2-1「二段階認証の設定」・§10）。
 //
 //	looptrack user add <login> --admin --two-factor required|optional   最初の利用者を作るときに決める（指定しなければ作らない）
 //	looptrack settings two-factor                                       現在の設定と変更の記録を表示する

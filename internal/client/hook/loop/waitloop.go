@@ -157,7 +157,7 @@ func PreToolWaitLoopGuard(ctx context.Context, ev hookio.Event) (hookio.Result, 
 	loops := waitLoops(cmd)
 	for _, w := range loops {
 		if !w.bounded {
-			return hookio.Result{Deny: i18n.T(lang, "loop.waitloop.deny", "cmd", headStr(w.body, 160))}, nil
+			return hookio.Result{Deny: i18n.T(lang, "loop.waitloop.deny", "cmd", headStr(w.body, 160)), Kind: "waitloop: unbounded"}, nil
 		}
 	}
 	// ここから先は止めない（上限はあるので規律には反していない）。待つ先の置き場が無いときだけ注意を返す。
@@ -180,7 +180,7 @@ func PreToolWaitLoopGuard(ctx context.Context, ev hookio.Event) (hookio.Result, 
 			p = filepath.Join(cwd, p)
 		}
 		if dir := filepath.Dir(p); !isDir(dir) {
-			return hookio.Result{Context: i18n.T(lang, "loop.waitloop.missing_dir", "path", w.target, "dir", dir)}, nil
+			return hookio.Result{Context: i18n.T(lang, "loop.waitloop.missing_dir", "path", w.target, "dir", dir), Kind: "waitloop: missing_dir"}, nil
 		}
 	}
 	return hookio.Result{}, nil

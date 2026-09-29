@@ -158,6 +158,21 @@ func TestFreshness(t *testing.T) {
 			{name: "prompt", mk: markCall(map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": sid,
 				"prompt": "<cross-session-message from=\"uds:/tmp/x.sock\" from-name=\"22\">TST-0001 は私が見ています</cross-session-message>"}), want: wantQuiet},
 			doWork(sid), stopStep("check", sid, false, pass)}},
+		{name: "サブエージェントの報告の ID は参照にしない", steps: []step{
+			{name: "prompt", mk: markCall(map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": sid,
+				"prompt": "Another Claude session sent a message:\n<agent-message from=\"worker-1\">TST-0001 を確認しました</agent-message>"}), want: wantQuiet},
+			doWork(sid), stopStep("check", sid, false, pass)}},
+		{name: "報告に混ざっていても利用者が書いた ID は参照（対照）", steps: []step{
+			{name: "prompt", mk: markCall(map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": sid,
+				"prompt": "<agent-message from=\"worker-1\">TST-0002 を確認しました</agent-message>\nTST-0001 の続きをやって"}), want: wantQuiet},
+			doWork(sid), stopStep("check", sid, false, func(t *testing.T, _ *sandbox, g got) {
+				if !strings.Contains(g.res.Block, "TST-0001") {
+					t.Errorf("利用者が書いた TST-0001 が挙がっていない\n%s", g.res.Block)
+				}
+				if strings.Contains(g.res.Block, "TST-0002") {
+					t.Errorf("報告の中の TST-0002 が挙がっている\n%s", g.res.Block)
+				}
+			})}},
 		{name: "system の注意書きの ID は参照にしない（差し戻し文の再掲を含む）", steps: []step{
 			{name: "prompt", mk: markCall(map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": sid,
 				"prompt": "<system-reminder>\n参照したのに一度も更新されていないイシュー:\n   • TST-0001 [Todo] 参照されるイシュー\n</system-reminder>"}), want: wantQuiet},
@@ -464,4 +479,66 @@ func TestFreshnessAgents(t *testing.T) {
 		cliStep("ack", nil, "ack", "TST-0001"),
 		stopStep("check", sid, false, wantQuiet),
 	}}.run(t)
+}
+
+// TestFreshnessWrappedCommands は、包んだ形（入れ子のシェル・eval・前置の語・行末の継続）の git 操作と
+// looptrack issue の呼び出しも、素の形と同じく実作業・参照として記録されることを確かめる。
+//
+// 判定は「引用符の中はデータ」という前提で組んであるので、ほどかないと `bash -c 'git commit …'` の中身は
+// 判定の対象から消え、実作業が 1 件も記録されない（Stop の検査は黙って通る）。表は実バイナリで取った実測の
+// 全行（届く形・届かない形・誤検知しない形）で、差し戻しの文面に出るラベルまで突き合わせる。
+//
+// 対照として、ほどく位置を広げていないこと（引数の位置の `echo bash -c '…'` は実作業に数えない）も同じ表に置く。
+// ここが実作業になるなら、ほどく位置が HeadOnly から AnyPos に広がっている。
+func TestFreshnessWrappedCommands(t *testing.T) {
+	sid := "s1"
+	work := []struct {
+		name, cmd string
+		label     string // 空なら実作業ではない（差し戻さない）
+	}{
+		// 届く形（退行させない）
+		{"1 素の git commit", `git commit -m "x"`, "git commit -m"},
+		{"2 素の git push", "git push origin main", "git push origin main"},
+		{"3 素の git merge", "git merge feature", "git merge feature"},
+		{"7 sudo の前置", `sudo git commit -m "x"`, "git commit -m"},
+		{"8 env の前置", `env git commit -m "x"`, "git commit -m"},
+		// 届かなかった形（本件）
+		{"4 bash -c の一重引用符", `bash -c 'git commit -m "x"'`, "git commit -m"},
+		{"5 sh -c の二重引用符", `sh -c "git commit -m x"`, "git commit -m x"},
+		{"6 eval の二重引用符（中に打ち消した引用符）", `eval "git commit -m \"x\""`, "git commit -m"},
+		{"9 行末の継続で git と副コマンドが分かれる", "git \\\n  commit -m \"x\"", "git commit -m"},
+		{"10 bash -c の git push", `bash -c 'git push origin main'`, "git push origin main"},
+		// 誤検知しない形
+		{"13 引数の中の文字列", `echo 'git commit is forbidden'`, ""},
+		{"14 git status", "git status", ""},
+		// 対照: ほどくのはコマンドの位置だけ（引数の位置の bash -c は何も実行しない）
+		{"対照: echo の引数の bash -c は実作業ではない", `echo bash -c 'git commit -m x'`, ""},
+		{"対照: 引用符の中の bash -c は実作業ではない", `echo "bash -c 'git push origin main'"`, ""},
+	}
+	var cases []scenario
+	for _, c := range work {
+		w := wantQuiet
+		if c.label != "" {
+			w = wantBlock("git 操作: " + c.label + "\n")
+		}
+		cases = append(cases, scenario{name: "実作業: " + c.name, steps: []step{
+			engage("TST-0001", sid), bash(sid, c.cmd), stopStep("check", sid, false, w)}})
+	}
+	engaged := []struct{ name, cmd, want string }{
+		{"11 素の looptrack issue comment", `looptrack issue comment TST-0002 "メモ"`, "engaged : TST-0002\n"},
+		{"12 bash -c で包んだ looptrack issue comment", `bash -c 'looptrack issue comment TST-0002 "メモ"'`, "engaged : TST-0002\n"},
+		{"eval で包んだ looptrack issue show", `eval "looptrack issue show TST-0002"`, "engaged : TST-0002\n"},
+		{"sudo の前置の looptrack issue show", "sudo looptrack issue show TST-0002", "engaged : TST-0002\n"},
+		{"行末の継続で分かれた looptrack issue show", "looptrack issue \\\n  show TST-0002", "engaged : TST-0002\n"},
+		{"対照: echo の引数の bash -c は参照にしない", `echo bash -c 'looptrack issue show TST-0002'`, "engaged : (なし)\n"},
+	}
+	for _, e := range engaged {
+		want := e.want
+		cases = append(cases, scenario{name: "参照: " + e.name, steps: []step{bash(sid, e.cmd),
+			{name: "show", mk: func(*sandbox) call { return call{cli: []string{"show"}} }, want: wantStdout(want, true)}}})
+	}
+	for _, sc := range cases {
+		sc.setup = chain(freshSetup, sc.setup)
+		sc.run(t)
+	}
 }

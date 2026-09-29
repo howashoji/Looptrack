@@ -212,6 +212,15 @@ test("フォームは can_edit のときだけ出る（viewer には出さない
   assert.match(commentForm({ canEdit: true, it, t: JA }), /data-action="comment" data-id="IM-0001"/);
 });
 
+test("状態の変更フォームは、応答が載せた注意をフォームの下に出す（無ければ出さない）", () => {
+  const it = { id: "IM-0001", status: "In Progress" };
+  const without = statusForm({ canEdit: true, it, statuses: ["Todo", "In Progress"], t: JA });
+  assert.doesNotMatch(without, /form-notice/);   // 対照: 注意が無ければ枠も出さない
+  const note = "注意: IM-0001 の「## 受け入れ条件」が起票の雛形のままです <b>";
+  const html = statusForm({ canEdit: true, it, statuses: ["Todo", "In Progress"], t: JA, notice: note });
+  assert.match(html, /<p class="form-notice" role="status">注意: IM-0001 の「## 受け入れ条件」が起票の雛形のままです &lt;b&gt;<\/p><\/form>$/);
+});
+
 test("フォームの値はエスケープする", () => {
   const html = statusForm({ canEdit: true, it: { id: 'X"><script>', status: "<b>" }, statuses: ["<b>"], t: JA })
     + newIssueForm({ canEdit: true, types: ['"><img>'], priorities: [], t: JA });

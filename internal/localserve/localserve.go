@@ -9,12 +9,16 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +28,7 @@ import (
 	"github.com/howashoji/looptrack/internal/server"
 	"github.com/howashoji/looptrack/internal/setupwiz"
 	"github.com/howashoji/looptrack/internal/store"
+	"github.com/howashoji/looptrack/internal/updatecheck"
 	"github.com/howashoji/looptrack/migrations"
 )
 
@@ -94,9 +99,41 @@ func shellQuoteAll(paths []string) string {
 	return strings.Join(q, " ")
 }
 
+// BackupDirName は、migrate の前に取る DB の控えを置くディレクトリの名前（DB のファイルと同じディレクトリの下に作る）。
+const BackupDirName = "backups"
+
+// BackupKeep は残す控えの数（新しいものから）。
+const BackupKeep = 2
+
+// backupStamp は控えの名前に入れる時刻（UTC）の書式。名前の順が作った順になる。
+const backupStamp = "20060102T150405Z"
+
 // Migrate はローカルモードの起動時にスキーマを最新にする（LOOPTRACK_DSN だけで起動する未設定のデスクトップ版にはテーブルが無いため）。
-func Migrate(ctx context.Context, db *sql.DB, logger *slog.Logger) error {
-	applied, err := store.Migrate(ctx, db, migrations.FS)
+//
+// dbPath は SQLite のファイル（MySQL・:memory:・空なら控えを取らない）。適用するマイグレーションが 1 本以上あり、
+// DB に適用記録が既にある（前の版で使っていた）ときだけ、適用の前に DB の控えを <dbPath のディレクトリ>/backups/ に取り、
+// 新しいものから BackupKeep 個を残す。新しい版に置き換えた後で前の版に戻すとき、前の版はこの版が migrate した DB を
+// 使わない（store.checkAppliedRecords）ので、控えを DB に戻して使う。控えを取れなければ migrate しない（DB は前の版の形のまま）。
+func Migrate(ctx context.Context, db *sql.DB, dbPath string, logger *slog.Logger) error {
+	return migrate(ctx, db, dbPath, migrations.FS, time.Now, logger)
+}
+
+func migrate(ctx context.Context, db *sql.DB, dbPath string, fsys fs.FS, now func() time.Time, logger *slog.Logger) error {
+	if store.IsSQLite(db) && dbPath != "" && dbPath != ":memory:" {
+		pending, recorded, err := store.Pending(ctx, db, fsys)
+		if err != nil {
+			return i18n.Wrapf(err, "localserve.err.migrate")
+		}
+		if len(pending) > 0 && recorded > 0 {
+			path, err := backupSQLite(ctx, db, dbPath, now().UTC())
+			if err != nil {
+				return err
+			}
+			logger.Info(i18n.T(i18n.FromEnv(os.Getenv), "localserve.log.backup_created"), "path", path, "pending", len(pending))
+			pruneBackups(dbPath, path, logger)
+		}
+	}
+	applied, err := store.Migrate(ctx, db, fsys)
 	if err != nil {
 		return i18n.Wrapf(err, "localserve.err.migrate")
 	}
@@ -106,12 +143,96 @@ func Migrate(ctx context.Context, db *sql.DB, logger *slog.Logger) error {
 	return nil
 }
 
+// BackupDir は dbPath の控えの置き場（<dbPath のディレクトリ>/backups）。
+func BackupDir(dbPath string) string {
+	return filepath.Join(filepath.Dir(dbPath), BackupDirName)
+}
+
+// backupName は控えのファイル名の形（<DB のファイル名>.<UTC の時刻>。同じ秒に 2 つ目を作るときは -2 から後ろに番号を足す）。
+func backupName(dbPath string) *regexp.Regexp {
+	return regexp.MustCompile(`^` + regexp.QuoteMeta(filepath.Base(dbPath)) + `\.\d{8}T\d{6}Z(-\d+)?$`)
+}
+
+// backupSQLite は DB の控えを BackupDir に作り、そのパスを返す。本人だけのファイルとして作る（DB と同じ。privfile）。
+// 途中で失敗したときに半端な控えを残さないよう、.tmp の名前で書いてから名前を変える。
+func backupSQLite(ctx context.Context, db *sql.DB, dbPath string, at time.Time) (string, error) {
+	dir := BackupDir(dbPath)
+	if err := privfile.MkdirAll(dir); err != nil {
+		return "", i18n.Wrapf(err, "localserve.err.backup", "path", dir)
+	}
+	base := filepath.Join(dir, filepath.Base(dbPath)+"."+at.Format(backupStamp))
+	final := base
+	for n := 2; ; n++ {
+		if _, err := os.Lstat(final); errors.Is(err, os.ErrNotExist) {
+			break
+		} else if err != nil {
+			return "", i18n.Wrapf(err, "localserve.err.backup", "path", final)
+		}
+		if n > 99 {
+			return "", i18n.Wrapf(os.ErrExist, "localserve.err.backup", "path", base)
+		}
+		final = base + "-" + strconv.Itoa(n)
+	}
+	tmp := final + ".tmp"
+	_ = os.Remove(tmp) // 前に途中で止まった残り
+	if _, err := privfile.CreateEmpty(tmp); err != nil {
+		return "", i18n.Wrapf(err, "localserve.err.backup", "path", tmp)
+	}
+	if err := store.BackupSQLite(ctx, db, tmp); err != nil {
+		os.Remove(tmp)
+		return "", i18n.Wrapf(err, "localserve.err.backup", "path", tmp)
+	}
+	if err := os.Rename(tmp, final); err != nil {
+		os.Remove(tmp)
+		return "", i18n.Wrapf(err, "localserve.err.backup", "path", final)
+	}
+	return final, nil
+}
+
+// pruneBackups は BackupDir の控えのうち、新しいものから BackupKeep 個（いま作った keep を必ず含む）を残して消す。
+// 途中で止まった .tmp も消す。消せなくても起動は止めない（警告だけ）。時計が戻って keep の名前が古い順に並んでも keep は消さない。
+func pruneBackups(dbPath, keep string, logger *slog.Logger) {
+	dir := BackupDir(dbPath)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		logger.Warn(i18n.T(i18n.FromEnv(os.Getenv), "localserve.log.backup_prune_failed"), "path", dir, "err", err)
+		return
+	}
+	re := backupName(dbPath)
+	var drop, old []string
+	for _, e := range entries {
+		name := e.Name()
+		switch {
+		case e.IsDir():
+		case strings.HasSuffix(name, ".tmp") && re.MatchString(strings.TrimSuffix(name, ".tmp")):
+			drop = append(drop, name) // 途中で止まった残り
+		case re.MatchString(name) && name != filepath.Base(keep):
+			old = append(old, name)
+		}
+	}
+	sort.Strings(old)
+	if extra := len(old) - (BackupKeep - 1); extra > 0 {
+		drop = append(drop, old[:extra]...)
+	}
+	for _, n := range drop {
+		if err := os.Remove(filepath.Join(dir, n)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			logger.Warn(i18n.T(i18n.FromEnv(os.Getenv), "localserve.log.backup_prune_failed"), "path", filepath.Join(dir, n), "err", err)
+		}
+	}
+}
+
 // Options はデスクトップ版のサーバの設定。
 type Options struct {
 	DBPath   string       // SQLite のファイル（無ければ作る。ディレクトリも本人だけで作る）
 	Listener net.Listener // 待ち受け（127.0.0.1 の TCP。呼び出し側が開く＝ポートの選び方は呼び出し側が決める）
 	BasePath string       // 既定 /looptrack
 	Logger   *slog.Logger
+	// UpdateNotice は画面の共通ヘッダの帯に出す新しい版（server.Config.UpdateNotice。nil なら出さない）
+	UpdateNotice func() *updatecheck.Notice
+	// UpdateStopInTray は帯の止め方をトレイのメニューで案内するか（server.Config.UpdateStopInTray）
+	UpdateStopInTray func() bool
+	// UpdateApplier は帯の「更新する」ボタンが呼ぶ置き換え（server.Config.UpdateApplier。nil ならボタンを出さない）
+	UpdateApplier server.UpdateApplier
 }
 
 // Instance は動いているサーバ。
@@ -155,17 +276,20 @@ func Start(ctx context.Context, o Options) (*Instance, error) {
 		db.Close()
 		return nil, err
 	}
-	if err := Migrate(ctx, db, o.Logger); err != nil {
+	if err := Migrate(ctx, db, o.DBPath, o.Logger); err != nil {
 		db.Close()
 		return nil, err
 	}
 	WarnSQLitePerms(dsn, o.Logger)
 	h, err := server.New(server.Config{
-		BasePath:     o.BasePath,
-		CookieSecure: false, // http（127.0.0.1）で使う
-		Box:          box,
-		Logger:       o.Logger,
-		LocalMode:    true,
+		BasePath:         o.BasePath,
+		CookieSecure:     false, // http（127.0.0.1）で使う
+		Box:              box,
+		Logger:           o.Logger,
+		LocalMode:        true,
+		UpdateNotice:     o.UpdateNotice,
+		UpdateStopInTray: o.UpdateStopInTray,
+		UpdateApplier:    o.UpdateApplier,
 	}, db)
 	if err != nil {
 		db.Close()

@@ -259,7 +259,7 @@ type countsJSON struct {
 	Ready      int            `json:"ready"`
 	OpenBugs   int            `json:"open_bugs"`
 	ByStatus   map[string]int `json:"by_status"`
-	// summary だけに付ける（§5-8-7）: 48 時間超の In Review・未応答のフィードバックの件数
+	// summary だけに付ける（DESIGN.md §9-3-7）: 48 時間超の In Review・未応答のフィードバックの件数
 	InReviewStale   *int `json:"in_review_stale,omitempty"`
 	FeedbackPending *int `json:"feedback_pending,omitempty"`
 }
@@ -412,7 +412,8 @@ func queryBool(v string) bool {
 // 同じ作業ツリーで複数の AI のセッションが動くとき、着手済みのものを取りに行かせないために出す
 // （経過時間は、渡したまま放置されたものに気づく手がかりにもなる）。器が違うだけの同じ人の別セッションも
 // 「別のセッション」として扱う。セッション ID が分からない経路（画面・セッション ID を送らない AI）では何もしない。
-func markOtherSession(ctx context.Context, lang i18n.Lang, db *sql.DB, projectID int64, me string, items []issueJSON) {
+// 着手のセッション ID は、MCP の着手を後から会話に結んだものならその値で比べる（service.StarterSession。見る側 me による）。
+func markOtherSession(ctx context.Context, lang i18n.Lang, db *sql.DB, projectID int64, me service.Actor, items []issueJSON) {
 	starters, err := store.InProgressStarters(ctx, db, projectID)
 	if err != nil {
 		return
@@ -426,10 +427,11 @@ func markOtherSession(ctx context.Context, lang i18n.Lang, db *sql.DB, projectID
 		if !ok {
 			continue
 		}
+		sess := service.StarterSession(me, x)
 		switch {
-		case service.ComparableSessions(me, x.SessionID) && x.SessionID != me:
+		case service.ComparableSessions(me.SessionID, sess) && sess != me.SessionID:
 			items[i].OtherSession = true
-		case service.CrossPath(me, x.SessionID): // 比べられない（CLI と MCP）。判定できないことを示す
+		case service.CrossPath(me.SessionID, sess): // 比べられない（CLI と MCP）。判定できないことを示す
 			items[i].CrossPathSession = true
 		}
 		if !x.At.IsZero() {
@@ -501,7 +503,7 @@ func (s *Server) apiListIssues(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	hasFeedback := queryBool(q.Get("has_feedback"))
-	// 未応答のフィードバックで絞るときは既定でクローズ済みも含める（反応は Done の後に来る。§5-8-6）
+	// 未応答のフィードバックで絞るときは既定でクローズ済みも含める（反応は Done の後に来る。DESIGN.md §9-3-6）
 	f := domain.Filter{Status: q.Get("status"), Type: q.Get("type"), Label: q.Get("label"), Ref: q.Get("ref"), All: queryBool(q.Get("all")) || hasFeedback}
 	if f.Status != "" {
 		if err := domain.ValidateValue("--status", f.Status, domain.Statuses); err != nil {
@@ -516,7 +518,7 @@ func (s *Server) apiListIssues(w http.ResponseWriter, r *http.Request) {
 	}
 	items := filterAssignee(itemsJSON(pr, rows, set.List(f, key, reverse)), q.Get("assignee"), principalFrom(r.Context()).User.Login)
 	// 別のセッションが着手したものに印を付ける（空きを探す経路。summary と同じ判定。CLI が注記を出す）
-	markOtherSession(r.Context(), reqLang(r), s.db, pr.ID, actor(r).SessionID, items)
+	markOtherSession(r.Context(), reqLang(r), s.db, pr.ID, actor(r), items)
 	if hasFeedback {
 		n, _, err := s.pendingByIssue(r.Context(), pr)
 		if err != nil {
@@ -660,7 +662,7 @@ func (s *Server) apiSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	inProgress := byStatus("In Progress")
-	markOtherSession(r.Context(), reqLang(r), s.db, pr.ID, actor(r).SessionID, inProgress)
+	markOtherSession(r.Context(), reqLang(r), s.db, pr.ID, actor(r), inProgress)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"usage_missing": map[string]any{"count": missing.Missing, "issues": missing.Issues, "days": missing.Days,
 			"command": missing.Command, "message": usageMissingText(reqLang(r), missing)},
@@ -814,6 +816,9 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 	it := res.Issue
 	w.Header().Set("ETag", etag(it.Row.Version))
 	body := map[string]any{"issue": toIssueJSON(it), "from": res.From, "to": it.Item.Status}
+	if res.AcceptanceNotice != "" { // Web は messages を出さないので、この欄を状態の変更フォームの下に出す
+		body["acceptance_notice"] = res.AcceptanceNotice
+	}
 	// 下位の最後の 1 件を閉じたら要件の検証と close を促す。messages に入れるので古い CLI でも表示される
 	body["messages"] = withClosable(reqLang(r), statusMessages(reqLang(r), res, req.Comment), body, s.closedRequirements(r.Context(), pr, res))
 	if n := s.usageNotice(r.Context(), reqLang(r), a, pr, it, it.Closed() && res.From != it.Item.Status); n != "" {
@@ -890,6 +895,10 @@ func statusMessages(lang i18n.Lang, res *service.StatusResult, comment string) [
 	}
 	if comment != "" {
 		messages = append(messages, i18n.T(lang, "server.api.issue.comment_added", "id", it.Item.ID))
+	}
+	// 受け入れ条件が雛形のままの着手の注意（service が判定。REST の messages と MCP の本文で同じ行）
+	if res.AcceptanceNotice != "" {
+		messages = append(messages, res.AcceptanceNotice)
 	}
 	return messages
 }

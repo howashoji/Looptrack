@@ -86,7 +86,7 @@ func TestMCPSessionKind(t *testing.T) {
 			for k, v := range c.header {
 				h.Set(k, v)
 			}
-			call, err := mcpCallOf(mcpReqOf(h))
+			call, err := (&Server{}).mcpCallOf(mcpReqOf(h))
 			if err != nil {
 				t.Fatal(err)
 			}

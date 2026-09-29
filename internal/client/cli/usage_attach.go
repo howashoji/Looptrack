@@ -1,6 +1,6 @@
 package cli
 
-// トークン情報の付与（設計 §5-4 の経路 ①・③）と、usage attach・usage ledger add。
+// トークン情報の付与（設計 §9-5 の経路 ①・③）と、usage attach・usage ledger add。
 // 会話記録から累計を作るのは internal/client/usagesnap（以前の CLI と payload が完全に一致する）。
 
 import (
