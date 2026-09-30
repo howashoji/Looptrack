@@ -1242,6 +1242,25 @@ prompt review の手順:
 
 引数は `project` です（省略すると `X-Looptrack-Project`）。Claude Code では `/mcp__looptrack__loop`・`/mcp__looptrack__review` のようなスラッシュコマンドとして出ます。
 
+### DNS rebinding の対策（Host の検査）
+
+攻撃者のドメインを 127.0.0.1 に向けると、ブラウザは手元のサーバへ要求を送りますが、Host はそのドメインのまま届きます。
+go-sdk の既定の判定（ループバックのアドレスで受けた要求は、Host もループバックでなければ 403）は、
+**127.0.0.1 で待ち受け、リバースプロキシ（nginx / Caddy）が公開の Host を渡す配置**（`install.sh` の systemd 方式）では、MCP の要求をすべて 403 にします。
+そこで SDK の判定は切り（`DisableLocalhostProtection`）、`/mcp` の入口（認証より前）で次のように判定します（`mcpHostAllowed`）。
+
+| 受けたローカルアドレス | Host（ポートを除く） | 結果 |
+| -- | -- | -- |
+| ループバック | ループバック（127.0.0.0/8・`::1`・`localhost`。SDK の判定と同じ範囲） | 通す |
+| ループバック | `LOOPTRACK_PUBLIC_URL` の host（大文字小文字は無視） | 通す |
+| ループバック | それ以外（公開の URL が無いときは、ループバック以外のすべて） | **403**（`Forbidden: invalid Host header "…"`）。トークンの有無に関わらず 403 で、401 の案内も返しません |
+| ループバック以外（コンテナの中で受ける配置など） | 問わない | 判定しません（SDK の既定と同じ） |
+
+- `X-Forwarded-Host` は見ません（要求の送り手が自由に付けられるからです）。
+- 公開の URL を持たないデスクトップ版（ローカルモード）では、SDK の既定と同じくループバックの Host だけが通ります。
+  ローカルモードでは、この判定より前に全経路の Host の検査（421。§3-3「ローカルモードのブラウザ経由の攻撃への備え」）も効きます。
+- 検査は `TestMCPHostBehindProxy`・`TestMCPHostWithoutPublicURL` が固定しています。
+
 ### 限界
 
 - 人の承認は最低 1 回要ります（コマンドの実行許可・フックの承認）。CLI のログインでは AI が `looptrack issue login --browser` を実行します。利用者はブラウザでログインと承認をします（§3-2。トークンは会話に出ません）。ブラウザの無い環境だけは、発行したトークンを `login --url` に貼る手作業が残ります。

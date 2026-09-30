@@ -2,9 +2,9 @@
 
 [Guide contents](README.md) · Previous: [Where Looptrack fits](where-it-fits.md) · Next: [Daily use](daily-use.md)
 
-This section takes you from a machine with nothing installed to your first full loop, with every command spelled out.
+From a machine with nothing installed to your first full loop. That's the path this section walks, with every command spelled out.
 Run the steps in order.
-The examples use the values below; substitute your own.
+The examples use the values below. Swap in your own.
 
 | Item | Example value |
 | -- | -- |
@@ -22,27 +22,26 @@ The examples use the values below; substitute your own.
 | Local, single user | Using it on your own machine only | SQLite (a single file) | Skipped (listens on 127.0.0.1 only) |
 | Team server | Several people | MySQL or SQLite | Login and password (+ two-factor auth) |
 
-This section describes the **local, single-user** setup.
+We'll assume the local, single-user setup here.
 The differences for a team server are collected under "For a team server" after step 3.
-If the team server is a bare Linux machine, you can skip steps 1 to 3 entirely and let the installer do them; see "On a bare Linux server" after step 3.
+If the team server is a bare Linux machine, you can skip steps 1 to 3 entirely and let the installer do them. See "On a bare Linux server" after step 3.
 
-Before you begin, install the agent you plan to use (Claude Code, Codex, GitHub Copilot, …).
-You will also need git.
-Nothing else: Looptrack is a single executable, and the server, the CLI and the hooks all run from it.
-There is no runtime to install (no separate runtime), and `looptrack issue init` writes no scripts into your project.
-This is the same on Windows.
+Install the agent you plan to use (Claude Code, Codex, GitHub Copilot, …) before you begin. You'll need git too.
+Anything else? No.
+Looptrack is a single executable, and the server, the CLI and the hooks all run from it. There's no runtime to install (no separate runtime), and `looptrack issue init` doesn't write any scripts into your project. Same on Windows.
 
 ## 1. Download the binaries
 
-From the releases page (https://github.com/howashoji/looptrack/releases ), download these two files:
+Grab these two files from the releases page (https://github.com/howashoji/looptrack/releases ):
 
 - `looptrack_<version>_<os>_<arch>_server.tar.gz` (`.zip` on Windows): an archive holding one binary, `looptrack`, for the server, the CLI, and the hooks, together with its license texts
 - `SHA256SUMS` (the checksums)
 
-`<os>` is `darwin` (macOS), `linux`, or `windows`; `<arch>` is `amd64` or `arm64`.
+`<os>` is `darwin` (macOS), `linux`, or `windows`. `<arch>` is `amd64` or `arm64`.
 The archive unpacks into a single folder, `looptrack_<version>_<os>_<arch>_server/`, holding `looptrack` (`looptrack.exe` on Windows), `NOTICE`, `OFL-BIZUDGothic.txt`, and `LICENSE`.
+
 Check the archive against `SHA256SUMS` before you unpack it.
-Put the binary somewhere that does not need administrator rights.
+And put the binary somewhere that doesn't need administrator rights.
 
 ### macOS / Linux
 
@@ -61,7 +60,7 @@ install -m 755 "$NAME/looptrack" ~/.local/bin/looptrack
 ```
 
 Make sure the checksum output says `OK`.
-If `~/.local/bin` is not on your PATH, add this line to your shell profile (`~/.zshrc`, `~/.bashrc`, …) and open a new terminal.
+If `~/.local/bin` isn't on your PATH, add this line to your shell profile (`~/.zshrc`, `~/.bashrc`, …), then open a new terminal.
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -69,7 +68,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ### Windows (PowerShell)
 
-No administrator rights are needed.
+No administrator rights needed.
 The binary goes in `%LOCALAPPDATA%\Programs\looptrack`.
 
 ```powershell
@@ -93,8 +92,8 @@ if (($UserPath -split ';') -notcontains $D) { [Environment]::SetEnvironmentVaria
 ```
 
 Make sure you see an `OK` line.
-The PATH change only applies to **terminals and apps started afterwards**.
-Open a new PowerShell window before you continue.
+But the PATH change only applies to terminals and apps started afterwards.
+So open a new PowerShell window before you continue.
 
 > **`looptrack issue verify` needs Git Bash on Windows.** Verification commands run under `bash -c`, and
 > Looptrack does not fall back to `cmd.exe` or PowerShell (a POSIX command line means something else there).
@@ -105,8 +104,8 @@ Open a new PowerShell window before you continue.
 ### Windows (Git Bash)
 
 Git Bash works too.
-Follow the macOS / Linux steps with `OS=windows`; the Windows archive is a `.zip`, and the binary inside it is `looptrack.exe`.
-Unpacking uses `unzip`; if your Git Bash has no `unzip`, use the PowerShell steps instead.
+Follow the macOS / Linux steps, just with `OS=windows`. The Windows archive is a `.zip`, and the binary inside it is `looptrack.exe`.
+Unpacking uses `unzip`. No `unzip` in your Git Bash? Use the PowerShell steps instead.
 
 ```bash
 VER=v1.0.0
@@ -122,8 +121,8 @@ unzip -q "$NAME.zip"
 cp "$NAME/looptrack.exe" ~/.local/bin/looptrack.exe
 ```
 
-PowerShell and your agent may not see Git Bash's `~/.local/bin`.
-If an agent will call `looptrack`, installing into `%LOCALAPPDATA%\Programs\looptrack` with the PowerShell steps is more reliable.
+One catch: PowerShell and your agent may not see Git Bash's `~/.local/bin`.
+If an agent will call `looptrack`, you're better off installing into `%LOCALAPPDATA%\Programs\looptrack` with the PowerShell steps.
 
 ### Check
 
@@ -133,26 +132,26 @@ looptrack version
 
 ### Signatures and OS warnings
 
-- **macOS**: the official macOS binaries are signed with the publisher's Apple Developer ID and notarized by Apple.
-  Gatekeeper does not block them, even when you download them with a browser.
-  Binaries you build yourself (for example, from a fork) are not signed.
-- **Windows**: the Windows binaries are **currently not signed**.
-  When you start one downloaded with a browser, Microsoft Defender SmartScreen may show "Windows protected your PC".
-  First check that the SHA-256 matches `SHA256SUMS` (the steps above), then click **More info** → **Run anyway**.
-  Files downloaded with `Invoke-WebRequest` and started from PowerShell usually do not show this screen.
-- **`SHA256SUMS` is signed with minisign** (`SHA256SUMS.minisig` on the releases page).
+- macOS: the official macOS binaries are signed with the publisher's Apple Developer ID and notarized by Apple.
+  Gatekeeper won't block them, even when you download them with a browser.
+  Binaries you build yourself (for example, from a fork) aren't signed, though.
+- Windows: the Windows binaries are **currently not signed**.
+  Start one you downloaded with a browser, and Microsoft Defender SmartScreen may show "Windows protected your PC".
+  First check that the SHA-256 matches `SHA256SUMS` (the steps above). Then click More info → Run anyway.
+  Files downloaded with `Invoke-WebRequest` and started from PowerShell usually don't show this screen.
+- `SHA256SUMS` is signed with minisign. That's `SHA256SUMS.minisig` on the releases page.
   `looptrack self-update` checks this signature before replacing itself.
-  To check it by hand, install [minisign](https://jedisct1.github.io/minisign/), download `SHA256SUMS.minisig` next to `SHA256SUMS`, and run:
+  Want to check it by hand? Install [minisign](https://jedisct1.github.io/minisign/), download `SHA256SUMS.minisig` next to `SHA256SUMS`, and run:
 
 ```bash
 minisign -Vm SHA256SUMS -P RWRrJP/r1wfXKalGsxLnzFmmsExUd2azSJh4ccrYDJEBu8yE3N0ZlLJy
 ```
 
-It should print `Signature and comment signature verified`.
+You should see `Signature and comment signature verified`.
 
 ## 2. Set up the server (`looptrack setup`)
 
-Create a directory for the server and run the interactive wizard.
+Make a directory for the server, then run the interactive wizard.
 
 ```bash
 mkdir -p ~/looptrack-server
@@ -168,7 +167,7 @@ Set-Location "$HOME\looptrack-server"
 looptrack setup
 ```
 
-Answer the questions as follows (values in `[ ]` are defaults; press Enter to accept them).
+Here's how to answer. Values in `[ ]` are defaults, and pressing Enter accepts them.
 
 | Question | Answer for local, single-user use |
 | -- | -- |
@@ -179,18 +178,18 @@ Answer the questions as follows (values in `[ ]` are defaults; press Enter to ac
 | ⑤ Two-factor auth | Optional (the local default; it has no effect because local mode skips sign-in) |
 | ⑥ First project | `-` (create none here; step 4 creates `demo`. Entering a slug creates it now and you can skip step 4) |
 
-Review the summary and enter `y`. The wizard creates:
+Review the summary and enter `y`. You end up with:
 
 - `<server directory>/.env` (settings; it contains secrets, so do not share it or commit it)
 - `<server directory>/im.db` (the SQLite data)
 - the first administrator
 
 When it finishes, it prints the start command, the browser URL, the CLI login command, and the MCP connection settings.
+
 **If you lose `LOOPTRACK_SECRET_KEY` in `.env`, nobody's two-factor auth will work any more.** Keep a copy of `.env` somewhere safe.
 
-If you stop with Ctrl-C part-way, no files and no users are left behind.
-Running `looptrack setup` a second time changes nothing and shows the current settings.
-To start over, run `looptrack setup --force`.
+Stop with Ctrl-C part-way, and no files and no users are left behind.
+Run `looptrack setup` a second time and it changes nothing. It just shows the current settings. To start over, run `looptrack setup --force`.
 
 ## 3. Start the server
 
@@ -200,9 +199,8 @@ looptrack serve --env-file ./.env
 ```
 
 In PowerShell: `looptrack serve --env-file .\.env`.
-Leave this terminal open; closing it stops the server.
-Open http://127.0.0.1:8090/looptrack/ in a browser and check that the page loads.
-In local, single-user mode you will not see a login page.
+Leave this terminal open. Closing it stops the server.
+Open http://127.0.0.1:8090/looptrack/ in a browser and check that the page loads. In local, single-user mode you won't see a login page.
 
 Local mode listens on `127.0.0.1` only.
 **Do not use it on a machine shared by several people.** Other users on the same machine could use it without signing in.
@@ -212,7 +210,7 @@ Local mode listens on `127.0.0.1` only.
 - In ①, choose "team server". The default storage is MySQL; pass the MySQL connection string in the environment variable `LOOPTRACK_SETUP_DSN`.
 - In ③, enter the public URL (e.g. `https://im.example.com`). Two-factor auth defaults to required.
 - The wizard writes a `compose.yaml` next to `.env`, plus the `Dockerfile` and `NOTICE` it builds from.
-  Start it with `docker compose up -d`; the image is built locally, not pulled.
+  Start it with `docker compose up -d`. The image is built locally, not pulled.
   On Linux the wizard also copies itself there as `looptrack`; elsewhere, put a `linux/amd64` build there first.
 - Put a reverse proxy (Nginx, …) in front: receive `/looptrack/` and pass it to `127.0.0.1:8090`. Do not strip the `/looptrack` prefix.
 - For the admin commands in step 4, use `docker compose run --rm --no-deps looptrack …` instead of `looptrack …` (e.g. `docker compose run --rm --no-deps looptrack user list`).
@@ -220,40 +218,40 @@ Local mode listens on `127.0.0.1` only.
 
 ### On a bare Linux server (`install.sh`)
 
-On a fresh Ubuntu LTS or Debian server you do not have to do steps 1 to 3 by hand.
-One line runs the installer: it downloads the server archive, verifies it, unpacks it, runs `looptrack setup`, writes a systemd unit (or a `compose.yaml`), starts the service and checks that it answers.
+On a fresh Ubuntu LTS or Debian server, you don't have to do steps 1 to 3 by hand.
+One line runs the installer. It downloads the server archive, verifies it, unpacks it, runs `looptrack setup`, writes a systemd unit (or a `compose.yaml`), starts the service and checks that it answers.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
 ```
 
-The installer takes `looptrack_<version>_linux_<arch>_server.tar.gz` of the newest release, and checks it against `SHA256SUMS` (and the signature of `SHA256SUMS` when the server has `minisign`) before it unpacks or installs anything.
-The script itself is fetched over HTTPS only and cannot check itself. To read it first, download it with `curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh`, read it, and run `sudo sh install.sh`.
+The installer takes `looptrack_<version>_linux_<arch>_server.tar.gz` of the newest release. It checks it against `SHA256SUMS` (and the signature of `SHA256SUMS` when the server has `minisign`) before it unpacks or installs anything.
+The script itself, though, is fetched over HTTPS only and can't check itself. To read it first, download it with `curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh`, read it, and run `sudo sh install.sh`.
 Options go after `sh -s --` (for example `… | sudo sh -s -- --version v1.0.0` to pin a version).
 If you built the distribution yourself, pass that directory instead: `sudo sh deploy/install.sh --from /path/to/dist`.
-The installer is for Linux only; on macOS or Windows, use the [desktop edition](desktop.md) to run a server.
 
-The installer first asks how to run the server (systemd or Docker compose), then the same questions as `looptrack setup`.
-When it finishes it prints Nginx and Caddy configuration examples (also written to `/etc/looptrack/proxy-examples.txt`), the browser URL, the CLI login command and the MCP connection settings.
-Put the reverse proxy in front, sign in at the public URL, and continue from step 4.
+The installer is for Linux only. On macOS or Windows, use the [desktop edition](desktop.md) to run a server.
 
-If you choose MySQL and give the application's database user only the privileges it needs (`deploy/grants.sql`), the same run takes care of it.
-Per-table `GRANT`s can only be run once the tables exist, so after setup creates the tables, the installer asks on the terminal for an administrative MySQL account (the password is not shown and not stored).
-It creates the application user if it is missing, grants the privileges built into `looptrack` (`looptrack grants print` shows them), checks that the application user can read, and only then starts the service.
-If the administrative account is wrong, it stops without starting anything; run it again and it continues from the question.
+First it asks how to run the server (systemd or Docker compose). Then come the same questions as `looptrack setup`.
+When it finishes, it prints Nginx and Caddy configuration examples (also written to `/etc/looptrack/proxy-examples.txt`), the browser URL, the CLI login command and the MCP connection settings.
+Put the reverse proxy in front, sign in at the public URL, and carry on from step 4.
+
+Choosing MySQL and giving the application's database user only the privileges it needs (`deploy/grants.sql`)? The same run takes care of that too.
+Per-table `GRANT`s can only run once the tables exist. So after setup creates the tables, the installer asks on the terminal for an administrative MySQL account (the password isn't shown and isn't stored).
+It creates the application user if it's missing, grants the privileges built into `looptrack` (`looptrack grants print` shows them), checks that the application user can read, and only then starts the service.
+If the administrative account is wrong, it stops without starting anything. Run it again and it picks up from the question.
 If the database does not exist yet, setup asks for the same administrative account up front and, after asking whether to go ahead, creates the database too (you are asked only once). This needs the user that creates the tables (`LOOPTRACK_SETUP_MIGRATE_DSN`) and its `GRANT` on that database to be in place first; without them it stops at the connection as before. Answer no and it stops without creating anything, showing the `CREATE DATABASE` statement to run yourself.
 
-To update, run `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` (details in [Updating](updating.md)); to remove it, `--uninstall` (`--purge` also deletes the settings and the data).
+To update, run `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` (details in [Updating](updating.md)). To remove it, use `--uninstall`. Add `--purge` and the settings and the data go too.
 
 ## 4. Create a project and join it
 
-**If you already created a project at question ⑥ of the wizard, skip this step.**
-Re-creating the same slug fails.
+Already created a project at question ⑥ of the wizard? Then skip this step. Re-creating the same slug fails.
 You can also create one from the browser later (`/admin/projects`, "Create project").
 
 Projects are created with an admin command.
-Admin commands connect to storage using `LOOPTRACK_DSN` from `.env`.
-Run them **in a different terminal from the one running the server**.
+Admin commands reach storage through `LOOPTRACK_DSN` in `.env`.
+Run them in a different terminal from the one running the server.
 
 macOS / Linux / Git Bash:
 
@@ -281,30 +279,30 @@ looptrack project list
 
 ## 5. Users and permissions (team server)
 
-Skip this step for local, single-user use.
+Local, single-user? Skip this step.
 On a team server, an administrator adds users in the browser.
 
 1. Open `<server URL>/admin/users` and add a user with a login, display name, initial password, and role (admin / member)
 2. On the same page, under project permissions, give the user `editor` (create, comment, change status) or `viewer` (read only) on the project
 3. Send the user the URL, login, and initial password. They sign in and, if two-factor auth is required, register an authenticator app. They can change their password at `<server URL>/account`
 
-See [Administration](admin.md) for more.
+More in [Administration](admin.md).
 
 ## 6. Sign in the CLI (`looptrack issue login`)
 
-Skip this step for local, single-user use: like the UI and the agent's MCP connection, the CLI works without a token there.
-You sign in when you point it at a team server.
+Local, single-user? Skip this step. Like the UI and the agent's MCP connection, the CLI works without a token there.
+You only sign in when you point it at a team server.
 
 ```bash
 looptrack issue login --browser --url http://127.0.0.1:8090/looptrack
 ```
 
-A browser opens; sign in and click Allow (in local, single-user mode there is no login page).
-If no browser opens, open the URL that is printed.
+A browser opens. Sign in and click Allow (in local, single-user mode there's no login page).
+No browser? Open the URL that's printed.
 The token is stored in your user configuration directory, readable only by you (`~/.config/looptrack/credentials.json` on macOS / Linux, `%APPDATA%\looptrack\credentials.json` on Windows).
-After that, it is refreshed automatically before it expires.
+From then on, it's refreshed automatically before it expires.
 
-Where there is no browser (for example over ssh), create an access token at `<server URL>/account` and paste it into:
+Some places have no browser at all, like a machine you reach over ssh. There, create an access token at `<server URL>/account` and paste it into:
 
 ```bash
 looptrack issue login --url http://127.0.0.1:8090/looptrack
@@ -313,7 +311,7 @@ looptrack issue login --url http://127.0.0.1:8090/looptrack
 ## 7. Install into a project (`looptrack issue init`)
 
 Run this in the repository you work in.
-Start with `--dry-run` to see what would be written.
+Start with `--dry-run`, so you can see what would be written.
 
 ```bash
 mkdir -p ~/work/demo-app
@@ -327,10 +325,10 @@ looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --agen
 - `--mcp` also writes the MCP connection settings (`.mcp.json` for Claude Code).
 - `--no-loop` installs core only; use `--loop` to add loop as well. With neither, you will be asked. See [Agent-specific notes](ai-agents.md) for how to choose.
 - Existing settings are merged, not replaced. Changed files are backed up to `.claude/.looptrack-init-backup/<timestamp>/`.
-- A self-check runs after installing; if it fails, everything written is rolled back.
-- Running it again is safe. The second run reports that nothing changed.
+- A self-check runs after installing. If it fails, everything written is rolled back.
+- Running it again is safe. The second run just reports that nothing changed.
 
-For Claude Code, the main things installed are:
+For Claude Code, here's what mainly goes in:
 
 | What | Contents |
 | -- | -- |
@@ -340,8 +338,8 @@ For Claude Code, the main things installed are:
 | `CLAUDE.md` | A managed section between `<!-- looptrack:begin -->` and `<!-- looptrack:end -->` |
 | `.mcp.json` | MCP connection settings (with `--mcp`) |
 
-If `looptrack` is not found on PATH, init wires the hooks with an absolute path and writes that wiring to the machine-local `.claude/settings.local.json`.
-Check the wiring and PATH with:
+If `looptrack` isn't found on PATH, init wires the hooks with an absolute path. That wiring goes into the machine-local `.claude/settings.local.json`.
+To check the wiring and PATH:
 
 ```bash
 looptrack doctor
@@ -349,7 +347,7 @@ looptrack doctor
 
 ## 8. Connect MCP
 
-If you used `init --mcp`, Claude Code is already configured.
+Used `init --mcp`? Then Claude Code is already configured.
 To add it by hand:
 
 ```bash
@@ -363,14 +361,14 @@ Or in `.mcp.json`:
   "headers": { "X-Looptrack-Project": "demo" } } } }
 ```
 
-**Restart** Claude Code.
-If it asks you to approve hooks, review them and approve.
+Restart Claude Code.
+If it asks you to approve hooks, look them over, then approve.
 On a team server, pick `looptrack` in Claude Code's `/mcp` and allow access in the browser.
-For Codex and Copilot, see [Agent-specific notes](ai-agents.md).
+Codex and Copilot are covered in [Agent-specific notes](ai-agents.md).
 
 ## 9. Your first loop
 
-First, check the connection from the CLI.
+Start by checking the connection from the CLI.
 
 ```bash
 cd ~/work/demo-app
@@ -379,9 +377,9 @@ looptrack issue config
 looptrack issue guide
 ```
 
-The two variables are needed because `init` writes them into `.claude/settings.json`,
-which only reaches the agent's own session — a plain terminal does not see them.
-If `config` shows the project `demo` and your role, you are connected.
+Why set the two variables yourself? Because `init` writes them into `.claude/settings.json`,
+which only reaches the agent's own session. A plain terminal doesn't see them.
+If `config` shows the project `demo` and your role, you're connected.
 
 Next, file your first issue and walk through one turn by hand.
 
@@ -405,13 +403,13 @@ looptrack issue next
 
 `next` moves `DEMO-0001` to In Progress and shows its body and acceptance criteria.
 `## 受け入れ条件` (acceptance criteria) and `## 検証コマンド` (verify commands) are the section headings the server looks for. You can write them in English instead: `## Acceptance criteria` and `## Verify commands` (case does not matter).
-From here, let the agent take over.
+From here on, it's the agent's turn.
 Open Claude Code and ask:
 
 > Take the next issue and do one full loop. Verify the acceptance criteria before you close it.
 
 The agent does the work, runs the verify commands with `verify`, records the results, and closes the issue.
-Finally, check the result yourself:
+Last, check the result yourself:
 
 ```bash
 looptrack issue show DEMO-0001
@@ -420,14 +418,14 @@ looptrack issue summary
 ```
 
 If `show` lists the comments and the status is Done, your first loop is complete.
-You can see the same issue in the browser at http://127.0.0.1:8090/looptrack/p/demo/.
+The same issue is in the browser too, at http://127.0.0.1:8090/looptrack/p/demo/.
 
-PowerShell has no here-documents; write the body to a file and pass it with `--body (Get-Content -Raw body.md)`.
+PowerShell has no here-documents. Write the body to a file and pass it with `--body (Get-Content -Raw body.md)`.
 
 ## 10. Language (English / Japanese)
 
 Everything you read comes out in English or Japanese. Set it explicitly with
-`LOOPTRACK_LANG`, or leave it to your terminal and browser:
+`LOOPTRACK_LANG`, or just leave it to your terminal and browser:
 
 ```bash
 LOOPTRACK_LANG=en looptrack issue list   # this command only
@@ -442,11 +440,11 @@ export LOOPTRACK_LANG=ja                 # this shell
 | 4 | — | `Accept-Language` |
 | 5 | — | English |
 
-Pick a display language on `/account` and **even a connection that cannot send headers (MCP) comes back in it**.
+Pick a display language on `/account`, and even a connection that can't send headers (MCP) comes back in it.
 Set it back to unset and it follows your browser and terminal again, exactly as before.
 
-What an AI agent reads (the MCP `instructions`, the `guide` bodies, the tool
-descriptions) comes back in the same language, picked for each connection. The rules installed into
-your project are shipped in both languages, and the hooks pick one at run time by the
-same order. For skills, `looptrack issue init` installs only the one in the language
-of the installation (run it again after changing the language).
+The same goes for what an AI agent reads. The MCP `instructions`, the `guide` bodies and the tool
+descriptions come back in the same language, picked for each connection. The rules installed into
+your project ship in both languages, and the hooks pick one at run time by the
+same order. Skills are the exception. `looptrack issue init` installs only the one in the language
+of the installation, so run it again after changing the language.

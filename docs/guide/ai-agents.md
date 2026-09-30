@@ -9,7 +9,7 @@
 | CLI (`looptrack issue …`) | The main path for Claude Code. Hooks use the CLI too |
 | MCP tools | The main path for Codex and Copilot. Agents without hooks run the whole loop through MCP alone |
 
-The server's rules, permissions, and records are the same for every agent.
+The server's rules, permissions, and records don't change from agent to agent.
 Install with `looptrack issue init --agent <agent>`.
 An agent that only has an MCP connection can ask the MCP `setup` tool for install steps (see "Installing through MCP only" below).
 
@@ -34,12 +34,12 @@ What loop adds:
 | Runaway background processes | Finds child processes the session left running and reports them |
 | Changes to another repository or project | Asks the user before making them |
 
-The rule texts ship in English and Japanese, and the hooks pick one at run time.
-Confirm mode reacts to requests in English (check, investigate, review, … / implement, fix, add, …) and in Japanese (「確認して」 / 「実装して」). When a request contains both, the Japanese words decide.
-To add your own phrasing, add patterns through `LOOPTRACK_LOOP_TASK_MODE_INVEST_RE` and `LOOPTRACK_LOOP_TASK_MODE_EXEC_RE` in the `env` of your agent settings.
-These are Go regular expressions (RE2), so lookahead and lookbehind such as `(?!…)` are not supported. `LOOPTRACK_LOOP_RUNAWAY_ALLOW` (processes to exempt from the runaway check) is the same. A pattern that cannot be read is ignored, only the default words apply, and the hook shows the variable name and the error as a message.
+The rule texts ship in both English and Japanese, and the hooks pick one at run time.
+Confirm mode reacts to requests in English (check, investigate, review, … / implement, fix, add, …) and in Japanese (「確認して」 / 「実装して」). If a request contains both, the Japanese words win.
+Want your own phrasing? Add patterns through `LOOPTRACK_LOOP_TASK_MODE_INVEST_RE` and `LOOPTRACK_LOOP_TASK_MODE_EXEC_RE` in the `env` of your agent settings.
+One catch: these are Go regular expressions (RE2), so lookahead and lookbehind such as `(?!…)` aren't supported. The same goes for `LOOPTRACK_LOOP_RUNAWAY_ALLOW` (processes to exempt from the runaway check). A pattern that can't be read is ignored, and only the default words apply. When that happens, the hook shows the variable name and the error as a message.
 
-**The user, not the agent, decides** whether to install loop.
+Whether to install loop is the user's call. Not the agent's.
 
 ```bash
 looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --loop          # add loop
@@ -52,13 +52,13 @@ looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --remo
 looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --agent claude-code --mcp
 ```
 
-- **Hooks** are wired in `.claude/settings.json`. When you restart and are asked to approve hooks, review and approve them.
-- **The `/issue` skill** covers filing, starting, commenting, and closing. Type `/issue`, or just ask the agent to file an issue.
-- **The `/iterate` skill** (loop) runs one implementation as "start → implement → gates → file problems → close → next".
-- **MCP prompts**: `/mcp__looptrack__loop` (the standard loop), `/mcp__looptrack__review` (raise items waiting for you and unanswered reactions), `/mcp__looptrack__setup` (installation).
-- The managed section of `CLAUDE.md` tells the agent how to use the CLI.
+- Hooks: wired in `.claude/settings.json`. When you restart and get asked to approve them, look them over and approve.
+- The `/issue` skill: covers filing, starting, commenting, and closing. Type `/issue`, or just ask the agent to file an issue.
+- The `/iterate` skill (loop): runs one implementation as "start → implement → gates → file problems → close → next".
+- MCP prompts: `/mcp__looptrack__loop` (the standard loop), `/mcp__looptrack__review` (raise items waiting for you and unanswered reactions), `/mcp__looptrack__setup` (installation).
+- What tells the agent how to use the CLI is the managed section of `CLAUDE.md`.
 
-An example request:
+Here's an example request:
 
 > Work from the next issue. Put anything that needs my decision In Review and keep going.
 
@@ -68,9 +68,9 @@ An example request:
 looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --agent codex
 ```
 
-- **Instructions**: a managed section is added to `AGENTS.md` (Codex has no rules files or skills, so the essentials go here).
-- **Codex works mainly through MCP.** Codex's default sandbox blocks network access for shell commands the agent runs. Every CLI call would need your approval, so issue operations go through MCP tools.
-- **Connecting MCP**: add the following to `~/.codex/config.toml` and authorise with `codex mcp login looptrack`.
+- Instructions: a managed section goes into `AGENTS.md`. Codex has no rules files or skills, so the essentials live here.
+- Codex works mainly through MCP. Why? Its default sandbox blocks network access for the shell commands the agent runs. So every CLI call would need your approval. Issue operations go through MCP tools instead.
+- Connecting MCP: add the following to `~/.codex/config.toml` and authorise with `codex mcp login looptrack`.
 
 ```toml
 [mcp_servers.looptrack]
@@ -78,8 +78,8 @@ url = "http://127.0.0.1:8090/looptrack/mcp"
 http_headers = { "X-Looptrack-Project" = "demo" }
 ```
 
-- **Hooks** are wired in `.codex/hooks.json`. After trusting the project, **start the terminal `codex` in the project and trust the hooks with `/hooks`**. That trust also applies to the desktop app. Untrusted hooks are skipped silently.
-- **CLI environment**: init writes `LOOPTRACK_API_URL` and `LOOPTRACK_PROJECT` to `[shell_environment_policy]` in `.codex/config.toml`.
+- Hooks: wired in `.codex/hooks.json`. After trusting the project, **start the terminal `codex` in the project and trust the hooks with `/hooks`**. That trust carries over to the desktop app too. Untrusted hooks are skipped silently.
+- CLI environment: init writes `LOOPTRACK_API_URL` and `LOOPTRACK_PROJECT` to `[shell_environment_policy]` in `.codex/config.toml`.
 
 ## GitHub Copilot (VS Code agent mode, Copilot CLI)
 
@@ -87,25 +87,25 @@ http_headers = { "X-Looptrack-Project" = "demo" }
 looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --agent copilot --mcp
 ```
 
-- **Copilot works mainly through MCP** (as with Codex).
-- **Connecting MCP**: `--mcp` writes `.vscode/mcp.json` for VS Code and `.github/mcp.json` for Copilot CLI. In Copilot CLI, authorise with `/mcp auth looptrack`.
-- **Instructions**: Copilot reads the managed section of `AGENTS.md`.
-- **Hooks** are wired in `.github/hooks/looptrack.json`. VS Code picks them up in a new chat; Copilot CLI once you trust the folder.
-- **Token tracking**: Copilot usage can only be measured if the user turns on OpenTelemetry file export. If it is off, missing token info is not held against you.
+- Like Codex, Copilot works mainly through MCP.
+- Connecting MCP: with `--mcp`, init writes `.vscode/mcp.json` for VS Code and `.github/mcp.json` for Copilot CLI. In Copilot CLI, authorise with `/mcp auth looptrack`.
+- Instructions: Copilot reads the managed section of `AGENTS.md`.
+- Hooks: wired in `.github/hooks/looptrack.json`. VS Code picks them up in a new chat. Copilot CLI, once you trust the folder.
+- Token tracking: Copilot usage is measured only if the user turns on OpenTelemetry file export. If it's off, missing token info isn't held against you.
 
-Some of the Copilot hook behaviour has not yet been confirmed on real installations.
-If hooks do not work, run the loop through MCP tools alone.
+Parts of the Copilot hook behaviour haven't been confirmed on real installations yet.
+If the hooks don't work, run the loop through MCP tools alone.
 
 ## Other agents (MCP only)
 
-An agent without hooks can still run the loop through MCP tools alone.
+No hooks? No problem. An agent can still run the loop through MCP tools alone.
 
 1. Add the MCP connection (URL `<server URL>/mcp`, header `X-Looptrack-Project: <slug>`, authorised in the browser)
 2. Run `looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --agent other` and copy the printed guidance into the agent's instruction file
 3. Ask the agent: "Read the guide tool first, then work from next."
 4. When installation is done, tell the server with `looptrack issue installed --agent other`
 
-The MCP tools:
+Here are the MCP tools:
 
 | Purpose | Tools |
 | -- | -- |
@@ -116,32 +116,32 @@ The MCP tools:
 | Verification | `verify_issue` (returns the list; commands run in your local shell), `report_verify` (sends results you ran locally) |
 | Tokens | `issue_usage`, `usage_missing`, `usage_report`, `list_usage_ledger`, `add_usage_ledger`, `list_usage_requests` |
 
-With MCP only, the agent runs the verify commands in its local shell in order and sends the results with `report_verify`.
-Those records are marked as "self-reported via MCP", so people can tell them apart from CLI records.
+With MCP only, the agent runs the verify commands one by one in its local shell and sends the results with `report_verify`.
+Those records carry a "self-reported via MCP" mark. That's how people tell them apart from CLI records.
 
 ## Installing through MCP only (the setup tool)
 
-You can install on a machine with neither the CLI nor hooks, starting from just an MCP connection.
+A machine with neither the CLI nor hooks is fine. You can install starting from just an MCP connection.
 
 1. Add the MCP connection to the agent and authorise it in the browser. To have the agent add the connection too, use the prompts in "Installing by pasting one prompt" below
 2. Ask the agent to "set up issue management". The agent calls the `setup` tool
-3. The `setup` tool first returns only the question of whether to install loop. The agent asks you, then calls `setup` again with your answer, and runs the single command it gets back (download → SHA-256 check → init) after you approve it. If `~/.local/bin/looptrack` (on Windows, `%LOCALAPPDATA%\Programs\looptrack\looptrack.exe`) is already there, nothing is downloaded or replaced and only init runs with the existing one; if that version is older, the next setup suggests `looptrack self-update`
+3. The `setup` tool first returns only one question: install loop or not? The agent asks you, then calls `setup` again with your answer. What comes back is a single command (download → SHA-256 check → init), and the agent runs it once you approve. If `~/.local/bin/looptrack` (on Windows, `%LOCALAPPDATA%\Programs\looptrack\looptrack.exe`) is already there, nothing is downloaded or replaced. Init just runs with the existing one. If that version is older, the next setup suggests `looptrack self-update`
 4. If there is no token yet, the agent asks for approval and runs `looptrack issue login --browser`. You sign in and allow access in the browser
 5. You restart the agent and approve its hooks
 6. At the start of the next session, a hook tells the server the install is complete, and the [Setup incomplete] note disappears from tool results
 
 ## Installing by pasting one prompt (a remote server)
 
-These steps connect the agents on your own machine to a Looptrack server that runs on another machine or in the cloud.
+These steps connect the agents on your own machine to a Looptrack server running on another machine or in the cloud.
 All you do is fill in `<server URL>` and `<project>` in the prompt below and paste it into the agent.
 The agent adds the MCP connection, calls `setup`, and runs the install command.
-Your hands are needed only to allow access and sign in through the browser, approve commands, restart the agent, and trust its hooks.
+You only step in to allow access and sign in through the browser, approve commands, restart the agent, and trust its hooks.
 
-**Never hand a token to the agent.** Do not put a token, a password, or a verification code into the prompt or the conversation.
-Sign in with `looptrack issue login --browser`; the token travels only between the CLI and the server.
+**Never hand a token to the agent.** Don't put a token, a password, or a verification code into the prompt or the conversation.
+Sign in with `looptrack issue login --browser`. The token travels only between the CLI and the server.
 
-These steps have not been checked on a real Windows machine.
-Copilot in VS Code has not been checked on a real installation either.
+These steps haven't been checked on a real Windows machine.
+Nor has Copilot in VS Code, on a real installation.
 
 ### Before you start
 
@@ -152,14 +152,14 @@ Copilot in VS Code has not been checked on a real installation either.
 | You | Check that you can sign in to the server in the browser. If two-factor auth is required, register an authenticator app at your first sign-in |
 | You | Start the agent in the top directory of the repository you want to connect. For Codex, mark that directory as trusted first |
 
-If the project does not exist yet, the administrator usually creates it first (`<server URL>/admin/projects`).
-If you are a server administrator yourself, you do not have to. When `setup` answers "Project not found",
-an administrator gets a note that the MCP tool `create_project` can create it, and the agent follows it: it creates the project, then calls `setup` again.
-The prefix (of the IDs) and the width (digits of the number) can never be changed afterwards, so the agent shows you the slug, prefix and width and asks you to confirm them before it creates the project.
-Anyone who is not an administrator is told to ask an administrator.
+If the project doesn't exist yet, the administrator usually creates it first (`<server URL>/admin/projects`).
+If you're a server administrator yourself, though, you don't have to. When `setup` answers "Project not found",
+an administrator gets a note that the MCP tool `create_project` can create it. The agent follows that note: it creates the project, then calls `setup` again.
+The prefix (of the IDs) and the width (digits of the number) can never be changed afterwards. So before it creates the project, the agent shows you the slug, prefix and width and asks you to confirm them.
+Anyone who isn't an administrator is told to ask one.
 
-Apart from `<server URL>` and `<project>`, there is nothing to add to the prompt.
-You can paste the same prompt as many times as you like. The agent checks the install state with `setup` and carries on from the steps that are left.
+You add nothing to the prompt beyond `<server URL>` and `<project>`.
+Paste the same prompt as many times as you like. The agent checks the install state with `setup` and picks up from the steps that are left.
 
 ### The prompt for Claude Code
 
@@ -199,12 +199,12 @@ Before every command you run and every setting you change, show me what it is an
 9. For the [user] step (trusting the hooks with /hooks in the terminal codex), ask me and stop. When I paste this prompt again, confirm that setup reports Installed, and finish.
 ```
 
-Codex has one MCP configuration (`~/.codex/config.toml`) for the whole machine.
-If it already holds a looptrack entry for another project, setup is available at step 1, so steps 2 and 3 are skipped.
-Without the project argument, setup would then return the steps for the project in the connection's header (the other project), and the agent would not notice.
-That is why step 4 passes project (setup falls back to the header's project only when the argument is left out).
-After the install, too, the MCP tools use the header's project. If the header names another project, pass the project argument on every MCP tool call.
-The environment variables that init writes into the repository's `.codex/config.toml` take effect only after Codex restarts. So that it still works
+Codex has just one MCP configuration (`~/.codex/config.toml`) for the whole machine.
+Here's the catch. If it already holds a looptrack entry for another project, setup is available at step 1, so steps 2 and 3 are skipped.
+Without the project argument, setup would then return the steps for the project in the connection's header (the other project). And the agent wouldn't notice.
+That's why step 4 passes project (setup falls back to the header's project only when the argument is left out).
+Even after the install, the MCP tools use the header's project. If the header names another project, pass the project argument on every MCP tool call.
+One more thing. The environment variables that init writes into the repository's `.codex/config.toml` take effect only after Codex restarts. So that it still works
 before Codex is restarted, setup returns the steps' commands (including the token check, `looptrack issue config`) with the server's URL and project
 already prefixed.
 
@@ -247,7 +247,7 @@ Before every command you run and every setting you change, show me what it is an
 ```
 
 Some Copilot models decide whether to install loop without asking the user.
-That is why step 5 is worded more strongly in the Copilot prompts. You can also write your answer into the prompt from the start (for example "do not install loop").
+That's why step 5 is worded more strongly in the Copilot prompts. You can also write your answer into the prompt up front (for example "do not install loop").
 
 ### Where your hands are needed
 
@@ -263,7 +263,7 @@ That is why step 5 is worded more strongly in the Copilot prompts. You can also 
 | Trusting the hooks | Claude Code: restart and approve if asked. Codex: trust them with `/hooks` in the terminal `codex`. Copilot: start a new session (in Copilot CLI, always trust the folder) | Hooks run only after the user accepts them |
 
 In Codex, the sandbox blocks network access for the shell commands the agent runs.
-The install command and the sign-in need your approval to run with raised permissions.
+So the install command and the sign-in need your approval to run with raised permissions.
 In Copilot CLI, every call to an MCP tool needs your approval.
 
 ### When something goes wrong

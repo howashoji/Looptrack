@@ -4,12 +4,12 @@
 
 ## What loop engineering is
 
-When you hand work to a coding agent, very little of it is finished in a single instruction.
-The agent builds and checks, a person decides, users react, and the work goes around again.
-Loop engineering means designing that cycle on purpose instead of leaving it to chance.
+Hand work to a coding agent, and very little of it gets finished in one instruction.
+The agent builds and checks. A person decides. Users react, and the work goes around again.
+Loop engineering means designing that cycle on purpose, not leaving it to chance.
 
-Looptrack treats the cycle as **three nested loops**.
-The inner loops turn fast; the outer ones turn slowly.
+Looptrack treats the cycle as three nested loops.
+Inner loops turn fast. Outer ones turn slowly.
 
 | Loop | Typical period | Who drives it | One turn |
 | -- | -- | -- | -- |
@@ -19,59 +19,57 @@ The inner loops turn fast; the outer ones turn slowly.
 
 ## ① The agent loop
 
-The agent takes the highest-priority issue that is ready to start.
-That issue comes with its body, acceptance criteria, and links.
-The agent does the work and writes a comment as soon as it finds a cause or makes a decision.
-It checks each acceptance criterion, records the results in a comment, and only then marks the issue Done.
-Then it takes the next issue.
+The agent takes the highest-priority issue that's ready to start.
+It comes with its body, acceptance criteria, and links.
+As the agent works, it writes a comment the moment it finds a cause or makes a decision.
+It checks each acceptance criterion and records the results in a comment. Only then does it mark the issue Done.
+Then on to the next one.
 
-A person does not have to be part of every turn of this loop.
+A person doesn't have to be part of every turn.
 
 ## ② The human loop
 
-Some things an agent must not decide alone: how to read a spec, how something should look, which approach to take.
-The agent does not mark these Done; it moves them to In Review instead.
-A person reviews the In Review queue whenever it suits them.
-To approve, they leave a comment starting with `Decision:` (`判断:`); to ask for rework, one starting with `Changes requested:` (`差し戻し:`).
+Some things an agent must not decide alone. How to read a spec, how something should look, which approach to take.
+So the agent doesn't mark these Done. It moves them to In Review instead.
+A person goes through the In Review queue whenever it suits them.
+To approve, leave a comment starting with `Decision:` (`判断:`). To ask for rework, start it with `Changes requested:` (`差し戻し:`). That's all.
 Before its next turn, the agent picks these up and moves the issue to Done or back to Todo.
 
 ## ③ The outer loop
 
-You can only judge what you built once it reaches the people who use it.
-When you hear a reaction from a participant, tester, or user, put it on the issue as a comment starting with `Feedback:` (`フィードバック:`).
-Reactions nobody has answered yet are listed as "unanswered" in the summary.
-One response (a comment on the plan, a new issue, or a status change) removes it from the list.
+You can't judge what you built until it reaches the people who use it.
+Heard a reaction from a participant, tester, or user? Put it on the issue as a comment starting with `Feedback:` (`フィードバック:`).
+Reactions nobody has answered yet show up as "unanswered" in the summary.
+Answer once (a comment on the plan, a new issue, or a status change) and it drops off the list.
 
-These three prefixes are fixed keywords that the server recognises. The English and Japanese forms mean the same; use either.
+These three prefixes are fixed keywords the server recognises. The English and Japanese forms mean the same thing, so use either.
 
 ## Why the issue is the source of truth
 
 An agent's context disappears when the session ends.
-Even within a long session, details are lost when the context is summarised.
-The agent in the next session does not remember what was decided before.
+Even in a long session, details get lost when the context is summarised.
+The agent in the next session doesn't remember what was decided before.
 
 So Looptrack keeps two things in the issue:
 
 - **What to do next**: status, priority, what it waits for (blocked_by), acceptance criteria
 - **Why it was done that way**: causes, decisions, reasons for sending back, verification results (comments)
 
-Each issue exists exactly once, in the server's database.
-Every agent and every session reads the same issue.
-Comments are append-only; they cannot be edited or deleted.
-Once an issue is closed, its body cannot change.
-That is what lets you trace the history later.
+Each issue exists exactly once, in the server's database. Every agent and every session reads that same issue.
+Comments are append-only. Nobody can edit or delete them, and once an issue is closed, its body can't change either.
+That's what lets you trace the history later.
 
 If work moves forward only in chat or private notes, neither of those reaches the next session.
-Looptrack's basic rule is simple: **start work from an issue**.
+Looptrack's basic rule is simple: start work from an issue.
 
-Put together, the issues are the agent's external memory: what does not fit in its context window is kept here, and the next session starts from it.
-They are not meant to replace your project's own issue list.
-The feature requests and bug reports people discuss can stay where you keep them; what goes here are the work items an AI breaks that work into.
-Each is small enough to take one at a time, and carries its plan, its decisions and the tokens its work consumed ([Token reports](token-report.md)).
+Put together, the issues are the agent's external memory. Whatever doesn't fit in its context window stays here, and the next session starts from it.
+They aren't meant to replace your project's own issue list, though.
+Feature requests and bug reports people discuss can stay where you keep them. What goes here are the work items an AI breaks that work into.
+Each one is small enough to take one at a time, and carries its plan, its decisions and the tokens its work consumed ([Token reports](token-report.md)).
 
 ## The server enforces the rules
 
-The server checks numbering, append-only comments, the immutability of closed issues, and per-project rules.
-The same checks apply whether you work through the CLI or through MCP.
+The server checks numbering, append-only comments, closed issues staying unchanged, and per-project rules.
+CLI or MCP, the checks are the same.
 When something is rejected, the error tells you what to do next.
-Agents follow that message to continue.
+Agents just follow that message and keep going.

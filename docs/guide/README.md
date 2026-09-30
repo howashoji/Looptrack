@@ -1,10 +1,11 @@
 # Looptrack User Guide
 
-Looptrack is an issue tracker serving as external memory for AI coding agents, enabling loop engineering.
-It records the work items an AI plans, apart from your project's own issues, shows the plans and decisions behind them, and logs the tokens each task consumed so you can report on them.
-Coding agents and people run their work around the same issues.
-This guide is for **people who use it**.
-Server design and deployment details live in separate documents for developers and operators.
+Looptrack is an issue tracker that works as external memory for AI coding agents. It's how you actually run loop engineering.
+It records the work items an AI plans, kept apart from your project's own issues. You can see the plans and decisions behind them, and since it logs the tokens each task consumed, you can report on those too.
+Coding agents and people work around the same issues. That's the core idea.
+
+This guide is for people who use it.
+Server design and deployment details? Those live in separate documents for developers and operators.
 
 日本語: [ja/README.md](ja/README.md)
 
@@ -23,8 +24,8 @@ Server design and deployment details live in separate documents for developers a
 | 9 | [Updating](updating.md) | Updating the CLI, the desktop app, and the server: what is automatic and what is manual, `self-update`, `install.sh --upgrade`, the looptrack you distribute to users |
 | 10 | [Token reports](token-report.md) | What token usage is recorded and what is not, how it is attributed to issues, and how to make the PDF report and record it in the ledger |
 
-If you are new, read 1 → 3 → 4.
-To use it by yourself on one PC without a terminal, start with 8.
+New here? Read 1 → 3 → 4.
+Using it by yourself on one PC, with no terminal? Start with 8.
 
 ## Terms
 
@@ -43,4 +44,4 @@ To use it by yourself on one PC without a terminal, start with 8.
 - [docs/server/DEPLOY.md](../server/DEPLOY.md): deployment and the details of `looptrack setup`
 - [docs/server/DESIGN.md](../server/DESIGN.md): design
 
-These documents are currently written in Japanese.
+For now, they're written in Japanese only.

@@ -2,11 +2,11 @@
 
 *English: [README.md](README.md)*
 
-Looptrack は、AI コーディングエージェントの外部記憶となり、ループエンジニアリングを実現するイシュー管理ツールです（[README](../README.ja.md)）。kit はコーディング AI をその記憶につなぐものです。`core` は、セッションの冒頭に作業単位の課題を読ませ、更新を怠らせず、各作業のトークンを記録します。`loop` は、AI がループを自分で回すための規律を足します。設計は [docs/server/DESIGN.md](../docs/server/DESIGN.md) にあります。
+Looptrack は、AI コーディングエージェントの外部記憶となり、ループエンジニアリングを実現するイシュー管理ツールです（[README](../README.ja.md)）。kit は、コーディング AI をその記憶につなぐ部品。`core` がセッションの冒頭で作業単位の課題を読ませ、更新を後回しにさせず、作業ごとのトークンを記録します。`loop` はその上に、AI が自分でループを回すための規律を足すもの。設計は [docs/server/DESIGN.md](../docs/server/DESIGN.md) を見てください。
 
-ここに置くのは、**どのプロジェクトでも同じように効くもの**だけです。`looptrack issue init` と MCP の setup ツールが、
-ここから各プロジェクトに配ります。プロジェクト固有の分岐は入れません（汎用でないものはここに置きません）。
-固有の運用はサーバのプロジェクト別ルール（`looptrack project rules set`）か、そのプロジェクトの運用文書に置いてください。
+ここに置けるのは、**どのプロジェクトでも同じように効くもの**だけ。`looptrack issue init` と MCP の setup ツールが、
+ここから各プロジェクトへ配ります。プロジェクト固有の分岐は入れません（汎用でないものは、そもそもここに置かない）。
+固有の運用は、サーバのプロジェクト別ルール（`looptrack project rules set`）か、そのプロジェクトの運用文書へ。
 
 | 層 | 何が入るか | 入れ方 |
 | -- | -- | -- |
@@ -14,11 +14,12 @@ Looptrack は、AI コーディングエージェントの外部記憶となり�
 | **loop** | 汎用だがサーバ無しでも成り立つ規律。core と組み合わせると「起票 → 着手 → 実装 → 検証 → クローズ → 次へ」を AI が自走する基盤になる | 利用者が AI を介して要 / 不要を選ぶ（`init --loop` / `--no-loop` / `--remove-loop`） |
 | 対象外 | 特定のプロジェクト・スタック・外部ツールに依存するもの | 配らない |
 
-「効くループ」列は、各項目が 3 層のループのどれを回すかを示します（① AI の作業・② 人の判断・③ 外からの反応。
+「効くループ」の列は、その項目が 3 層のループのどれを回すかを示します（① AI の作業・② 人の判断・③ 外からの反応。
 [DESIGN.md](../docs/server/DESIGN.md)）。
-② の「人の判断待ち」と ③ の「外からの反応」を AI に持ちかけさせる指示と `summary` の 3 層表示は、
-このシステム無しでは成り立たないので core に入れています。
-サーバの prompt `review` / `loop` と `guide`（共通規則）も ②③ に効きます。これらは配布物ではなく、サーバから直接 AI に届きます。
+② の「人の判断待ち」と ③ の「外からの反応」を AI に持ちかけさせる指示、それに `summary` の 3 層表示は、このシステム無しでは成り立ちません。
+だから core に入れてあります。
+
+サーバの prompt `review` / `loop` と `guide`（共通規則）も、実は ②③ に効いています。こちらは配布物ではなく、サーバから直接 AI に届くもの。
 
 ## core — 無条件に配るもの
 
@@ -33,17 +34,18 @@ Looptrack は、AI コーディングエージェントの外部記憶となり�
 | `core/skills/token-report/SKILL.md` | skill | トークン消費のレポート（PDF）を作って渡す手順 | 集計はサーバが持つ。skill は依頼の仕方だけを書く | — | ①（計測） |
 | CLAUDE.md / AGENTS.md の案内節 | 文書 | サーバの URL・CLI の呼び方・guide の読み方 | 書く内容はサーバの設定から決まる | `internal/client/kitinit` | — |
 
-**MCP の着手を会話に結ぶ（トークン計測の副次の効果）**: MCP から着手したイシューは、接続設定がセッション ID を送れないと
-CLI から「別の経路（CLI / MCP）で着手されています。同じセッションかは判定できません」と見えます。トークン計測の hook が
-同じツール呼び出しのスナップショットを送ると、サーバはその着手を会話のセッション ID に結び、CLI から「自分の着手」か
-「別のセッションが着手しています」かを見分けられるようになります（仕組みは [docs/server/DESIGN.md](../docs/server/DESIGN.md) の §6「MCP の操作を会話に結ぶ」）。
-**効くのは Claude Code だけです**（ツール呼び出しの ID を MCP の要求に入れるのが Claude Code だけのため）。**トークン計測の hook に依存します**
-（入れていなければ結ばれず、従来どおりの注記のままです）。
+**MCP の着手を会話に結ぶ（トークン計測の副次の効果）**: 接続設定がセッション ID を送れないと、MCP から着手したイシューは
+CLI から「別の経路（CLI / MCP）で着手されています。同じセッションかは判定できません」と見えてしまいます。ここでトークン計測の hook が
+同じツール呼び出しのスナップショットを送ると、サーバはその着手を会話のセッション ID に結びます。すると CLI から「自分の着手」か
+「別のセッションが着手しています」かを見分けられる（仕組みは [docs/server/DESIGN.md](../docs/server/DESIGN.md) の §6「MCP の操作を会話に結ぶ」）。
+**効くのは Claude Code だけです**。ツール呼び出しの ID を MCP の要求に入れるのが、Claude Code だけだからです。それと、トークン計測の hook に依存します
+（入れていなければ結ばれず、注記は従来どおり）。
 
-**MCP から呼んだ側の「自分」を見分ける（合鍵）**: MCP から呼んだ側のセッションは、上の結びでは分かりません。そこで合鍵の hook が
-呼び出しの直前に会話のセッション ID を届け、サーバは `_meta` のツール呼び出しの ID でそれを引きます。これで MCP の `next`・一覧が、
+**MCP から呼んだ側の「自分」を見分ける（合鍵）**: 上の結びでは、MCP から呼んだ側のセッションまでは分かりません。
+そこで合鍵の hook の出番です。呼び出しの直前に会話のセッション ID を届け、サーバは `_meta` のツール呼び出しの ID でそれを引く。これで MCP の `next`・一覧が、
 自分の会話の着手と、同じ利用者の別の会話の着手（同じ MCP の接続でも）を見分けます（仕組みは DESIGN の §6「セッションの見分け方」）。
-限界: 効くのは Claude Code だけです。`claudecode/toolUseId` は公開の仕様ではありません。サーバはメモリにだけ持つので、再起動をまたいだものと
+
+限界もあります。効くのは Claude Code だけ。`claudecode/toolUseId` は公開の仕様ではありません。サーバはメモリにしか持たないので、再起動をまたいだものと
 複数台の別の台に届いたものは引けず、従来どおり（接続 ID か空）に戻ります。MCP の呼び出しごとに REST が 1 往復増えます。
 
 ## loop — 利用者が選んで配るもの
@@ -68,7 +70,7 @@ CLI から「別の経路（CLI / MCP）で着手されています。同じセ�
 
 ## 対象外（配らない）
 
-汎用かどうかは、**そのプロジェクトを知らなくても同じ判断ができるか**で決めます。次のものは配りません。
+汎用かどうかの物差しは 1 つ。**そのプロジェクトを知らなくても同じ判断ができるか**です。次のものは配りません。
 
 | 対象 | 理由 |
 | -- | -- |
@@ -94,32 +96,32 @@ kit/
     manifest.json           ← hook の配線（イベント・matcher・timeout・順序）と Codex・Copilot での対応
 ```
 
-- `kit/embed.go` が `kit/` を埋め込みます（go:embed はパッケージより上を指せないので、別のパッケージにしています）。
+- `kit/` を埋め込むのは `kit/embed.go`。go:embed はパッケージより上を指せないので、別のパッケージにしてあります。
   `GET /api/v1/dist` の一覧には `kit/core/…` `kit/loop/…` の名前で、SHA-256 つきで出ます。
-- hook の本体は Go で書いてあり（`internal/client/hook/core`・`internal/client/hook/loop`）、kit にファイルはありません。
-  出力の形は `internal/hookio` が AI ごとに直します。
+- hook の本体は Go です（`internal/client/hook/core`・`internal/client/hook/loop`）。kit にファイルはありません。
+  出力の形を AI ごとに直すのは `internal/hookio` の仕事。
 
 ### 本文の言語（日英 2 言語）
 
-**日本語が元の定義で、いまの場所に置いたままにします。英語は同じディレクトリの `en/` に同じファイル名で置きます**
+**日本語が元の定義で、いまの場所から動かしません。英語は同じディレクトリの `en/` に、同じファイル名で置きます**
 （`loop/rules/background-process.md` ↔ `loop/rules/en/background-process.md`）。
 
-- ルートの `README.md` / `README.ja.md`・この文書（`kit/README.md` / `kit/README.ja.md`）・`docs/guide/` は
-  英語が上位（`ja/` が下）です。ただし**これらは配線には使われていません**。
-  kit のパスは `manifest.json`・hook の配線・`internal/client/kitinit` が参照しているので、元の定義を動かすと配線が全部動きます。
-  `internal/i18n` の方針（日本語が元の定義で、英語がそこに追いつく）ともそろいます。
-- **rules は、導入のときに日英の両方を配ります。** どちらを読むかは実行時に決まります（hook の rules の注入は `i18n.FromEnv` と同じ
+- ルートの `README.md` / `README.ja.md`、この文書（`kit/README.md` / `kit/README.ja.md`）、`docs/guide/` は向きが逆で、
+  英語が上位（`ja/` が下）。けど、**これらは配線には使われていません**。
+  kit のパスは事情が違います。`manifest.json`・hook の配線・`internal/client/kitinit` が参照しているので、元の定義を動かせば配線が全部動く。
+  `internal/i18n` の方針（日本語が元の定義で、英語がそこに追いつく）とも、この形ならそろいます。
+- **rules は、導入のときに日英の両方を配ります。** どちらを読むかは実行時に決まる（hook の rules の注入は `i18n.FromEnv` と同じ
   `LOOPTRACK_LANG` → `LC_ALL` → `LC_MESSAGES` → `LANG` の順。訳の無いファイルは日本語の元の定義に戻る）。
-  rules では、導入時に片方だけを選ぶ形にはしません。`LOOPTRACK_LANG` を切り替えたときについていけなくなるからです。
-  例外は Codex・Copilot の `AGENTS.md` です。これは生成物なので、導入時の言語で写します（言語を変えたら
+  なぜ導入時に片方だけを選ばないのか。`LOOPTRACK_LANG` を切り替えたとき、ついていけなくなるからです。
+  例外は Codex・Copilot の `AGENTS.md`。生成物なので、導入時の言語で写します（言語を変えたら
   `looptrack issue init --loop` をもう一度実行してください）。
-- **skill は、導入時の言語の 1 本だけを置きます。** skill は AI のハーネスが `.claude/skills/<名前>/SKILL.md` という
-  固定のパスで読みます。実行時に言語を選ぶ仕組みが無いので、`en/SKILL.md` を並べて置いても読まれません。そこで init が
-  導入時の言語（上と同じ順）で本文を選び、その 1 本を `SKILL.md` として置きます（`description` も導入時の言語になります）。
-  以前の init が置いた `en/SKILL.md` は、次の init で片付けます（手で変えたものは残します）。
-  **skill の言語を変えたいときは、`looptrack issue init` をやり直してください**（`AGENTS.md` の例外と同じです）。
-- 構成の一致（見出しの階層の並び・コードブロックの数・表の数・注入の印・相対リンク）は、
-  `go test ./internal/docscheck/` の `TestKitStructure` が確かめます。訳が無いファイルは失敗にせず、訳した分だけを検査します。
+- **skill は、導入時の言語の 1 本だけを置きます。** AI のハーネスは skill を `.claude/skills/<名前>/SKILL.md` という
+  固定のパスで読むだけで、実行時に言語を選ぶ仕組みがありません。`en/SKILL.md` を横に並べても、読まれずに終わります。だから init が
+  導入時の言語（上と同じ順）で本文を選び、その 1 本を `SKILL.md` として置く（`description` も導入時の言語になります）。
+  以前の init が置いた `en/SKILL.md` は、次の init で片付けます（手で変えたものは残す）。
+  **skill の言語を変えたいなら、`looptrack issue init` をやり直してください**（`AGENTS.md` の例外と同じ）。
+- 構成の一致（見出しの階層の並び・コードブロックの数・表の数・注入の印・相対リンク）を確かめるのは、
+  `go test ./internal/docscheck/` の `TestKitStructure`。訳が無いファイルは落とさず、訳した分だけを見ます。
 
 ### core の置き方
 
@@ -128,14 +130,14 @@ kit/
 | `skills/issue/SKILL.md`・`skills/issue/en/SKILL.md` | `.claude/skills/issue/SKILL.md`。**置かれるのは導入時の言語の 1 本だけ**（英語なら `en/SKILL.md` の本文を `SKILL.md` として置く。`en/SKILL.md` は置かない）。init の印が kit の SKILL.md 自体に入っている。印の無い手で置いたものは変えない |
 | `skills/token-report/SKILL.md` | `.claude/skills/token-report/SKILL.md`（同上） |
 
-- core の hook（summary・鮮度ガード・トークン計測・MCP の呼び出しの合鍵）は `looptrack hook <名前>` で配線します。
-- **導入先にスクリプトは 1 つも置きません。** 本文に出てくる CLI の呼び方は、置くときに必ず `looptrack issue` にします
+- core の hook（summary・鮮度ガード・トークン計測・MCP の呼び出しの合鍵）は、`looptrack hook <名前>` で配線。
+- **導入先にスクリプトは 1 つも置きません。** 本文に出てくる CLI の呼び方も、置くときに必ず `looptrack issue` へ書き換えます
   （`internal/client/kitinit` の cliText）。
-- サーバの一覧に `kit/core/…` が無ければ（古いサーバ）、skill を置かずに「配布物に kit が無い」と知らせます。
+- サーバが古く、一覧に `kit/core/…` が無いときは？ skill は置かず、「配布物に kit が無い」と知らせます。
 
 ### loop の置き方
 
-**配線の元の定義は `kit/loop/manifest.json` です。** init はこれを読んで `settings.json` / `.codex/hooks.json` /
+**配線の元の定義は `kit/loop/manifest.json`。** init がこれを読み、`settings.json` / `.codex/hooks.json` /
 `.github/hooks/looptrack.json` / `AGENTS.md` を書きます。
 
 ```json
@@ -148,25 +150,25 @@ kit/
    {"name": "skills/iterate/SKILL.md", "kind": "skill", "codex": {"agents_md": "description"}, "copilot": {"agents_md": "description"}}, …]}
 ```
 
-- `name` は `kit/loop/` からの相対パスです。rules・skill は **kit/loop のファイルと 1 対 1** です（manifest.json 自身と `en/` の訳を除く）。
-  hook は `hooks/<名前>` で、ファイルはありません（`looptrack hook <名前>` の名前。Go の登録表と 1 対 1）。
-  確かめるのは `internal/client/hook/loop` の `TestManifest` です。
+- `name` は `kit/loop/` からの相対パス。rules・skill は **kit/loop のファイルと 1 対 1** です（manifest.json 自身と `en/` の訳を除く）。
+  hook は `hooks/<名前>` の形で、ファイルは持ちません（`looptrack hook <名前>` の名前で、Go の登録表と 1 対 1）。
+  これを確かめるのが `internal/client/hook/loop` の `TestManifest`。
 - `kind`: `hook` / `rules` / `skill`。
-- `event`・`matcher`（無ければ null）・`timeout`（秒）・`order` を持つのは hook だけです。順は同じ event の中の順で、
-  既存の hook の後ろにこの順で足します。`runner: "looptrack"` は、配線が
-  `looptrack hook <名前> --agent <AI>`（PATH に無い端末では絶対パス。Claude Code は `.claude/settings.local.json`）になることを示します。
+- `event`・`matcher`（無ければ null）・`timeout`（秒）・`order` を持つのは hook だけ。`order` は同じ event の中の順で、
+  既存の hook の後ろにこの順で足していきます。`runner: "looptrack"` が示すのは、配線が
+  `looptrack hook <名前> --agent <AI>`（PATH に無い端末では絶対パス。Claude Code は `.claude/settings.local.json`）になるということ。
 - hook の `codex`: `{event, matcher, block?}` = `.codex/hooks.json` に配線する / null = 配線しない。
-  null なのは PreToolUse の編集ガード（Codex の編集ツールが PreToolUse で捕まるかを確かめていない）と、
-  `stop-tool-markup-guard`（書式ミスは Claude に固有）です。Stop の 2 本は `block: false` です。配線に `--no-block` を付け、
-  hook はやり直しを求めずに `{"systemMessage": …}`（exit 0）で知らせるだけにします。
+  null になっているのは、PreToolUse の編集ガード（Codex の編集ツールが PreToolUse で捕まるかを確かめていない）と
+  `stop-tool-markup-guard`（書式ミスは Claude に固有）です。Stop の 2 本は `block: false`。配線に `--no-block` が付き、
+  hook はやり直しを求めず、`{"systemMessage": …}`（exit 0）で知らせるだけになります。
 - rules / skill の `codex`（`AGENTS.md` の `<!-- looptrack:loop:begin -->` 節に何を入れるか）: null = **入れない** /
   rules の `{"agents_md": "sections"}` = その rules の `<!-- looptrack:inject session -->` の節と、全文の置き場
   （`.claude/rules/looptrack-loop/<名前>`）への 1 行 / skill の `{"agents_md": "description"}` =
-  frontmatter の description の 1 行と手順のパス。`output-discipline.md` は Claude の書式に固有なので null です。
+  frontmatter の description の 1 行と手順のパス。`output-discipline.md` は Claude の書式に固有なので、null。
 - hook の `copilot`: `{event, matcher, block?}` = `.github/hooks/looptrack.json` に配線する / null = 配線しない
-  （理由は下の「Copilot での対応」）。rules / skill の `copilot` は `codex` と同じです。
-  **全項目に `codex` と `copilot` の列を置きます**（null でもかまいません）。
-- 注入の印には AI を指定できます。`<!-- looptrack:inject session claude-code -->` は、その AI のときだけ入ります。
+  （理由は下の「Copilot での対応」）。rules / skill の `copilot` の読み方は `codex` と同じ。
+  **全項目に `codex` と `copilot` の列を置きます**（null でもかまわない）。
+- 注入の印では AI も指定できます。たとえば `<!-- looptrack:inject session claude-code -->` なら、その AI のときだけ入る。
 
 | kind | 置き場（実体のファイル。symlink は使わない＝Windows 対応） |
 | -- | -- |
@@ -174,12 +176,12 @@ kit/
 | rules | `.claude/rules/looptrack-loop/`。session-start-rules / user-prompt-rules はここを読む（`LOOPTRACK_LOOP_RULES_DIR` で変更可） |
 | skill | `.claude/skills/iterate/`・`.claude/skills/session-handoff/`（SKILL.md に init の印が入っている） |
 
-**hook の約束**: プロジェクトのルートは `CLAUDE_PROJECT_DIR` → `git rev-parse --show-toplevel` → `pwd` の順に決めます。
-状態ファイル（`task-mode.d/`・`handoff-pending.d/`・`session-scope/`）は `<ルート>/.claude/` に置きます
+**hook の約束**: プロジェクトのルートは `CLAUDE_PROJECT_DIR` → `git rev-parse --show-toplevel` → `pwd` の順で決めます。
+状態ファイル（`task-mode.d/`・`handoff-pending.d/`・`session-scope/`）の置き場は `<ルート>/.claude/`
 （`LOOPTRACK_LOOP_STATE_DIR` で変更可。`CLAUDE_PROJECT_DIR` が無く `CODEX_THREAD_ID` があれば `.codex/`）。
-判定できないときは通します（fail-open）。
+判定できなければ通す（fail-open）。
 **Claude Code 以外から `.claude/settings.json` の配線で起動されたら、何もしません**（`hookio.ForeignHost`）。
-プロジェクトごとの調整は、すべて `LOOPTRACK_LOOP_*` の環境変数（settings.json の `env`）で行います。
+プロジェクトごとの調整は、どれも `LOOPTRACK_LOOP_*` の環境変数（settings.json の `env`）で済ませます。
 
 | 環境変数 | 使う hook | 既定 |
 | -- | -- | -- |
@@ -197,9 +199,9 @@ kit/
 | `LOOPTRACK_LOOP_HOOK_LOG` | すべて（core の hook も） | 記録しない（ファイルも作らない）。`1` なら判定を 1 回 1 行の JSONL で `<状態の置き場>/.looptrack-freshness/hook-log.jsonl` に追記する。項目は `ts`・`hook`・`event`・`decision`（`deny`・`block`・`ask`・`update`・`context`・`system`・`pass`・`error`・`timeout`・`panic`）・`session`・`subagent`・`kind`（理由の種類の語。例 `git-guard: reset_hard`・`secrets: show .env`）だけで、コマンド・プロンプト・理由の文面・パスは残さない。1 MiB を超えたら `.1` へ 1 世代だけ回す。書けなくても判定は変えない。Codex の `.codex/.looptrack-freshness/`（と `LOOPTRACK_LOOP_STATE_DIR` で移した先）は導入先の `.gitignore` に入らない |
 
 **検証**: `go test ./internal/client/hook/loop/`（表駆動のテスト）。
-導入の後の自己診断（init の verify）は、次の 4 つを確かめます。配線が manifest どおりか・looptrack が起動できるか・
+導入の後には自己診断（init の verify）が走り、4 つを確かめます。配線が manifest どおりか・looptrack が起動できるか・
 置いた rules の印の節を session-start-rules が注入するか・入口が looptrack を呼べるか。
-失敗したら書いたものを元に戻して止まります（`--no-verify` で省けます）。
+失敗したら？ 書いたものを元に戻して止まります（`--no-verify` で省けます）。
 
 ## Codex での対応
 
@@ -214,8 +216,8 @@ kit/
 
 ## Copilot での対応
 
-対象は GitHub Copilot（VS Code のエージェントモード・Copilot CLI）です。
-「確度」の意味は、文書 = 公式文書に記載・ソース = 製品のソースで確認・実物 = Copilot CLI 1.0.86 で実測です。VS Code は未確認です。
+対象は GitHub Copilot（VS Code のエージェントモード・Copilot CLI）。
+下の表の「確度」は、文書 = 公式文書に記載・ソース = 製品のソースで確認・実物 = Copilot CLI 1.0.86 で実測、の意味です。VS Code は未確認。
 
 | 前提 | 確度・出典 |
 | -- | -- |
@@ -230,9 +232,9 @@ kit/
 | **Windows**: CLI は `powershell` のフィールド（PowerShell 7 以上）、VS Code は `windows` のフィールド（Windows PowerShell 5.1）で実行する。init は `powershell` / `windows` にも `command` と同じ `looptrack hook …` を置く（環境変数の前置は PowerShell の形。looptrack は Windows でも動く） | CLI: 文書。VS Code の 5.1: ソース。Windows での実物は未確認 |
 | VS Code に SessionEnd は無い。Copilot CLI はシェルに `COPILOT_AGENT_SESSION_ID` を渡し、VS Code のエージェント用ターミナルには `AI_AGENT=github_copilot_vscode_agent` / `COPILOT_AGENT=1` が付く | 文書・ソース |
 
-init が書く 1 件の形（`.github/hooks/looptrack.json`）は次のとおりです:
+init が `.github/hooks/looptrack.json` に書く 1 件は、こんな形です:
 `{"type": "command", "command": <bash>, "bash": <bash>, "powershell": <Windows 用>, "windows": <Windows 用>, "timeoutSec": …}`。
-`command` と `bash` は同じものです（VS Code は `command` を使い、CLI はどちらでも同じものを実行します）。
+`command` と `bash` の中身は同じ。VS Code は `command` を使い、CLI はどちらでも同じものを実行します。
 
 | kit の項目 | Copilot |
 | -- | -- |
@@ -253,17 +255,17 @@ init が書く 1 件の形（`.github/hooks/looptrack.json`）は次のとおり
 | トークン計測（core） | 配線（`PostToolUse`・`Stop`・`SessionEnd`（CLI だけ）に `looptrack hook usage --agent copilot --event <イベント>`。matcher なし＝hook の中で MCP のツール名を絞る）。OTel の出力先は `$COPILOT_HOME/otel/` の下に限る（Copilot CLI は出力先を hook に渡さない）。OpenTelemetry のファイル出力を有効にした利用者だけ送る（手順は [docs/AI-GUIDE.md](../docs/AI-GUIDE.md)） |
 | 鮮度ガード（core） | 配線しない（Claude Code だけ） |
 
-**案内文**: Copilot CLI は AGENTS.md・CLAUDE.md・`.github/copilot-instructions.md` をすべて読んで合成します。
-VS Code も AGENTS.md と CLAUDE.md を既定で読みます（文書）。CLAUDE.md の管理節は Claude Code 向け
-（`.claude/settings.json` の `env` を前提にした CLI の案内）なので、冒頭に
-「Claude Code 向け。GitHub Copilot・Codex は AGENTS.md の節に従う」と書きます。
+**案内文**: Copilot CLI は AGENTS.md・CLAUDE.md・`.github/copilot-instructions.md` を全部読んで合成します。
+VS Code も AGENTS.md と CLAUDE.md を既定で読む（文書）。ところが CLAUDE.md の管理節は Claude Code 向けです
+（`.claude/settings.json` の `env` を前提にした CLI の案内）。そこで冒頭に
+「Claude Code 向け。GitHub Copilot・Codex は AGENTS.md の節に従う」と書いておきます。
 
 **`.claude/settings.json` も読まれます**: VS Code と Copilot CLI は、`.claude/settings.json`・
-`.claude/settings.local.json` の hooks も読みます（両方の文書に記載）。
-Copilot CLI はその hook に `CLAUDE_PROJECT_DIR`・`COPILOT_CLI=1`・`COPILOT_PROJECT_DIR` を渡します
+`.claude/settings.local.json` の hooks まで読みに行きます（両方の文書に記載）。
+Copilot CLI がその hook に渡すのは `CLAUDE_PROJECT_DIR`・`COPILOT_CLI=1`・`COPILOT_PROJECT_DIR`
 （`CLAUDECODE` は無く、settings の `env` も渡りません。実物で確認）。
-そのため hook の判定では、`COPILOT_PROJECT_DIR`・`COPILOT_CLI` を `CLAUDE_PROJECT_DIR` より先に見ます（上の「hook の約束」）。
-init が書くルートは `${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}` です。
+だから hook の判定では、`COPILOT_PROJECT_DIR`・`COPILOT_CLI` を `CLAUDE_PROJECT_DIR` より先に見ています（上の「hook の約束」）。
+init が書くルートは `${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}`。
 Claude Code 以外から起動された hook は、何も出さずに exit 0 で終わります。
-init は、Claude Code と一緒に入れたときと `.claude/settings.json` に hooks があるときに知らせます。
-VS Code では設定 `chat.hookFilesLocations` で外せます。VS Code の実物での動きは未確認です。
+Claude Code と一緒に入れたときと、`.claude/settings.json` に hooks があるときは、init がそのことを知らせます。
+VS Code なら設定 `chat.hookFilesLocations` で外せます。ただ、VS Code の実物での動きはまだ確かめていません。

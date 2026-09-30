@@ -94,9 +94,11 @@ LOCAL_MODE=""
 AUTO_UPGRADE="${LOOPTRACK_INSTALL_AUTO_UPGRADE:-}"
 AUTO=off
 ONLY_NEWER=0
-# 無人の更新で、止めた後の失敗を前の版に戻すための状態（rollback_upgrade）
+# 無人の更新で、止めた後の失敗を前の版に戻すための状態（rollback_upgrade）。
+# ROLLBACK=1 の間にどの形で終わっても（die・set -e による裸のコマンドの失敗・中断）、終わりの trap が 1 回だけ戻す
 UNATTENDED=0
 ROLLBACK=0
+DIED=0
 RB_BIN=0
 RB_BACKUP=""
 
@@ -107,8 +109,8 @@ step() { printf '\n==> %s\n' "$*"; }
 warn() { printf '%s: 注意: %s\n' "$PROG" "$*" >&2; }
 die() {
   printf '%s: エラー: %s\n' "$PROG" "$*" >&2
-  if [ "$ROLLBACK" = 1 ]; then rollback_upgrade; fi
-  exit 1
+  DIED=1
+  exit 1 # 無人の更新で止めた後なら、終わりの trap（on_exit）が前の版に戻す
 }
 
 cleanup() {
@@ -116,8 +118,38 @@ cleanup() {
     rm -rf "$TMP"
   fi
 }
-trap cleanup EXIT
-trap 'cleanup; printf "\n%s: 中断しました（一時ファイルは片付けました。もう一度実行すると続きから進みます）\n" "$PROG" >&2; trap - EXIT; exit 130' INT TERM HUP
+
+# on_exit <終了コード> — 終わりの trap。無人の更新で止めた後（ROLLBACK=1）なら、終わり方に関わらず前の版に戻し、
+# 0 でない終了コードで終わる。戻す関数を die の中からも呼ぶと、die の外の失敗（set -e で止まる裸のコマンド）では
+# 戻らずにサービスを止めたまま終わるので、戻すのはここだけにする（rollback_upgrade が最初に ROLLBACK=0 にするので 2 回は走らない）
+on_exit() {
+  rc=$1
+  if [ "$ROLLBACK" = 1 ]; then
+    set +e # 戻す途中の失敗で trap を抜けると、サービスを止めたままになる
+    [ "$rc" != 0 ] || rc=1
+    if [ "$DIED" = 0 ]; then
+      printf '%s: エラー: 止めた後の手順が途中で失敗しました（終了コード %s。上の出力）\n' "$PROG" "$rc" >&2
+    fi
+    rollback_upgrade
+  fi
+  cleanup
+  trap - EXIT
+  exit "$rc"
+}
+
+# on_signal — 中断（INT・TERM・HUP）。無人の更新で止めた後なら、前の版に戻してから終わる
+on_signal() {
+  cleanup
+  printf '\n%s: 中断しました（一時ファイルは片付けました。もう一度実行すると続きから進みます）\n' "$PROG" >&2
+  if [ "$ROLLBACK" = 1 ]; then
+    set +e
+    rollback_upgrade
+  fi
+  trap - EXIT
+  exit 130
+}
+trap 'on_exit "$?"' EXIT
+trap on_signal INT TERM HUP
 
 usage() {
   cat <<'EOF'
@@ -289,7 +321,7 @@ download() {
   elif command -v wget >/dev/null 2>&1; then
     wget -q -O "$2" "$1"
   else
-    die "curl も wget もありません（apt-get install -y curl）"
+    die "curl も wget もありません（Debian・Ubuntu: apt-get install -y curl / AlmaLinux など: dnf install -y curl）"
   fi
 }
 
@@ -321,8 +353,8 @@ verify_sums_signature() {
     return 0
   fi
   if ! command -v minisign >/dev/null 2>&1; then
-    [ "$REQUIRE_SIG" = 1 ] && die "minisign がありません（apt-get install -y minisign）。--require-signature のため止めました。何も入れ替えていません"
-    warn "minisign が無いので SHA256SUMS の署名を確かめていません（apt-get install -y minisign を入れると確かめます。--require-signature で必須にできます）"
+    [ "$REQUIRE_SIG" = 1 ] && die "minisign がありません（Debian・Ubuntu: apt-get install -y minisign / AlmaLinux など: dnf install -y epel-release && dnf install -y minisign）。--require-signature のため止めました。何も入れ替えていません"
+    warn "minisign が無いので SHA256SUMS の署名を確かめていません（入れると確かめます。Debian・Ubuntu: apt-get install -y minisign / AlmaLinux など: dnf install -y epel-release && dnf install -y minisign。--require-signature で必須にできます）"
     return 0
   fi
   minisign -V -q -P "$MINISIGN_PUBKEY" -m "$TMP/SHA256SUMS" -x "$TMP/SHA256SUMS.minisig" >/dev/null 2>&1 ||
@@ -990,9 +1022,9 @@ check_auto_upgrade() {
   [ "$NO_START" = 0 ] || die "--no-start と --auto-upgrade on は一緒に使えません（起動していないサーバを置き換えないため）。何も変えていません"
   have_systemd || die "systemd が動いていないので、自動の置き換え（systemd timer）を入れられません。何も変えていません"
   command -v minisign >/dev/null 2>&1 ||
-    die "自動の置き換えは SHA256SUMS の署名の確認を必須にします。minisign を入れてください（apt-get install -y minisign）。何も変えていません"
+    die "自動の置き換えは SHA256SUMS の署名の確認を必須にします。minisign を入れてください（Debian・Ubuntu: apt-get install -y minisign / AlmaLinux など: dnf install -y epel-release && dnf install -y minisign）。何も変えていません"
   if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
-    die "自動の置き換えはこのスクリプトを取り直すので、curl か wget が要ります（apt-get install -y curl）。何も変えていません"
+    die "自動の置き換えは 1 日 1 回、新しい版の書庫・SHA256SUMS・その署名を取るので、curl か wget が要ります（Debian・Ubuntu: apt-get install -y curl / AlmaLinux など: dnf install -y curl）。何も変えていません"
   fi
 }
 
@@ -1178,9 +1210,10 @@ precheck_unattended_mysql() {
   esac
 }
 
-# rollback_upgrade — 無人の更新で、止めた後に失敗したとき（die から呼ぶ）: 前の実行ファイルに戻し、SQLite なら DB を止めた直後の控えに戻し、
-# 前の版で起動し直す。MySQL は置き換えの前に「DB の形を変えない」ことを確かめているので（precheck_unattended_mysql）、実行ファイルだけを戻す。
-# 印（install.conf）は前の版のまま。呼んだ die が 0 でない終了コードで終わる（timer の service は失敗として journal に残る）
+# rollback_upgrade — 無人の更新で、止めた後に失敗したとき（終わりの trap の on_exit・on_signal から呼ぶ）: 前の実行ファイルに戻し、
+# SQLite なら DB を止めた直後の控えに戻し、前の版で起動し直す。MySQL は置き換えの前に「DB の形を変えない」ことを確かめているので
+# （precheck_unattended_mysql）、実行ファイルだけを戻す。印（install.conf）は前の版のまま。呼んだ trap が 0 でない終了コードで終わる
+# （timer の service は失敗として journal に残る）
 rollback_upgrade() {
   ROLLBACK=0
   printf '\n==> %s\n' "前の版 ${S_VERSION} に戻して起動し直します（無人の更新なので、サービスを止めたままにしない）" >&2
@@ -1253,7 +1286,7 @@ upgrade() {
     fi
     step "停止"
     systemctl stop looptrack
-    # 無人の更新は、ここから後の失敗（die）で前の版に戻して起動し直す（rollback_upgrade）
+    # 無人の更新は、ここから後の失敗（die・裸のコマンドの失敗・中断）で前の版に戻して起動し直す（終わりの trap の rollback_upgrade）
     if [ "$UNATTENDED" = 1 ]; then ROLLBACK=1; fi
     db=$(sqlite_host_path)
     if [ -n "$db" ]; then
@@ -1274,8 +1307,8 @@ upgrade() {
     check_store_access # 表が増えた更新では権限を与え直すまで読めない（ここで尋ねて与え直す）
     if [ -n "$db" ]; then restrict_sqlite "$db"; fi
     step "起動"
-    systemctl daemon-reload
-    systemctl start looptrack
+    systemctl daemon-reload || die "systemctl daemon-reload に失敗しました（上の出力）。新しい版 $NEW_VERSION を起動していません"
+    systemctl start looptrack || die "新しい版 $NEW_VERSION を起動できません（systemctl start looptrack が失敗しました。理由は journalctl -u looptrack）"
   else
     check_docker
     step "実行ファイル"

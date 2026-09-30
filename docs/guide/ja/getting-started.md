@@ -2,9 +2,9 @@
 
 [ガイドの目次](README.md) · 前: [本システムの位置](where-it-fits.md) · 次: [日々の使い方](daily-use.md)
 
-この節では、何も入っていない PC から最初の 1 周までをコマンドを省かずに説明します。
+何も入っていない PC から、最初の 1 周まで。この節ではその道のりを、コマンドを省かずに追います。
 上から順に実行してください。
-例では次の値を使うので、自分の環境に合わせて読み替えてください。
+例では次の値を使います。自分の環境に合わせて読み替えればそれで OK。
 
 | 項目 | 例の値 |
 | -- | -- |
@@ -22,27 +22,26 @@
 | ローカルの 1 人利用 | 自分の PC だけで使う | SQLite（ファイル 1 つ） | 省く（127.0.0.1 だけで待ち受ける） |
 | チームのサーバ | 複数の人で使う | MySQL か SQLite | ID・パスワード（+ 二段階認証） |
 
-この節はローカルの 1 人利用を前提に書いています。
-チームのサーバとの違いは、手順 3 の後の「チームのサーバの場合」にまとめました。
-チームのサーバがまっさらな Linux のマシンなら、手順 1〜3 はインストーラに任せて飛ばせます。手順 3 の後の「まっさらな Linux サーバの場合」を見てください。
+前提はローカルの 1 人利用。
+チームのサーバとの違いは、手順 3 の後の「チームのサーバの場合」にまとめてあります。
+チームのサーバがまっさらな Linux のマシンなら、手順 1〜3 はインストーラに任せて飛ばせます。詳しくは手順 3 の後の「まっさらな Linux サーバの場合」で。
 
-Claude Code・Codex・GitHub Copilot など、使う AI は先に入れておいてください。
-git も使います。
-ほかに要るものはありません。Looptrack は実行ファイル 1 つで、サーバも CLI も hook もそこから動きます。
-別の処理系（ランタイム）は要りません。`looptrack issue init` もプロジェクトにスクリプトを 1 つも置きません。
-Windows でも同じです。
+Claude Code・Codex・GitHub Copilot など、使う AI は先に入れておきましょう。git も使います。
+ほかに要るものは？　ありません。
+Looptrack は実行ファイル 1 つで、サーバも CLI も hook もそこから動きます。別の処理系（ランタイム）は要らないし、`looptrack issue init` がプロジェクトにスクリプトを置くこともありません。Windows でも同じです。
 
 ## 1. 実行ファイルを取得する
 
-リリースのページ（https://github.com/howashoji/looptrack/releases ）から次の 2 つを落とします。
+落とすのは、リリースのページ（https://github.com/howashoji/looptrack/releases ）にある次の 2 つ。
 
 - `looptrack_<版>_<OS>_<CPU>_server.tar.gz`（Windows は `.zip`）: サーバ・CLI・hook をまとめた実行ファイル `looptrack` と、そのライセンス文を入れた書庫
 - `SHA256SUMS`（ハッシュの一覧）
 
-OS は `darwin`（macOS）・`linux`・`windows` のどれかで、CPU は `amd64`・`arm64` のどちらかです。
-書庫を展開すると `looptrack_<版>_<OS>_<CPU>_server/` というフォルダが 1 つでき、その中に `looptrack`（Windows は `looptrack.exe`）・`NOTICE`・`OFL-BIZUDGothic.txt`・`LICENSE` があります。
-展開する前に、書庫を `SHA256SUMS` で照合してください。
-置き場は管理者権限の要らない場所にしてください。
+OS は `darwin`（macOS）・`linux`・`windows` のどれか。CPU は `amd64`・`arm64` のどちらかです。
+書庫を展開すると `looptrack_<版>_<OS>_<CPU>_server/` というフォルダが 1 つでき、中には `looptrack`（Windows は `looptrack.exe`）・`NOTICE`・`OFL-BIZUDGothic.txt`・`LICENSE` が入っています。
+
+展開の前に、書庫を `SHA256SUMS` で照合すること。
+置き場は、管理者権限の要らない場所にしてください。
 
 ### macOS / Linux
 
@@ -60,8 +59,8 @@ tar -xzf "$NAME.tar.gz"
 install -m 755 "$NAME/looptrack" ~/.local/bin/looptrack
 ```
 
-`shasum` の結果が `OK` であることを確かめてください。
-`~/.local/bin` が PATH に無いときは、`~/.zshrc` や `~/.bashrc` といったシェルの設定に次の 1 行を足します。足したらターミナルを開き直してください。
+`shasum` の結果が `OK` か、必ず確かめてください。
+`~/.local/bin` が PATH に無ければ、`~/.zshrc` や `~/.bashrc` といったシェルの設定に次の 1 行を足します。足したら、ターミナルを開き直しましょう。
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -70,7 +69,7 @@ export PATH="$HOME/.local/bin:$PATH"
 ### Windows（PowerShell）
 
 管理者権限は要りません。
-置き場は `%LOCALAPPDATA%\Programs\looptrack` です。
+置き場は `%LOCALAPPDATA%\Programs\looptrack`。
 
 ```powershell
 $Ver = 'v1.0.0'
@@ -93,8 +92,8 @@ if (($UserPath -split ';') -notcontains $D) { [Environment]::SetEnvironmentVaria
 ```
 
 `OK` が出ることを確かめてください。
-PATH の変更が効くのは、新しく開いたターミナルと新しく起動したアプリだけです。
-PowerShell を開き直してから次に進んでください。
+ただ、PATH の変更が効くのは新しく開いたターミナルと新しく起動したアプリだけ。
+PowerShell を開き直してから、次に進んでください。
 
 > **Windows の `looptrack issue verify` には Git Bash が要ります。** 検証コマンドは `bash -c` で実行し、
 > `cmd.exe` や PowerShell では代わりに実行しません。POSIX の書き方のコマンドが別の意味になってしまうからです。`verify` を使うなら
@@ -104,8 +103,8 @@ PowerShell を開き直してから次に進んでください。
 ### Windows（Git Bash）
 
 Git Bash でも使えます。
-取得は macOS / Linux の手順と同じで、`OS=windows` にします。Windows の書庫は `.zip` で、中の実行ファイルは `looptrack.exe` です。
-展開には `unzip` を使います。Git Bash に `unzip` が無いときは、PowerShell の手順を使ってください。
+取得は macOS / Linux の手順と同じで、`OS=windows` にするだけ。Windows の書庫は `.zip` で、中の実行ファイルは `looptrack.exe` です。
+展開には `unzip` を使います。Git Bash に `unzip` が無い？　なら PowerShell の手順でどうぞ。
 
 ```bash
 VER=v1.0.0
@@ -121,8 +120,8 @@ unzip -q "$NAME.zip"
 cp "$NAME/looptrack.exe" ~/.local/bin/looptrack.exe
 ```
 
-Git Bash の `~/.local/bin` は PowerShell や AI から見えないことがあります。
-AI から使うなら、PowerShell の手順で `%LOCALAPPDATA%\Programs\looptrack` に置くほうが確実です。
+ただし、Git Bash の `~/.local/bin` は PowerShell や AI から見えないことがあります。
+AI から使うつもりなら、PowerShell の手順で `%LOCALAPPDATA%\Programs\looptrack` に置くほうが確実です。
 
 ### 確かめる
 
@@ -132,26 +131,26 @@ looptrack version
 
 ### 署名と OS の警告
 
-- macOS: 公式の macOS 版は配布元の Apple Developer ID で署名し、Apple の公証（notarization）も通しています。
-  ブラウザで取得しても Gatekeeper に止められることはありません。
-  フォークなど、自分でビルドしたものには署名が付きません。
+- macOS: 公式の macOS 版は、配布元の Apple Developer ID で署名し、Apple の公証（notarization）も通してあります。
+  ブラウザで取得しても、Gatekeeper に止められることはありません。
+  ただ、フォークなど自分でビルドしたものには署名が付かない点に注意。
 - Windows: **Windows 版はまだ署名していません。**
   ブラウザで取得したものを起動すると、Microsoft Defender SmartScreen の「Windows によって PC が保護されました」が出ることがあります。
-  上の手順で SHA-256 が `SHA256SUMS` と一致するのを先に確かめ、「詳細情報」→「実行」で進めてください。
-  `Invoke-WebRequest` で取得して PowerShell から起動する場合、ふつうこの画面は出ません。
-- `SHA256SUMS` には minisign の署名を付けています。リリースのページの `SHA256SUMS.minisig` がそれです。
-  `looptrack self-update` はこの署名を確かめてから置き換えます。
-  手で確かめるときは [minisign](https://jedisct1.github.io/minisign/) を入れ、`SHA256SUMS.minisig` を `SHA256SUMS` と同じ場所に落として次を実行します。
+  先に上の手順で SHA-256 が `SHA256SUMS` と一致するのを確かめ、それから「詳細情報」→「実行」で進めてください。
+  `Invoke-WebRequest` で取得して PowerShell から起動するなら、ふつうこの画面は出ません。
+- `SHA256SUMS` には minisign の署名が付いています。リリースのページの `SHA256SUMS.minisig` がそれ。
+  `looptrack self-update` は、この署名を確かめてから置き換えます。
+  手で確かめたいなら、[minisign](https://jedisct1.github.io/minisign/) を入れ、`SHA256SUMS.minisig` を `SHA256SUMS` と同じ場所に落として次を実行します。
 
 ```bash
 minisign -Vm SHA256SUMS -P RWRrJP/r1wfXKalGsxLnzFmmsExUd2azSJh4ccrYDJEBu8yE3N0ZlLJy
 ```
 
-`Signature and comment signature verified` と出れば一致しています。
+`Signature and comment signature verified` と出れば一致。
 
 ## 2. サーバを立ち上げる（`looptrack setup`）
 
-サーバの置き場を作り、対話式のウィザードを実行します。
+サーバの置き場を作って、対話式のウィザードを走らせます。
 
 ```bash
 mkdir -p ~/looptrack-server
@@ -159,7 +158,7 @@ cd ~/looptrack-server
 looptrack setup
 ```
 
-PowerShell では次のとおりです。
+PowerShell ならこうです。
 
 ```powershell
 New-Item -ItemType Directory -Force -Path "$HOME\looptrack-server" | Out-Null
@@ -167,7 +166,7 @@ Set-Location "$HOME\looptrack-server"
 looptrack setup
 ```
 
-問いには次のように答えます。`[ ]` の中は既定値で、Enter だけ押せばそれが選ばれます。
+問いへの答えは次のとおり。`[ ]` の中は既定値で、Enter を押すだけでそれが選ばれます。
 
 | 問い | ローカルの 1 人利用での答え |
 | -- | -- |
@@ -178,18 +177,18 @@ looptrack setup
 | ⑤ 二段階認証 | 任意（ローカルの既定）。ローカルではログインを省くので影響しません |
 | ⑥ 最初のプロジェクト | `-`。ここでは作らず、手順 4 で `demo` を作ります。slug を入れるとここで作られるので、手順 4 は飛ばせます |
 
-最後に内容を確かめて `y` を入れると、次のものができます。
+最後に内容を確かめて `y` を入れれば、次のものができあがります。
 
 - `<置き場>/.env`: 設定です。秘密を含むので、他人に見せたり git に入れたりしないでください
 - `<置き場>/im.db`: SQLite のデータです
 - 最初の管理者
 
-終わると起動のコマンド・ブラウザの URL・CLI のログイン方法・MCP の接続設定が表示されます。
-**`.env` の `LOOPTRACK_SECRET_KEY` を失うと、全員の二段階認証が使えなくなります。** `.env` は別の場所にも控えてください。
+終わると、起動のコマンド・ブラウザの URL・CLI のログイン方法・MCP の接続設定が表示されます。
+
+**`.env` の `LOOPTRACK_SECRET_KEY` を失うと、全員の二段階認証が使えなくなります。** `.env` は別の場所にも控えておきましょう。
 
 途中で Ctrl-C を押してやめても、ファイルも利用者も残りません。
-2 回目の `looptrack setup` は何も書き換えず、今の設定を表示するだけです。
-作り直すときは `looptrack setup --force` を使います。
+2 回目の `looptrack setup` は何も書き換えず、今の設定を表示するだけ。作り直すなら `looptrack setup --force` です。
 
 ## 3. サーバを起動する
 
@@ -198,20 +197,19 @@ cd ~/looptrack-server
 looptrack serve --env-file ./.env
 ```
 
-PowerShell では `looptrack serve --env-file .\.env` です。
-閉じるとサーバが止まるので、このターミナルは開いたままにしておきます。
-ブラウザで http://127.0.0.1:8090/looptrack/ を開き、画面が出ることを確かめてください。
-ローカルの 1 人利用ではログインの画面は出ません。
+PowerShell では `looptrack serve --env-file .\.env`。
+このターミナルは開いたままに。閉じるとサーバが止まります。
+ブラウザで http://127.0.0.1:8090/looptrack/ を開き、画面が出るか確かめてください。ローカルの 1 人利用なら、ログインの画面は出ません。
 
 ローカルモードは `127.0.0.1` だけで待ち受けます。
-**複数の人が使う PC では使わないでください。** 同じ PC のほかの利用者が認証なしで操作できてしまいます。
+**複数の人が使う PC では使わないでください。** 同じ PC のほかの利用者が、認証なしで操作できてしまいます。
 
 ### チームのサーバの場合
 
 - ① で「チームのサーバ」を選びます。保存先の既定は MySQL で、接続先は環境変数 `LOOPTRACK_SETUP_DSN` で渡します。
 - ③ で公開 URL（例 `https://im.example.com`）を入れます。二段階認証は既定で必須です。
-- `.env` と一緒に `compose.yaml` と、それが使う `Dockerfile`・`NOTICE` ができます。
-  起動は `docker compose up -d` です。イメージは手元で作り、レジストリからは取ってきません。
+- `.env` と一緒に、`compose.yaml` と、それが使う `Dockerfile`・`NOTICE` ができます。
+  起動は `docker compose up -d`。イメージは手元で作り、レジストリからは取ってきません。
   Linux ではウィザードが自分自身を `looptrack` として複製します。ほかの OS では `linux/amd64` の実行ファイルを先に置いてください。
 - 外からは Nginx などのリバースプロキシで `/looptrack/` を受け、`127.0.0.1:8090` へ渡します。接頭辞 `/looptrack` は外さずに渡します。
 - 手順 4 の管理コマンドは、`looptrack …` の代わりに `docker compose run --rm --no-deps looptrack …` で実行します（例 `docker compose run --rm --no-deps looptrack user list`）。
@@ -219,40 +217,40 @@ PowerShell では `looptrack serve --env-file .\.env` です。
 
 ### まっさらな Linux サーバの場合（`install.sh`）
 
-まっさらな Ubuntu LTS や Debian のサーバなら、手順 1〜3 を手で進める必要はありません。
-1 行でインストーラが走り、サーバ版の書庫の取得・照合・展開・`looptrack setup`・systemd の unit か `compose.yaml` の作成・起動・動作確認まで進みます。
+まっさらな Ubuntu LTS や Debian のサーバなら、手順 1〜3 を手で進めなくて構いません。
+1 行でインストーラが走ります。サーバ版の書庫の取得・照合・展開・`looptrack setup`・systemd の unit か `compose.yaml` の作成・起動・動作確認まで進みます。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh
 ```
 
-インストーラは最新のリリースの `looptrack_<版>_linux_<arch>_server.tar.gz` を取り、`SHA256SUMS`（サーバに `minisign` があればその署名も）で照合してから展開し、入れます。
-スクリプト自身は HTTPS で取るだけで、自分を照合できません。先に中身を読むなら、`curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh` で落として読み、`sudo sh install.sh` で実行します。
+インストーラが取るのは、最新のリリースの `looptrack_<版>_linux_<arch>_server.tar.gz`。`SHA256SUMS`（サーバに `minisign` があればその署名も）で照合してから展開し、入れます。
+ところが、スクリプト自身は HTTPS で取るだけで、自分を照合できません。先に中身を読むなら、`curl -fsSL -o install.sh https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh` で落として読み、`sudo sh install.sh` で実行してください。
 オプションは `sh -s --` の後ろに置きます（版を固定するなら `… | sudo sh -s -- --version v1.0.0`）。
-手元で作った配布物から入れるときは、そのディレクトリを渡してください（`sudo sh deploy/install.sh --from /path/to/dist`）。
-インストーラは Linux 専用です。macOS や Windows でサーバを動かすときは[デスクトップ版](desktop.md)を使ってください。
+手元で作った配布物から入れるときは、そのディレクトリを渡します（`sudo sh deploy/install.sh --from /path/to/dist`）。
 
-インストーラはまず systemd と Docker compose のどちらで動かすかを聞き、続けて `looptrack setup` と同じことを聞きます。
-終わると Nginx と Caddy の設定例・ブラウザの URL・CLI のログイン方法・MCP の接続設定が表示されます。設定例は `/etc/looptrack/proxy-examples.txt` にも書き出されます。
-リバースプロキシを前に置き、公開 URL でログインしてから手順 4 に進みましょう。
+インストーラは Linux 専用。macOS や Windows でサーバを動かすなら[デスクトップ版](desktop.md)を使ってください。
 
-保存先に MySQL を選び、`deploy/grants.sql` でアプリ用の DB 利用者に必要な権限だけを与える場合も、同じ 1 回の実行で進みます。
-表ごとの `GRANT` は表ができてからでないと流せないので、setup が表を作った後で、インストーラが MySQL の管理用の資格情報を端末で尋ねます（パスワードは表示しません。保存しません）。
-アプリ用の利用者が無ければ作り、`looptrack` に埋め込んだ権限を与え（中身は `looptrack grants print` で見られます）、アプリ用の利用者で読めることを確かめてから起動します。
-管理用の資格情報が合わなければ、何も起動せずに止まります。もう一度実行すると、尋ねるところから続きます。
+最初に聞かれるのは、systemd と Docker compose のどちらで動かすか。続けて `looptrack setup` と同じことを聞かれます。
+終わると、Nginx と Caddy の設定例・ブラウザの URL・CLI のログイン方法・MCP の接続設定が表示されます。設定例は `/etc/looptrack/proxy-examples.txt` にも書き出されます。
+リバースプロキシを前に置き、公開 URL でログインしたら、手順 4 へ。
+
+保存先に MySQL を選び、`deploy/grants.sql` でアプリ用の DB 利用者に必要な権限だけを与える。この場合も、同じ 1 回の実行で進みます。
+表ごとの `GRANT` は、表ができてからでないと流せません。だから setup が表を作った後で、インストーラが MySQL の管理用の資格情報を端末で尋ねます（パスワードは表示しません。保存もしません）。
+アプリ用の利用者が無ければ作り、`looptrack` に埋め込んだ権限を与え（中身は `looptrack grants print` で見られます）、アプリ用の利用者で読めるのを確かめてから起動する。そういう流れです。
+管理用の資格情報が合わなければ、何も起動せずに止まります。もう一度実行すれば、尋ねるところから続きます。
 DB がまだ無ければ、setup が同じ管理用の資格情報を先に尋ね、作ってよいかを確かめてから DB も作ります（尋ねるのは 1 回だけです）。ただし、表を作る利用者（`LOOPTRACK_SETUP_MIGRATE_DSN`）と、その DB への `GRANT` は先に用意しておきます（無ければ従来どおり接続で止まります）。作らないと答えると何も作らずに止まり、自分で流す `CREATE DATABASE` の文を示します。
 
-更新は `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` です（詳しくは[更新](updating.md)）。アンインストールは `--uninstall` で、`--purge` を付けると設定とデータも消えます。
+更新は `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade`（詳しくは[更新](updating.md)）。アンインストールは `--uninstall` で、`--purge` を付ければ設定とデータも消えます。
 
 ## 4. プロジェクトを作り、自分を参加させる
 
-ウィザードの質問 ⑥ でプロジェクトを作った場合は、この手順を飛ばしてください。
-同じ slug をもう一度作ろうとすると失敗します。
-ブラウザの画面（`/admin/projects` の「プロジェクトを作る」）から後で作ることもできます。
+ウィザードの質問 ⑥ でプロジェクトを作ったなら、この手順は飛ばしてください。同じ slug をもう一度作ろうとすると失敗します。
+ブラウザの画面（`/admin/projects` の「プロジェクトを作る」）から、後で作ることもできます。
 
 プロジェクトは管理コマンドで作ります。
-管理コマンドは `.env` の `LOOPTRACK_DSN` を使って保存先につなぎます。
-サーバを起動したターミナルとは別のターミナルで実行してください。
+管理コマンドは、`.env` の `LOOPTRACK_DSN` を使って保存先につなぐ仕組み。
+実行するのは、サーバを起動したのとは別のターミナルです。
 
 macOS / Linux / Git Bash:
 
@@ -280,30 +278,30 @@ looptrack project list
 
 ## 5. 利用者と権限（チームのサーバの場合）
 
-ローカルの 1 人利用ではこの手順は要りません。
+ローカルの 1 人利用なら、この手順は要りません。
 チームのサーバでは、管理者がブラウザで利用者を足します。
 
 1. `<サーバの URL>/admin/users` を開き、ログイン名・表示名・初期パスワード・役割（admin / member）を入れて追加します。
 2. 同じ画面の「プロジェクトの権限」で、プロジェクトに `editor`（起票・コメント・状態の変更）か `viewer`（閲覧のみ）を付けます。
 3. 利用者に URL・ログイン名・初期パスワードを伝えます。利用者はログインし、二段階認証が必須なら認証アプリを登録します。パスワードは `<サーバの URL>/account` で変えられます。
 
-詳しくは[管理者の手引き](admin.md)にあります。
+詳しくは[管理者の手引き](admin.md)で。
 
 ## 6. CLI にログインする（`looptrack issue login`）
 
-ローカルの 1 人利用ではこの手順は要りません。画面や AI の MCP と同じく、CLI もトークンなしでそのまま使えます。
-ログインが要るのは、チームのサーバに向けるときです。
+ローカルの 1 人利用なら、この手順は要りません。画面や AI の MCP と同じく、CLI もトークンなしでそのまま使えます。
+ログインが要るのは、チームのサーバに向けるときだけ。
 
 ```bash
 looptrack issue login --browser --url http://127.0.0.1:8090/looptrack
 ```
 
-ブラウザが開くので、ログインして「許可」を押します。ローカルの 1 人利用ではログインの画面は出ません。
-ブラウザが開かないときは、表示された URL を開いてください。
-トークンは手元の設定ディレクトリに本人だけが読める形で保存されます。macOS と Linux では `~/.config/looptrack/credentials.json`、Windows では `%APPDATA%\looptrack\credentials.json` です。
-それ以降は、期限が近づくと自動で更新されます。
+ブラウザが開いたら、ログインして「許可」を押します。ローカルの 1 人利用ではログインの画面は出ません。
+ブラウザが開かない？　なら、表示された URL を開いてください。
+トークンは、手元の設定ディレクトリに本人だけが読める形で保存されます。macOS と Linux では `~/.config/looptrack/credentials.json`、Windows では `%APPDATA%\looptrack\credentials.json` です。
+以後は、期限が近づくと自動で更新されます。
 
-ssh の先のようなブラウザの無い環境では、`<サーバの URL>/account` でアクセストークンを発行して次のコマンドに貼り付けます。
+ssh の先のように、ブラウザの無い環境もあります。そのときは `<サーバの URL>/account` でアクセストークンを発行して、次のコマンドに貼り付けます。
 
 ```bash
 looptrack issue login --url http://127.0.0.1:8090/looptrack
@@ -311,8 +309,8 @@ looptrack issue login --url http://127.0.0.1:8090/looptrack
 
 ## 7. プロジェクトに導入する（`looptrack issue init`）
 
-作業するリポジトリで実行します。
-まず `--dry-run` で何が書かれるかを見ておきましょう。
+実行する場所は、作業するリポジトリ。
+まずは `--dry-run` で、何が書かれるかを見ておきましょう。
 
 ```bash
 mkdir -p ~/work/demo-app
@@ -326,10 +324,10 @@ looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --agen
 - `--mcp` を付けると MCP の接続設定も書きます。Claude Code なら `.mcp.json` です。
 - `--no-loop` は core だけを入れます。loop も入れるなら `--loop` にします。どちらも付けないと対話で尋ねられます。選び方は [AI ごとの手引き](ai-agents.md) にあります。
 - 既存の設定は消さずにマージします。変えたファイルは `.claude/.looptrack-init-backup/<時刻>/` に控えます。
-- 導入の後に自己診断が走り、失敗したら書いたものを元に戻します。
-- 再実行しても壊れません。2 回目は「変更はありません」と出ます。
+- 導入の後に自己診断が走ります。失敗したら、書いたものは元に戻ります。
+- 再実行しても壊れません。2 回目は「変更はありません」と出るだけです。
 
-Claude Code の場合、主に次のものが入ります。
+Claude Code なら、入るのは主に次のものです。
 
 | もの | 中身 |
 | -- | -- |
@@ -339,8 +337,8 @@ Claude Code の場合、主に次のものが入ります。
 | `CLAUDE.md` | `<!-- looptrack:begin -->` から `<!-- looptrack:end -->` までの案内の節 |
 | `.mcp.json` | MCP の接続設定（`--mcp` のとき） |
 
-PATH で `looptrack` が見つからないときは hook を絶対パスで配線し、その配線を手元専用の `.claude/settings.local.json` に書きます。
-配線と PATH は次のコマンドで確かめられます。
+PATH で `looptrack` が見つからないときは、hook を絶対パスで配線します。その配線は手元専用の `.claude/settings.local.json` に書かれます。
+配線と PATH の確認はこれで。
 
 ```bash
 looptrack doctor
@@ -348,28 +346,28 @@ looptrack doctor
 
 ## 8. MCP を接続する
 
-`init --mcp` を使った場合は、Claude Code の接続設定はもうできています。
-手で足すときは次のとおりです。
+`init --mcp` を使ったなら、Claude Code の接続設定はもうできています。
+手で足すならこうです。
 
 ```bash
 claude mcp add --transport http looptrack http://127.0.0.1:8090/looptrack/mcp --header "X-Looptrack-Project: demo"
 ```
 
-`.mcp.json` に書く場合は次の形です。
+`.mcp.json` に書くなら、次の形になります。
 
 ```json
 { "mcpServers": { "looptrack": { "type": "http", "url": "http://127.0.0.1:8090/looptrack/mcp",
   "headers": { "X-Looptrack-Project": "demo" } } } }
 ```
 
-Claude Code を起動し直します。
-hook の確認を求められたら、内容を見て承認してください。
-チームのサーバでは Claude Code の `/mcp` で `looptrack` を選び、ブラウザで許可します。
-Codex・Copilot の接続は [AI ごとの手引き](ai-agents.md) にあります。
+Claude Code を起動し直してください。
+hook の確認を求められたら、内容を見てから承認します。
+チームのサーバでは、Claude Code の `/mcp` で `looptrack` を選び、ブラウザで許可します。
+Codex・Copilot の接続は [AI ごとの手引き](ai-agents.md) にまとめてあります。
 
 ## 9. 最初の 1 周
 
-まず CLI でつながっていることを確かめます。
+まずは、CLI でつながっているかの確認から。
 
 ```bash
 cd ~/work/demo-app
@@ -378,11 +376,10 @@ looptrack issue config
 looptrack issue guide
 ```
 
-2 つの環境変数を自分で設定するのは、`init` がこれを `.claude/settings.json` に書くからです。
-そこに書いた値は AI のセッションにしか渡らず、ふつうのターミナルからは見えません。
-`config` にプロジェクト `demo` と自分の権限が出れば成功です。
+なぜ 2 つの環境変数を自分で設定するのか。`init` がこれを `.claude/settings.json` に書くからです。そこに書いた値は AI のセッションにしか渡らず、ふつうのターミナルからは見えません。
+`config` にプロジェクト `demo` と自分の権限が出れば成功。
 
-次に最初のイシューを起票し、1 周を手で回してみます。
+次は最初のイシューを起票して、1 周を手で回してみましょう。
 
 ```bash
 looptrack issue new "README に概要を書く" --type task --body "$(cat <<'EOF'
@@ -403,13 +400,13 @@ looptrack issue next
 ```
 
 `next` が `DEMO-0001` を In Progress にして、本文と受け入れ条件を表示します。
-ここからは AI に任せましょう。
-Claude Code を開いて、次のように頼みます。
+ここから先は AI の出番です。
+Claude Code を開いて、こう頼みます。
 
 > イシューの next から 1 周回して。受け入れ条件を検証してから close して。
 
 AI は作業を進め、`verify` で検証コマンドを実行して結果を残し、`close` します。
-最後に手元でも結果を確かめます。
+最後に、手元でも結果を確かめておきましょう。
 
 ```bash
 looptrack issue show DEMO-0001
@@ -417,14 +414,14 @@ looptrack issue verify DEMO-0001 --last
 looptrack issue summary
 ```
 
-`show` にコメントと Done の状態が出ていれば、最初の 1 周は完了です。
-ブラウザの http://127.0.0.1:8090/looptrack/p/demo/ でも同じイシューを見られます。
+`show` にコメントと Done の状態が出ていれば、最初の 1 周は完了。
+同じイシューは、ブラウザの http://127.0.0.1:8090/looptrack/p/demo/ でも見られます。
 
-PowerShell ではヒアドキュメントが使えません。本文をファイルに書いてから `--body (Get-Content -Raw body.md)` で渡してください。
+PowerShell ではヒアドキュメントが使えません。本文をファイルに書いてから、`--body (Get-Content -Raw body.md)` で渡してください。
 
 ## 10. 表示の言語（日本語 / 英語）
 
-文面は日本語か英語で表示されます。`LOOPTRACK_LANG` で指定するか、端末とブラウザの設定に任せます。
+文面は日本語か英語で表示されます。`LOOPTRACK_LANG` で指定してもいいし、端末とブラウザの設定に任せても構いません。
 
 ```bash
 LOOPTRACK_LANG=en looptrack issue list   # このコマンドだけ
@@ -439,9 +436,9 @@ export LOOPTRACK_LANG=ja                 # このシェルの間
 | 4 | — | `Accept-Language` |
 | 5 | — | 英語 |
 
-`/account` の「表示の言語」を選んでおくと、ヘッダを送れない MCP の接続でもその言語で返ります。
-「設定なし」に戻せば、これまでどおりブラウザや端末の設定に従います。
+`/account` の「表示の言語」を選んでおけば、ヘッダを送れない MCP の接続でもその言語で返ってきます。
+「設定なし」に戻すと、これまでどおりブラウザや端末の設定に従います。
 
-MCP の `instructions`・`guide` の本文・ツールの説明といった AI が読む文も、接続ごとに同じ順で言語が決まります。
-プロジェクトに配る rules は日英の両方を置き、hook が実行時に上と同じ順で選びます。
-skill は `looptrack issue init` が導入時の言語の 1 本だけを置きます。言語を変えたら `looptrack issue init` をもう一度実行してください。
+AI が読む文も同じです。MCP の `instructions`・`guide` の本文・ツールの説明は、接続ごとに同じ順で言語が決まります。
+プロジェクトに配る rules は日英の両方を置き、hook が実行時に上と同じ順で選ぶ仕組み。
+skill だけは違います。`looptrack issue init` が導入時の言語の 1 本だけを置くので、言語を変えたら `looptrack issue init` をもう一度実行してください。

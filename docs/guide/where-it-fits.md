@@ -24,7 +24,7 @@ flowchart LR
   S["summary (all three loops, shown at session start)"] --> N
 ```
 
-A text version for viewers that do not render the diagram:
+Diagram not showing up? Here's a text version:
 
 ```
 +-- ③ Outer loop ---------------------------------------------------+
@@ -56,28 +56,27 @@ A text version for viewers that do not render the diagram:
 
 ## Project rules
 
-Each project can add rules that the server enforces.
-An administrator sets them up (see [Administration](admin.md)).
+Each project can add its own rules for the server to enforce.
+An administrator sets them up. See [Administration](admin.md) for the details.
 
 | Rule | Effect |
 | -- | -- |
 | Verification required (`verify.require_on_close`) | An issue with a verify-commands section cannot be marked Done unless the latest `verify` against the current body passed completely |
 | Token info required (`usage.require_on_close`) | When an agent marks an issue Done or Canceled, the server refuses if the issue has no token info from that conversation |
 
-When something is rejected, the message tells you the next step.
-Use an override (`--override "reason"`) only when the user explicitly asks for it.
-The reason is recorded on the server.
+Got rejected? No need to panic. The message tells you the next step.
+Use an override (`--override "reason"`) only when the user explicitly asks for it. The reason is recorded on the server.
 
 ## Token tracking
 
-CLI write operations and hooks send the agent conversation's token usage to the server.
-Usage accumulates per stage, for each operation on the issue (creating it, commenting, changing status, and so on).
-`looptrack issue usage show <ID>` shows the breakdown by stage.
-You can also aggregate by period and produce a report (PDF); see [Token reports](token-report.md).
+The agent conversation's token usage goes to the server from CLI write operations and hooks.
+It piles up per stage, one for each operation on the issue (creating it, commenting, changing status, and so on).
+To see the breakdown, run `looptrack issue usage show <ID>`.
+You can also aggregate by period and produce a PDF report ([Token reports](token-report.md)).
 
 ## Kit hooks (core and loop)
 
-`looptrack issue init` installs the kit into a project.
+The kit goes into a project with `looptrack issue init`.
 
 | Layer | How it is installed | Main contents |
 | -- | -- | -- |
@@ -85,5 +84,6 @@ You can also aggregate by period and produce a report (PDF); see [Token reports]
 | loop | The user chooses | Output discipline, working discipline, confirm mode (asking the agent only to check or investigate blocks edits), handoff freshness, iteration discipline with the `/iterate` skill, context size warnings, runaway background process detection, confirmation before changing another repository |
 
 With core alone, loop ① already runs.
-Adding loop hands drift detection to hooks, so the person can focus on decisions.
-Whether to install loop is the user's call, not the agent's.
+Add loop and the hooks take over drift detection, which leaves the person free to focus on decisions.
+
+Should loop go in? That's the user's call, not the agent's.

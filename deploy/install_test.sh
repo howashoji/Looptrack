@@ -42,13 +42,18 @@
 #     「作らない」と答えると何も作らず（.env も書かず）、流す CREATE DATABASE を示して止まる / 対照: 既にある DB は作り直さない（表と行が残る）
 #   rc2（同じコンテナ）: 1.0.0-rc.2 の install.sh（開発側のタグ）で入れたサーバを、新しいインストーラの --upgrade --version で上げる
 #   auto-upgrade（同じコンテナ）: 自動の置き換え（--auto-upgrade。既定は off）。入れた直後は off で timer が無い / minisign が無ければ
-#     on は止まり何も変えない / 1 行（curl … | sh）の on で looptrack-upgrade.timer が有効になり、install.sh の写し（root 755）・service・
+#     on は止まり何も変えない / curl も wget も無ければ on は止まり、理由は新しい版の書庫・署名を取るため（取り直すとは書かない）/ 1 行（curl … | sh）の on で looptrack-upgrade.timer が有効になり、install.sh の写し（root 755）・service・
 #     timer が置かれる（service は写しを動かし、取り直さない）/ timer の service を動かすと新しい版（/gh2 の latest）に上がり、
 #     設定は on のまま・写しは書き換えない / もう一度動かしても何もしない / 人が --upgrade を動かすと写しをそろえる /
 #     古い版の取得元（/gh の latest）では版を下げない（--only-newer）/ off で timer を止めて 3 つのファイルを外す / on のまま --uninstall すると外れる
 #   mysql-auto-*（MySQL の最小権限）: 無人の更新（--yes・端末なし。timer と同じ）で、新しい版に未適用の migrate があれば止めずに置き換えない /
-#     止めた後に失敗（権限の欠けた表）すれば前の版に戻して起動し直し、0 でない終了コード / 対照: 権限がそろっていれば置き換わる
+#     止めた後に失敗（権限の欠けた表）すれば前の版に戻して起動し直し、0 でない終了コード / 対照: 権限がそろっていれば置き換わる /
+#     表を作る利用者（LOOPTRACK_SETUP_MIGRATE_DSN）を渡さず、アプリ用の利用者（schema_migrations に SELECT だけ）で migrate する形でも、
+#     未適用が 0 件なら置き換わる（手動の --upgrade と、timer の service を起動する無人の更新。service の環境にはこの変数が無い）
 #     （コンテナの minisign は呼び出しを確かめる偽物。本物の署名と検証の形は手元の minisign で dist.sh sign-sums・verify が確かめる）
+#   auto-rollback（同じコンテナ・SQLite）: 無人の更新で止めた後に、新しい版が起動しない（unit の追加設定で …2 の起動だけを失敗させる）・
+#     daemon-reload の失敗・die を通らない裸のコマンドの失敗・中断（TERM）のどれでも、前の版に 1 回だけ戻して起動し直し、
+#     理由を 1 行残して 0 でない終了コードで終わる / 対照: 端末のある手動の --upgrade は戻さない（サービスは止まったまま）
 #   compose（任意）: イメージ作成・イメージの /NOTICE（looptrack licenses と同じ）・docker compose up・/healthz・DB の権限・
 #     ログイン・--upgrade（0644 の DB を直す・更新の後のログイン）・--uninstall --purge
 #     compose.yaml の ./data を Docker が解決できるよう、ホストの一時ディレクトリを同じパスでコンテナに入れる。
@@ -534,7 +539,7 @@ if [ "${1:-}" = --in-container ]; then
       rm -rf /etc/looptrack /var/lib/looptrack /usr/local/bin/looptrack /usr/local/bin/looptrack.prev
       ;;
 
-    mysql-nodb-decline | mysql-nodb | mysql-bad | mysql-good | mysql-upgrade | mysql-auto-pending | mysql-auto-fail | mysql-auto-ok)
+    mysql-nodb-decline | mysql-nodb | mysql-bad | mysql-good | mysql-upgrade | mysql-auto-pending | mysql-auto-fail | mysql-auto-ok | mysql-manual-nomig | mysql-auto-timer)
       # MySQL を最小権限で使う構成（テスト専用の MySQL のコンテナ im0151-mysql。DB ltdb と表を作る利用者 lt_migrate は
       # 手元の側で先に作ってある。アプリ用の利用者 lt_app は無い → インストーラが尋ねたついでに作る）。
       # mysql-nodb*: DB ltnew は無い（表を作る利用者 lt_newmig と、その権限だけが手元の側で先にある）→ DB もインストーラが作る。
@@ -692,6 +697,47 @@ if [ "${1:-}" = --in-container ]; then
           check "動いている" systemctl is-active looptrack
           $I --uninstall --purge --yes >/dev/null 2>&1 || ng "MySQL の分の purge が失敗"
           ;;
+        mysql-manual-nomig)
+          echo "== MySQL（最小権限）: 表を作る利用者を渡さない手動の --upgrade（未適用 0 件）→ アプリ用の利用者で migrate して置き換わる（取得元は …1）"
+          unset LOOPTRACK_SETUP_MIGRATE_DSN
+          # 更新の場面を続けて流すと、looptrack.service の起動が systemd の既定の上限（10 秒に 5 回）に掛かって
+          # start-limit-hit で起動できなくなる（1 日 1 回の timer では起きない）。数えを戻してから始める
+          systemctl reset-failed looptrack
+          rc=0
+          out=$($I --upgrade --from /dist 2>&1 </dev/null) || rc=$?
+          [ "$rc" = 0 ] && ok "0 で終わる" || ng "手動の --upgrade が失敗（${rc}）: $out"
+          contains "$out" "最新です（適用するマイグレーションはありません）" && ok "migrate は未適用 0 件で通った" || ng "migrate の表示: $out"
+          contains "$out" "CREATE command denied" && ng "migrate が CREATE の権限を求めた: $out" || ok "migrate が CREATE の権限を求めない"
+          contains "$out" "更新しました: v0.0.0-installtest2 → v0.0.0-installtest1" && ok "置き換わった" || ng "更新の表示: $out"
+          check "…1 で動いている（印も）" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1 && grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf'
+          ;;
+        mysql-auto-timer)
+          echo "== MySQL（最小権限）: timer の service（LOOPTRACK_SETUP_MIGRATE_DSN の無い環境）の無人の更新で、DB の形を変えない新しい版に置き換わる（取得元は latest が …2 の /gh2）"
+          unset LOOPTRACK_SETUP_MIGRATE_DSN
+          # 更新の場面を続けて流すと、looptrack.service の起動が systemd の既定の上限（10 秒に 5 回）に掛かって
+          # start-limit-hit で起動できなくなる（1 日 1 回の timer では起きない）。数えを戻してから始める（終わりにも戻す）
+          systemctl reset-failed looptrack
+          # 偽の minisign（auto-upgrade の場面と同じ。本物の検証は dist.sh verify が確かめる）
+          printf '#!/bin/sh\necho "$*" >>/root/minisign.args\nexit 0\n' >/usr/local/bin/minisign
+          chmod 755 /usr/local/bin/minisign
+          out=$(LOOPTRACK_INSTALL_REPO="$GH2_URL" LOOPTRACK_INSTALL_ALLOW_HTTP=1 LOOPTRACK_INSTALL_SCRIPT_URL="$RAW_URL" $I --auto-upgrade on 2>&1) || ng "on が失敗: $out"
+          check "timer が有効" systemctl is-enabled looptrack-upgrade.timer
+          check "service の環境に LOOPTRACK_SETUP_MIGRATE_DSN が無い（アプリ用の DSN で migrate する）" sh -c '! grep -q LOOPTRACK_SETUP_MIGRATE_DSN /etc/systemd/system/looptrack-upgrade.service'
+          since=$(date +%s)
+          # timer を待たずに、timer が動かす service を 1 回動かす（oneshot は終わるまで戻らない。上限 300 秒）
+          timeout 300 systemctl start looptrack-upgrade.service && ok "timer の service が 0 で終わる" || ng "timer の service が失敗"
+          j=$(journalctl -u looptrack-upgrade -o cat --no-pager --since "@$since" 2>/dev/null)
+          contains "$j" "未適用の migrate はありません" && ok "止める前の確かめ（未適用 0 件）を通った" || ng "事前の確かめの表示: $(tail -n 30 <<<"$j")"
+          contains "$j" "最新です（適用するマイグレーションはありません）\|Up to date (there is no migration to apply)" && ok "migrate は未適用 0 件で通った" || ng "migrate の表示: $(tail -n 30 <<<"$j")"
+          contains "$j" "CREATE command denied" && ng "migrate が CREATE の権限を求めた: $(tail -n 30 <<<"$j")" || ok "migrate が CREATE の権限を求めない"
+          contains "$j" "更新しました: v0.0.0-installtest1 → v0.0.0-installtest2" && ok "置き換わった" || ng "更新の表示: $(tail -n 30 <<<"$j")"
+          contains "$j" "前の版" && ng "戻しが走った: $(tail -n 30 <<<"$j")" || ok "戻しは走らない"
+          check "…2 で動いている（印も。設定は on のまま）" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest2 && grep -qx VERSION=v0.0.0-installtest2 /etc/looptrack/install.conf && grep -qx AUTO_UPGRADE=on /etc/looptrack/install.conf'
+          # 次の場面（mysql-auto-ok）のために外し、起動の数えを戻す
+          out=$($I --auto-upgrade off 2>&1) || ng "off が失敗: $out"
+          rm -f /usr/local/bin/minisign /root/minisign.args
+          systemctl reset-failed looptrack
+          ;;
         mysql-upgrade)
           echo "== MySQL（最小権限）: 権限の欠けた表がある状態の --upgrade（表が増えた更新と同じ症状）"
           with_tty /tmp/mysql-up.log root "$ADMIN_PW" "sh /src/install.sh --upgrade --from /dist2" || ng "upgrade が失敗: $(tr -d '\r' </tmp/mysql-up.log | tail -n 30)"
@@ -734,7 +780,24 @@ if [ "${1:-}" = --in-container ]; then
       command -v minisign >/dev/null 2>&1 && ng "前提: このコンテナに minisign がある" || true
       out=$($I --auto-upgrade on 2>&1) && ng "minisign なしで on が通った" || true
       contains "$out" "minisign を入れてください" && ok "署名を確かめられないので止まる" || ng "minisign なしの表示: $out"
+      contains "$out" "dnf install -y epel-release && dnf install -y minisign" && ok "minisign の入れ方に dnf（EPEL）も並べる" || ng "minisign の dnf の案内: $out"
       check "止まったときは何も置かない（印は off のまま）" sh -c 'grep -qx AUTO_UPGRADE=off /etc/looptrack/install.conf && [ ! -e /etc/systemd/system/looptrack-upgrade.timer ] && [ ! -e /usr/local/lib/looptrack/auto-upgrade ]'
+
+      echo "== curl も wget も無ければ on は止まる（理由は新しい版の書庫・署名を取るため。timer は install.sh を取り直さない）"
+      # 偽の minisign（下の on と同じ）を置き、curl を一時的に外す（このコンテナに wget は無い）
+      printf '#!/bin/sh\nexit 0\n' >/usr/local/bin/minisign
+      chmod 755 /usr/local/bin/minisign
+      command -v wget >/dev/null 2>&1 && ng "前提が崩れています（このコンテナに wget がある）" || true
+      CURL=$(command -v curl)
+      mv "$CURL" "$CURL.hidden"
+      out=$($I --auto-upgrade on 2>&1) && ng "curl も wget も無いのに on が通った" || true
+      mv "$CURL.hidden" "$CURL"
+      contains "$out" "curl か wget が要ります" && ok "curl も wget も無ければ止まる" || ng "curl・wget なしの表示: $out"
+      contains "$out" "新しい版の書庫・SHA256SUMS・その署名を取るので" && ok "理由は書庫・SHA256SUMS・署名を取るため" || ng "理由の表示: $out"
+      contains "$out" "取り直す" && ng "スクリプトを取り直すと読める理由が残っている: $out" || ok "スクリプトを取り直すとは書かない"
+      contains "$out" "dnf install -y curl" && ok "dnf の入れ方も並べる" || ng "dnf の案内: $out"
+      check "止まったときは何も置かない（curl・wget なし）" sh -c 'grep -qx AUTO_UPGRADE=off /etc/looptrack/install.conf && [ ! -e /etc/systemd/system/looptrack-upgrade.timer ] && [ ! -e /usr/local/lib/looptrack/auto-upgrade ]'
+      rm -f /usr/local/bin/minisign
 
       echo "== on（入れた後のサーバに、1 行（curl … | sh）で。取得元は新しい版が latest の /gh2）"
       # 偽の minisign: 呼ばれた引数を控えて、合ったことにする（本物の検証は dist.sh verify が確かめる）
@@ -793,6 +856,85 @@ if [ "${1:-}" = --in-container ]; then
       check "--uninstall で timer も外れる" sh -c '! systemctl is-enabled looptrack-upgrade.timer && [ ! -e /etc/systemd/system/looptrack-upgrade.timer ] && [ ! -e /usr/local/lib/looptrack ]'
       grep -q -- "-V -q -P .* -m .*/SHA256SUMS -x .*/SHA256SUMS.minisig" /root/minisign.args && ok "minisign で SHA256SUMS を確かめた" || ng "minisign の引数: $(cat /root/minisign.args 2>&1)"
       rm -f /usr/local/bin/minisign /root/minisign.args
+      ;;
+
+    auto-rollback)
+      echo "== 無人の更新（--yes・端末なし。timer と同じ）: 止めた後にどの形で終わっても、前の版に 1 回だけ戻して起動し直す"
+      version_is() { case "$(/usr/local/bin/looptrack version)" in "looptrack $1（"*) return 0 ;; esac; return 1; }
+      HEAD_LINE='前の版 v0.0.0-installtest1 に戻して起動し直します（無人の更新なので'
+      DONE_LINE='前の版 v0.0.0-installtest1 に戻して起動し直しました（新しい版 v0.0.0-installtest2 は入れていません）'
+      rolled_back() { # <場面の名前> <出力> <終了コード> — 戻しが 1 回だけ走り、前の版で動き、0 でない終了コードで終わった
+        local name=$1 o=$2 code=$3
+        [ "$code" != 0 ] && ok "$name: 0 でない終了コード（${code}）" || ng "$name: 失敗したのに 0 で終わった: $o"
+        contains "$o" "==> 停止" && ok "$name: 止めて置き換えを始めた" || ng "$name: 置き換えを始めていない: $o"
+        [ "$(grep -c -- "$HEAD_LINE" <<<"$o")" = 1 ] && ok "$name: 戻しは 1 回だけ走る" || ng "$name: 戻しの回数が 1 でない（$(grep -c -- "$HEAD_LINE" <<<"$o")）: $o"
+        contains "$o" "$DONE_LINE" && ok "$name: 前の版に戻したと示す" || ng "$name: 戻しの表示: $o"
+        contains "$o" "でも起動できません" && ng "$name: 前の版でも起動できなかった: $o" || true
+        check "$name: 前の版で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1'
+        check "$name: /healthz が 200" env LOOPTRACK_HEALTH_URL=http://127.0.0.1:8090/looptrack/healthz /usr/local/bin/looptrack healthcheck
+        check "$name: 印は前の版のまま" grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf
+      }
+      unattended_upgrade() { # 出力を out・終了コードを rc に。起動を短い間に重ねると systemd の上限（10 秒に 5 回）に掛かるので、数えを戻してから
+        systemctl reset-failed looptrack
+        rc=0
+        out=$($I --upgrade --from /dist2 --yes 2>&1 </dev/null) || rc=$?
+      }
+      out=$($I --from /dist --yes --method systemd -- "${SETUP[@]}" 2>&1) || ng "install が失敗: $out"
+      check "前提: …1 で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1'
+
+      echo "== 新しい版が起動しない（systemctl start looptrack の失敗）"
+      # 新しい版（…2）だけを起動させない unit の追加設定（ExecStartPre が失敗すると systemctl start が失敗する。前の版は起動できる）
+      REFUSE=/etc/systemd/system/looptrack.service.d/zz-test-refuse-new.conf
+      mkdir -p "${REFUSE%/*}"
+      printf '[Service]\nExecStartPre=+/bin/sh -c "! /usr/local/bin/looptrack version | grep -q installtest2"\n' >"$REFUSE"
+      systemctl daemon-reload
+      unattended_upgrade
+      contains "$out" "エラー: 新しい版 v0.0.0-installtest2 を起動できません（systemctl start looptrack が失敗しました" &&
+        ok "起動の失敗を戻しの理由として 1 行残す" || ng "起動の失敗の理由: $out"
+      contains "$out" "DB を控え " && ok "SQLite の DB を止めた直後の控えに戻す" || ng "DB の戻しの表示: $out"
+      rolled_back "起動の失敗" "$out" "$rc"
+
+      # 1 回だけ失敗させる偽物（/usr/local/sbin・/usr/local/bin は PATH で /usr/bin より前）。印のファイルがあるときだけ失敗し、印を消す
+      REAL_SYSTEMCTL=$(command -v systemctl)
+      printf '#!/bin/sh\nif [ "$1" = "$(cat /root/systemctl.fail-once 2>/dev/null)" ]; then rm -f /root/systemctl.fail-once; echo "偽の systemctl: $1 を失敗させました" >&2; exit 1; fi\nexec %s "$@"\n' "$REAL_SYSTEMCTL" >/usr/local/sbin/systemctl
+      printf '#!/bin/sh\nif [ -e /root/install.fail-once ]; then m=$(cat /root/install.fail-once); rm -f /root/install.fail-once\n  if [ "$m" = term ]; then kill -TERM "$PPID"; sleep 1; fi\n  echo "偽の install: 失敗させました" >&2; exit 1\nfi\nexec /usr/bin/install "$@"\n' >/usr/local/bin/install
+      chmod 755 /usr/local/sbin/systemctl /usr/local/bin/install
+
+      echo "== systemctl daemon-reload の失敗（die）"
+      echo daemon-reload >/root/systemctl.fail-once
+      unattended_upgrade
+      contains "$out" "偽の systemctl: daemon-reload を失敗させました" && ok "前提: daemon-reload が失敗した" || ng "前提が崩れています（daemon-reload が失敗していない）: $out"
+      contains "$out" "エラー: systemctl daemon-reload に失敗しました" && ok "daemon-reload の失敗を理由として残す" || ng "daemon-reload の理由: $out"
+      rolled_back "daemon-reload の失敗" "$out" "$rc"
+
+      echo "== die を通らない裸のコマンドの失敗（set -e で止まる。実行ファイルを置く install の失敗）"
+      echo fail >/root/install.fail-once
+      unattended_upgrade
+      contains "$out" "偽の install: 失敗させました" && ok "前提: install が失敗した" || ng "前提が崩れています（install が失敗していない）: $out"
+      contains "$out" "エラー: 止めた後の手順が途中で失敗しました（終了コード " && ok "裸の失敗も理由として 1 行残す" || ng "裸の失敗の理由: $out"
+      rolled_back "裸のコマンドの失敗" "$out" "$rc"
+
+      echo "== 止めた後の中断（TERM）"
+      echo term >/root/install.fail-once
+      unattended_upgrade
+      contains "$out" "中断しました" && ok "前提: 中断した" || ng "前提が崩れています（中断していない）: $out"
+      rolled_back "中断" "$out" "$rc"
+      rm -f /usr/local/sbin/systemctl /usr/local/bin/install /root/systemctl.fail-once /root/install.fail-once
+
+      echo "== 対照: 端末のある手動の --upgrade（--yes なし）は戻さない（今の振る舞い）"
+      systemctl reset-failed looptrack
+      rc=0
+      out=$($I --upgrade --from /dist2 2>&1 </dev/null) || rc=$?
+      [ "$rc" != 0 ] && ok "手動: 0 でない終了コード（${rc}）" || ng "手動: 起動できないのに 0 で終わった: $out"
+      contains "$out" "エラー: 新しい版 v0.0.0-installtest2 を起動できません" && ok "手動: 起動の失敗を示す" || ng "手動: 起動の失敗の表示: $out"
+      contains "$out" "前の版" && ng "手動なのに戻した: $out" || ok "手動: 戻さない"
+      systemctl is-active looptrack >/dev/null 2>&1 && ng "手動: サービスが動いている（起動の失敗を作れていない）" || ok "手動: サービスは止まったまま"
+      version_is v0.0.0-installtest2 && ok "手動: 実行ファイルは新しい版のまま" || ng "手動: 版: $(/usr/local/bin/looptrack version)"
+      rm -f "$REFUSE"
+      rmdir "${REFUSE%/*}" 2>/dev/null || true
+      systemctl daemon-reload
+      systemctl reset-failed looptrack
+      $I --uninstall --purge --yes >/dev/null 2>&1 || ng "purge が失敗"
       ;;
 
     compose)
@@ -992,6 +1134,9 @@ run_systemd() {
   echo "######## 自動の置き換え（--auto-upgrade・systemd timer）"
   # shellcheck disable=SC2086
   docker exec $web -e GH2_URL="http://host.docker.internal:$port/gh2" im0151-systemd bash /src/install_test.sh --in-container auto-upgrade || status=1
+  echo
+  echo "######## 無人の更新の戻し（止めた後の失敗: 起動・daemon-reload・裸のコマンド・中断）"
+  docker exec im0151-systemd bash /src/install_test.sh --in-container auto-rollback || status=1
   return $status
 }
 
@@ -1067,6 +1212,13 @@ run_mysql() {
   # 止めた後の失敗（権限の欠けた表）では前の版に戻す
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-auto-fail || status=1
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-upgrade || status=1
+  # 表を作る利用者（LOOPTRACK_SETUP_MIGRATE_DSN）を渡さない更新: アプリ用の利用者は schema_migrations に SELECT だけ
+  grep -q 'GRANT SELECT ON `ltdb`.`schema_migrations` TO `lt_app`@`%`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_app'@'%'" 2>&1)" &&
+    echo "  ok: 前提: lt_app は schema_migrations に SELECT だけ（grants.sql の最小権限）" || { echo "  NG: lt_app の schema_migrations の権限" >&2; status=1; }
+  # 手動の --upgrade（…2 → …1）と、timer の service の無人の更新（…1 → …2。変数 web と port は呼び出し元の run_systemd のもの）
+  docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-manual-nomig || status=1
+  # shellcheck disable=SC2086
+  docker exec $web -e GH2_URL="http://host.docker.internal:$port/gh2" -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-auto-timer || status=1
   # 対照: 権限をそろえた後（上の --upgrade が与え直した）の無人の更新は置き換わる
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-auto-ok || status=1
   grep -q '`ltdb`.`projects`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_app'@'%'" 2>&1)" &&
