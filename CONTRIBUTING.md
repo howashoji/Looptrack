@@ -1,40 +1,40 @@
 # Contributing to Looptrack
 
-Thank you for taking the time. This document covers how to set up a development
-environment, how to run the tests, and the conventions a pull request is
-expected to follow.
+Thanks for taking the time. This document covers setting up a development
+environment, running the tests, and the conventions we expect a pull request to
+follow.
 
-Looptrack is one Go module that builds one binary, `looptrack`. The same binary
+Looptrack is one Go module that builds one binary, `looptrack`. That same binary
 is the server (`serve`, `setup`, `migrate`, the admin subcommands), the client
-(`issue`, `hook`, `report`), and the desktop edition (`desktop`). There is no
-second runtime and no shell script to install anywhere, and we intend to keep it
+(`issue`, `hook`, `report`), and the desktop edition (`desktop`). There's no
+second runtime and no shell script to install anywhere. We intend to keep it
 that way.
 
-Day-to-day development happens in a private repository and reaches this one as
+Day-to-day development happens in a private repository. It reaches this one as
 periodic commits, each carrying one finished piece of work. Issues and pull
-requests from outside are welcome here and are handled here; [How this
+requests from outside are welcome here, and they're handled here; [How this
 repository is maintained](#how-this-repository-is-maintained) explains what that
 means for you in practice.
 
 ## Before you start
 
 - **Bug reports, feature requests and questions all go to GitHub Issues.**
-  There is no Discussions tab. Please search the existing issues first, and
+  There's no Discussions tab. Search the existing issues first, please. Then
   include the version (`looptrack version`), how the server is deployed, and the
   exact commands and output.
 - **Security problems do not go to GitHub Issues.** See [SECURITY.md](SECURITY.md).
 - **For anything larger than a bug fix, open an issue before you write code.**
   A short description of the problem and the approach you have in mind saves
-  everyone a rewrite. Behaviour that every project sees — the CLI, the hooks, the
-  kit, the API — is changed carefully and rarely.
+  everyone a rewrite. Behaviour that every project sees (the CLI, the hooks, the
+  kit, the API) changes carefully, and rarely.
 - **Writing acceptance criteria is research, not drafting.** Check every path,
   file, string and line number you put in a criterion against the real thing
   first, at a pinned revision (`git show <rev>:<path>`, `git grep <rev>`, the
-  routing definitions), and never copy the wording of someone else's report — a
-  summary confuses a lookup key with the text that is actually rendered. A
-  criterion that cannot be met tempts the implementer into building something to
-  fit it; criteria cannot be written ahead of the thing they describe. Find one
-  wrong criterion and re-check every criterion written in the same sitting.
+  routing definitions). Never copy the wording of someone else's report: a
+  summary confuses a lookup key with the text that's actually rendered. And a
+  criterion that can't be met tempts the implementer into building something to
+  fit it. Criteria can't be written ahead of the thing they describe.
+  Found one wrong criterion? Re-check every criterion written in the same sitting.
 - By contributing you agree that your contribution is licensed under the MIT
   license (see [LICENSE](LICENSE)).
 
@@ -55,15 +55,15 @@ cd looptrack
 go build ./cmd/looptrack
 ```
 
-Start the local MySQL that the tests use. It listens on 127.0.0.1:13306 only,
-and its password is for this throwaway container:
+Start the local MySQL the tests use. It listens on 127.0.0.1:13306 only, and
+its password is for this throwaway container:
 
 ```bash
 docker compose -f deploy/dev/compose.yaml up -d
 ```
 
-To try the server itself, run the setup wizard in a scratch directory and pick
-the single-user, SQLite answers:
+Want to try the server itself? Run the setup wizard in a scratch directory and
+pick the single-user, SQLite answers:
 
 ```bash
 mkdir /tmp/looptrack-try && cd /tmp/looptrack-try
@@ -71,8 +71,8 @@ looptrack setup
 looptrack serve --env-file ./.env
 ```
 
-Do not run `looptrack issue init` against this repository or against a project
-you care about — it writes hook wiring and skill files into `.claude/`. Try it in
+Don't run `looptrack issue init` against this repository, or against any project
+you care about. It writes hook wiring and skill files into `.claude/`. Try it in
 a throwaway directory.
 
 ## Running the tests
@@ -98,61 +98,77 @@ go vet ./...
 go mod tidy -diff
 ```
 
-Keep `LOOPTRACK_TEST_DB=mysql` on the command. Without it, and without
-`LOOPTRACK_TEST_DSN`, the database-backed tests are not skipped at all: they
-fall through to SQLite and pass (`skipWithoutDB` in `internal/testutil` skips
-only for `LOOPTRACK_TEST_DB=skip|none`, or for `LOOPTRACK_TEST_DB=mysql` with an
-empty DSN). With `LOOPTRACK_TEST_DB=mysql` and no DSN they are skipped rather
-than failed, so a green `go test ./...` on its own still does not mean much —
-and when you report a green, say that you had that value set. CI fails if any of
-them are skipped on the Linux job. `-count=1` keeps Go from reporting a cached
-`ok` for a package it did not actually run. `internal/server` creates more than
-100 throwaway databases in a single run. **It used to take over ten minutes, but
-that was waiting, not weight**: concurrent runs were serialized behind a named
-lock shared across the whole MySQL instance (the reason is in the comment on
-`migrateLockPrefix` in `internal/store/migrate.go`). The lock is now per schema
-and nothing is serialized, so measured in 2026-09 with nothing else running it
-takes around two minutes on its own and the whole suite two to three. **In
-exchange, runs going at the same time now genuinely compete** for creating the
-throwaway databases and for the CPU: what parallelism costs has turned from "you
-wait your turn" into "the results wobble", which is why taking the window is not
-a nicety but the thing that keeps a result clean. Slower machines stretch it a
-long way too, so keep `-timeout 30m` on. Never judge from the elapsed time alone
-whether the tests ran: no `(cached)` in the output means the package really did
-run, but **run plain, the skip count does not tell you whether a database was
-used** — without `LOOPTRACK_TEST_DSN` there is a path that falls through to
-SQLite (the branch in `MigratedDB` and `AppDB` in `internal/testutil`), and it
-prints no skip. **Run it with `LOOPTRACK_TEST_DB=mysql` and a skip count of 0
-becomes evidence that nothing fell through to SQLite** (with that value
-`Dialect()` returns mysql, so the SQLite branch cannot be taken and a missing
-DSN turns into a `t.Skip`). Run without it, show the dialect
-(`testutil.Dialect()`) or the number of throwaway databases created instead.
-`--- PASS: TestSQLiteSchemaMatchesMySQL` (`internal/store/sqlite_test.go`, which
-skips without `LOOPTRACK_TEST_DSN` and otherwise queries `information_schema` on
-MySQL) is evidence of a real MySQL connection on its own. Several sessions
-hammering the one development MySQL container at the same time drains the result
-of its meaning, so count the runs already going by **looking at the list** from
-`ps -eo pid,etime,command | grep -E '[g]o test'` before you start (`grep -c`
-also matches the command line of the wrapping shell: measured, it returned 3
-where the real count was 0). Whenever you report a green or a red to someone,
-say which SHA you checked, in which pinned worktree, whether `-count=1` was on,
-how long it took (the real output of `time`), how many tests were skipped
-(counted from `-v`), and how many runs were going in parallel at the time; with
-any of them missing it is not treated as evidence. A `(cached)` in the output
-means that package did not run. A green summary (0 failed, 0 skipped) is no
-evidence that the test you cared about ran: an empty `-run` filter, a build tag
-or a package left out all look the same from the summary. When you rest a case
-on a specific red being cleared, run it with `-count=1 -v` and quote the `===
-RUN` and `--- PASS` lines.
+Keep `LOOPTRACK_TEST_DB=mysql` on the command. Here's why. Without it, and
+without `LOOPTRACK_TEST_DSN`, the database-backed tests aren't skipped at all:
+they fall through to SQLite and pass (`skipWithoutDB` in `internal/testutil`
+skips only for `LOOPTRACK_TEST_DB=skip|none`, or for `LOOPTRACK_TEST_DB=mysql`
+with an empty DSN). With `LOOPTRACK_TEST_DB=mysql` and no DSN they're skipped
+rather than failed. So a green `go test ./...` on its own still doesn't mean
+much, and when you report a green, say that you had that value set. CI fails if
+any of them are skipped on the Linux job.
+
+`-count=1` keeps Go from reporting a cached `ok` for a package it didn't
+actually run.
+
+`internal/server` creates more than 100 throwaway databases in a single run. It
+used to take over ten minutes. **But that was waiting, not weight**: concurrent
+runs were serialized behind a named lock shared across the whole MySQL instance
+(the reason is in the comment on `migrateLockPrefix` in
+`internal/store/migrate.go`). The lock is now per schema and nothing is
+serialized. Measured in 2026-09 with nothing else running, it takes around two
+minutes on its own, and the whole suite two to three.
+
+**The catch: runs going at the same time now genuinely compete**, for creating
+the throwaway databases and for the CPU. What parallelism costs has turned from
+"you wait your turn" into "the results wobble". That's why taking the window
+isn't a nicety. It's the thing that keeps a result clean. Slower machines
+stretch the run a long way too, so keep `-timeout 30m` on.
+
+Never judge from the elapsed time alone whether the tests ran. No `(cached)` in
+the output means the package really did run. But **run plain, the skip count
+doesn't tell you whether a database was used**: without `LOOPTRACK_TEST_DSN`
+there's a path that falls through to SQLite (the branch in `MigratedDB` and
+`AppDB` in `internal/testutil`), and it prints no skip. **Run it with
+`LOOPTRACK_TEST_DB=mysql`, and a skip count of 0 becomes evidence that nothing
+fell through to SQLite** (with that value `Dialect()` returns mysql, so the
+SQLite branch can't be taken and a missing DSN turns into a `t.Skip`). If you
+ran without it, show the dialect (`testutil.Dialect()`) or the number of
+throwaway databases created instead. `--- PASS: TestSQLiteSchemaMatchesMySQL`
+(`internal/store/sqlite_test.go`, which skips without `LOOPTRACK_TEST_DSN` and
+otherwise queries `information_schema` on MySQL) is evidence of a real MySQL
+connection on its own.
+
+Several sessions hammering the one development MySQL container at the same time
+drain the result of its meaning. So before you start, count the runs already
+going by **looking at the list** from
+`ps -eo pid,etime,command | grep -E '[g]o test'`. (`grep -c` also matches the
+command line of the wrapping shell.
+Measured, it returned 3 where the real count was 0.)
+
+Whenever you report a green or a red to someone, say:
+
+- which SHA you checked, and in which pinned worktree
+- whether `-count=1` was on
+- how long it took (the real output of `time`)
+- how many tests were skipped (counted from `-v`)
+- how many runs were going in parallel at the time
+
+With any of them missing, it isn't treated as evidence. A `(cached)` in the
+output means that package didn't run.
+
+A green summary (0 failed, 0 skipped) is no evidence that the test you cared
+about ran. An empty `-run` filter, a build tag, or a package left out all look
+the same from the summary. When you rest a case on a specific red being
+cleared, run it with `-count=1 -v` and quote the `=== RUN` and `--- PASS` lines.
 
 `deploy/dev/test-record.sh` collects all of that for you. It runs the command
-above with `-v` added and prints one line to keep as the record of the run: the
-start time, the SHA, the worktree path, whether `-count=1` was on, the elapsed
-time (the whole run, and the `ok` line of `internal/server`), the PASS / FAIL /
-SKIP counts with the names of the skipped and failed tests, the package `ok` /
-`FAIL` / `(cached)` counts, the `go test` runs already going when it started,
-whether `--- PASS: TestSQLiteSchemaMatchesMySQL` appeared, the exit code and
-where the log went.
+above with `-v` added and prints one line to keep as the record of the run. That
+line holds the start time, the SHA, the worktree path, whether `-count=1` was
+on, the elapsed time (the whole run, and the `ok` line of `internal/server`),
+the PASS / FAIL / SKIP counts with the names of the skipped and failed tests,
+the package `ok` / `FAIL` / `(cached)` counts, the `go test` runs already going
+when it started, whether `--- PASS: TestSQLiteSchemaMatchesMySQL` appeared, the
+exit code, and where the log went.
 
 ```bash
 SHA=$(git rev-parse --short HEAD); git worktree add --detach ../verify-$SHA $SHA
@@ -161,25 +177,26 @@ deploy/dev/test-record.sh --parse <log>          # rebuild the line from a saved
 ```
 
 It refuses to run when the worktree has uncommitted or untracked changes, since
-the record would not be evidence for that SHA (`--allow-dirty` runs anyway and
-marks the line `dirty`). It keeps the log outside the worktree, and it exits
-with the status of `go test`, printing the line even for a red run. Paste the
-line as it is wherever you report the result. The counting is covered by
-`deploy/dev/test-record_test.sh`, which `go test ./internal/docscheck/` runs.
+then the record wouldn't be evidence for that SHA (`--allow-dirty` runs anyway
+and marks the line `dirty`). The log stays outside the worktree. The script
+exits with the status of `go test`, and it prints the line even for a red run.
+Paste that line as it is wherever you report the result. The counting itself is
+covered by `deploy/dev/test-record_test.sh`, which `go test
+./internal/docscheck/` runs.
 
 `GOOS=windows go vet ./...`, `GOOS=windows go build ./...` and `GOOS=windows go
-test -c` only tell you that the code compiles: the test binary they produce
-cannot be run on macOS or Linux. How the code behaves at run time on Windows —
-path separators and drive letters, a temporary directory on `D:\`, the
-resolution of the monotonic clock, line endings — cannot be checked locally at
-all, and is only seen by the `go test (windows, no database)` job in CI. That job
-does not run on a push or a pull request — CI is triggered by hand
-(`workflow_dispatch`) and weekly only — so a change that touches anything
-Windows-specific has to wait for a manual run before you can call it green: every
-local check can be green while Windows alone fails.
+test -c` only tell you that the code compiles. The test binary they produce
+can't run on macOS or Linux. How the code behaves at run time on Windows (path
+separators and drive letters, a temporary directory on `D:\`, the resolution of
+the monotonic clock, line endings) can't be checked locally at all. Only the
+`go test (windows, no database)` job in CI sees it. And that job doesn't run on
+a push or a pull request, because CI is triggered by hand (`workflow_dispatch`)
+and weekly only. So a change that touches anything Windows-specific has to wait
+for a manual run before you can call it green. Every local check can be green
+while Windows alone fails.
 
-Two more checks run in CI and are worth running locally when you touch documents
-or dependencies:
+Two more checks run in CI. They're worth running locally when you touch
+documents or dependencies:
 
 ```bash
 go test ./internal/docscheck/   # guide/README structure, and the published-tree scan below
@@ -188,39 +205,41 @@ go run ./internal/tools/notice  # regenerate NOTICE after changing dependencies
 ```
 
 `public-scan.sh` scans the commit plus your working-tree changes (anything
-`git add`ed, and untracked files too) and prints what it scanned — including how
-many untracked files went in, and their names — on the first and last line.
-Files ignored by `.gitignore` are left out: they never reach the published tree
-unless they get tracked, so scanning them only produces false positives. Run the
-scan in a worktree pinned to the SHA you are checking; in a shared main worktree
-another session's untracked files can turn it red. `go test
-./internal/docscheck/` runs it too, so it fails locally as well as in CI — on
-Windows that test is skipped.
+`git add`ed, and untracked files too). On its first and last line it prints what
+it scanned, including how many untracked files went in and their names. Files
+ignored by `.gitignore` are left out. They never reach the published tree unless
+they get tracked, so scanning them only produces false positives.
 
-Keep the history in the issue tracker and only the reason in the code: a comment
+Run the scan in a worktree pinned to the SHA you're checking. In a shared main
+worktree, another session's untracked files can turn it red. `go test
+./internal/docscheck/` runs it too, so it fails locally as well as in CI (on
+Windows that test is skipped).
+
+Keep the history in the issue tracker and only the reason in the code. A comment
 should say why the code is the way it is, without a tracker ID. IDs in shipped
 source are what the scan rejects; test inputs and `testdata/` are exempt.
 
-Test files are published too — `_test.go` and `_test.mjs` are part of what `git
-archive` writes out — so keep real user names, tracker IDs and internal proper
-nouns out of fixtures and test comments. In a test file the tracker-ID scan reads
-the explanatory comments only (everything after `//`); an ID the test uses as
-data — an input or an expected value — is not read, and neither is an ID in a
-comment that the same file also uses as data (a synthetic fixture). What is
-already there is listed per file in `ids_comments_baseline` in
-`deploy/public-scan.sh`: the scan fails once a file goes above its number, and
-passes for the numbers themselves. A passing scan therefore says only that
-nothing was added on top of the baseline, not that the published tree is clean
+Test files are published too. `_test.go` and `_test.mjs` are part of what `git
+archive` writes out, so keep real user names, tracker IDs and internal proper
+nouns out of fixtures and test comments. In a test file the tracker-ID scan
+reads only the explanatory comments (everything after `//`). It doesn't read an
+ID the test uses as data (an input or an expected value), and it doesn't read an
+ID in a comment that the same file also uses as data (a synthetic fixture).
+
+What's already there is listed per file in `ids_comments_baseline` in
+`deploy/public-scan.sh`. The scan fails once a file goes above its number, and
+passes for the numbers themselves. So a passing scan says only that nothing was
+added on top of the baseline. It doesn't say the published tree is clean
 (emptying the baseline is tracked as its own issue). Known blind spots: inside
 `/* … */`, and after a `//` that sits inside a string literal.
 
-`NOTICE` is generated. Never edit it by hand; CI checks that it matches the
+`NOTICE` is generated. Never edit it by hand. CI checks that it matches the
 dependency graph.
 
 ## Things that must not change
 
-Some things are load-bearing for data that already exists. A change to any of
-them breaks installations in the field, so they are not accepted as part of an
+Some things are load-bearing for data that already exists. Change any of them
+and installations in the field break, so they're not accepted as part of an
 ordinary pull request:
 
 | What | Why |
@@ -234,69 +253,69 @@ ordinary pull request:
 
 ## Code conventions
 
-- **Comments and documentation inside the code are written in Japanese.** Write a
-  comment when the reason for a decision is not obvious from the code — what the
-  code does is usually clear enough, why it does it that way is not. Identifiers,
-  error strings for programs, and log keys stay in English.
+- **Comments and documentation inside the code are written in Japanese.** Write
+  a comment when the reason for a decision isn't obvious from the code. What the
+  code does is usually clear enough. Why it does it that way isn't.
+  Identifiers, error strings for programs, and log keys stay in English.
 - **Keep project-specific behaviour out of the shared paths.** The CLI, the hooks
-  and the kit reach every project that installs Looptrack. If something only
-  makes sense for one project, it belongs in that project's rules
-  (`looptrack project rules set`) or in its guide document, not in a branch here.
+  and the kit reach every project that installs Looptrack. Something that only
+  makes sense for one project belongs in that project's rules
+  (`looptrack project rules set`) or in its guide document. Not in a branch here.
 - **Put rules in one place.** Anything the server should enforce goes into the
-  shared service layer (`internal/service`) so that REST, MCP, the CLI and the
-  Web UI all get it, rather than into one of the handlers.
-- Run `gofmt` — CI rejects unformatted files. Follow the surrounding style;
-  there is no separate linter configuration to satisfy beyond `go vet`.
-- New dependencies are a real cost: they have to be license-checked and appear in
-  `NOTICE` and in every release artifact. Prefer the standard library, and say in
-  the pull request why a new module is needed.
+  shared service layer (`internal/service`), not into one of the handlers. Then
+  REST, MCP, the CLI and the Web UI all get it.
+- Run `gofmt`; CI rejects unformatted files. Follow the surrounding style.
+  There's no separate linter configuration to satisfy beyond `go vet`.
+- New dependencies are a real cost. Each one has to be license-checked, and it
+  shows up in `NOTICE` and in every release artifact. Prefer the standard
+  library, and say in the pull request why a new module is needed.
 
 ### Tests
 
-- Table-driven tests are the default. Give each case a name that reads as a
-  sentence about the behaviour, so that a failure message explains itself.
-- Test through the same entry point real callers use. Domain rules are tested
-  against the service layer, CLI behaviour against the CLI, hook behaviour
-  against the hook. That way a rule cannot pass in one access path and fail in
-  another.
+- Table-driven tests are the default. Name each case with a sentence about the
+  behaviour, so a failure message explains itself.
+- Test through the same entry point real callers use: domain rules against the
+  service layer, CLI behaviour against the CLI, hook behaviour against the hook.
+  Then a rule can't pass in one access path and fail in another.
 - Tests that need a database skip themselves when `LOOPTRACK_TEST_DB=mysql` is
-  set and `LOOPTRACK_TEST_DSN` is not; keep that pattern rather than failing.
+  set and `LOOPTRACK_TEST_DSN` isn't. Keep that pattern rather than failing.
   With neither variable set they fall through to SQLite and run, so a run with
-  no skips is not by itself a run against a database.
-- Tests must never write to a real server. Do not read `LOOPTRACK_API_URL` or
+  no skips isn't by itself a run against a database.
+- Tests must never write to a real server. Don't read `LOOPTRACK_API_URL` or
   `LOOPTRACK_PROJECT` from the ambient environment in a test.
-- CLI output is checked against recorded golden files. When output changes on
-  purpose, update the golden file in the same commit and say so in the pull
-  request; when it changes by accident, that is the test doing its job.
+- CLI output is checked against recorded golden files. Changed the output on
+  purpose? Update the golden file in the same commit and say so in the pull
+  request. If it changed by accident, that's the test doing its job.
 - Changing a request, a header, some wiring or a count makes the golden files
-  that record it move, even in packages your branch never touched — run
-  `internal/clitest` (`TestCLIGolden`) and `internal/client/kitinit`
-  (`TestInitGolden`) after that kind of change.
-- The golden test in `internal/client/kitinit` pins the line count of the generated
-  `AGENTS.md`, so it fails when you change the length of a `kit/loop/rules` section
-  that both carries the `<!-- looptrack:inject session -->` marker and sits in a rules
-  file marked `"agents_md": "sections"` in `kit/loop/manifest.json`; the body is masked
-  in the golden, so re-record it the way the failure message says.
+  that record it move, even in packages your branch never touched. After that
+  kind of change, run `internal/clitest` (`TestCLIGolden`) and
+  `internal/client/kitinit` (`TestInitGolden`).
+- The golden test in `internal/client/kitinit` pins the line count of the
+  generated `AGENTS.md`. It fails when you change the length of a
+  `kit/loop/rules` section that both carries the
+  `<!-- looptrack:inject session -->` marker and sits in a rules file marked
+  `"agents_md": "sections"` in `kit/loop/manifest.json`. The body is masked in
+  the golden, so re-record it the way the failure message says.
 - A bug fix comes with a test that fails before the fix.
 
 ## How this repository is maintained
 
 Looptrack is developed in a separate repository, and each release is published
-here. That shows in the history, so it is worth explaining before you read it.
+here. That shows in the history, so here's what to expect before you read it.
 
 - **Each release arrives as a single commit.** When a version is released, the
   files that changed since the previous release are copied into this repository
-  and committed once, with the release tag on that commit. There is no chain of
-  smaller commits behind it here, so `git log` is coarser than it would be for a
+  and committed once, with the release tag on that commit. There's no chain of
+  smaller commits behind it here. So `git log` is coarser than it would be for a
   project developed in the open, and `git blame` points at the release that
-  published a line rather than at the change that wrote it.
-- **[CHANGELOG.md](CHANGELOG.md) is where a change is explained.** It is the
-  record to read, rather than reconstructing intent from a large diff.
-- **Pull requests from outside are ordinary pull requests.** They are reviewed
+  published a line, not at the change that wrote it.
+- **[CHANGELOG.md](CHANGELOG.md) is where a change is explained.** Read that
+  record instead of reconstructing intent from a large diff.
+- **Pull requests from outside are ordinary pull requests.** They're reviewed
   and merged here like anywhere else. A merged contribution is also taken into
   the development repository with its author intact, so the next release carries
-  it forward instead of overwriting it. Nothing about the arrangement asks you to
-  do anything differently.
+  it forward instead of overwriting it. You don't have to do anything
+  differently because of the arrangement.
 - **Release commits go straight onto `main`,** on top of the previous release
   and of any pull requests merged since. The history of `main` is never
   rewritten, so a branch you started from `main` stays valid across releases.
@@ -304,24 +323,25 @@ here. That shows in the history, so it is worth explaining before you read it.
 ## Commits and pull requests
 
 - **One logical change per commit,** carrying only the paths that belong to it.
-- The subject line says what changed and, where it is not obvious, why. English
+- The subject line says what changed and, where it isn't obvious, why. English
   and Japanese are both fine. Reference the issue in this repository that the
-  work belongs to — in the pull request description if not in the commit itself.
-- Rebase onto the current `main` rather than merging it into your branch, and
+  work belongs to, in the pull request description if not in the commit itself.
+- Rebase onto the current `main` rather than merging it into your branch. Then
   make sure the whole test suite passes on the result.
-- A pull request should say: what problem it solves, what approach it takes, how
-  you verified it, and anything reviewers should look at closely. If it changes
-  behaviour users can see, update the documents in the same pull request and add
-  an entry to the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md).
+- A pull request should say what problem it solves, what approach it takes, how
+  you verified it, and anything reviewers should look at closely. Does it change
+  behaviour users can see? Then update the documents in the same pull request
+  and add an entry to the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md),
+  in English and in Japanese (the Japanese follows the English after a `---`).
 - If it changes the user-facing guide under `docs/guide/`, change the English and
-  the Japanese version together — `go test ./internal/docscheck/` checks that
+  the Japanese versions together. `go test ./internal/docscheck/` checks that
   their headings, code blocks and tables still line up.
 - CI runs formatting, `go vet`, `go mod tidy -diff`, `govulncheck`, the Go tests
-  on Linux and Windows and the small checks on every run, and the macOS tests,
-  the cross-build and the desktop builds on the weekly run and on a manual run
-  with `full`. It is **not** triggered by a push or a pull request (the workflow
-  only carries `workflow_dispatch` and `schedule`), so run the commands above
-  locally and treat that as the evidence; a maintainer runs CI by hand before a
+  on Linux and Windows, and the small checks on every run. The macOS tests, the
+  cross-build and the desktop builds run on the weekly run and on a manual run
+  with `full`. CI is **not** triggered by a push or a pull request (the workflow
+  only carries `workflow_dispatch` and `schedule`). So run the commands above
+  locally and treat that as the evidence. A maintainer runs CI by hand before a
   deployment, a release tag, or a batch of Windows-related changes.
 
 ## Where things live
@@ -345,4 +365,4 @@ docs/            guide, design, deployment, adding a project
 
 The design document, [docs/server/DESIGN.md](docs/server/DESIGN.md), describes
 the data model, the permission model, the API and the rules the server enforces.
-Read the section that covers what you are changing before you change it.
+Read the section that covers what you're changing before you change it.

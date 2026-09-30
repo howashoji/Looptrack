@@ -2,13 +2,12 @@
 
 [ガイドの目次](README.md) · 前: [AI ごとの手引き](ai-agents.md) · 次: [FAQ / トラブルシュート](faq.md)
 
-管理者とは、利用者の役割が `admin` の人のことです。
+管理者とは、利用者の役割が `admin` の人のこと。
 最初の管理者は `looptrack setup` が作ります。
 管理の画面は `<サーバの URL>/admin/…` にあります。
 
-`looptrack user …` や `looptrack project …` といった管理コマンドは、保存先に直接つなぎます。
-`.env` の `LOOPTRACK_DSN` を環境変数に入れてから実行してください。手順は[始め方](getting-started.md)の手順 4 にあります。
-チームのサーバでは `docker compose run --rm --no-deps looptrack …` の形で実行します。
+`looptrack user …` や `looptrack project …` のような管理コマンドは、保存先に直接つなぎます。だから実行の前に、`.env` の `LOOPTRACK_DSN` を環境変数に入れておいてください。手順は[始め方](getting-started.md)の手順 4 にあります。
+チームのサーバなら `docker compose run --rm --no-deps looptrack …` の形で実行します。
 
 ## 利用者
 
@@ -20,11 +19,11 @@
 | 変更 | 役割の変更・無効化 / 有効化・パスワードの再設定・二段階認証のリセット・アクセストークンの失効 |
 | プロジェクトの権限 | プロジェクトごとに viewer / editor / admin を付ける・外す |
 
-- 自分自身の役割の変更・無効化はできません。有効な管理者が 0 人になる変更も拒否されます。
-- 無効化するとその人のセッションは破棄され、トークンも使えなくなります。
-- パスワードの変更とアクセストークンの発行・失効は、各自が `<サーバの URL>/account` で行います。
+- 自分自身の役割は変えられず、無効化もできません。有効な管理者が 0 人になる変更も拒否されます。
+- 無効化すると、その人のセッションは破棄。トークンも使えなくなります。
+- パスワードの変更と、アクセストークンの発行・失効は、各自が `<サーバの URL>/account` で行います。
 
-管理コマンドでも同じことができます。
+同じことは管理コマンドでもできます。
 
 ```bash
 looptrack user list
@@ -41,10 +40,10 @@ looptrack user totp-reset alice
 | editor | 起票・コメント・状態の変更・担当の変更 |
 | admin（プロジェクト） | editor と同じく書けます |
 
-- 権限はプロジェクトごとです。
-- システムの管理者でも、参加していないプロジェクトは読むだけです。書くには自分を editor か admin で参加させてください。
-- 画面 `<サーバの URL>/admin/projects` では、全プロジェクトの参加者と役割を一覧で見て変えられます。
-- 参加を外す相手や viewer に下げる相手が未完了のイシューの担当なら、代わりの担当者を選ぶよう求められます。
+- 権限はプロジェクトごと。
+- システムの管理者でも、参加していないプロジェクトは読むだけです。書きたければ、自分を editor か admin で参加させましょう。
+- 画面 `<サーバの URL>/admin/projects` なら、全プロジェクトの参加者と役割を一覧で見て、その場で変えられます。
+- 参加を外す相手や viewer に下げる相手が未完了のイシューを担当していると、代わりの担当者を選ぶよう求められます。
 
 ```bash
 looptrack member set demo alice --role editor
@@ -63,13 +62,13 @@ looptrack project list --archived                   # アーカイブしたも�
 looptrack project unarchive demo                    # 戻す
 ```
 
-- slug は英小文字・数字・ハイフンです。
-- `--prefix` と `--width` は後から変えられません。発番済みの ID が壊れるからです。slug も変えられません。変えられるのは表示名だけです（`project rename`）。
-- 画面 `<サーバの URL>/admin/projects` でも、各プロジェクトの「表示名とアーカイブ」から表示名を変え、アーカイブできます。管理者だけが使えます。
-- **アーカイブは消去ではありません。** ハブ・API・MCP・CLI の一覧から消え、起票・更新・コメントを受け付けなくなりますが、イシュー・コメント・経緯は残ります。
-  画面ではアーカイブの前に確認のため slug の入力を求めます。戻すと元どおり一覧に出て、参加者と役割もそのまま使えます。
-  画面の下の「アーカイブしたプロジェクト」から「戻す」を押すか、`project unarchive` を使ってください。slug と接頭辞は使い回されません。
-- プロジェクトごとの運用の文書を登録しておくと、CLI・MCP の `guide` が共通の規則と一緒に AI へ返します。
+- slug に使えるのは英小文字・数字・ハイフン。
+- `--prefix` と `--width` は後から変えられません。発番済みの ID が壊れるからです。slug も同じく変えられず、変えられるのは表示名だけ（`project rename`）。
+- 画面 `<サーバの URL>/admin/projects` でも、各プロジェクトの「表示名とアーカイブ」から表示名の変更とアーカイブができます。使えるのは管理者だけです。
+- **アーカイブは消去ではありません。** ハブ・API・MCP・CLI の一覧から消え、起票・更新・コメントも受け付けなくなります。けど、イシュー・コメント・経緯はちゃんと残ります。
+  画面では、アーカイブの前に確認として slug の入力を求めます。戻せば元どおり一覧に出ますし、参加者と役割もそのまま使えます。
+  戻すには、画面の下の「アーカイブしたプロジェクト」で「戻す」を押すか、`project unarchive` を使います。slug と接頭辞が使い回されることはありません。
+- プロジェクトごとの運用の文書も登録できます。登録すると、CLI・MCP の `guide` が共通の規則と一緒に AI へ返します。
 
 ```bash
 looptrack project guide set demo ./demo-rules.md --source demo-rules.md
@@ -84,9 +83,9 @@ looptrack project guide show demo
 | 任意 | 登録した人にだけ、ログイン時に確認コードを求めます。登録と解除は各自が `<サーバの URL>/account` で行います |
 
 - 最初の設定は `looptrack setup` の ⑤ で決めます。
-- あとから変えるときは画面 `<サーバの URL>/admin/security` か、次のコマンドを使います。必須を外すときはパスワードの再入力が要り、登録済みなら確認コードも求められます。
-- 任意から必須にすると、二段階認証を通っていないセッションは無効になります。
-- 登録済みの TOTP はどちらに切り替えても消えません。
+- あとから変えるなら、画面 `<サーバの URL>/admin/security` か次のコマンドで。必須を外すときはパスワードの再入力が要ります。登録済みなら確認コードも求められます。
+- 任意から必須にすると、二段階認証を通っていないセッションは無効になる。
+- 登録済みの TOTP は、どちらに切り替えても消えません。
 - CLI・MCP のアクセストークンには影響しません。
 
 ```bash
@@ -94,15 +93,15 @@ looptrack settings two-factor              # 今の設定と変更の記録
 looptrack settings two-factor required
 ```
 
-**`.env` の `LOOPTRACK_SECRET_KEY` を失うと、全員の TOTP が使えなくなります。** DB のバックアップには含まれないので、別に控えてください。
+**`.env` の `LOOPTRACK_SECRET_KEY` を失うと、全員の TOTP が使えなくなります。** DB のバックアップには入っていません。別に控えておいてください。
 
 ## プロジェクト別ルールの設定
 
 ### require_on_close と verify
 
-ルールは JSON で書き、`looptrack project rules set` で登録します。
-**このコマンドはルール全体を置き換えます。** ファイルに書かなかったルールは消えます。
-ファイルで管理するなら、使うルールをすべてそのファイルに書いてください。
+ルールは JSON で書いて、`looptrack project rules set` で登録します。
+**このコマンドはルール全体を置き換えます。** ファイルに書かなかったルールは消える。
+なので、ファイルで管理するなら、使うルールを全部そのファイルに書いてください。
 
 ```json
 {
@@ -122,18 +121,18 @@ looptrack project rules clear demo
 | `verify.require_on_close` | 「## 検証コマンド」節のあるイシューは、今の本文に対する直近の `verify` が全件成功でないと Done にできません |
 | `usage.require_on_close` | AI が Done / Canceled にするとき、その会話のトークン情報が無いと拒否します。CLI は拒否されると自動で付けてやり直します |
 
-知らないキーや綴りの誤りは登録のときに拒否されます。
-`--override "理由"` で上書きした記録はサーバに残ります。
+知らないキーや綴りの誤りは、登録の時点で拒否されます。
+`--override "理由"` で上書きした記録は、サーバに残ります。
 
 ## トークンレポート
 
-AI の会話のトークン消費は、イシューごと・段階ごとにサーバに貯まります。
-何が記録され、どう集計し、レポートをどう作るかは [トークンレポート](token-report.md) にまとめてあります。
+AI の会話のトークン消費は、イシューごと・段階ごとにサーバへ貯まっていきます。
+何が記録され、どう集計し、レポートをどう作るか。詳しくは [トークンレポート](token-report.md) にまとめました。
 期間ごとに集計して PDF のレポートを作り、台帳に登録できます。
 
-1. プロジェクトのボード（`<サーバの URL>/p/<slug>/`）の「レポート作成」で期間を指定し、作成を依頼します。
-2. 依頼は `summary` の末尾に出ます。skill `token-report` の入ったプロジェクトなら、AI に「トークンレポートを作成して」と頼むだけで集計・本文・PDF・台帳の登録まで進みます。この skill は `looptrack issue init` が Claude Code 向けに `.claude/skills/token-report/SKILL.md` として置き、PDF は `looptrack report pdf` で作ります。
-3. 手で集計するときは次のコマンドを使います。
+1. プロジェクトのボード（`<サーバの URL>/p/<slug>/`）の「レポート作成」で期間を指定して、作成を依頼します。
+2. 依頼は `summary` の末尾に出ます。skill `token-report` の入ったプロジェクトなら、AI に「トークンレポートを作成して」と頼むだけ。集計・本文・PDF・台帳の登録まで進みます。この skill は `looptrack issue init` が Claude Code 向けに `.claude/skills/token-report/SKILL.md` として置きます。PDF を作るのは `looptrack report pdf` です。
+3. 手で集計するなら、次のコマンドを使います。
 
 ```bash
 looptrack issue usage requests                             # 画面から登録された作成依頼
@@ -144,5 +143,5 @@ looptrack issue usage ledger list
 looptrack issue usage missing --all-users                  # トークン情報が付いていない AI の操作と充足率
 ```
 
-- PDF は `looptrack report pdf --report 集計.json --content 本文.json --out レポート.pdf` で作ります。日本語フォントは内蔵しています。
-- 指示文（作業名）は既定では送りません。送るかどうかは画面 `<サーバの URL>/admin/projects` で切り替えられます。
+- PDF は `looptrack report pdf --report 集計.json --content 本文.json --out レポート.pdf` で作ります。日本語フォントは内蔵済み。
+- 指示文（作業名）は、既定では送りません。送るかどうかは画面 `<サーバの URL>/admin/projects` で切り替えられます。

@@ -2,12 +2,11 @@
 
 [Guide contents](README.md) · Previous: [Agent-specific notes](ai-agents.md) · Next: [FAQ / Troubleshooting](faq.md)
 
-An administrator is a user whose role is `admin`.
+An administrator is simply a user whose role is `admin`.
 `looptrack setup` creates the first one.
 The admin pages live under `<server URL>/admin/…`.
 
-Admin commands (`looptrack user …`, `looptrack project …`, …) connect straight to storage.
-Load `LOOPTRACK_DSN` from `.env` into the environment before running them (step 4 of [Getting started](getting-started.md)).
+Admin commands (`looptrack user …`, `looptrack project …`, …) connect straight to storage. So load `LOOPTRACK_DSN` from `.env` into the environment before you run them (step 4 of [Getting started](getting-started.md)).
 On a team server, run them as `docker compose run --rm --no-deps looptrack …`.
 
 ## Users
@@ -20,11 +19,11 @@ Page: `<server URL>/admin/users`
 | Change | Change role, disable / enable, reset password, reset two-factor auth, revoke access tokens |
 | Project permissions | Grant or remove viewer / editor / admin per project |
 
-- You cannot change your own role or disable yourself. Changes that would leave no active administrator are refused.
-- Disabling a user ends their sessions and their tokens stop working.
-- Each user changes their own password and issues or revokes their own access tokens at `<server URL>/account`.
+- You can't change your own role or disable yourself. Any change that would leave no active administrator is refused too.
+- Disabling a user ends their sessions. Their tokens stop working as well.
+- Each user changes their own password, and issues or revokes their own access tokens, at `<server URL>/account`.
 
-The same can be done with admin commands:
+Admin commands do the same:
 
 ```bash
 looptrack user list
@@ -42,9 +41,9 @@ looptrack user totp-reset alice
 | admin (project) | Write, the same as editor |
 
 - Permissions are per project.
-- **A system administrator can only read projects they have not joined.** To write, join the project as editor or admin.
-- `<server URL>/admin/projects` lists every project's members and roles and lets you change them.
-- If the person you remove or downgrade to viewer is assigned to open issues, you are asked to choose a replacement assignee.
+- A system administrator can only read projects they haven't joined. Want to write? Add yourself to the project as editor or admin.
+- `<server URL>/admin/projects` lists every project's members and roles, and you can change them right there.
+- If the person you remove or downgrade to viewer is assigned to open issues, you'll be asked to pick a replacement assignee.
 
 ```bash
 looptrack member set demo alice --role editor
@@ -64,12 +63,12 @@ looptrack project unarchive demo                  # restore
 ```
 
 - A slug is lowercase letters, digits, and hyphens.
-- `--prefix` and `--width` cannot be changed later, because issued IDs would break. The slug cannot be changed either; only the display name can (`project rename`).
-- `<server URL>/admin/projects` also lets you rename and archive each project, under "Display name and archiving". Only administrators can use it.
-- **Archiving does not erase anything.** The project disappears from the listings of the hub, the API, MCP and the CLI, and new issues, updates and comments are refused, but the issues, comments and history are kept.
-  On the page you are asked to type the slug to confirm before archiving. Restoring lists it again, with its members and roles as they were.
-  Press "Restore" under "Archived projects" at the bottom of the page, or use `project unarchive`. The slug and the prefix are never reused.
-- If you register a per-project operating document, `guide` (CLI and MCP) returns it to agents together with the common rules.
+- `--prefix` and `--width` can't be changed later: issued IDs would break. Neither can the slug. Only the display name can change (`project rename`).
+- `<server URL>/admin/projects` also lets you rename and archive each project, under "Display name and archiving". It's for administrators only.
+- **Archiving doesn't erase anything.** The project drops out of the listings of the hub, the API, MCP and the CLI, and new issues, updates and comments are refused. But the issues, comments and history all stay.
+  Before archiving, the page asks you to type the slug to confirm. Restore it and it's listed again, with its members and roles as they were.
+  To restore, press "Restore" under "Archived projects" at the bottom of the page, or use `project unarchive`. The slug and the prefix are never reused.
+- You can also register a per-project operating document. `guide` (CLI and MCP) then returns it to agents together with the common rules.
 
 ```bash
 looptrack project guide set demo ./demo-rules.md --source demo-rules.md
@@ -83,26 +82,26 @@ looptrack project guide show demo
 | Required | Everyone must register an authenticator app (TOTP). The first sign-in sends them to the registration page |
 | Optional | Only people who registered are asked for a code at sign-in. Each user registers or removes it at `<server URL>/account` |
 
-- The initial setting is chosen in step ⑤ of `looptrack setup`.
-- To change it later, use `<server URL>/admin/security` or the commands below. Turning "required" off asks for your password again (and your code, if you registered one).
-- Switching from optional to required invalidates sessions that did not pass two-factor auth.
-- Registered TOTP secrets are kept either way.
-- Access tokens for the CLI and MCP are not affected.
+- You pick the initial setting in step ⑤ of `looptrack setup`.
+- To change it later, use `<server URL>/admin/security` or the commands below. Turning "required" off asks for your password again, and for your code too if you registered one.
+- Switching from optional to required invalidates any session that didn't pass two-factor auth.
+- Registered TOTP secrets survive either switch.
+- Access tokens for the CLI and MCP aren't affected.
 
 ```bash
 looptrack settings two-factor              # current setting and change history
 looptrack settings two-factor required
 ```
 
-**If you lose `LOOPTRACK_SECRET_KEY` in `.env`, nobody's TOTP will work any more.** It is not in database backups, so keep a separate copy.
+**If you lose `LOOPTRACK_SECRET_KEY` in `.env`, nobody's TOTP works any more.** Database backups don't include it. Keep a separate copy.
 
 ## Setting project rules
 
 ### require_on_close and verify
 
 Rules are written in JSON and registered with `looptrack project rules set`.
-**This command replaces the whole rule set.** Any rule missing from the file is removed,
-so if you manage rules in a file, write every rule you use into it.
+**This command replaces the whole rule set.** Any rule missing from the file is gone.
+So if you manage rules in a file, put every rule you use into it.
 
 ```json
 {
@@ -122,17 +121,17 @@ looptrack project rules clear demo
 | `verify.require_on_close` | An issue with a verify-commands section cannot be marked Done unless the latest `verify` against the current body passed completely |
 | `usage.require_on_close` | When an agent marks an issue Done or Canceled, refuse if there is no token info from that conversation. The CLI attaches it automatically and retries once |
 
-Unknown keys and misspellings are rejected when you register the rules.
+Unknown keys and misspellings are rejected at registration.
 Every override (`--override "reason"`) is recorded on the server.
 
 ## Token reports
 
-Agent token usage accumulates on the server per issue and per stage.
-What is recorded, how it is added up and how the report is made are described in [Token reports](token-report.md).
+Agent token usage piles up on the server, per issue and per stage.
+What gets recorded, how it's added up, how the report is made: it's all in [Token reports](token-report.md).
 You can aggregate it by period, produce a PDF report, and record it in a ledger.
 
 1. On the project board (`<server URL>/p/<slug>/`), use the report-request button to request a report for a period
-2. The request appears at the end of `summary`. In a project that has the `token-report` skill, asking the agent to "create the token report" takes it through aggregation, text, PDF, and ledger entry (`looptrack issue init` installs the skill for Claude Code at `.claude/skills/token-report/SKILL.md`; the PDF is made with `looptrack report pdf`)
+2. The request shows up at the end of `summary`. In a project with the `token-report` skill, just ask the agent to "create the token report". It goes all the way through aggregation, text, PDF, and ledger entry (`looptrack issue init` installs the skill for Claude Code at `.claude/skills/token-report/SKILL.md`; the PDF is made with `looptrack report pdf`)
 3. To aggregate by hand, use these commands
 
 ```bash
@@ -144,5 +143,5 @@ looptrack issue usage ledger list
 looptrack issue usage missing --all-users                  # agent operations without token info, and the coverage rate
 ```
 
-- Build the PDF with `looptrack report pdf --report summary.json --content body.json --out report.pdf` (a Japanese font is built in).
-- Prompt texts (task names) are not sent by default. Switch this per project at `<server URL>/admin/projects`.
+- Build the PDF with `looptrack report pdf --report summary.json --content body.json --out report.pdf`. A Japanese font is built in.
+- Prompt texts (task names) aren't sent by default. You can switch this per project at `<server URL>/admin/projects`.

@@ -81,6 +81,10 @@ func migrateLockName(schema string) string {
 	return migrateLockPrefix + hex.EncodeToString(sum[:16])
 }
 
+// mysqlSchemaMigrationsExists は MySQL で適用記録の表（schema_migrations）が今の DB にあるかを数える（Migrate と Pending が使う）。
+// information_schema は、その利用者が何かの権限を持つ表だけを見せる。
+const mysqlSchemaMigrationsExists = "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_migrations'"
+
 // Migrate は未適用のマイグレーションを番号順に適用し、適用したファイル名を返す。
 // MySQL は fsys 直下、SQLite は fsys の sqlite/ のファイルを使う。
 // MySQL では同じスキーマに複数プロセスから同時に呼ばれても GET_LOCK で直列化する。DDL は MySQL では暗黙コミットされるため、
@@ -119,13 +123,22 @@ func Migrate(ctx context.Context, db *sql.DB, fsys fs.FS) ([]string, error) {
 	}
 	defer conn.ExecContext(context.Background(), "DO RELEASE_LOCK(?)", lock) //nolint:errcheck
 
-	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+	// 表が既にあれば CREATE TABLE IF NOT EXISTS も流さない。MySQL は表があっても CREATE の権限を求める（無ければ 1142）ので、
+	// schema_migrations に SELECT だけを持つ最小権限の利用者（deploy/grants.sql）では、未適用が 0 件の migrate まで失敗する。
+	// 表が見えない（権限が無い）ときは作りにいき、権限が無ければそこで失敗する（黙って通さない）。
+	var tables int
+	if err := conn.QueryRowContext(ctx, mysqlSchemaMigrationsExists).Scan(&tables); err != nil {
+		return nil, err
+	}
+	if tables == 0 {
+		if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
   version    INT UNSIGNED NOT NULL,
   name       VARCHAR(255) NOT NULL,
   applied_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (version)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`); err != nil {
-		return nil, err
+			return nil, err
+		}
 	}
 	applied, err := appliedMigrations(ctx, conn)
 	if err != nil {
@@ -341,7 +354,7 @@ func Pending(ctx context.Context, db *sql.DB, fsys fs.FS) (pending []string, rec
 		fsys = sub
 		exists = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'"
 	} else {
-		exists = "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_migrations'"
+		exists = mysqlSchemaMigrationsExists
 	}
 	migs, err := LoadMigrations(fsys)
 	if err != nil {

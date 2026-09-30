@@ -160,6 +160,73 @@ func TestAppUserCannotRewriteHistory(t *testing.T) {
 	}
 }
 
+// TestMigrateAsAppUser は、deploy/grants.sql と同じ最小権限（schema_migrations に SELECT だけ）の利用者でも、
+// 未適用が 0 件なら Migrate が成功することを確かめる（MySQL は表があっても CREATE TABLE IF NOT EXISTS に CREATE の権限を求める）。
+// 対照: 同じ利用者で未適用が 1 件あれば、権限の無い DDL で失敗し、適用記録も増えない（権限の無い操作を黙って通さない）。
+func TestMigrateAsAppUser(t *testing.T) {
+	db, dbName, adminCfg := testDB(t)
+	ctx := context.Background()
+	if _, err := Migrate(ctx, db, migrations.FS); err != nil {
+		t.Fatal(err)
+	}
+	user, pass := "im_app_t_"+randHex(t, 4), randHex(t, 16)
+	if _, err := db.Exec("CREATE USER '" + user + "'@'%' IDENTIFIED BY '" + pass + "'"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Exec("DROP USER '" + user + "'@'%'") })
+	grants := strings.NewReplacer("im.", dbName+".", "'im_app'@'%'", "'"+user+"'@'%'").Replace(deploy.GrantsSQL)
+	for _, stmt := range SplitStatements(grants) {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	appCfg := adminCfg.Clone()
+	appCfg.User, appCfg.Passwd = user, pass
+	app, err := sql.Open("mysql", appCfg.FormatDSN())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+
+	// 前提: この利用者は schema_migrations に CREATE の権限を持たない（持っていれば、下の成功は何も確かめない）
+	var me *mysql.MySQLError
+	if _, err := app.Exec("CREATE TABLE IF NOT EXISTS schema_migrations (version INT UNSIGNED NOT NULL PRIMARY KEY)"); !errors.As(err, &me) || me.Number != 1142 {
+		t.Fatalf("前提が崩れています: アプリ用の利用者の CREATE TABLE IF NOT EXISTS schema_migrations が権限エラー（1142）にならない: %v", err)
+	}
+	before := migrationRecords(t, db)
+	for i := 0; i < 2; i++ {
+		applied, err := Migrate(ctx, app, migrations.FS)
+		if err != nil || len(applied) != 0 {
+			t.Fatalf("%d 回目: 未適用 0 件の Migrate（アプリ用の利用者）: applied=%v err=%v", i+1, applied, err)
+		}
+	}
+
+	// 対照: 未適用が 1 件ある版では、同じ利用者の Migrate は権限の無い DDL で失敗する
+	extra := fstest.MapFS{}
+	migs, err := LoadMigrations(migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range migs {
+		extra[m.Name] = &fstest.MapFile{Data: []byte(m.SQL)}
+	}
+	const extraName = "9999_app_user_check.sql"
+	extra[extraName] = &fstest.MapFile{Data: []byte("CREATE TABLE app_user_check (id INT NOT NULL PRIMARY KEY);\n")}
+	applied, err := Migrate(ctx, app, extra)
+	if len(applied) != 0 {
+		t.Errorf("権限の無い利用者が適用した: %v", applied)
+	}
+	if !errors.As(err, &me) || me.Number != 1142 {
+		t.Fatalf("未適用 %s がある Migrate（アプリ用の利用者）: err = %v, want 権限エラー（1142）", extraName, err)
+	}
+	if got := migrationRecords(t, db); got != before {
+		t.Errorf("失敗したのに適用記録が変わった: %s → %s", before, got)
+	}
+	if pending, _, err := Pending(ctx, db, extra); err != nil || len(pending) != 1 || pending[0] != extraName {
+		t.Errorf("失敗の後の未適用: %v %v（%s だけのはず）", pending, err, extraName)
+	}
+}
+
 func mustExec(t *testing.T, db *sql.DB, q string) {
 	t.Helper()
 	if _, err := db.Exec(q); err != nil {

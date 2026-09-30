@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,8 +109,12 @@ func (s *Server) mcpHandler() http.Handler {
 		servers[lang] = srv
 		s.mcpServersBuilt.Add(1)
 	}
+	// DNS rebinding の対策は SDK の判定を切り、mcpHostAllowed で同じ位置（SDK に渡す前）に置き直す。
+	// SDK の判定は「ループバックで受けた要求は Host もループバックでなければ 403」で、127.0.0.1 で待ち受けて
+	// リバースプロキシ（nginx / Caddy）が公開の Host を渡す配置では、MCP の要求がすべて 403 になる。
 	h := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server { return servers[mcpConnLang(r)] },
-		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, Logger: s.cfg.Logger})
+		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, Logger: s.cfg.Logger, DisableLocalhostProtection: true})
+	publicHost := publicURLHost(s.cfg.PublicURL)
 	verify := func(ctx context.Context, token string, r *http.Request) (*auth.TokenInfo, error) {
 		if s.cfg.LocalMode { // ローカルモードはトークンを見ずに最初の管理者として通す
 			p, err := s.localPrincipal(r)
@@ -125,6 +132,11 @@ func (s *Server) mcpHandler() http.Handler {
 	// 接続の記録（clientInfo）は認証の後・SDK の前に置く
 	protected := auth.RequireBearerToken(verify, &auth.RequireBearerTokenOptions{AllowMissingExpiration: true})(s.recordMCPConnections(h))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 認証より前に判定する（想定外の Host には、トークンの有無に関わらず 401 の案内も返さない）
+		if !mcpHostAllowed(r, publicHost) {
+			http.Error(w, fmt.Sprintf("Forbidden: invalid Host header %q", r.Host), http.StatusForbidden)
+			return
+		}
 		if s.cfg.LocalMode {
 			// SDK の RequireBearerToken は Authorization が無いと verify を呼ばずに 401 を返すため、置き換えて渡す
 			r = r.Clone(r.Context())
@@ -138,6 +150,53 @@ func (s *Server) mcpHandler() http.Handler {
 		// 401 には保護リソースのメタデータの場所を添える（クライアントが OAuth の入口を見つけられる）
 		protected.ServeHTTP(&challengeWriter{ResponseWriter: w, resourceMetadata: s.resourceMetadataURL(r)}, r)
 	})
+}
+
+// mcpHostAllowed は MCP の要求の DNS rebinding の対策（攻撃者のドメインを 127.0.0.1 に向けても、Host はそのドメインのまま届く）。
+// ループバックのアドレスで受けた要求は、Host（ポートを除く）がループバックか公開の URL の host（大文字小文字は無視）のときだけ通す。
+// 公開の URL が無い（デスクトップ版の形）ときは、SDK の既定と同じくループバックの Host だけを通す。
+// ループバック以外のアドレスで受けた要求（コンテナの中で受ける配置など）は判定しない（SDK の既定と同じ）。
+// X-Forwarded-Host は見ない（要求の送り手が自由に付けられる）。
+func mcpHostAllowed(r *http.Request, publicHost string) bool {
+	local, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
+	if !ok || local == nil || !mcpLoopback(local.String()) {
+		return true
+	}
+	if mcpLoopback(r.Host) {
+		return true
+	}
+	return publicHost != "" && strings.EqualFold(hostWithoutPort(r.Host), publicHost)
+}
+
+// publicURLHost は公開の URL（LOOPTRACK_PUBLIC_URL）の host（ポートを除く）。空・読めないときは ""。
+func publicURLHost(publicURL string) string {
+	if strings.TrimSpace(publicURL) == "" {
+		return ""
+	}
+	u, err := url.Parse(strings.TrimSpace(publicURL))
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
+}
+
+// hostWithoutPort は host[:port] から host を取り出す（IPv6 の角かっこも外す）。
+func hostWithoutPort(hostport string) string {
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		return h
+	}
+	return strings.Trim(hostport, "[]")
+}
+
+// mcpLoopback は host[:port] がループバックか。範囲は go-sdk の判定（DisableLocalhostProtection で切ったもの）と
+// そろえる: 127.0.0.0/8・::1・localhost（ローカルモードの localHosts より広い）。
+func mcpLoopback(hostport string) bool {
+	host := hostWithoutPort(hostport)
+	if host == "localhost" {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.IsLoopback()
 }
 
 // challengeWriter は 401 に WWW-Authenticate が無ければ補う（RFC 6750。SDK は resource_metadata を設定したときだけ付ける）。

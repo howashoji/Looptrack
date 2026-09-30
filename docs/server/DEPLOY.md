@@ -183,7 +183,7 @@ Releases の最新は、公開側でプレリリースを Latest にしてあれ
   取り出した looptrack が SHA256SUMS の `looptrack_<版>_linux_<arch>` の行と違うときも何も入れ替えません。`looptrack version` が名前の版と違えば注意を出します。
 - 接頭辞にはローカルのディレクトリか `https://` の URL を使えます。
   `http://` では改ざんを防げません。そのため `127.0.0.1`・`localhost` 以外では `LOOPTRACK_INSTALL_ALLOW_HTTP=1` を求めます。
-- SHA256SUMS の署名: 取得元に `SHA256SUMS.minisig` があり、サーバに `minisign` コマンドがあれば署名を確かめます（`apt-get install -y minisign` で入ります）。
+- SHA256SUMS の署名: 取得元に `SHA256SUMS.minisig` があり、サーバに `minisign` コマンドがあれば署名を確かめます（Debian・Ubuntu は `apt-get install -y minisign`、AlmaLinux などは EPEL から `dnf install -y epel-release && dnf install -y minisign` で入ります）。
   使う鍵は install.sh に埋め込んだ Looptrack の公開鍵で、鍵 ID は 29D707D7EBFF246B です。`deploy/release/minisign.pub` と同じもので、looptrack 本体とも同じです。
   署名が合わなければ何も入れ替えません。
   署名や minisign が無いときは、注意を出して SHA-256 の照合だけで進みます。止めたいときは `--require-signature` か `LOOPTRACK_INSTALL_REQUIRE_SIGNATURE=1` を指定してください。
@@ -331,9 +331,9 @@ journalctl -u looptrack-upgrade                         # 自動の置き換え�
   手順は上の「更新」と同じです（控え・migrate・再起動・動作確認）。
 - **timer は install.sh を取り直しません。** 写しを新しくするのは、人が install.sh を動かしたとき（1 行か手元のファイルで、入れる・`--upgrade`・`--auto-upgrade on`）だけです。
   1 行で動かしたときは同じ URL から取り直したものを、手元のファイルで動かしたときはそのファイルを写します。
-- **取るのは書庫だけで、署名を必須にします。** 書庫は SHA256SUMS と minisign の署名で確かめます。有効にするときに `minisign` が要ります（`apt-get install -y minisign`）。
+- **取るのは書庫だけで、署名を必須にします。** 書庫は SHA256SUMS と minisign の署名で確かめます。有効にするときに `minisign`（Debian・Ubuntu は `apt-get install -y minisign`、AlmaLinux などは EPEL から `dnf install -y epel-release && dnf install -y minisign`）と、書庫・SHA256SUMS・署名を取るための `curl` か `wget` が要ります。
 - **版を下げません。** `--only-newer` は、取得した版が入っている版より新しいときだけ置き換えます。
-- **サービスを止めたままにしません。** 止めた後に失敗すれば（migrate・権限・`/healthz`）、前の実行ファイル（SQLite は DB も止めた直後の控え）に戻して前の版で起動し直し、
+- **サービスを止めたままにしません。** 止めた後に失敗すれば（migrate・権限・起動・`/healthz`・途中のコマンドの失敗・中断）、前の実行ファイル（SQLite は DB も止めた直後の控え）に戻して前の版で起動し直し、
   理由を `journalctl -u looptrack-upgrade` に残して失敗として終わります。次の日の回も同じ理由なら同じく戻ります。
 - 取得元は GitHub Releases の最新です（`--from` で入れたサーバでも、自動の置き換えは GitHub Releases から取ります）。
 - 設定は `install.conf` の `AUTO_UPGRADE` に残り、`--upgrade` のたびに設定どおりに入れ直します。`--uninstall` で外れます。
@@ -386,12 +386,14 @@ README の 1 行は、一時 HTTP サーバに置いた `raw/deploy/install.sh` 
   もう一度実行すると疑似端末で尋ねられた資格情報でアプリ用の利用者を作って権限を与え、起動まで 1 回で進む。尋ねたパスワードが設定・データの置き場・
   インストーラの出力・シェルの履歴・`ps` の引数に残らない（対照: `SHOW GRANTS` に grants.sql と同じ権限が出る）。権限の欠けた表がある状態の `--upgrade` も与え直して起動する
 - 1.0.0-rc.2 の install.sh（開発側のタグ `v1.0.0-rc.2`）で入れたサーバを、新しいインストーラの `--upgrade --version` で上げる
-- 自動の置き換え（`--auto-upgrade`）: 既定は off で timer が無い。compose・`--no-start`・systemd なし・minisign なしの on は何も変えずに止まる。
+- 自動の置き換え（`--auto-upgrade`）: 既定は off で timer が無い。compose・`--no-start`・systemd なし・minisign なし・curl も wget も無いときの on は何も変えずに止まる（curl・wget は新しい版の書庫と署名を取るため）。
   1 行の on で timer が有効になり、install.sh の写し（root 755）を置く（service は写しを動かす）。timer の service を動かすと新しい版に上がる
   （写しは書き換えない・もう一度動かしても何もしない・古い版の取得元では版を下げない）。人が `--upgrade` を動かすと写しをそろえる。
   off と `--uninstall` で timer と写しが外れる（コンテナの minisign は呼び出しを確かめる偽物）
 - 無人の更新（MySQL の最小権限）: 新しい版に未適用の migrate があれば止めずに置き換えない。止めた後に失敗（権限の欠けた表）すれば前の版に戻して起動し直し、
   0 でない終了コードで終わる。対照: 権限がそろっていれば置き換わる
+- 無人の更新の戻し（SQLite）: 止めた後に、新しい版が起動しない・`daemon-reload` の失敗・`die` を通らない裸のコマンドの失敗・中断（TERM）の
+  どれでも、前の版に 1 回だけ戻して起動し直し、理由を 1 行残して 0 でない終了コードで終わる。対照: 端末のある手動の `--upgrade` は戻さない
 
 コンテナでは代えられないので、次は手で確かめます。
 実機（VM）の Ubuntu LTS・Debian で、本物の証明書（ACME）を使うリバースプロキシの後ろから通してください。
