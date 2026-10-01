@@ -17,6 +17,7 @@ var JST = time.FixedZone("JST", 9*3600)
 
 // Normalizer は実行ごとに変わる値を固定の記号に置き換える。規則の一覧は doc.go と Text・JSON の説明。
 type Normalizer struct {
+	Exes     []string  // 試す looptrack の実行ファイル（EvalSymlinks の前後の両方）→ $LOOPTRACK（init が再実行のコマンドに出す）
 	Paths    []string  // 一時ディレクトリ（EvalSymlinks の前後の両方）→ $TMP
 	Repo     string    // このリポジトリのルート（配布物の置き場の親）→ $REPO
 	APIBase  string    // 偽 API の URL（http://127.0.0.1:<port>/im）→ $API
@@ -44,7 +45,7 @@ var (
 
 // Text は出力・ファイルの本文を正規化する。規則（この順）:
 //  1. 改行 CRLF → LF
-//  2. 一時ディレクトリのパス → $TMP（長いものから）、このリポジトリのパス → $REPO（一時ディレクトリからの相対パス → $REPO_REL）
+//  2. 試す looptrack の実行ファイルのパス → $LOOPTRACK、一時ディレクトリのパス → $TMP（長いものから）、このリポジトリのパス → $REPO（一時ディレクトリからの相対パス → $REPO_REL）
 //  3. 偽 API の URL → $API
 //  4. ほかの 127.0.0.1 のポート（login --browser の戻り先）→ 127.0.0.1:$PORT（URL エンコードされた %3A も）
 //  5. OAuth の state=・code_challenge=・code_verifier= の値（16 文字以上）→ $STATE・$PKCE_CHALLENGE・$PKCE_VERIFIER
@@ -54,6 +55,13 @@ var (
 //     20260918-120000 の形（init の控えのディレクトリ名）も同じ
 func (n *Normalizer) Text(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
+	exes := append([]string(nil), n.Exes...)
+	sort.Slice(exes, func(i, j int) bool { return len(exes[i]) > len(exes[j]) })
+	for _, p := range exes {
+		if p != "" {
+			s = strings.ReplaceAll(s, p, "$LOOPTRACK")
+		}
+	}
 	paths := append([]string(nil), n.Paths...)
 	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) > len(paths[j]) })
 	for _, p := range paths {

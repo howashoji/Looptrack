@@ -456,64 +456,31 @@ func wordsIn(run string) []wordAt {
 var copyCmdRe = regexp.MustCompile(cmdAnyPos + cmdPath + `(?:cp|install)` + cmdEnd)
 var copyCmdHeadRe = regexp.MustCompile(cmdHeadPos + cmdPath + `(?i:cp|install|copy|copy-item|cpi|xcopy)` + cmdEnd)
 
-// runSegments は引用符の外の区切り（; & | 改行 かっこ）でコマンド文字列を単純コマンドに分ける。
-// 引用符の中の区切りでは切らない。閉じていない引用符があるときは ok = false（呼ぶ側は分けずに扱う）。
+// quoteReading は引用符の組の取り方の 1 つ（hookcmd の posix の読み方か Windows の読み方）。
+// 秘密のガードは両方で判定し、どちらかで確認になれば確認にする（hook にはどのシェルが実行するかが分からない。
+// sh では `cat "x\" ; cat ~/.ssh/id_rsa \""` は 1 つの引数だが、PowerShell では `"x\"` で閉じて後ろの cat が走る）。
+// Windows の読み方は以前の hook の組の取り方のままなので、両方で読む限り確認は以前より減らない。
 //
-// 雛形からの複写を通す判断（templateCopy）は、**この単位ごと**に行う。行の全体で判断すると、
+// 部品は読み方ごとに組で持つ（落とす側・中身を読む側・単純コマンドに分ける側が別々の読み方を混ぜないように）。
+//
+// 雛形からの複写を通す判断（templateCopy）は、segments で分けた**単純コマンドごと**に行う。行の全体で判断すると、
 // `cp .env.example /tmp/t && cat ~/.ssh/id_rsa` のように、複写と無関係な秘密の読み出しまで一緒に通ってしまう。
-//
-// 行末のコメント（語の先頭の # から行末まで）は、引用符の数えに入れない。`cp .env.example .env  # don't …`
-// のようにコメントの中に ' があると、閉じていない引用符と誤認して雛形の例外が使われず、日常の複写が確認に
-// 倒れていた（引用符の外で # が語の先頭に来たときだけコメントとして飛ばす。引用符の中の # はそのまま数える
-// ので `echo '# don't'` のような形を誤って特別扱いしない）。
-func runSegments(raw string) ([]string, bool) {
-	var out []string
-	var q byte
-	start := 0
-	for i := 0; i < len(raw); {
-		c := raw[i]
-		if q == 0 && c == '#' && (i == 0 || isRunWordBreak(raw[i-1])) {
-			nl := strings.IndexByte(raw[i:], '\n')
-			if nl < 0 {
-				break // コメントが文字列の終わりまで続く。その後ろに区切りは無い
-			}
-			i += nl // 次に読む位置は改行そのもの（改行は区切りとしてふだんどおり扱う）
-			continue
-		}
-		if q != 0 {
-			if c == q {
-				q = 0
-			}
-			i++
-			continue
-		}
-		switch c {
-		case '\'', '"':
-			q = c
-		case ';', '&', '|', '\n', '(', ')':
-			out = append(out, raw[start:i])
-			start = i + 1
-		}
-		i++
-	}
-	if q != 0 {
-		return []string{raw}, false
-	}
-	return append(out, raw[start:]), true
+type quoteReading struct {
+	run      func(cmd string) string           // 実行される語だけ（ヒアドキュメントの本文と引用符の中を落とす）
+	strip    func(seg string) string           // 引用符の中を落とす
+	quoted   func(seg string) []string         // 引用符の組の中身
+	segments func(raw string) ([]string, bool) // 単純コマンドへの分割（閉じていない引用符があれば ok = false）
 }
 
-// isRunWordBreak は、その直後に # が来たときにコメントの始まりと認めてよい文字（空白と区切り）。
-// runSegments でだけ使う（skipInert の isWordBreak と同じ考え方だが、対象の区切りの並びが違うので別に持つ）。
-func isRunWordBreak(c byte) bool {
-	switch c {
-	case ' ', '\t', '\r', '\n', ';', '&', '|', '(', ')':
-		return true
-	}
-	return false
+var quoteReadings = []quoteReading{
+	{run: func(cmd string) string { return hookcmd.CommandText(cmd, true) },
+		strip: hookcmd.StripQuotes, quoted: hookcmd.QuotedTexts, segments: hookcmd.SimpleSegments},
+	{run: hookcmd.CommandTextWin,
+		strip: hookcmd.StripQuotesWin, quoted: hookcmd.QuotedTextsWin, segments: hookcmd.SimpleSegmentsWin},
 }
 
 // templateCopy は「雛形から秘密のファイルを作る」複写か（利用者の決定 2026-09-21。cp .env.example .env は通す）。
-// **単純コマンド 1 つ**に対して呼ぶ（runSegments で分けた単位）。
+// **単純コマンド 1 つ**に対して呼ぶ（quoteReading.segments で分けた単位）。
 //
 // 通すのは **複写元が雛形（secretFileAllowRe）に当たり、かつそのコマンドの秘密のパスがそれ 1 つだけ**のときだけ。
 // 「複写元」は、雛形の語が秘密のパスより**前**に現れることで見る。これにより次はいずれも確認のまま:
@@ -560,29 +527,14 @@ func templateCopy(run string, paths []string) bool {
 // 引用符の中身を落とすと（hookcmd.StripQuotes）引用符で囲むだけでガードを抜けられるが、中身を丸ごと
 // 語として数えると `echo 'cat .env は禁止'` の類で誤発火する。中身がそれ自体で秘密のパスのときだけ数えて
 // 両立させる（文の中に .env が現れても、文の末尾がパスの形でない限り当たらない）。
-// 組の取り方は hookcmd.StripQuotes と同じ（先に ' '、次に残りへ " "）。
-func quotedSecretPaths(text string) []string {
+// 組の取り方は呼ぶ側の読み方（quoteReading.quoted）に合わせる。落とす側と読む側で数え方がずれると、
+// 引用符つきの秘密のパスが両方から消える（`cat "\"" "/p/.env"` の類）。
+func quotedSecretPaths(inners []string) []string {
 	var out []string
-	for _, q := range []byte{'\'', '"'} {
-		var rest strings.Builder
-		s := text
-		for {
-			i := strings.IndexByte(s, q)
-			if i < 0 {
-				break
-			}
-			j := strings.IndexByte(s[i+1:], q)
-			if j < 0 {
-				break
-			}
-			if inner := strings.TrimSpace(s[i+1 : i+1+j]); secretPath(inner) {
-				out = append(out, inner)
-			}
-			rest.WriteString(s[:i])
-			s = s[i+1+j+1:]
+	for _, q := range inners {
+		if inner := strings.TrimSpace(q); secretPath(inner) {
+			out = append(out, inner)
 		}
-		rest.WriteString(s)
-		text = rest.String()
 	}
 	return out
 }
@@ -643,31 +595,42 @@ func PreToolSecretsGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 	// 位置を問わない（hookcmd.AnyPos）のは、`ask` は人がその場で通せるので、広く当てて
 	// 取りこぼしを減らすほうがよいため（git ガードは `deny` なのでコマンドの位置だけ）。
 	cmd = hookcmd.Normalize(cmd, hookcmd.AnyPos)
+	// 引用符の組の取り方は posix と Windows の両方で読み、どちらかで確認になれば確認にする（quoteReading）。
+	for _, rd := range quoteReadings {
+		if r, ok := secretsVerdict(cmd, rd, lang, note, e.env); ok {
+			return r, nil
+		}
+	}
+	return hookio.Result{}, nil
+}
+
+// secretsVerdict は 1 つの読み方で秘密のガードの判定をする（確認にするなら ok = true）。
+func secretsVerdict(cmd string, rd quoteReading, lang i18n.Lang, note string, env func(string) string) (hookio.Result, bool) {
 	// コマンド名は「実際に実行される語」だけを見る（引用符・ヒアドキュメントの中の同じ語では反応しない）。
-	run := hookcmd.CommandText(cmd, true)
+	run := rd.run(cmd)
 	if run == "" {
-		return hookio.Result{}, nil
+		return hookio.Result{}, false
 	}
 	if m := secretStoreRe.FindString(run); m != "" {
 		// 保管庫の読み出しには見るべきパスが無いので、例外はコマンド全体で見る。
-		if secretsAllowed(run, e.env) {
-			return hookio.Result{}, nil
+		if secretsAllowed(run, env) {
+			return hookio.Result{}, false
 		}
-		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.store", "match", strings.TrimSpace(m)) + note, Kind: "secrets: store"}, nil
+		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.store", "match", strings.TrimSpace(m)) + note, Kind: "secrets: store"}, true
 	}
 	// パスは引用符の中も見る（ヒアドキュメントの本文だけ落とす）。数えるのは中身がパスそのものの組だけ。
 	// 単純コマンドごとに数え、雛形からの複写であるコマンドだけを除く（ほかのコマンドは通常どおり判定する）。
-	allowed := func(p string) bool { return secretsAllowed(p, e.env) }
-	segs, split := runSegments(hookcmd.CommandText(cmd, false))
+	allowed := func(p string) bool { return secretsAllowed(p, env) }
+	segs, split := rd.segments(hookcmd.CommandText(cmd, false))
 	var paths []string
 	redirect := false
 	seen := map[string]bool{}
 	for _, seg := range segs {
-		segRun := hookcmd.StripQuotes(seg)
+		segRun := rd.strip(seg)
 		if redirectsSecret(segRun, allowed) {
 			redirect = true
 		}
-		segPaths := secretPathsIn(segRun, quotedSecretPaths(seg), allowed)
+		segPaths := secretPathsIn(segRun, quotedSecretPaths(rd.quoted(seg)), allowed)
 		if split && templateCopy(segRun, segPaths) {
 			continue
 		}
@@ -679,15 +642,15 @@ func PreToolSecretsGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 		}
 	}
 	if len(paths) == 0 {
-		return hookio.Result{}, nil
+		return hookio.Result{}, false
 	}
 	list := strings.Join(paths, i18n.T(lang, "loop.secrets.sep"))
 	rule := secretRule(paths[0]) // 記録の kind は最初のパスの規則の種類（定数）だけ。パスそのものは入れない
 	if gitStageRe.MatchString(run) {
-		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.git_stage", "list", list), Kind: "secrets: git_stage " + rule}, nil
+		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.git_stage", "list", list), Kind: "secrets: git_stage " + rule}, true
 	}
 	if redirect || showCmdRe.MatchString(run) || showCmdHeadRe.MatchString(run) {
-		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.show", "list", list) + note, Kind: "secrets: show " + rule}, nil
+		return hookio.Result{Ask: i18n.T(lang, "loop.secrets.show", "list", list) + note, Kind: "secrets: show " + rule}, true
 	}
-	return hookio.Result{}, nil
+	return hookio.Result{}, false
 }

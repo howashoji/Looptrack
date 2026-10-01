@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/i18n"
+	"github.com/howashoji/looptrack/internal/setuppath"
 )
 
 // CLIInstall はメニューの「CLI を使えるようにする」（アプリの中の実体を、管理者権限の要らない置き場から呼べるようにする）。
@@ -264,7 +265,8 @@ func (c CLIInstall) pathHint(lang i18n.Lang) string {
 	if c.GOOS == "windows" {
 		return "\n\n" + i18n.T(lang, "desktop.cli.path_hint_windows", "dir", dir)
 	}
-	return "\n\n" + i18n.T(lang, "desktop.cli.path_hint_unix", "dir", dir)
+	// 足し方は setup の取得の手順と同じ断片（internal/setuppath）で示す（どの起動ファイルに書くかの規則を 2 か所に書かない）
+	return "\n\n" + i18n.T(lang, "desktop.cli.path_hint_unix", "dir", dir, "command", setuppath.PosixCommand(lang))
 }
 
 // sameFile は 2 つのファイルの中身が同じか（大きさ → SHA-256）。

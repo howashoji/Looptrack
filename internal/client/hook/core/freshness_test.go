@@ -508,6 +508,12 @@ func TestFreshnessWrappedCommands(t *testing.T) {
 		{"6 eval の二重引用符（中に打ち消した引用符）", `eval "git commit -m \"x\""`, "git commit -m"},
 		{"9 行末の継続で git と副コマンドが分かれる", "git \\\n  commit -m \"x\"", "git commit -m"},
 		{"10 bash -c の git push", `bash -c 'git push origin main'`, "git push origin main"},
+		// 行末のバックスラッシュが偶数本なら継続ではない（実シェルと同じ）。次の行の git commit は別のコマンドとして記録する。
+		// 実作業の判定（gitWork）は位置を問わず `git commit` の並びを探すので、つないで `a\git` になっても当たる。
+		// つなぐ誤りを捕まえるのは下の参照の表の同じ形（looptrack issue show）。ここは退行させないための行
+		{"行末が 2 本の行の次の行の git commit", "echo a\\\\\ngit commit -m x", "git commit -m x"},
+		{"行末が 4 本の行の次の行の git commit", "echo a\\\\\\\\\ngit commit -m x", "git commit -m x"},
+		{"対照: 1 本の継続でつないだ git commit", "git \\\ncommit -m x", "git commit -m x"},
 		// 誤検知しない形
 		{"13 引数の中の文字列", `echo 'git commit is forbidden'`, ""},
 		{"14 git status", "git status", ""},
@@ -530,6 +536,9 @@ func TestFreshnessWrappedCommands(t *testing.T) {
 		{"eval で包んだ looptrack issue show", `eval "looptrack issue show TST-0002"`, "engaged : TST-0002\n"},
 		{"sudo の前置の looptrack issue show", "sudo looptrack issue show TST-0002", "engaged : TST-0002\n"},
 		{"行末の継続で分かれた looptrack issue show", "looptrack issue \\\n  show TST-0002", "engaged : TST-0002\n"},
+		// 行末が偶数本なら継続ではない。つなぐと `a\looptrack` の 1 語になり、参照が 1 件も記録されない
+		{"行末が 2 本の行の次の行の looptrack issue show", "echo a\\\\\nlooptrack issue show TST-0002", "engaged : TST-0002\n"},
+		{"対照: 1 本の継続でつないだ looptrack issue show", "looptrack issue \\\nshow TST-0002", "engaged : TST-0002\n"},
 		{"対照: echo の引数の bash -c は参照にしない", `echo bash -c 'looptrack issue show TST-0002'`, "engaged : (なし)\n"},
 	}
 	for _, e := range engaged {

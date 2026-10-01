@@ -17,7 +17,7 @@ import (
 func newSecretKey() (string, error) { return auth.NewSecretKey() }
 
 // renderEnv は .env の中身を作る。値は単引用符で囲む（docker compose の env_file と sh の `. ./.env` の両方で
-// 括弧などを含む DSN をそのまま読めるように。単引用符・改行を含む値は validEnvValue で拒否済み）。
+// 括弧などを含む DSN をそのまま読めるように。単引用符・CR・LF を含む値は checkEnvValue で拒否済み）。
 func renderEnv(p *Plan, now time.Time, lang i18n.Lang) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n", i18n.T(lang, "files.env.header", "time", now.Format("2006-01-02 15:04")))
@@ -66,10 +66,15 @@ func renderCompose(p *Plan, now time.Time, lang i18n.Lang) string {
 `, port, port)
 	if p.Store == StoreSQLite {
 		writeComment(&b, "    ", i18n.T(lang, "files.compose.sqlite"))
-		b.WriteString(`    volumes:
-      - ./data:/data
-`)
-	} else {
+	}
+	writeComment(&b, "    ", i18n.T(lang, "files.compose.dist"))
+	b.WriteString("    volumes:\n")
+	if p.Store == StoreSQLite {
+		b.WriteString("      - ./data:/data\n")
+	}
+	// install.sh はこの行（./dist を /dist に読み取り専用）があるときだけ配布ディレクトリを受け持つ（deploy/install.sh の dist_plan）
+	b.WriteString("      - ./dist:/dist:ro\n")
+	if p.Store != StoreSQLite {
 		writeComment(&b, "    ", i18n.T(lang, "files.compose.mysql"))
 	}
 	writeComment(&b, "    ", i18n.T(lang, "files.compose.mem_limit"))

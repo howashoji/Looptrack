@@ -20,6 +20,7 @@ import (
 	"github.com/howashoji/looptrack/internal/client/verify"
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/relver"
+	"github.com/howashoji/looptrack/internal/setuppath"
 )
 
 // looptrack doctor（DESIGN.md §5-1 の Q2「解決できなければ手元専用の設定に絶対パス（looptrack doctor で確かめる）」）。
@@ -105,11 +106,16 @@ func Doctor(args []string, o DoctorOptions) int {
 		exe = real
 	}
 	r.ok(i18n.T(o.Lang, "kitinit.doctor.running", "version", o.Version, "os", runtime.GOOS, "arch", runtime.GOARCH, "path", orDash(exe)))
+	// 案内のコマンドの呼び方とやり直し方。サーバ版の導入（控えの置き方が server）では、PATH の looptrack・--url の無い init・
+	// self-update に頼らず、MCP の setup ツールの手順（置き場の looptrack の取得と --url 付きの init）に寄せる
+	bin := runningBin(exe)
+	source := kitSourceOf(dir)
+	redo, update := doctorRedo(o.Lang, source)
 
 	// 2. PATH
 	inPath := false
 	if p, err := lookPath("looptrack"); err != nil || p == "" {
-		r.note(i18n.T(o.Lang, "kitinit.doctor.path.missing"))
+		r.note(pathMissingText(o.Lang, runtime.GOOS, source, redo))
 	} else {
 		inPath = true
 		real := p
@@ -172,11 +178,11 @@ func Doctor(args []string, o DoctorOptions) int {
 			}
 			switch {
 			case bin == "looptrack" && !inPath:
-				r.bad(i18n.T(o.Lang, "kitinit.doctor.wire.not_in_path", "file", f.rel, "hook", name))
+				r.bad(i18n.T(o.Lang, "kitinit.doctor.wire.not_in_path", "file", f.rel, "hook", name, "redo", redo))
 			case bin != "looptrack":
 				p := strings.Trim(bin, `"'`)
 				if !isFile(p) {
-					r.bad(i18n.T(o.Lang, "kitinit.doctor.wire.missing_bin", "file", f.rel, "hook", name, "path", p))
+					r.bad(i18n.T(o.Lang, "kitinit.doctor.wire.missing_bin", "file", f.rel, "hook", name, "path", p, "redo", redo))
 				}
 			}
 		}
@@ -231,7 +237,7 @@ func Doctor(args []string, o DoctorOptions) int {
 	case cl.LocalMode(cl.BaseURL): // ローカルモードのサーバは認証を省くのでトークンは要らない
 		r.ok(i18n.T(o.Lang, "kitinit.doctor.api.local", "url", cl.BaseURL))
 	default:
-		r.note(i18n.T(o.Lang, "kitinit.doctor.api.no_token", "url", cl.BaseURL))
+		r.note(i18n.T(o.Lang, "kitinit.doctor.api.no_token", "url", cl.BaseURL, "bin", bin))
 		return r.finish(o.Stdout)
 	}
 
@@ -249,7 +255,7 @@ func Doctor(args []string, o DoctorOptions) int {
 	case b == nil:
 		r.note(i18n.T(o.Lang, "kitinit.doctor.dist.none", "os", runtime.GOOS, "arch", runtime.GOARCH))
 	case relver.Older(o.Version, b.Version):
-		r.note(i18n.T(o.Lang, "kitinit.doctor.dist.outdated", "latest", b.Version, "local", o.Version))
+		r.note(i18n.T(o.Lang, "kitinit.doctor.dist.outdated", "latest", b.Version, "local", o.Version, "update", update))
 	default:
 		r.ok(i18n.T(o.Lang, "kitinit.doctor.dist.latest", "latest", b.Version, "local", o.Version))
 	}
@@ -257,6 +263,53 @@ func Doctor(args []string, o DoctorOptions) int {
 		r.note(msg)
 	}
 	return r.finish(o.Stdout)
+}
+
+// runningBin は案内のコマンドに書く looptrack の呼び方（実行中の実行ファイルの絶対パス。分からなければ PATH の名前）。
+func runningBin(exe string) string {
+	switch {
+	case exe == "":
+		return "looptrack"
+	case runtime.GOOS == "windows":
+		return "& '" + strings.ReplaceAll(exe, "'", "''") + "'"
+	}
+	return `"` + exe + `"`
+}
+
+// kitSourceOf は控え（.claude/.looptrack-kit.json）の置き方（link / copy / server。読めなければ空）。
+func kitSourceOf(dir string) string {
+	b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(kitJSON)))
+	if err != nil {
+		return ""
+	}
+	data, err := jsonorder.DecodeObject(b)
+	if err != nil {
+		return ""
+	}
+	return data.String("source")
+}
+
+// doctorRedo は配線のやり直し方と、実行ファイルの更新の仕方の文（置き方が server ならサーバ版の手順）。
+func doctorRedo(lang i18n.Lang, source string) (redo, update string) {
+	if source == "server" {
+		return i18n.T(lang, "kitinit.doctor.redo.server"), i18n.T(lang, "kitinit.doctor.update.server")
+	}
+	return i18n.T(lang, "kitinit.doctor.redo.local"), i18n.T(lang, "kitinit.doctor.update.local")
+}
+
+// pathMissingText は PATH で looptrack を解決できないときの注意。サーバ版の導入（控えの置き方が server）では、kit・規律・
+// hook の案内が looptrack を名前で呼ぶので AI がそのままでは打てないことと、直し方（setup の手順の再実行。その手順が置き場を
+// PATH に足す）を示す。導入済みだと setup は手順を返さないので、PATH を足すだけのコマンド（setup の手順と同じ断片。
+// internal/setuppath）も添える。
+func pathMissingText(lang i18n.Lang, goos, source, redo string) string {
+	if source != "server" {
+		return i18n.T(lang, "kitinit.doctor.path.missing")
+	}
+	cmd := setuppath.PosixCommand(lang)
+	if goos == "windows" {
+		cmd = setuppath.WinCommand(lang)
+	}
+	return i18n.T(lang, "kitinit.doctor.path.missing_server", "redo", redo, "command", cmd)
 }
 
 // serverUpdateNote はサーバ自身の新しい版の注意（GET /api/v1/dist の server_update。admin のトークンのときだけサーバが付ける）。

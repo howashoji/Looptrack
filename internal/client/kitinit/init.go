@@ -250,6 +250,38 @@ func binDirHint() string {
 	return "~/.local/bin"
 }
 
+// serverMode は、サーバ版の導入（--url か --source server。setup の取得 + init もこの形）か。
+func (in *installer) serverMode() bool { return in.o.URL != "" || in.source == "server" }
+
+// rerunCommand は、このプロジェクトで init をやり直すコマンド（extra は足す旗。例: " --loop"）。
+// サーバ版では、実行中の looptrack の絶対パスに --project・--url・--agent（と --source server）を付ける。サーバ版の利用者の
+// 端末に PATH の looptrack は無く、--url の無い init は CLI の既定の接続先（手元のローカルモード）に向くため。
+// --dist（setup の券の URL）は期限があるので付けない（--source server はトークンで取る）。
+// サーバ版でない（埋め込みの kit で入れた）ときは、これまでどおり looptrack issue init。
+func (in *installer) rerunCommand(extra string) string {
+	if !in.serverMode() {
+		return "looptrack issue init" + extra
+	}
+	bin := "looptrack"
+	if exe, err := executable(); err == nil && exe != "" {
+		if r, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = r
+		}
+		bin = `"` + exe + `"`
+		if runtime.GOOS == "windows" {
+			bin = "& '" + strings.ReplaceAll(exe, "'", "''") + "'"
+		}
+	}
+	cmd := fmt.Sprintf("%s issue init --project %s --url %s", bin, in.o.Project, in.url)
+	if len(in.o.agents) > 0 {
+		cmd += " --agent " + strings.Join(in.o.agents, ",")
+	}
+	if in.source == "server" {
+		cmd += " --source server"
+	}
+	return cmd + extra
+}
+
 func (in *installer) wiring(agent string) wiring {
 	return wiring{agent: agent, bin: in.bin.sh, psBin: in.bin.ps, url: in.url, slug: in.o.Project, env: agent != "claude-code"}
 }
@@ -381,7 +413,7 @@ func (in *installer) run() error {
 		case wantLoop:
 			c.Println(i18n.T(c.Lang, "kitinit.init.set.core_loop_nochange"))
 		case truthy(loopState, "declined_at"):
-			c.Println(i18n.T(c.Lang, "kitinit.init.set.core_declined"))
+			c.Println(i18n.T(c.Lang, "kitinit.init.set.core_declined", "command", in.rerunCommand(" --loop")))
 		default:
 			c.Println(i18n.T(c.Lang, "kitinit.init.set.core_only"))
 		}

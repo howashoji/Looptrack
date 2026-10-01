@@ -207,6 +207,7 @@ Releases の最新は、公開側でプレリリースを Latest にしてあれ
 | 実行ファイル | `/usr/local/bin/looptrack` | 同じ（setup と管理用）。コンテナは取得した実行ファイルを scratch に載せたイメージ `looptrack:<版>`（`looptrack:latest`）をその場で作る |
 | 設定 | `/etc/looptrack/.env`（root 600。systemd の `EnvironmentFile` が読む。サービスの利用者はファイルを読めない） | `<dir>/.env`（600）と setup が書く `<dir>/compose.yaml` |
 | データ（SQLite） | `/var/lib/looptrack/im.db`（利用者 `looptrack`・ディレクトリ 0750・ファイル 0600） | `<dir>/data/im.db`（uid 65534・0600。コンテナの `/data`） |
+| クライアントに配る looptrack | `/usr/local/share/looptrack/dist`（root 0755。サービスは読むだけ） | `<dir>/dist`（setup の compose.yaml が `./dist:/dist:ro` でコンテナの `/dist` に読み取り専用で入れる） |
 | 動く利用者 | 専用のシステム利用者 `looptrack`（ログイン不可） | 65534（`read_only`・`cap_drop: ALL`・`no-new-privileges`。上の「コンテナ」と同じ） |
 | 前提 | systemd | Docker Engine と compose プラグイン |
 | 管理コマンド | `sudo sh -c 'set -a; . /etc/looptrack/.env; exec setpriv --reuid looptrack --regid looptrack --init-groups looptrack user list'` | `cd <dir> && docker compose run --rm --no-deps looptrack user list` |
@@ -222,9 +223,19 @@ Releases の最新は、公開側でプレリリースを Latest にしてあれ
   `PrivateDevices`・`PrivateUsers`・`NoNewPrivileges`・`CapabilityBoundingSet=`（空）・`RestrictAddressFamilies`・`SystemCallFilter=@system-service ~@privileged`・
   `MemoryDenyWriteExecute`。`systemd-analyze security looptrack` の評価は 1.2（OK）です。
   1024 未満のポートは使えませんが、プロキシの後ろなので使う理由もありません。
+- **起動の確認では、応えたのが今起こしたサービスかも確かめます（systemd）。** 動作確認は `http://127.0.0.1:<ポート><接頭辞>/healthz` の 200 を見ます。
+  そのポートを別のプロセス（止め忘れた古いコンテナ・手で起こした `looptrack serve` など）が握っていると、起こしたサービスは待ち受けに失敗するのに、確認はその別のプロセスの 200 で通ってしまいます。そこで次の 2 段で確かめます。
+  - **起こす前**: 入れるときと `--upgrade` のときに、サービスを止めた状態で `/healthz` を 1 回叩きます。応答があれば「別のプロセス」とポート番号を示して止まります
+    （`ss -ltnp 'sport = :<ポート>'` で握っているプロセスを確かめて止めてから、もう一度実行します）。入れるときと端末のある `--upgrade` では、サービスを起こさずに止まります。
+    無人の更新（`--yes`・端末なし）では、サービスを止めたままにしない方針なので何も置き換えずにサービスを起こし直し、起動を確かめられないとして失敗で終わります（下の「新しい版の知らせと自動の置き換え」）。
+    止めたはずのサービスがまだ動いていれば、その応答を別のプロセスと取り違えないよう「looptrack のサービスを止められません」と出して止まります。
+  - **起こした後**: 200 に加えて、`systemctl is-active looptrack` が `active` であることと、`ss` でポートの待ち受けを持つプロセスがサービスの MainPID であることを確かめます。
+    unit は `Type=simple` なので起こした直後から `active` になり、`is-active` だけでは、起こす前の確認の後に別のプロセスがポートを取った形を見分けられないからです。
+    **`ss`（iproute2）が無いサーバでは `is-active` だけに落ちます。** その形では別のプロセスの 200 で通ってしまうので、`ss` を入れておいてください。
+  compose はコンテナの中で確かめるので、この確認はしません。
 - setup への渡し方: install.sh は `looptrack setup --dir <設定の置き場> --mode team` に、動かし方に応じた引数を足して呼びます。
   systemd なら `--service systemd --sqlite-path /var/lib/looptrack/im.db`、compose なら `--service compose` です（`--service` の違いは上の「新しく立ち上げる」の表）。
-  `.env` は setup が書いたまま使い、install.sh は書き換えません。
+  `.env` は setup が書いたまま使います。install.sh が足すのは `LOOPTRACK_DIST_DIR` の 1 行だけです（無いときだけ。下の「クライアントに配る looptrack」）。
   `--dir`・`--mode`・`--service`・`--yes`・`--force` は install.sh が決めるので、`--` の後ろには置けません。setup の最後の「■ 起動」の案内は、install.sh が実行済みです。
 - compose のイメージ: ビルド済みのイメージは配っていません。取得して SHA-256 を確かめた実行ファイルから、その場で作ります（`FROM scratch` の数行で deploy/Dockerfile と同じ形）。
   第三者のライセンス文はイメージの `/NOTICE` に入ります。取得元から取るのではなく、入れる実行ファイル自身の `looptrack licenses` の出力を書き出します。なので実行ファイルと必ず同じ版になります。
@@ -296,16 +307,65 @@ TLS をプロキシに任せる理由は次の 3 つです。
 `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` で、次の順に進みます
 （取得元は入れるときと同じで、`--from` なしなら GitHub Releases の最新・`--version <版>` でその版）。
 
-1. 新しい版を取得して確かめます（書庫は照合してから展開します）。
+1. 新しい版を取得して確かめます（書庫は照合してから展開します）。クライアントに配る looptrack（6 対象）も取って確かめます（下の「クライアントに配る looptrack」）。MySQL なら、続けて止める前の確認をします（下の「止める前の確認（MySQL）」）。
 2. 停止します。
 3. SQLite なら、止めた状態で `im.db`（と `-wal`・`-shm`）を `backup-<日時>/` に写します。
 4. 実行ファイルを入れ替えます。前の版は `looptrack.prev` に残ります（compose は新しいイメージを作ります）。
-5. `migrate` を流します。MySQL でテーブル作成用の利用者を別にするときは `LOOPTRACK_SETUP_MIGRATE_DSN` を使います。
-6. 起動して `/healthz` を待ちます。MySQL を最小権限で使っていて、5 の後にアプリ用の利用者が読めなければ、起動の前に管理用の資格情報を尋ねて権限を与え直します（上の「保存先に MySQL を選ぶとき」）。
+5. `migrate` を流します。MySQL でテーブル作成用の利用者を別にするときは `LOOPTRACK_SETUP_MIGRATE_DSN` を使います（渡し方は下の「止める前の確認（MySQL）」）。
+6. クライアントに配る looptrack を配布ディレクトリに置き、起動して `/healthz` を待ちます（systemd では、2 の後に別のプロセスが `/healthz` に応えていれば、何も置き換えずに止まります。起動の後も、応えたのがサービスかを確かめます。上の「動かし方」）。MySQL を最小権限で使っていて、5 の後にアプリ用の利用者が読めなければ、起動の前に管理用の資格情報を尋ねて権限を与え直します（上の「保存先に MySQL を選ぶとき」）。
 
-同じ版なら何もしません。MySQL のバックアップは各自で取ってください（`mysqldump` など）。
+同じ版ならサーバは置き換えません（クライアントに配る looptrack だけをその版にそろえます）。MySQL のバックアップは各自で取ってください（`mysqldump` など）。
+
+**止める前の確認（MySQL）。** 1 の後、止める前（実行ファイル・イメージ・印を置き換える前）に、新しい版の `looptrack migrate --check` で未適用の migrate を確かめます。
+systemd も compose も同じ判定です（compose は作った新しい版のイメージを `docker compose run` で動かします。動いているコンテナは止めません）。
+未適用がある版は、止めた後の `migrate` で表を作ります。アプリ用の利用者を最小権限（`deploy/grants.sql`）にしていると、その利用者では表を作れません。
+表を作れる接続先を `LOOPTRACK_SETUP_MIGRATE_DSN` で渡さないと、サービスを止めた後に `migrate` が失敗し、止まったまま残ります。
+
+- 未適用が無ければ、今までどおり進みます。
+- 未適用があり、`LOOPTRACK_SETUP_MIGRATE_DSN` を渡していれば、尋ねずに進みます（`migrate` はその接続先で流します）。
+- 未適用があり、`LOOPTRACK_SETUP_MIGRATE_DSN` を渡していなければ、未適用の一覧と「アプリ用の接続先では表を作れず、止めた後に失敗する」ことを示して、続けるかを尋ねます。
+  **既定は「続けない」です**（`--yes` では尋ねずに既定の答えにします。尋ねる端末が無いときも同じです）。
+  続けないときはサービスを止めず、実行ファイル・印（`install.conf`）・版を変えずに、0 でない終了コードで終わります。
+  アプリ用の利用者が表を作れる構成（DB 単位の広い権限）なら、`y` と答えると今までどおり進みます。
+- 未適用を確かめられなかったとき（`migrate --check` が失敗したとき）も、DB の形を変えるかが分からないので、渡していなければ同じように尋ねます。
+- 無人の更新（自動の置き換え。`--yes` で端末が無い）は尋ねず、未適用があれば置き換えません（下の「新しい版の知らせと自動の置き換え」）。
+
+`LOOPTRACK_SETUP_MIGRATE_DSN` の渡し方: `sudo` は環境変数を落とします。値をコマンドの引数・画面・シェルの履歴に出さないよう、
+`sudo sh -c` の中で、root だけが読めるファイルから組んで渡します。次の例は systemd の構成で、`/root/mysql-root.pw` は 1 行目が MySQL の root のパスワードの
+0600 のファイルです。接続先・DB 名・引数は `.env` の `LOOPTRACK_DSN` の最後の `@` より後ろをそのまま使います。
+同じファイルを `LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE` にも渡すと、`migrate` の後に権限を与え直すときに尋ねません（上の「保存先に MySQL を選ぶとき」）。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -c 'q=$(printf "\047")
+p=$(head -n 1 /root/mysql-root.pw); d=$(sed -n "s/^LOOPTRACK_DSN=//p" /etc/looptrack/.env | tail -n 1); case $d in "$q"*"$q" | \"*\") d=${d#?}; d=${d%?} ;; esac
+[ -n "$p" ] && [ -n "$d" ] || { echo "パスワードか LOOPTRACK_DSN を読めません" >&2; exit 1; }
+LOOPTRACK_SETUP_MIGRATE_DSN="root:$p@${d##*@}" LOOPTRACK_INSTALL_DB_ADMIN_USER=root LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE=/root/mysql-root.pw sh -s -- --upgrade'
+```
+
+`sh -x` は使いません（組んだ値が画面に出ます）。この確認を持たない版の install.sh（1.0.0-rc.4 まで）は、端末の回では確かめずに止めてから `migrate` を流すので、
+渡し忘れると止めた後に失敗します（前の実行ファイルは `looptrack.prev` に残ります）。
 
 **前の版に戻すときは、実行ファイル（`looptrack.prev`・compose の前の版のイメージ）だけでは戻りません。** 手順 5 の migrate が 1 本でも適用していれば、前の版は「新しい版の looptrack で migrate した DB」と出して、migrate も serve も止まります（前の版がこの確かめを持つ版の場合）。古い版が新しい形の DB に書き込んで壊さないためです。前の版で動かすには、DB も手順 3 の控え（SQLite）か各自の控え（MySQL）に戻します。控えの後に書かれたデータは失われるので、戻すより新しい版のまま直すほうを先に考えてください。
+
+### クライアントに配る looptrack（配布ディレクトリ）
+
+利用者の手元の `looptrack`（`self-update` と【配布スクリプトの更新】）が使うのは、サーバの配布ディレクトリ（`.env` の `LOOPTRACK_DIST_DIR`）です。
+install.sh は、入れるときと `--upgrade`（自動の置き換えの timer を含む）のたびに、取得したリリースからこのディレクトリを新しい版にそろえます。サーバを上げれば、利用者に配る `looptrack` も同じ版になります。
+
+- **置くもの**: 6 対象（linux・darwin・windows × amd64・arm64）の `looptrack_<版>_<os>_<arch>[.exe]` と、取得元の `SHA256SUMS`・`SHA256SUMS.minisig`（とライセンス文の `NOTICE`・`OFL-BIZUDGothic.txt`）。
+  GitHub Releases の書庫は、書庫の行で照合してから展開し、取り出した実行ファイルを `SHA256SUMS` の `looptrack_<版>_<os>_<arch>[.exe]` の行で照合してから置きます。署名の確かめ方はサーバの実行ファイルと同じです（`--require-signature` なら署名が必須）。合わなければ何も置き換えずに止まります。
+- **置き場**: systemd は `/usr/local/share/looptrack/dist`、compose は `<dir>/dist`（コンテナの `/dist` に読み取り専用）。`.env` に `LOOPTRACK_DIST_DIR` が無ければ足します（setup が書く形と同じ単引用符）。
+  **`.env` の `LOOPTRACK_DIST_DIR` が別の置き場を指していれば触りません**（管理者が自分で置いている配布ディレクトリ。注意だけ出します）。install.sh にそろえさせるときは、その行を消してから `--upgrade` を実行します。
+- **以前の setup が書いた compose.yaml** には `./dist:/dist:ro` がありません。install.sh は compose.yaml を書き換えないので、注意を出して配布物を置きません。`services.looptrack.volumes` に `- ./dist:/dist:ro` を足してから、もう一度 `--upgrade` を実行してください。
+- **置き換えの順番**: 新しい版の実行ファイルを置き、署名と `SHA256SUMS` を同じディレクトリの中の rename で置き換えます（serve は `SHA256SUMS` に載る名前だけを配るので、途中の形を配りません）。サーバの起動の前に置き、起動を確かめた後に前の版の実行ファイルを片付けます。
+  無人の更新が止めた後に失敗して前の版に戻すときは、配布物も前の版の配布に戻します。
+- **取得した版が入っている版より古く、`--only-newer` で置き換えない回は、配布ディレクトリにも `.env` にも触りません。**
+  同じ版の `--upgrade`（`--only-newer` の timer の回を含む）は別で、サーバを置き換えずに配布物だけをその版にそろえます（そろっていれば何も変えません。`.env` に `LOOPTRACK_DIST_DIR` が無ければ足します）。
+  以前の install.sh で入れたサーバは、新しい install.sh で 1 度 `--upgrade` を実行すると、`.env` に `LOOPTRACK_DIST_DIR` が入って配布物がそろいます（自動の置き換えの timer が動かすのは手元の写しなので、人が 1 度動かすまでは変わりません）。
+  そのとき `.env` に足した行は、サービスを起動し直すまで効きません（版が変わる `--upgrade` は起動し直すので、そのまま効きます。同じ版なら案内に従って `systemctl restart looptrack` か `docker compose up -d`）。
+- **windows の書庫（zip）** を開くには `unzip` か `python3` が要ります（Debian・Ubuntu: `apt-get install -y unzip`）。どちらも無ければ windows の 2 対象は置かず、注意を出します。
+- **知らせ**: 配布物がサーバの版にそろっていない（置き場が無い・6 対象のどれかが無い・古い）と、`looptrack serve` は起動時のログ（`journalctl -u looptrack`・`docker compose logs`）と、admin の画面の上部の帯で知らせます。直し方は上の `--upgrade` の 1 行です。`.env` に `LOOPTRACK_DIST_DIR` を足した後は、起動し直すまで配らず、知らせも残ります。`LOOPTRACK_DIST_DIR=` と空の値を書いたサーバは配らないと決めたものとして扱い、知らせません（起動時のログに 1 行残すだけ。install.sh も触りません）。
+- `--uninstall` は systemd の配布ディレクトリを外します（compose の `<dir>/dist` は設定と一緒に残り、`--purge` で消えます）。
 
 ### 新しい版の知らせと自動の置き換え（--auto-upgrade）
 
@@ -328,20 +388,22 @@ journalctl -u looptrack-upgrade                         # 自動の置き換え�
 
 - on にすると、1 日 1 回（時刻は 1 時間の幅でずらします。止まっていた間の回は起動した後に 1 回）`looptrack-upgrade.timer` が、
   手元に置いた install.sh の写し `/usr/local/lib/looptrack/install.sh`（root だけが書ける・0755）を `--upgrade --require-signature --yes --only-newer` で動かします。
-  手順は上の「更新」と同じです（控え・migrate・再起動・動作確認）。
+  手順は上の「更新」と同じです（控え・migrate・クライアントに配る looptrack・再起動・動作確認）。
 - **timer は install.sh を取り直しません。** 写しを新しくするのは、人が install.sh を動かしたとき（1 行か手元のファイルで、入れる・`--upgrade`・`--auto-upgrade on`）だけです。
   1 行で動かしたときは同じ URL から取り直したものを、手元のファイルで動かしたときはそのファイルを写します。
 - **取るのは書庫だけで、署名を必須にします。** 書庫は SHA256SUMS と minisign の署名で確かめます。有効にするときに `minisign`（Debian・Ubuntu は `apt-get install -y minisign`、AlmaLinux などは EPEL から `dnf install -y epel-release && dnf install -y minisign`）と、書庫・SHA256SUMS・署名を取るための `curl` か `wget` が要ります。
 - **版を下げません。** `--only-newer` は、取得した版が入っている版より新しいときだけ置き換えます。
 - **サービスを止めたままにしません。** 止めた後に失敗すれば（migrate・権限・起動・`/healthz`・途中のコマンドの失敗・中断）、前の実行ファイル（SQLite は DB も止めた直後の控え）に戻して前の版で起動し直し、
   理由を `journalctl -u looptrack-upgrade` に残して失敗として終わります。次の日の回も同じ理由なら同じく戻ります。
+  止めた後に別のプロセスが `/healthz` に応えていれば、何も置き換えずにサービスを起こし直しますが、起動を確かめられないので「起動し直しました」とは言わずに失敗として終わります。
 - 取得元は GitHub Releases の最新です（`--from` で入れたサーバでも、自動の置き換えは GitHub Releases から取ります）。
 - 設定は `install.conf` の `AUTO_UPGRADE` に残り、`--upgrade` のたびに設定どおりに入れ直します。`--uninstall` で外れます。
 - **compose では有効にできません。** コンテナのイメージは自動では置き換えず、知らせるだけです（更新は `--upgrade`）。`--no-start` で入れたサーバも有効にできません。
 - **MySQL では、DB の形を変える版を自動では置き換えません。** 止める前に新しい版の `looptrack migrate --check` で未適用の migrate を確かめ、あれば置き換えずに失敗として終わります
   （migrate の後に新しい表の権限を与え直す管理用の資格情報を無人では尋ねられず、MySQL の DB は控えから戻せないため）。サービスは今の版のまま動き、知らせは続きます。
-  `journalctl -u looptrack-upgrade` を見て、端末で `--upgrade` を実行してください（有効にするときにも注意を出します）。
-- 端末で動かす手動の `--upgrade` は変わりません（権限が足りなければ尋ねて与え直します）。
+  `journalctl -u looptrack-upgrade` を見て、表を作れる接続先を `LOOPTRACK_SETUP_MIGRATE_DSN` で渡して、端末で `--upgrade` を実行してください
+  （上の「止める前の確認（MySQL）」。有効にするときにも注意を出します）。
+- 端末で動かす手動の `--upgrade` は、DB の形を変える版も置き換えます（権限が足りなければ尋ねて与え直します）。ただし表を作れる接続先が渡されていなければ、止める前に続けるかを尋ねます（既定は続けない）。
 
 install.sh で入れたサーバでは `looptrack self-update` は置き換えずにエラーで止まり、インストーラの 1 行の `--upgrade`（`curl … | sudo sh -s -- --upgrade`）を案内します。
 1.0.0-rc.1・rc.2 の install.sh で入れたサーバも同じ 1 行で上げられます（置いた `install.conf`・`.env`・unit / `compose.yaml` をそのまま読みます）。
@@ -358,7 +420,7 @@ INSTALL_TEST_COMPOSE=1 bash deploy/install_test.sh     # compose の実起動も
 INSTALL_TEST_SYSTEMD=0 INSTALL_TEST_IMAGES=debian:12 bash deploy/install_test.sh
 ```
 
-材料は `deploy/release/dist.sh` で作った 2 つの版（Docker の CPU の linux/<arch>）です。素の形（`dist.sh build` の出力）は `--from <ディレクトリ>` で、
+材料は `deploy/release/dist.sh` で作った 2 つの版です（…1 は Docker の CPU の linux/<arch> だけ、…2 はクライアントに配る looptrack の確認のために 6 対象）。素の形（`dist.sh build` の出力）は `--from <ディレクトリ>` で、
 GitHub Releases と同じ並び（書庫）は `LOOPTRACK_INSTALL_REPO`（`--from` なしのときの取得元のリポジトリ。テスト・ミラー用）で渡します。
 README の 1 行は、一時 HTTP サーバに置いた `raw/deploy/install.sh` と `gh/releases/…` に読み替えて通します（`--upgrade` の一部も一時 HTTP サーバの URL から）。
 確かめるのは次のことです。
@@ -386,6 +448,10 @@ README の 1 行は、一時 HTTP サーバに置いた `raw/deploy/install.sh` 
   もう一度実行すると疑似端末で尋ねられた資格情報でアプリ用の利用者を作って権限を与え、起動まで 1 回で進む。尋ねたパスワードが設定・データの置き場・
   インストーラの出力・シェルの履歴・`ps` の引数に残らない（対照: `SHOW GRANTS` に grants.sql と同じ権限が出る）。権限の欠けた表がある状態の `--upgrade` も与え直して起動する
 - 1.0.0-rc.2 の install.sh（開発側のタグ `v1.0.0-rc.2`）で入れたサーバを、新しいインストーラの `--upgrade --version` で上げる
+- クライアントに配る looptrack: 入れると `.env` に `LOOPTRACK_DIST_DIR` が入り（compose は compose.yaml の `./dist:/dist:ro` も）、取得元の `SHA256SUMS` にある対象を照合して置く。
+  `--upgrade` の後は配布ディレクトリが新しい版の 6 対象（`SHA256SUMS` の行と一致）になり、`GET /api/v1/dist` の binaries も同じ 6 対象・同じ SHA-256 になる。
+  古い looptrack の導入済み通知（`POST /install`）の応答に【配布スクリプトの更新】が出る（対照: 同じ版の looptrack には出ない）。
+  timer の更新（書庫・署名必須。windows は zip から取り出す）でも同じ。取得した版が古く `--only-newer` で置き換えない回は配布ディレクトリを変えない。無人の更新の戻しは配布物も前の版に戻す
 - 自動の置き換え（`--auto-upgrade`）: 既定は off で timer が無い。compose・`--no-start`・systemd なし・minisign なし・curl も wget も無いときの on は何も変えずに止まる（curl・wget は新しい版の書庫と署名を取るため）。
   1 行の on で timer が有効になり、install.sh の写し（root 755）を置く（service は写しを動かす）。timer の service を動かすと新しい版に上がる
   （写しは書き換えない・もう一度動かしても何もしない・古い版の取得元では版を下げない）。人が `--upgrade` を動かすと写しをそろえる。
@@ -394,6 +460,10 @@ README の 1 行は、一時 HTTP サーバに置いた `raw/deploy/install.sh` 
   0 でない終了コードで終わる。対照: 権限がそろっていれば置き換わる
 - 無人の更新の戻し（SQLite）: 止めた後に、新しい版が起動しない・`daemon-reload` の失敗・`die` を通らない裸のコマンドの失敗・中断（TERM）の
   どれでも、前の版に 1 回だけ戻して起動し直し、理由を 1 行残して 0 でない終了コードで終わる。対照: 端末のある手動の `--upgrade` は戻さない
+- 同じポートを別のプロセスが握っている（nginx の偽の応答者が同じポート・接頭辞の `/healthz` に 200 を返す）: 初回・入れ直しの install と手動の `--upgrade` は
+  起こす前に「別のプロセス」とポートを示して 0 でない終了コードで止まり、完了と 200 OK を出さない。無人の `--upgrade` は「戻して起動し直しました」を出さずに失敗として終わる。
+  対照: 偽の応答者を止めると同じ操作が完了する。起こした後に別のプロセスがポートを取る形（unit の追加設定の `ExecStartPre` で起動の直前に偽の応答者を起こす）でも、
+  200 に対して「別のプロセス」と示して完了を出さない（ポートの PID と MainPID の突き合わせ）。対照: 偽の応答者を起こさなければ完了する
 
 コンテナでは代えられないので、次は手で確かめます。
 実機（VM）の Ubuntu LTS・Debian で、本物の証明書（ACME）を使うリバースプロキシの後ろから通してください。

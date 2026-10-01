@@ -125,8 +125,8 @@ A machine with neither the CLI nor hooks is fine. You can install starting from 
 
 1. Add the MCP connection to the agent and authorise it in the browser. To have the agent add the connection too, use the prompts in "Installing by pasting one prompt" below
 2. Ask the agent to "set up issue management". The agent calls the `setup` tool
-3. The `setup` tool first returns only one question: install loop or not? The agent asks you, then calls `setup` again with your answer. What comes back is a single command (download → SHA-256 check → init), and the agent runs it once you approve. If `~/.local/bin/looptrack` (on Windows, `%LOCALAPPDATA%\Programs\looptrack\looptrack.exe`) is already there, nothing is downloaded or replaced. Init just runs with the existing one. If that version is older, the next setup suggests `looptrack self-update`
-4. If there is no token yet, the agent asks for approval and runs `looptrack issue login --browser`. You sign in and allow access in the browser
+3. The `setup` tool first returns only one question: install loop or not? The agent asks you, then calls `setup` again with your answer. What comes back is a single command (download → SHA-256 check → init), and the agent runs it once you approve. If `~/.local/bin/looptrack` (on Windows, `%LOCALAPPDATA%\Programs\looptrack\looptrack.exe`) is already there with the same SHA-256 as the distributed one, the download is skipped. Otherwise (or if there is none) it is downloaded, verified and swapped in, and init runs with it. If that place is not on your PATH, the same command adds it: on macOS and Linux one line goes into the startup file of your default shell (`$SHELL`) — `~/.zshenv` for zsh (and also under `ZDOTDIR` if it is set in the environment), `~/.bashrc` plus the file a bash login shell reads for bash, `conf.d/looptrack.fish` for fish, `~/.profile` otherwise — and on Windows it goes into your user environment variable `Path`. Nothing is written if it is already there. Until you reopen the agent app and the terminal, `looptrack` cannot be called by name (hooks run with the absolute path). When your version is out of date, "[Update the distributed files]" appears, and the same setup steps download it again
+4. If there is no token yet, the agent asks for approval and runs the sign-in command from the setup steps: `~/.local/bin/looptrack issue login --browser --url <server URL>` (on Windows, in PowerShell: `& (Join-Path $env:LOCALAPPDATA 'Programs\looptrack\looptrack.exe') issue login --browser --url <server URL>`). You sign in and allow access in the browser
 5. You restart the agent and approve its hooks
 6. At the start of the next session, a hook tells the server the install is complete, and the [Setup incomplete] note disappears from tool results
 
@@ -138,7 +138,7 @@ The agent adds the MCP connection, calls `setup`, and runs the install command.
 You only step in to allow access and sign in through the browser, approve commands, restart the agent, and trust its hooks.
 
 **Never hand a token to the agent.** Don't put a token, a password, or a verification code into the prompt or the conversation.
-Sign in with `looptrack issue login --browser`. The token travels only between the CLI and the server.
+Sign in with the `issue login --browser --url <server URL>` command from the setup steps (it runs the `looptrack` that setup placed, by its absolute path). The token travels only between the CLI and the server.
 
 These steps haven't been checked on a real Windows machine.
 Nor has Copilot in VS Code, on a real installation.
@@ -174,7 +174,7 @@ Before every command you run and every setting you change, show me what it is an
 4. Call the setup tool with the arguments workspace (the absolute path of this repository's git root) and project: "<project>".
 5. If you are asked whether to install loop (the loop engineering set), ask me before deciding. Call setup again with my answer and the same arguments as in 4.
 6. Carry out the steps setup returns, from the top. Run the commands of the [AI] steps at the repository root only after I approve them. If the SHA-256 does not match, stop there.
-7. Sign in with looptrack issue login --browser, as the setup steps say. Set the command's timeout longer than 5 minutes. I sign in and allow access in the browser myself.
+7. Sign in with the issue login --browser command from the setup steps (the placed looptrack by its absolute path, with --url). Set the command's timeout longer than 5 minutes. I sign in and allow access in the browser myself.
 8. Never read or display a token. Never ask me to paste a token.
 9. For the [user] steps (restarting and approving the hooks), ask me and stop. When I paste this prompt again, confirm that setup reports Installed, and finish.
 ```
@@ -194,7 +194,7 @@ Before every command you run and every setting you change, show me what it is an
 4. Call the setup tool with the arguments workspace (the absolute path of this repository's git root) and project: "<project>".
 5. If you are asked whether to install loop (the loop engineering set), ask me before deciding. Call setup again with my answer and the same arguments as in 4.
 6. Carry out the steps setup returns, from the top. Run the commands of the [AI] steps at the repository root only after I approve them. If the sandbox blocks network access, ask me whether you may run it with raised permissions. If the SHA-256 does not match, stop there.
-7. Sign in with looptrack issue login --browser, as the setup steps say. Set the command's timeout longer than 5 minutes. I sign in and allow access in the browser myself.
+7. Sign in with the issue login --browser command from the setup steps (the placed looptrack by its absolute path, with --url). Set the command's timeout longer than 5 minutes. I sign in and allow access in the browser myself.
 8. Never read or display a token. Never ask me to paste a token.
 9. For the [user] step (trusting the hooks with /hooks in the terminal codex), ask me and stop. When I paste this prompt again, confirm that setup reports Installed, and finish.
 ```
@@ -223,7 +223,7 @@ Before every command you run and every file you change, show me what it is and g
 4. Call the setup tool with the arguments workspace (the absolute path of this repository's git root) and project: "<project>".
 5. If you are asked whether to install loop (the loop engineering set), always ask me before deciding. Never decide the answer yourself. Call setup again with my answer and the same arguments as in 4.
 6. Carry out the steps setup returns, from the top. Run the commands of the [AI] steps at the repository root only after I approve them. If the SHA-256 does not match, stop there.
-7. Sign in with looptrack issue login --browser, as the setup steps say. Set the command's timeout longer than 5 minutes. I sign in and allow access in the browser myself.
+7. Sign in with the issue login --browser command from the setup steps (the placed looptrack by its absolute path, with --url). Set the command's timeout longer than 5 minutes. I sign in and allow access in the browser myself.
 8. Never read or display a token. Never ask me to paste a token.
 9. For the [user] step (starting a new chat), ask me and stop. When I paste this prompt again, confirm that setup reports Installed, and finish.
 ```
@@ -241,7 +241,7 @@ Before every command you run and every setting you change, show me what it is an
 4. Call the setup tool with the arguments workspace (the absolute path of this repository's git root) and project: "<project>".
 5. If you are asked whether to install loop (the loop engineering set), always ask me before deciding. Never decide the answer yourself. Call setup again with my answer and the same arguments as in 4.
 6. Carry out the steps setup returns, from the top. Run the commands of the [AI] steps at the repository root only after I approve them. If the SHA-256 does not match, stop there.
-7. Sign in with looptrack issue login --browser, as the setup steps say. Set the command's timeout longer than 5 minutes. I sign in and allow access in the browser myself.
+7. Sign in with the issue login --browser command from the setup steps (the placed looptrack by its absolute path, with --url). Set the command's timeout longer than 5 minutes. I sign in and allow access in the browser myself.
 8. Never read or display a token. Never ask me to paste a token.
 9. For the [user] step (restarting copilot and choosing to always trust the folder when asked), ask me and stop. When I paste this prompt again, confirm that setup reports Installed, and finish.
 ```
@@ -259,7 +259,7 @@ That's why step 5 is worded more strongly in the Copilot prompts. You can also w
 | Restarting and pasting again | Restart the agent (a new chat in VS Code) and paste the same prompt. Restart Copilot CLI once more after allowing access in the browser | A newly added connection is loaded after the restart. Copilot CLI starts the authorisation as soon as it starts, so the connection can pass its 10-second limit while it waits and fail with `Failed to connect … timed out after 10000 ms` |
 | The loop question | Answer whether to install it | The user, not the agent, decides whether to install loop |
 | The install command | Approve the single command: download → SHA-256 check → init. Claude Code asks for your permission for this command even in auto mode (it flags it as `Contains brace with quote character (expansion obfuscation)`) | It puts the executable in `~/.local/bin` and changes files in the repository |
-| Signing in | Approve `looptrack issue login --browser`, then sign in (with two-factor auth) and allow access in the browser that opens. If this machine already has a token, this stage is skipped | The token travels only between the CLI and the server and never appears in the conversation |
+| Signing in | Approve the sign-in command from the setup steps (`issue login --browser --url <server URL>` on the `looptrack` that setup placed), then sign in (with two-factor auth) and allow access in the browser that opens. If this machine already has a token, this stage is skipped | The token travels only between the CLI and the server and never appears in the conversation |
 | Trusting the hooks | Claude Code: restart and approve if asked. Codex: trust them with `/hooks` in the terminal `codex`. Copilot: start a new session (in Copilot CLI, always trust the folder) | Hooks run only after the user accepts them |
 
 In Codex, the sandbox blocks network access for the shell commands the agent runs.
@@ -270,10 +270,11 @@ In Copilot CLI, every call to an MCP tool needs your approval.
 
 | Symptom | What to check |
 | -- | -- |
-| The browser does not open to allow access | Start your default browser first. In Claude Code, close the `/mcp` screen and open it again. `looptrack issue login --browser` also prints the URL, so you can paste it into a browser that is already running |
+| The browser does not open to allow access | Start your default browser first. In Claude Code, close the `/mcp` screen and open it again. The sign-in command (`issue login --browser`) also prints the URL, so you can paste it into a browser that is already running |
 | The MCP tools are still unavailable after pasting again | Check that you restarted the agent after the connection was added, and that you allowed access. Also check that the URL ends in `/mcp` |
 | [Setup incomplete] does not disappear from tool results | Check that you restarted and trusted the hooks. Codex skips untrusted hooks silently. Without a registered token the hook cannot report (check with `looptrack issue config`) |
 | The PATH or the hook wiring looks wrong | Run `looptrack doctor`. It checks the PATH, the hook wiring and the install record (it writes nothing) |
+| The `looptrack` that setup installed is not found by name | Check that you reopened the agent app and the terminal (a PATH change only applies after that). If it is still not found, running the setup steps again adds its place to PATH. If setup reports it as installed and returns no steps, `~/.local/bin/looptrack doctor` (on Windows, in PowerShell: `& (Join-Path $env:LOCALAPPDATA 'Programs\looptrack\looptrack.exe') doctor`) shows a command that adds it to PATH |
 | `setup` answers "Project not found" | Check the spelling of the slug. If you are a server administrator, the agent asks whether it may create the project with `create_project`, showing the slug, prefix and width; check the values before you answer (the prefix and the width cannot be changed later). If you are not an administrator, ask one to create the project or to add you to it |
 | loop was installed without asking you | Remove it with `looptrack issue init --remove-loop` |
-| You need to work without a browser | Issue a token yourself at `<server URL>/account` and paste it into `looptrack issue login --url <server URL>` in your own terminal. Never hand it to the agent |
+| You need to work without a browser | Issue a token yourself at `<server URL>/account` and paste it into `~/.local/bin/looptrack issue login --url <server URL>` (on Windows, in PowerShell: `& (Join-Path $env:LOCALAPPDATA 'Programs\looptrack\looptrack.exe') issue login --url <server URL>`; the `/account` page shows both) in your own terminal. Never hand it to the agent |

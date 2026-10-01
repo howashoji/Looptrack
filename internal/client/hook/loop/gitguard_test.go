@@ -184,6 +184,20 @@ func TestPreToolGitGuard(t *testing.T) {
 			{name: "Windows: git を名乗らない実行ファイルは素通りする（notgit.exe）",
 				mk: b(`C:\tools\notgit.exe add -A`), want: quiet},
 
+			// ── 二重引用符の中の `\"`。sh では `\"` は組を閉じず全体が 1 つの引数で、後ろの reset / clean は
+			// 実行されない（posix の分け方では 1 つの単純コマンド）。ところが PowerShell では `\` はただの文字なので
+			// `"x\"` で組が閉じ、`;` の後ろのコマンドが実際に実行される。Windows 規則の分け方がそれを拾うので deny のまま
+			// （hook にはどのシェルが実行するかが分からない。deny を外すと PowerShell で走る形が素通りになる）。
+			{name: "引用符の中の \\\": Windows 規則で読むと reset --hard が実行される", mk: b(`git commit -m "x\" ; git reset --hard \""`), want: deny},
+			{name: "引用符の中の \\\": Windows 規則で読むと clean -fd が実行される", mk: b(`echo "a\" ; git clean -fd \""`), want: deny},
+			{name: "引用符の中の \\\"（対照）: 引用符の外の reset --hard", mk: b(`git commit -m "x" ; git reset --hard`), want: deny},
+			{name: "引用符の中の \\\"（対照）: 同じ文でも reset を含まなければ通す", mk: b(`git commit -m "x\" ; git status \""`), want: quiet},
+			// バックスラッシュが偶数本なら、どちらの規則でも引用符が閉じて後ろのコマンドが実行される
+			{name: "偶数本のバックスラッシュで閉じた後ろの reset --hard", mk: b(`echo "a\\" ; git reset --hard`), want: deny},
+			{name: "偶数本のバックスラッシュ: sudo bash -c の中", mk: b(`sudo bash -c 'echo "a\\" ; git reset --hard'`), want: deny},
+			{name: "偶数本のバックスラッシュ: env の後ろの sh -c の中", mk: b(`env X=1 sh -c 'echo "a\\" ; git clean -fd'`), want: deny},
+			{name: "偶数本のバックスラッシュ: eval の中", mk: b(`eval 'echo "a\\" ; git reset --hard'`), want: deny},
+
 			// ── 末尾の欄が空になる形（区切りで分ける実装の落とし穴）──────────────
 			{name: "空欄: git checkout --（`--` の後ろに何も無い）", mk: b("git checkout --"), want: quiet},
 			{name: "空欄: git checkout HEAD --（`--` の後ろに何も無い）", mk: b("git checkout HEAD --"), want: quiet},

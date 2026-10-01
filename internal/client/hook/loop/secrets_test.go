@@ -84,6 +84,27 @@ func TestPreToolSecrets(t *testing.T) {
 		{name: "cmd の copy（別の場所へ写す）", mk: bash(`copy C:\Users\x\proj\.env C:\tmp\backup.txt`), want: ask},
 		{name: "PowerShell の Copy-Item", mk: bash(`Copy-Item .\.env C:\tmp\backup.txt`), want: ask},
 		{name: "xcopy", mk: bash(`xcopy .\.env C:\tmp\`), want: ask},
+		// 引用符の組の 2 つの読み方（posix: `\"` は組を開きも閉じもしない / Windows: `\` はただの文字）。
+		// hook にはどのシェルが実行するかが分からないので、どちらかの読み方で読み出しに当たれば確認にする。
+		// sh では 1 つの引数だが、PowerShell では `"x\"` で閉じて後ろの cat が実行される
+		{name: "読み方: 引用符の中の \\\" の後ろの cat（Windows の読み方で当たる）",
+			mk: bash(`cat "x\" ; cat /tmp/x/.ssh/id_rsa \""`), want: ask},
+		{name: "読み方（対照）: 同じ鍵をそのまま読む", mk: bash(`cat /tmp/x/.ssh/id_rsa`), want: ask},
+		// posix だけで読むと素通りになる形（PowerShell では Get-Content が .env を読む）
+		{name: "読み方: 末尾が \\ のパスの後ろの Get-Content（Windows の読み方で当たる）",
+			mk: bash(`Get-ChildItem "C:\proj\" ; Get-Content "C:\proj\.env"`), want: ask},
+		// Windows の読み方（以前の組の取り方）だけでは素通りになる形。sh では cat が実行される
+		{name: "読み方: 引用符の外の \\\" で挟んだ cat（posix の読み方で当たる）",
+			mk: bash(`cp .env.example x\" ; cat /tmp/x/id_rsa \"`), want: ask},
+		{name: "読み方: 二重引用符の中の ' の後ろの cat（posix の読み方で当たる）",
+			mk: bash(`echo "it's" ; cat /tmp/x/.env ; echo 'x'`), want: ask},
+		// バックスラッシュが偶数本なら、どちらの読み方でも引用符が閉じて後ろの cat が実行される
+		{name: "読み方: 偶数本のバックスラッシュの後ろの cat", mk: bash(`echo "a\\" ; cat /tmp/x/.env`), want: ask},
+		{name: "読み方: 偶数本のバックスラッシュ（sudo sh -c）", mk: bash(`sudo sh -c 'echo "a\\" ; cat /tmp/x/.env'`), want: ask},
+		{name: "読み方: 偶数本のバックスラッシュ（env bash -c）", mk: bash(`env X=1 bash -c 'echo "a\\" ; cat /tmp/x/.env'`), want: ask},
+		{name: "読み方: 偶数本のバックスラッシュ（eval）", mk: bash(`eval 'echo "a\\" ; cat /tmp/x/.env'`), want: ask},
+		// どちらの読み方でも引用符の中の文にすぎない形は鳴らさない
+		{name: "読み方: どちらで読んでも文の中の .env", mk: bash(`git commit -m "don't cat .env"`), want: quiet},
 		{name: "Format-Hex（xxd 相当）", mk: bash(`Format-Hex .\id_rsa`), want: ask},
 		{name: "certutil -encode（base64 にして別ファイルへ）", mk: bash(`certutil -encode .env out.b64`), want: ask},
 
@@ -530,6 +551,14 @@ func TestPreToolSecrets(t *testing.T) {
 		{name: "Windows のパスを壊さない（cat）", mk: bash(`cat C:\tmp\x.txt`), want: quiet},
 		{name: "末尾がディレクトリの Windows のパス", mk: bash(`Copy-Item C:\proj\README.md C:\tmp\`), want: quiet},
 		{name: "継続だけでは鳴らない", mk: bash("echo a\\\nb"), want: quiet},
+		// 行末のバックスラッシュが偶数本なら継続ではなく、改行はふつうの区切り（実シェルと同じ）。
+		// 次の行は別のコマンドとして判定する
+		{name: "2 本の次の行は別のコマンド", mk: bash("echo a\\\\\ncat /tmp/lt-s41/.env"), want: ask},
+		{name: "3 本は継続（1 本だけ落ちる）", mk: bash("echo a\\\\\\\ngo test ./..."), want: quiet},
+		{name: "2 本で終わる語は .env ではない", mk: bash("cat /tmp/lt-s41/.env\\\\\n"), want: quiet},
+		// つなぐと次の行が雛形の複写の引数に潰れて素通りしていた形（実シェルでは次の行の cat が走る）
+		{name: "雛形の複写の次の行の cat（2 本）",
+			mk: bash("cp .env.example /tmp/lt-s41/.env\\\\\ncat /tmp/lt-s41/.env"), want: ask},
 
 		// ⑤ クラウドの認証情報（拡張子の無い credentials と、置き場としての .aws/）
 		{name: ".aws の credentials", mk: bash("cat /tmp/lt-s41/.aws/credentials"), want: ask},

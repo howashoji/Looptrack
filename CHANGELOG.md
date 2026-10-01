@@ -13,6 +13,217 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.5] - 2026-10-01
+
+Fifth release candidate for 1.0.0. The changes below are relative to
+`v1.0.0-rc.4`.
+
+### Fixed
+
+- **An out-of-date installation is fixed with one download-and-init command
+  that knows the server URL.** When the `looptrack` or the kit in a working
+  environment was out of date, the setup tool returned
+  `looptrack self-update && looptrack issue init --project <slug> --agent <agent>`
+  (no `--url`), followed by a second init with `--url` when the loop choice was
+  answered, so init ran twice. The "[Update the distributed files]" notice (at
+  session start and in MCP tool results) suggested the same init without
+  `--url`. Run in a terminal without `LOOPTRACK_API_URL`, that init pointed at
+  the CLI's default (the local mode). Now the setup tool returns a single
+  command that downloads `looptrack`, verifies its SHA-256 and runs init with
+  `--url`, `--source server` and `--dist` (plus `--loop` / `--no-loop` when the
+  loop choice was answered), and the notice tells you to call the setup tool
+  instead of showing a command. The optional check after it passes the server
+  URL and the project to the `looptrack` it placed, rather than relying on the
+  agent's environment. Every command in the setup result and in the notices
+  now uses the absolute path of the `looptrack` it placed, never a bare
+  `looptrack` from the PATH: the loop step, the "declined" hint, the
+  token-paste hint and the `doctor` hint.
+- **The setup download replaces a `looptrack` that differs from the
+  distributed one.** It used to keep any `looptrack` already in
+  `~/.local/bin` (on Windows, `%LOCALAPPDATA%\Programs\looptrack`) and only run
+  init with it. Now the download is skipped only when the file there has the
+  same SHA-256 as the distributed one; otherwise it is downloaded, verified and
+  swapped in (a symbolic link there is replaced, and the file it points to is
+  left alone). So when a `looptrack` there differs from the distributed one,
+  such as the desktop app's symbolic link (on Windows, its marked copy), the
+  server setup replaces it with the distributed one.
+- **Environment variables in setup commands no longer stay in your shell.**
+  The setup commands that pass `LOOPTRACK_API_URL` and `LOOPTRACK_PROJECT`
+  (every command for Codex and Copilot, the PowerShell command that reports an
+  `other` agent as installed) set them with `export` in sh or `$env:` in PowerShell, so
+  pasting one into a terminal left them set, and a later `looptrack` in
+  another project silently pointed at this one. A chained command now exports
+  them inside a subshell, a single command takes them as a plain prefix
+  (`LOOPTRACK_API_URL=… LOOPTRACK_PROJECT=… …`), and PowerShell restores the
+  previous values when the command ends (saved under names that the wrapped
+  command does not use).
+- **The setup download command leaves nothing behind in your shell, and
+  cleans up after a failed download.** The download-and-init command was not
+  wrapped for any agent, so pasting it into a terminal
+  left the variables `U`, `S` and `D`, and a `sum` function hiding
+  `/usr/bin/sum`, in sh, and `$ErrorActionPreference`, `$ProgressPreference`
+  and `$U` and the other variables in PowerShell. Now it is wrapped for every
+  agent, in a subshell in sh and in `& { }` in PowerShell. When the download,
+  the SHA-256 check or the swap fails in sh, the `.part` file is removed (as
+  PowerShell already did).
+- **The guide, `init`, `doctor`, `self-update` and the account page no longer
+  point a server user at an init without `--url` or at a `looptrack` on the
+  PATH.** The guide told you to add loop with `looptrack issue init --loop`;
+  it now tells you to call the MCP setup tool. After a server install
+  (`--url` or `--source server`) that declined loop, `init` now shows the
+  command to add it with the absolute path of the running `looptrack`,
+  `--project`, `--url`, `--agent` and `--source server`. `doctor` (for an
+  install whose kit came from the server) and `self-update` point to the
+  setup tool instead of re-running init or `self-update`, and the sign-in
+  hint in `doctor` uses the running `looptrack`. The account page shows the
+  sign-in commands with the absolute path where setup places `looptrack`, for
+  macOS and Linux and for Windows. The init errors about a broken JSON file
+  now say to run the same init command again.
+- **The setup download adds the place of `looptrack` to your PATH.** The
+  skills, rules, hooks and MCP messages call `looptrack` by name, but a server
+  user had no `looptrack` on the PATH: setup placed it in `~/.local/bin` (on
+  Windows, `%LOCALAPPDATA%\Programs\looptrack`) without adding that place to
+  the PATH. Now the download-and-init command adds it when it is not on the
+  PATH yet: on macOS and Linux one line goes into the startup file of your
+  default shell (`~/.zshenv` for zsh, also under `ZDOTDIR` when it is set, `~/.bashrc` plus the file a bash login
+  shell reads for bash, `conf.d/looptrack.fish` for fish, `~/.profile`
+  otherwise), and on Windows the place goes into your user environment
+  variable `Path` (without `setx`, keeping the kind of the existing value).
+  Nothing is written when it is already there. Reopen the agent app and the
+  terminal afterwards. When `looptrack` still cannot be found on the PATH for
+  an install whose kit came from the server, `doctor` and the session-start
+  summary say so and show how to fix it (run the setup steps again, or the
+  command that `doctor` shows to add the place to the PATH). The desktop app's
+  hint for a CLI place that is not on the PATH now shows the same command
+  instead of telling you to edit `~/.zshrc` or `~/.bashrc`.
+- **Upgrading a server with `install.sh` now updates the `looptrack` it
+  distributes to users.** `install.sh --upgrade` (and the automatic
+  replacement's timer) replaced only the server's own binary, so the
+  distribution directory (`LOOPTRACK_DIST_DIR`) kept the old `looptrack`, and
+  sessions running an old `looptrack` were never told to update. Now
+  `install.sh`, when it installs and on every `--upgrade`, fills the
+  distribution directory from the release it downloaded: the binaries for all
+  six platforms (taken out of the archives and checked against the signed
+  `SHA256SUMS`), plus that `SHA256SUMS` and its signature. The directory is
+  `/usr/local/share/looptrack/dist` under systemd and `<dir>/dist` with compose
+  (setup's `compose.yaml` now mounts `./dist` read-only at `/dist`), and
+  `install.sh` adds `LOOPTRACK_DIST_DIR` to `.env` when it isn't there. A
+  `LOOPTRACK_DIST_DIR` that points elsewhere is left alone. Run `--upgrade`
+  once with the new `install.sh` (even on the same version) to bring an
+  existing server in line. Opening the Windows archives needs `unzip` or
+  `python3` on the server.
+- **The server tells administrators when the distributed `looptrack` is out of
+  date.** When the distribution directory is missing, lacks a platform, or
+  holds an older version than the server, `looptrack serve` says so in its
+  startup log and in a banner for administrators, with the `--upgrade` line
+  that fixes it.
+  After `LOOPTRACK_DIST_DIR` is added to `.env`, the server distributes nothing
+  (and the notice stays) until it is restarted. A server whose `.env` sets
+  `LOOPTRACK_DIST_DIR` to an empty value is treated as one that has decided not
+  to distribute `looptrack`: it logs one line at startup and shows no warning
+  or banner, and `install.sh` leaves it alone.
+- **`install.sh` no longer takes another process's answer for the service's.**
+  With systemd, the start check looked only for a `200` from `/healthz`, so
+  when another process (an old container left running, say) held the same
+  port, the installer reported a finished install while the service had
+  failed to bind. Now, once the service is stopped, `install.sh` stops with an
+  error naming the port if something still answers there (an unattended
+  upgrade starts the service again and ends as failed). After starting, it
+  also checks that the service is active and that the process listening on
+  the port is the service's main process (this needs `ss`; without it, only
+  that the service is active).
+- **`install.sh` checks `.env` before reading it, without printing any
+  value.** `install.sh` reads `.env` with the shell's `.`. An unquoted value
+  containing brackets, spaces or other special characters made the shell print
+  the line (a password included) or run part of the value as a separate
+  command. Now every line has to be blank, a comment, `KEY='…'`, `KEY="…"`
+  (with no `$`, backquote, `\` or `"` inside) or an unquoted value with no
+  spaces or special characters that does not start with `~`. Anything else
+  stops `install.sh` before the file is read, naming only the key (or the line
+  number). The `KEY='…'` form that setup writes always passes.
+- **On MySQL, a terminal `--upgrade` checks for pending migrations before it
+  stops anything.** Without `LOOPTRACK_SETUP_MIGRATE_DSN`, it fell back to the
+  application user, stopped the service, failed to create the new tables and
+  left the service stopped. Now, with systemd and with compose, it first runs
+  the new version's `migrate --check` (with compose, from the new image). When
+  migrations are pending and `LOOPTRACK_SETUP_MIGRATE_DSN` is not set, it lists
+  them and asks whether to go on; the default (also with `--yes` or without a
+  terminal) is to stop without changing anything. The unattended upgrade still
+  leaves such a version alone, and its message now says that
+  `LOOPTRACK_SETUP_MIGRATE_DSN` is needed.
+- **The secrets guard and the work record read quotes and line continuations
+  the way a shell does.** The secrets guard and the freshness guard's record of
+  work now read quotes both the POSIX way (outside quotes and inside double
+  quotes, `\"` neither opens nor closes a pair) and the Windows way (`\` is an
+  ordinary character, as in PowerShell), and act when either reading matches.
+  A command that hid a `cat` of a secret file behind `\"` is now confirmed, and
+  nothing that was confirmed or recorded before goes through. A line ending in
+  an even number of backslashes no longer joins the next line onto it: only an
+  odd number counts as a continuation, as in the shell. The git guard is
+  unchanged.
+
+### Docs
+
+- **Development builds stay in the working tree.** `CONTRIBUTING.md` now
+  builds into `./bin/looptrack` and says not to copy it to `~/.local/bin`
+  (where the server edition's setup places the released binary) or to use
+  `go install`. The deployment guide and the updating guides describe the
+  distribution directory, the start check and the migration check before
+  stopping. The AI agents guide shows the sign-in commands with the absolute
+  path of the `looptrack` that setup placed and adds what to do when that
+  `looptrack` is not found by name, and the FAQ tells you to fix an
+  out-of-date `looptrack` through the setup tool.
+
+### Moving from 1.0.0-rc.4
+
+- This version adds no migrations.
+- The automatic update keeps running the copy of `install.sh` saved on the
+  server. Run the one-line `--upgrade` once by hand to get the new one:
+  `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade`
+  (it also fills the distribution directory and adds `LOOPTRACK_DIST_DIR` to
+  `.env` even when the server is already on this version; restart the service if it
+  tells you to).
+- With a `compose.yaml` written by an older setup, add `- ./dist:/dist:ro`
+  under `services.looptrack.volumes` before that `--upgrade` (create
+  `volumes:` there if it is missing, as it is with MySQL).
+- If `install.sh` now stops on a line of `.env`, put that value in single
+  quotes (`KEY='…'`).
+- Once the server distributes the new `looptrack`, sessions running an older
+  one get "[Update the distributed files]". Have the agent call the setup tool
+  and run the step it returns; it replaces `looptrack` and adds its place to
+  the PATH. Reopen the agent app and the terminal afterwards.
+
+---
+
+1.0.0 のリリース候補、5 つ目。下の変更は `v1.0.0-rc.4` からの差分です。
+
+### 修正
+
+- **導入が古いときは、サーバの URL を持つ取得 + init の 1 つのコマンドで直す。** 作業環境の `looptrack` や kit が古いと、setup ツールは `looptrack self-update && looptrack issue init --project <slug> --agent <AI>`（`--url` 無し）を返し、loop の答えがあれば続けて `--url` 付きの init も返していました（init が 2 回続く）。【配布スクリプトの更新】の案内（セッションの開始時と MCP のツールの結果）も、同じ `--url` の無い init を示していました。`LOOPTRACK_API_URL` の無い端末で実行すると、その init は CLI の既定（ローカルモード）に向きます。いまの setup ツールは、`looptrack` を取得して SHA-256 を確かめ、`--url`・`--source server`・`--dist`（loop の答えがあれば `--loop` / `--no-loop` も）を付けて init する 1 つのコマンドを返します。案内はコマンドを示さず、setup ツールを呼ぶよう伝えます。その後の確認（任意）も、置いた `looptrack` にサーバの URL とプロジェクトを渡し、AI の作業環境の環境変数に頼りません。setup の結果と案内に出るコマンドは、どれも置いた `looptrack` の絶対パスで書き、PATH のパスの付かない `looptrack` を使いません（loop の手順、辞退済みの案内、トークンを貼る案内、`doctor` の案内）。
+- **setup の取得は、配布物と違う `looptrack` を置き換える。** これまでは `~/.local/bin`（Windows は `%LOCALAPPDATA%\Programs\looptrack`）に `looptrack` があれば、どんなものでもそのまま使って init だけを行っていました。いまは、そこにあるファイルの SHA-256 が配布物と同じときだけ取得を省きます。違えば取得して確かめ、置き換えます（symlink ならリンクを置き換え、リンクの先には触りません）。そのため置き場にデスクトップ版の symlink（Windows は印つきのコピー）など配布物と違う looptrack があれば、サーバ版の setup は配布物に置き換えます。
+- **setup のコマンドの環境変数がシェルに残らない。** `LOOPTRACK_API_URL`・`LOOPTRACK_PROJECT` を渡す setup のコマンド（Codex・Copilot 向けのすべてのコマンド、other の導入済みを知らせる PowerShell のコマンド）は、値を sh では `export`、PowerShell では `$env:` で置いていたので、端末に貼ると値が残り、同じ端末で別のプロジェクトに移ると、そちらの `looptrack` が黙ってこのプロジェクトに向いていました。いまは、`&&` でつないだコマンドはサブシェルの中で export し、単純コマンドは export の無い前置（`LOOPTRACK_API_URL=… LOOPTRACK_PROJECT=… …`）で渡し、PowerShell は終わったら前の値に戻します（退避の変数名は、包む中身が使わない名前にしました）。
+- **setup の取得のコマンドがシェルに何も残さず、取得に失敗したら途中のファイルを消す。** 取得 + init のコマンドは、どの AI 向けでも包まずに出ていたので、端末に貼ると、sh では変数 `U`・`S`・`D` と `/usr/bin/sum` を覆い隠す関数 `sum` が、PowerShell では `$ErrorActionPreference`・`$ProgressPreference` と `$U` などの変数が残っていました。いまは、どの AI 向けでも sh はサブシェル、PowerShell は `& { }` で包みます。sh で取得・SHA-256 の確認・置き換えのどれかに失敗したら、`.part` を消します（PowerShell は以前から消していました）。
+- **guide・`init`・`doctor`・`self-update`・アカウント設定の画面が、サーバ版の利用者に `--url` の無い init や PATH の `looptrack` を案内しない。** guide は loop を足すのに `looptrack issue init --loop` を案内していました。いまは MCP の setup ツールを呼ぶよう案内します。サーバ版（`--url` か `--source server`）で loop を辞退した `init` は、足すためのコマンドを、実行中の `looptrack` の絶対パスに `--project`・`--url`・`--agent`・`--source server` を付けて示します。`doctor`（kit をサーバから取った導入）と `self-update` は、init の再実行や `self-update` ではなく setup ツールの手順を示し、`doctor` のログインの案内は実行中の `looptrack` で書きます。アカウント設定の画面は、ログインのコマンドを setup が置く `looptrack` の絶対パスで、macOS・Linux 向けと Windows 向けの両方を示します。JSON が壊れているときの init のエラーは「同じ init のコマンドを再実行」と案内します。
+- **setup の取得が、`looptrack` の置き場を PATH に足す。** スキル・規律・hook・MCP の案内は `looptrack` を名前で呼びますが、サーバ版の利用者の PATH には `looptrack` がありませんでした。setup は `~/.local/bin`（Windows は `%LOCALAPPDATA%\Programs\looptrack`）に置くだけで、その置き場を PATH に足していなかったためです。いまは取得 + init のコマンドが、置き場が PATH に無ければ足します。macOS・Linux は既定のシェルの起動ファイルに 1 行（zsh は `~/.zshenv`（`ZDOTDIR` があればその下にも）、bash は `~/.bashrc` とログインのシェルが読むファイル、fish は `conf.d/looptrack.fish`、それ以外は `~/.profile`）、Windows は利用者の環境変数 `Path`（`setx` を使わず、元の値の種類を保つ）です。既にあれば何も書きません。足した後は AI のアプリと端末を開き直します。kit をサーバから取った導入で PATH から `looptrack` が見つからないときは、`doctor` とセッション開始時の要約がそれを知らせ、直し方（setup の手順の再実行か、`doctor` が示す PATH を足すコマンド）を示します。デスクトップ版の「置き場が PATH に無い」の案内も、`~/.zshrc`・`~/.bashrc` に足すよう伝える代わりに、同じコマンドを示します。
+- **`install.sh` でサーバを上げると、利用者に配る `looptrack` も新しくなる。** これまでの `install.sh --upgrade`（自動の置き換えの timer も）はサーバ自身の実行ファイルだけを置き換え、配布ディレクトリ（`LOOPTRACK_DIST_DIR`）は古い `looptrack` のままでした。そのため、古い `looptrack` を使うセッションに更新の知らせも出ませんでした。いまの `install.sh` は、入れるときと `--upgrade` のたびに、取得したリリースから配布ディレクトリをそろえます。置くのは 6 つの OS・CPU の組の実行ファイル（書庫から取り出し、署名つきの `SHA256SUMS` で照合したもの）と、その `SHA256SUMS` と署名です。置き場は systemd が `/usr/local/share/looptrack/dist`、compose が `<dir>/dist` です（setup の `compose.yaml` は `./dist` をコンテナの `/dist` に読み取り専用で入れるようになりました）。`.env` に `LOOPTRACK_DIST_DIR` が無ければ足し、別の置き場を指していれば触りません。いまのサーバは、新しい `install.sh` で 1 度 `--upgrade` を実行するとそろいます（同じ版でもそろえます）。Windows 向けの書庫を開くには、サーバに `unzip` か `python3` が要ります。
+- **配る `looptrack` が古いと、サーバが管理者に知らせる。** 配布ディレクトリが無い・OS・CPU の組が足りない・サーバより古い版のときに、`looptrack serve` が起動時のログと管理者の画面の帯で知らせ、直す `--upgrade` の 1 行を示します。`.env` に `LOOPTRACK_DIST_DIR` を足した後は、起動し直すまで配らず、知らせも消えません。`.env` で `LOOPTRACK_DIST_DIR` を空の値にしたサーバは、`looptrack` を配らないと決めたものとして扱います。起動時のログに 1 行残すだけで、警告も帯も出さず、`install.sh` も触りません。
+- **`install.sh` が、ほかのプロセスの応答をサービスの応答と取り違えない。** systemd の起動の確認は `/healthz` の `200` だけを見ていました。そのため、止め忘れた古いコンテナなどが同じポートを握っていると、サービスは bind に失敗しているのに、インストールが終わったと報告していました。いまの `install.sh` は、サービスを止めた後もそのポートに応答があれば、ポートを示して止まります（無人の更新はサービスを起動し直し、失敗として終わります）。起動した後は、サービスが active であることに加えて、ポートで待ち受けているのがサービスのメインのプロセスであることも確かめます（`ss` が要ります。無ければ active かどうかだけを見ます）。
+- **`install.sh` は `.env` を読む前に確かめ、値を一切出さない。** `install.sh` は `.env` をシェルの `.` で読みます。引用符で囲まない値に括弧・空白などの特殊な文字があると、シェルがその行（パスワードを含む）を出力したり、値の一部を別のコマンドとして実行したりしていました。いまは、空行・コメント・`KEY='…'`・`KEY="…"`（中に `$`・バッククォート・`\`・`"` を含まない）・空白も特殊な文字も含まず `~` で始まらない引用なしの値、のどれかに当たらない行があると、ファイルを読む前に止まり、キーの名前（読めなければ行番号）だけを示します。setup が書く `KEY='…'` の形は必ず通ります。
+- **MySQL では、端末の `--upgrade` が何かを止める前に未適用のマイグレーションを確かめる。** `LOOPTRACK_SETUP_MIGRATE_DSN` が無いと、アプリ用の利用者で接続し、サービスを止め、新しい表を作れずに失敗して、止まったまま残っていました。いまは systemd でも compose でも、先に新しい版の `migrate --check` を実行します（compose は新しい版のイメージで）。未適用があって `LOOPTRACK_SETUP_MIGRATE_DSN` が無ければ、その一覧を示して続けるかを尋ねます。既定（`--yes` や端末の無いときも）は続けず、何も変えずに止まります。無人の更新はこれまでどおりそういう版を置き換えず、理由の文面に `LOOPTRACK_SETUP_MIGRATE_DSN` が要ることを足しました。
+- **秘密のガードと作業の記録が、引用符と行末の継続をシェルと同じように読む。** 秘密のガードと鮮度ガードの作業の記録は、引用符を posix の読み方（引用符の外と二重引用符の中では `\"` が組を開きも閉じもしない）と Windows の読み方（PowerShell と同じく `\` はただの文字）の両方で読み、どちらかで当たれば確認・記録します。`\"` の陰に秘密のファイルの `cat` を隠したコマンドも確認になり、これまで確認・記録していたものが素通りになることはありません。偶数本のバックスラッシュで終わる行は、もう次の行とつなぎません。シェルと同じく、継続とみなすのは奇数本のときだけです。git ガードは変えていません。
+
+### 文書
+
+- **開発版は作業ツリーに置く。** `CONTRIBUTING.md` のビルドの手順は `./bin/looptrack` に作るようになり、`~/.local/bin`（サーバ版の setup が配布物を置く場所）に写さないこと、`go install` を使わないことを書きました。配置の文書と更新のガイドには、配布ディレクトリ・起動の確認・止める前のマイグレーションの確認を書き足しています。AI エージェントのガイドは、サインインのコマンドを setup が置いた `looptrack` の絶対パスで示すようになり、その `looptrack` が名前で見つからないときの対処を足しました。FAQ は、古い `looptrack` を setup ツールで直すよう案内します。
+
+### 1.0.0-rc.4 から上げるとき
+
+- この版に移行（マイグレーション）はありません。
+- 自動更新は、サーバに保存した `install.sh` の写しを動かし続けます。新しいものにするには、1 行の `--upgrade` を 1 度だけ手で実行してください: `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade`（サーバが既にこの版でも、配布ディレクトリをそろえ、`.env` に `LOOPTRACK_DIST_DIR` を足します。起動し直すよう出たら、そのとおりに）。
+- 古い setup が書いた `compose.yaml` なら、その `--upgrade` の前に `services.looptrack.volumes` へ `- ./dist:/dist:ro` を足してください（MySQL の構成では `volumes:` が無いので、作ってから足します）。
+- `install.sh` が `.env` のある行で止まるようになったら、その値を単引用符で囲みます（`KEY='…'`）。
+- サーバが新しい `looptrack` を配り始めると、古いものを使うセッションに【配布スクリプトの更新】が出ます。AI に setup ツールを呼ばせ、返った手順を実行してください。`looptrack` が置き換わり、その置き場が PATH に入ります。済んだら AI のアプリと端末を開き直します。
+
 ## [1.0.0-rc.4] - 2026-09-30
 
 Fourth release candidate for 1.0.0. The changes below are relative to
@@ -672,7 +883,8 @@ First public release. Everything below is what Looptrack ships in 1.0.0.
 - **Markdown へのエクスポート。** `looptrack export` がイシューを Markdown に書き戻します。だからデータが閉じ込められることはない。
 - **作業ツリーの片付け。** `looptrack worktree list` は、すべての git の作業ツリーを、それについて決めるのに要ることと一緒に並べます。マージ済みかどうか、未コミットの変更（ビルドの残りは無視する）、ロック、そして**最後に動いた時刻**。片付けは `looptrack worktree prune` で。`--yes` を渡さない限り何も消さず、本体の作業ツリーには決して触れず、最近動いたものは残します。ほかのセッションがまだ中にいるかもしれないからです。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.0-rc.4...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.0-rc.5...HEAD
+[1.0.0-rc.5]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.4
 [1.0.0-rc.3]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.2

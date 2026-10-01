@@ -462,11 +462,19 @@ func isLooptrack(w string) bool {
 
 // isEscapeCmd は `looptrack issue-freshness ack|reset` を実行するコマンドか
 // （引用符の中に書いただけのものは数えない）。
+//
+// 単純コマンドに分けられないときは実行される語の文字列で見る。引用符の組の取り方は posix と Windows の
+// 読み方（hookcmd.CommandTexts）の**両方で当たったときだけ**抜け道とみなす。抜け道は参照の記録を止める側なので、
+// ほかの判定（どちらかで当たれば記録する）と向きを合わせると、読み方を足したことで記録が減らない。
 func isEscapeCmd(cmd string) bool {
 	cmds, ok := hookcmd.SimpleCommands(cmd)
 	if !ok {
-		text := hookcmd.CommandText(cmd, true)
-		return strings.Contains(text, "looptrack issue-freshness ack") || strings.Contains(text, "looptrack issue-freshness reset")
+		for _, text := range hookcmd.CommandTexts(cmd) {
+			if !strings.Contains(text, "looptrack issue-freshness ack") && !strings.Contains(text, "looptrack issue-freshness reset") {
+				return false
+			}
+		}
+		return true
 	}
 	for _, words := range cmds {
 		for i := 0; i+1 < len(words); i++ {
@@ -489,11 +497,22 @@ var (
 func bashEngagedIDs(cmd string, pat *idMatcher) []string {
 	cmds, ok := hookcmd.SimpleCommands(cmd)
 	if !ok {
-		text := hookcmd.CommandText(cmd, true)
-		if strings.Contains(text, ".claude/issues") || strings.Contains(text, "looptrack issue") {
-			return pat.findAll(text)
+		// 引用符の組の取り方は Windows と posix の読み方の両方で読み、どちらかで当たった ID を合わせる。
+		// Windows の読み方（以前の hook と同じ組の取り方）の結果はそのまま並べ、posix の読み方でだけ当たった ID を後ろに足す。
+		var ids []string
+		seen := map[string]bool{}
+		for k, text := range []string{hookcmd.CommandTextWin(cmd), hookcmd.CommandText(cmd, true)} {
+			if !strings.Contains(text, ".claude/issues") && !strings.Contains(text, "looptrack issue") {
+				continue
+			}
+			for _, id := range pat.findAll(text) {
+				if k == 0 || !seen[id] {
+					ids = append(ids, id)
+				}
+				seen[id] = true
+			}
 		}
-		return nil
+		return ids
 	}
 	var ids []string
 	for _, words := range cmds {
@@ -573,9 +592,31 @@ var msgHeredocOpen = regexp.MustCompile(`^["']?\$\(` + spaceClass + `*cat` + spa
 // spaceClass は空白文字の類（正規表現の \s。Unicode）。
 const spaceClass = `[\t\n\v\f\r \x{1c}-\x{1f}\x{85}\x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}]`
 
+// bashWork は Bash のコマンドが実作業（git の commit・merge・push）かを「実際に実行される語」だけで見て、
+// 記録の引数（workLabel）を返す。引用符の組の取り方は posix と Windows の読み方（hookcmd.CommandTexts）の
+// 両方で読み、どちらかで当たれば実作業とする（hook にはどのシェルが実行するかが分からないため）。
+func bashWork(cmd string) (string, bool) {
+	for _, run := range hookcmd.CommandTexts(cmd) {
+		if s, _ := gitWork(run, "commit", "merge", "push"); s >= 0 {
+			return workLabel(run, s), true
+		}
+	}
+	return "", false
+}
+
+// anyGitWork は、posix と Windows のどちらかの読み方で、実行される語に git のサブコマンド subs があるか。
+func anyGitWork(cmd string, subs ...string) bool {
+	for _, run := range hookcmd.CommandTexts(cmd) {
+		if s, _ := gitWork(run, subs...); s >= 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // commitMessageHead は `git commit` のコミットメッセージの先頭行（無ければ ""。commit_message_head）。
 func commitMessageHead(cmd string) string {
-	if s, _ := gitWork(hookcmd.CommandText(cmd, true), "commit"); s < 0 {
+	if !anyGitWork(cmd, "commit") {
 		return ""
 	}
 	_, end := gitWork(cmd, "commit")
@@ -737,10 +778,9 @@ func FreshnessMark(ctx context.Context, c *Call, ev hookio.Event) (hookio.Result
 			}
 		}
 		// 実作業の判定は「実際に実行される語」だけを見る
-		run := hookcmd.CommandText(cmd, true)
-		if s, _ := gitWork(run, "commit", "merge", "push"); s >= 0 {
+		if label, ok := bashWork(cmd); ok {
 			// 記録（work）はファイルに残って後から別の言語で読まれるので、文面ではなくキーと引数で書く（表示は workEvent が訳す）
-			return hookio.Result{}, g.addWork("git\t" + workLabel(run, s))
+			return hookio.Result{}, g.addWork("git\t" + label)
 		}
 	case hookio.KindRead, hookio.KindEdit, hookio.KindWrite:
 		fp := t.FilePath()

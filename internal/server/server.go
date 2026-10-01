@@ -40,10 +40,16 @@ type Config struct {
 	Issuer         string         // TOTP の発行者名（認証アプリに表示される名前。LOOPTRACK_TOTP_ISSUER。空なら DefaultTOTPIssuer）
 	PublicURL      string         // 外から見た URL の基点（例 https://example.com）。OAuth のメタデータで使う
 	// 実行ファイルの配布と版の判定（DESIGN.md §5-1）
-	DistDir          string // looptrack の配布ディレクトリ（LOOPTRACK_DIST_DIR。空なら binaries は空の一覧）
+	DistDir string // looptrack の配布ディレクトリ（LOOPTRACK_DIST_DIR。空なら binaries は空の一覧）
+	// DistOff は LOOPTRACK_DIST_DIR を空の値で明示した（配らないと決めた）こと。未設定とは分け、配布物の遅れを知らせない
+	// （install.sh も空の値には触らない。looptrack serve が os.LookupEnv で決める）
+	DistOff          bool
 	ClientMinVersion string // 対応する looptrack の最低の版（LOOPTRACK_CLIENT_MIN_VERSION。空なら判定しない）
-	Logger           *slog.Logger
-	Now              func() time.Time // テスト用
+	// Version はサーバ自身の版（looptrack serve が渡す）。配布物がこの版にそろっているかを起動時のログと管理者の帯で知らせる
+	// （distLagStatus）。空・比べられない版（dev など）なら比べない
+	Version string
+	Logger  *slog.Logger
+	Now     func() time.Time // テスト用
 	// LocalMode はローカルモード（DESIGN.md §3-3）。127.0.0.1 固定の待ち受け（serve が検査）で、Web・API・MCP を
 	// 認証なしで最初の管理者として通す。Host・Origin の検査でブラウザ経由の攻撃を止める
 	LocalMode bool
@@ -129,6 +135,7 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	var srv *Server // distLag が配布ディレクトリを読むのに使う（テンプレートの関数は Server を作る前に決めるため）
 	funcs := template.FuncMap{
 		"base": func() string { return cfg.BasePath },
 		// T は画面の文面を対訳表から出す（{{T .Lang "server.web.…"}}）。
@@ -154,6 +161,17 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 		// updateServer は帯をサーバ版の知らせ（管理者だけ・更新の 1 行）にするか。updateCommand はその 1 行
 		"updateServer":  func() bool { return cfg.UpdateServer },
 		"updateCommand": func() string { return updatecheck.ServerUpgradeCommand },
+		// distLag は管理者の帯に出す、配布物（クライアントに配る looptrack）がサーバの版にそろっていないことの文面（そろっていれば空）
+		"distLag": func(lang any) string {
+			if srv == nil {
+				return ""
+			}
+			lag := srv.distLagStatus()
+			if lag == nil {
+				return ""
+			}
+			return distLagText(templateLang(lang), lag, cfg.DistDir, "")
+		},
 		// updateApply は帯の「更新する」の表示（デスクトップ版が UpdateApplier を渡したときだけ。サーバ版の帯では nil）
 		"updateApply": func() *updateApplyView {
 			if cfg.UpdateApplier == nil || cfg.UpdateServer {
@@ -185,6 +203,7 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 	}
 	s := &Server{cfg: cfg, db: db, tmpl: tmpl, mux: http.NewServeMux(), svc: service.New(db, cfg.Now), hashSlot: make(chan struct{}, 2),
 		binds: newSessionBinds(cfg.Now)}
+	srv = s
 	s.routes()
 	return s, nil
 }
