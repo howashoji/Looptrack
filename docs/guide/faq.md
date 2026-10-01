@@ -21,6 +21,7 @@ looptrack doctor
 ## "[Update the distributed files]" appears
 
 You'll see it when your `looptrack` is older than the version the server expects.
+Have the agent call the setup tool, and you get one command (with `--url`) that downloads and runs init. To do it by hand:
 
 ```bash
 looptrack self-update --check --url <server URL>   # only check whether a newer version exists

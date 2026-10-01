@@ -7,7 +7,7 @@ $ issue init --project demo --source server --agent codex,copilot --no-loop
 init: $TMP/ws（プロジェクト demo・$API・AI codex, copilot）
 kit の取得元: サーバ（$API/api/v1/dist・SHA-256 を確認）
 配線: looptrack hook <名前> --agent <AI>
-導入セット: core のみ（loop は辞退を記録。入れるなら looptrack issue init --loop）
+導入セット: core のみ（loop は辞退を記録。入れるなら "$LOOPTRACK" issue init --project demo --url $API --agent codex,copilot --source server --loop）
   作成         .codex/hooks.json
   作成         .codex/config.toml
   作成         .github/hooks/looptrack.json

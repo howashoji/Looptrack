@@ -308,7 +308,10 @@ mode, so stopping a form that runs nothing would stop the very work of writing a
 `if bash -c 'git reset --hard'; then …`, `find . -exec bash -c 'git clean -fd' \;`, `echo don\'t ; bash -c 'git reset --hard'`,
 `case a in a) git clean -fd;; esac` (that one stops without any nesting, because `)` is a separator), and
 `C:\tools\git.exe add -A` (an unquoted Windows absolute path, spaces excluded — caught by the second, Windows-rule
-tokenizer; a program that does not call itself `git`, such as `C:\tools\notgit.exe add -A`, still goes through as before).
+tokenizer; a program that does not call itself `git`, such as `C:\tools\notgit.exe add -A`, still goes through as before),
+`git commit -m "x\" ; git reset --hard \""` and `echo "a\" ; git clean -fd \""` (to sh, `\"` does not close the pair and the
+whole thing is one argument, but in PowerShell `\` is an ordinary character, so `"x\"` closes and the command after `;` runs;
+the second, Windows-rule tokenizer catches that. The hook cannot tell which shell will run the command, so these stay stopped).
 
 ### What it does not stop (ruled out, or out of reach — all measured)
 

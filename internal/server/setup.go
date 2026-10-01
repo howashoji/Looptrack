@@ -357,9 +357,6 @@ type installStateJSON struct {
 	ClientArch    string `json:"client_arch,omitempty"`
 	LatestClient  string `json:"latest_client_version,omitempty"`
 	MinClient     string `json:"min_client_version,omitempty"`
-	// updateShell は UpdateCommand の案内に対応する、そのまま実行できるコマンド。UpdateCommand は利用者の言語の
-	// 文（「… の後に … を再実行する」）なので、そこから機械で取り出すと言語ごとに壊れる。手順に出すのはこちら
-	updateShell string
 }
 
 // goClientName は looptrack の古さを stale_files に出すときの名前。
@@ -422,8 +419,7 @@ func (s *Server) evalInstall(lang i18n.Lang, pr store.Project, agent string, ins
 		// フックの有無・kit の控えに依らず、looptrack の取得 + init（hook の配線を looptrack に置き換える）を求める
 		st.State = "stale"
 		st.StaleFiles = append(st.StaleFiles, goClientName)
-		st.UpdateCommand = i18n.T(lang, "server.mcp.setup.update.legacy_cli",
-			"command", fmt.Sprintf("looptrack issue init --project %s --agent %s", pr.Slug, agent))
+		st.UpdateCommand = i18n.T(lang, "server.mcp.setup.update.refetch")
 		st.Message = i18n.T(lang, "server.mcp.setup.state.legacy_cli", "agent", label, "at", st.ReportedAt,
 			"source", orDash(inst.Source), "command", st.UpdateCommand)
 		return st
@@ -460,7 +456,7 @@ func (s *Server) evalInstall(lang i18n.Lang, pr store.Project, agent string, ins
 			"approve", approveStep(lang, agent))
 	case len(st.StaleFiles) > 0 || len(st.StaleKit) > 0:
 		st.State = "stale"
-		st.UpdateCommand, st.updateShell, st.Message = s.goStaleMessage(lang, pr, agent, label, st, why)
+		st.UpdateCommand, st.Message = goStaleMessage(lang, label, st, why)
 	default:
 		st.State = "current"
 		dist := i18n.T(lang, "server.mcp.setup.state.dist_current", "version", orDash(st.ClientVersion))
@@ -477,31 +473,20 @@ func (s *Server) evalInstall(lang i18n.Lang, pr store.Project, agent string, ins
 	return st
 }
 
-// goStaleMessage は Go 版（looptrack）の導入が古いときの更新コマンドと文面。実行ファイルは self-update で、
-// kit（core / loop）の控えは init の再実行で直す（kit は実行ファイルに埋め込まれているので、self-update の後に init を回す）。
-// 返すのは (案内の文, そのまま実行できるコマンド, 状態の文)。案内の文は言語で変わるので、手順に載せる
-// コマンドは別に作る（文から取り出すと言語ごとに壊れる）。
-func (s *Server) goStaleMessage(lang i18n.Lang, pr store.Project, agent, label string, st installStateJSON, why []string) (string, string, string) {
-	initCmd := fmt.Sprintf("looptrack issue init --project %s --agent %s", pr.Slug, agent)
-	const selfUpdate = "looptrack self-update"
-	var cmd, shell string
-	switch {
-	case len(st.StaleFiles) > 0 && len(st.StaleKit) > 0:
-		cmd = i18n.T(lang, "server.mcp.setup.update.self_and_init", "self_update", selfUpdate, "command", initCmd)
-		shell = selfUpdate + " && " + initCmd
-	case len(st.StaleFiles) > 0:
-		cmd, shell = selfUpdate, selfUpdate
-	default:
-		cmd = i18n.T(lang, "server.mcp.setup.update.init_only", "command", initCmd)
-		shell = initCmd
-	}
+// goStaleMessage は Go 版（looptrack）の導入が古いときの案内と文面。返すのは (案内の文, 状態の文)。
+// 案内は「setup ツールの手順（取得 + init の 1 つ）で直す」で、そのまま実行できるコマンドは載せない。この文は
+// SessionStart の summary と MCP のツール結果の注記に出て、利用者の端末で実行されうる。利用者の端末には
+// PATH の looptrack も LOOPTRACK_API_URL も無いことがあり、self-update や --url の無い init は CLI の既定
+// （手元のローカルモード）に向く。取得 + init には期限つきの券の URL が要るので、券を発行する setup の手順で返す。
+func goStaleMessage(lang i18n.Lang, label string, st installStateJSON, why []string) (string, string) {
+	cmd := i18n.T(lang, "server.mcp.setup.update.refetch")
 	for _, l := range st.StaleKit {
 		why = append(why, i18n.T(lang, "server.mcp.setup.stale.kit", "layer", l))
 	}
 	msg := i18n.T(lang, "server.mcp.setup.state.stale", "agent", label, "version", orDash(st.ClientVersion),
 		"os", st.ClientOS, "arch", orDash(st.ClientArch), "why", strings.Join(why, i18n.T(lang, "server.mcp.setup.sep.reason")),
 		"at", st.ReportedAt, "command", cmd)
-	return cmd, shell, msg
+	return cmd, msg
 }
 
 func orDash(s string) string {
@@ -881,7 +866,7 @@ type setupJSON struct {
 
 // setupStepsFor は AI の種類と導入状態に合わせた手順。answer は loop の利用者の答え
 // （yes / no。問う状態なら composeSetupFor が答えのある呼び出しでだけここへ来る）で、答えに合う loop の手順を挟む。
-// 取得と init がある手順（missing・以前の CLI の導入の置き換え）では、取得 + init のコマンドに答えの旗（--loop / --no-loop）を付けた
+// 取得と init がある手順（missing・stale）では、取得 + init のコマンドに答えの旗（--loop / --no-loop）を付けた
 // 1 つにし、承認 1 回で導入を終える。
 // Copilot・Codex 向けは、手順のコマンドにサーバの URL とプロジェクトを環境変数で前置する（agentEnvPrefix）。
 func setupStepsFor(lang i18n.Lang, agent, slug, base, dist string, st installStateJSON, l distLatest, g *goSetup, answer string) []setupStepJSON {
@@ -908,16 +893,48 @@ func needsEnvPrefix(agent string) bool {
 // Claude Code は init が書いた .claude/settings.json の env を CLI に渡すが、Copilot（CLI・VS Code）は渡さず、
 // Codex は起動し直すまで .codex/config.toml の env を渡さないため、前置しないと「サーバの URL がありません」になる。
 // looptrack は LOOPTRACK_* を読む。
-// && でつないだ後ろのコマンドにも効くよう、sh は export、PowerShell は $env: で置く。空のコマンドはそのまま。
+// 手順のコマンドは利用者の端末に貼られることがあるので、値を呼び出し元のシェルに残さない。残ると、同じ端末で別の
+// プロジェクトに移ったときに、そちらの looptrack が黙ってこのプロジェクトに向く。&& でつないだ後ろのコマンドにも効くよう、
+// sh はサブシェルの中で export し（終われば消える）、PowerShell は envRestoreWin で終わったら前の値に戻す。
+// 既に前置したコマンド（envPrefixSimple の形）と空のコマンドはそのまま。
 func agentEnvPrefix(cmd, base, slug string, win bool) string {
+	if cmd == "" || strings.HasPrefix(cmd, envURLVar+"=") || strings.HasPrefix(cmd, envWinHead) {
+		return cmd
+	}
+	if win {
+		return envRestoreWin(cmd, base, slug)
+	}
+	return fmt.Sprintf("(export %s=%s %s=%s && %s)", envURLVar, base, envProjVar, slug, cmd)
+}
+
+const (
+	envURLVar  = "LOOPTRACK_API_URL"
+	envProjVar = "LOOPTRACK_PROJECT"
+	// 退避の変数名は、包む中身（winFetch の $U・$S・$D・$B・$P など）と重ならない名前にする。PowerShell の変数名は
+	// 大小を区別しないので、$u と書くと中身の $U = '<取得 URL>' に上書きされ、finally が取得 URL を戻してしまう
+	envWinPrevURL  = "$__ltPrevApiUrl"
+	envWinPrevProj = "$__ltPrevProject"
+	envWinHead     = "& { " + envWinPrevURL + " = $env:" + envURLVar
+)
+
+// envPrefixSimple は単純コマンド 1 つ（置いた looptrack の呼び出し）に、サーバの URL とプロジェクトを渡す。
+// sh は export の無い代入の前置（そのコマンドの環境にだけ入り、シェルには残らない）、PowerShell は envRestoreWin。
+func envPrefixSimple(cmd, base, slug string, win bool) string {
 	if cmd == "" {
 		return cmd
 	}
-	const urlVar, projVar = "LOOPTRACK_API_URL", "LOOPTRACK_PROJECT"
 	if win {
-		return fmt.Sprintf("$env:%s='%s'; $env:%s='%s'; %s", urlVar, base, projVar, slug, cmd)
+		return envRestoreWin(cmd, base, slug)
 	}
-	return fmt.Sprintf("export %s=%s %s=%s && %s", urlVar, base, projVar, slug, cmd)
+	return fmt.Sprintf("%s=%s %s=%s %s", envURLVar, base, envProjVar, slug, cmd)
+}
+
+// envRestoreWin は PowerShell で環境変数を置いて cmd を実行し、終わったら（失敗しても）前の値に戻す。
+// PowerShell の環境変数はプロセス全体のもので、スクリプトブロックのスコープでは戻らないため、退避して finally で戻す
+// （前の値が無ければ $null の代入で消える）。全体を & { } で包み、退避の変数も呼び出し元に残さない。
+func envRestoreWin(cmd, base, slug string) string {
+	return fmt.Sprintf("%s; %s = $env:%s; $env:%s = '%s'; $env:%s = '%s'; try { %s } finally { $env:%s = %s; $env:%s = %s } }",
+		envWinHead, envWinPrevProj, envProjVar, envURLVar, base, envProjVar, slug, cmd, envURLVar, envWinPrevURL, envProjVar, envWinPrevProj)
 }
 
 func setupStepsOf(lang i18n.Lang, agent, slug, base, dist string, st installStateJSON, l distLatest, g *goSetup, answer string) []setupStepJSON {
@@ -930,10 +947,9 @@ func setupStepsOf(lang i18n.Lang, agent, slug, base, dist string, st installStat
 	switch {
 	case st.State == "no_hook":
 		at = 1 // login の後・承認の前
-	case st.State == "stale" && st.ClientOS != "":
-		at = 1 // self-update の後
 	case st.State != "current":
-		// 取得と init の手順（steps[0]）を、答えの旗を付けた取得 + init の 1 つに置き換える
+		// missing・stale: 取得と init の手順（steps[0]）を、答えの旗を付けた取得 + init の 1 つに置き換える
+		// （loop の手順を別に挟むと init が 2 回続く）
 		steps[0] = g.fetchStep(lang, agent, slug, base, dist, loopFlag(answer), loopAnswerPhrase(lang, answer))
 		return steps
 	}
@@ -1060,9 +1076,14 @@ func (s *Server) composeSetupFor(ctx context.Context, lang i18n.Lang, base strin
 		}
 	}
 	if st.Loop == "declined" && agent != agentOther && !selfRepoLoop(st.SelfRepo, st.Loop) { // 正本には init を勧めない（クライアントが拒否する）
-		cmd := goInitCommand("looptrack", agent, pr.Slug, base, dist)
-		if needsEnvPrefix(agent) {
-			cmd = agentEnvPrefix(cmd, base, pr.Slug, g.isWindows()) // Copilot・Codex には環境変数を付けて渡す
+		// 置き場の looptrack の絶対パスで書く（PATH の looptrack に頼らない。OS が分からなければ両方）
+		c, w := g.run(goInitCommand("", agent, pr.Slug, base, dist) + " --loop")
+		if needsEnvPrefix(agent) { // Copilot・Codex には環境変数を付けて渡す
+			c, w = envPrefixSimple(c, base, pr.Slug, g.isWindows()), envPrefixSimple(w, base, pr.Slug, true)
+		}
+		cmd := "`" + c + "`"
+		if w != "" {
+			cmd = joinOS(lang, cmd, "`"+w+"`")
 		}
 		fmt.Fprintf(&b, "\n%s\n", i18n.T(lang, "server.mcp.setup.text.loop_declined", "command", cmd))
 	}

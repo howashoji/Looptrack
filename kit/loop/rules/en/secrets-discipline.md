@@ -173,7 +173,10 @@ Every example listed on the catching side is pinned by a test. So is every examp
   `grep -n token \` + newline + `  /tmp/x/.env\` + newline). The word became `.env\`, the basename came out empty,
   and the answer was always "not a secret". When the continuation is not followed by a space
   (`cat /tmp/x/.env\` + newline + `--foo`) the shell joins it into one word naming a different file, so nothing fires.
-  Windows paths (`type C:\tmp\notes.txt`, `cat C:\tmp\x.txt`) are not broken.
+  Windows paths (`type C:\tmp\notes.txt`, `cat C:\tmp\x.txt`) are not broken. **Only an odd number of trailing
+  backslashes counts as a continuation** (as in the shell). An even number (`echo a\\` + newline) ends the word in an
+  escaped backslash, so the newline stays an ordinary separator and the next line is judged as a separate command
+  (`cp .env.example /tmp/x/.env\\` + newline + `cat /tmp/x/.env` is confirmed).
 - **Cloud credentials**: `credentials` with no extension **inside a secret location** (`cat /tmp/x/.aws/credentials`,
   `cp /tmp/x/.aws/credentials /tmp/`, `source /tmp/x/.aws/credentials`, `cat /tmp/x/secrets/credentials`) and
   `.aws/` as a location (`cat /tmp/x/.aws/notes2026.pem`). `credentials.json` is still a secret by name alone.
@@ -190,6 +193,15 @@ Every example listed on the catching side is pinned by a test. So is every examp
   was widened, so a word in argument position (`go test -run Type … .env`, `npm run copy:env .env`,
   `npm run gc -- .env`) still goes through. An option that takes its value as a separate word
   (`sudo -u deploy CAT …`) cannot be read through as a prefix, so it is not caught.
+- **Two ways of pairing quotes**: the step that drops quoted text reads the command **both** the posix way (counting
+  left to right once; outside quotes and inside double quotes, `\"` neither opens nor closes a pair) and the Windows way
+  (`\` is an ordinary character, as in PowerShell), and confirms when either one matches — the hook cannot tell which
+  shell will run the command. Newly caught through the posix reading: `cp .env.example x\" ; cat /tmp/x/id_rsa \"`
+  (to sh, `\"` is an ordinary character and `cat` runs) and `echo "it's" ; cat /tmp/x/.env ; echo 'x'` (dropping the
+  single-quote pairs first read `'s" ; cat … ; echo '` as one pair, and the `cat` vanished).
+  Because of the Windows reading, `cat "x\" ; cat /tmp/x/.ssh/id_rsa \""` (one argument to sh, but in PowerShell
+  `"x\"` closes and the `cat` after it runs) and `Get-ChildItem "C:\proj\" ; Get-Content "C:\proj\.env"` stay confirmed.
+  The Windows reading is the earlier way of pairing, unchanged, so adding a reading never removes a confirmation.
 
 ### What it does not catch (what was decided not to close)
 
@@ -228,9 +240,6 @@ Every one below **was measured** (it does not become a confirmation). None of th
   `` echo `cat /tmp/x/.env` ``. Text inside double quotes is dropped as data, and a backquote is not counted as a word
   boundary, so the command that actually runs inside the substitution disappears from the text being judged. A `$(…)`
   outside quotes (`echo $(cat /tmp/x/.env)`) is split at the `(` and is confirmed.
-- **Wrapping it between quotes escaped with a backslash**: `cp .env.example x\" ; cat /tmp/x/id_rsa \"`.
-  The step that drops quoted text counts `\"` as a quote pair too, so the command between them disappears from the text
-  being judged (to the shell they are not quotes, and `cat` runs as written).
 
 The hook catches nothing but slips, and is no substitute for the discipline. A secret it cannot tell by name (a temporary file made during the work,
 a value mixed into some output) is not caught.

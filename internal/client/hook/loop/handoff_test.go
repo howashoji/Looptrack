@@ -922,6 +922,12 @@ func TestHandoffMarkWrappedCommands(t *testing.T) {
 		{"sudo bash -c の status Done", `sudo bash -c 'looptrack issue status ABC-0123 Done'`, "x", wantRecord("issue.status\tDone\tABC-0123")},
 		{"行末の継続で分かれた close", "looptrack issue \\\n  close ABC-0123", "x", wantRecord("issue.close\tABC-0123")},
 		{"行末の継続で分かれた git commit", "git \\\n  commit -m x", okResp, wantRecord(commit)},
+		// 行末のバックスラッシュが偶数本なら継続ではない（実シェルと同じ）。次の行の完了のコマンドは別のコマンドとして積む。
+		// つなぐと `a\looptrack` の 1 語になって積まれず、引き継ぎを求められずに黙って通る。対照は 1 本の継続
+		{"行末が 2 本の行の次の行の close", "echo a\\\\\nlooptrack issue close ABC-0123", "x", wantRecord("issue.close\tABC-0123")},
+		{"行末が 2 本の行の次の行の git commit", "echo a\\\\\ngit commit -m x", okResp, wantRecord(commit)},
+		{"対照: 1 本の継続でつないだ git commit", "git \\\ncommit -m x", okResp, wantRecord(commit)},
+		{"対照: 1 本の継続でつないだ close", "looptrack issue \\\nclose ABC-0123", "x", wantRecord("issue.close\tABC-0123")},
 		// 限界（値を別の語で取る選択肢は読み切れない。git ガードと同じ共通の段の限界で、取りこぼす側）
 		{"限界: sudo -u me は値の語が先頭に残る", "sudo -u me looptrack issue close ABC-0123", "x", wantNothing},
 		// 誤検知しない形（対照）

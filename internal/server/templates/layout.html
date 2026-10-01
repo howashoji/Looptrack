@@ -42,6 +42,7 @@
     {{template "usermenu" .}}
   </div>
   {{- template "update_notice" .}}
+  {{- template "dist_notice" .}}
 {{- end}}
 
 {{/* update_notice は新しい版の帯（ヘッダの行の下。確認の結果を渡したときだけ出す）。
@@ -65,6 +66,12 @@
       {{T $.Lang "server.web.common.update_hint_server_stop" "name" "LOOPTRACK_UPDATE_CHECK"}}</span>
     {{- else if updateStopInTray}} <span class="appbar-update-hint">{{T $.Lang "server.web.common.update_hint_tray"}}</span>
     {{- else}} <span class="appbar-update-hint">{{T $.Lang "server.web.common.update_hint_env" "name" "LOOPTRACK_UPDATE_CHECK"}}</span>{{end}}</div>
+{{- end}}{{end}}{{end}}
+
+{{/* dist_notice は、クライアントに配る looptrack（配布ディレクトリ）がサーバの版にそろっていないことの帯（role が admin の利用者だけ）。
+     文面は distLag（無い・足りない・古い対象）。そろえ方は install.sh の --upgrade の 1 行（同じ版でも配布物だけをそろえる）。 */}}
+{{define "dist_notice"}}{{if and $.User (eq $.User.Role "admin")}}{{with distLag $.Lang}}
+  <div class="appbar-update" role="status">{{.}} <span class="appbar-update-hint">{{T $.Lang "server.web.common.dist_lag_hint"}} <code>{{updateCommand}}</code></span></div>
 {{- end}}{{end}}{{end}}
 
 {{define "appbar_close"}}

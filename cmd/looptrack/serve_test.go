@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"testing"
 
@@ -97,5 +98,25 @@ func TestServeConfigTOTPIssuer(t *testing.T) {
 		if cfg, _, err := serveConfig(logger); err != nil || cfg.Issuer != want {
 			t.Errorf("LOOPTRACK_TOTP_ISSUER=%q: Issuer %q (%v), want %q", in, cfg.Issuer, err, want)
 		}
+	}
+}
+
+// TestServeConfigDistOff は LOOPTRACK_DIST_DIR の「未設定」と「空の値の明示（配らない）」を分けて読むことを確かめる。
+func TestServeConfigDistOff(t *testing.T) {
+	key, _ := auth.NewSecretKey()
+	t.Setenv("LOOPTRACK_SECRET_KEY", key)
+	t.Setenv("LOOPTRACK_DSN", "")
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	t.Setenv("LOOPTRACK_DIST_DIR", "")
+	if cfg, _, err := serveConfig(logger); err != nil || !cfg.DistOff || cfg.DistDir != "" {
+		t.Errorf("空の明示: DistOff=%v DistDir=%q err=%v", cfg.DistOff, cfg.DistDir, err)
+	}
+	t.Setenv("LOOPTRACK_DIST_DIR", "/srv/dist")
+	if cfg, _, err := serveConfig(logger); err != nil || cfg.DistOff || cfg.DistDir != "/srv/dist" {
+		t.Errorf("置き場あり: DistOff=%v DistDir=%q err=%v", cfg.DistOff, cfg.DistDir, err)
+	}
+	os.Unsetenv("LOOPTRACK_DIST_DIR") // t.Setenv が終わりに元へ戻す
+	if cfg, _, err := serveConfig(logger); err != nil || cfg.DistOff || cfg.DistDir != "" {
+		t.Errorf("未設定: DistOff=%v DistDir=%q err=%v", cfg.DistOff, cfg.DistDir, err)
 	}
 }

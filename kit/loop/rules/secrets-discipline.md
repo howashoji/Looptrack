@@ -176,7 +176,9 @@ SSH の鍵（`id_` + 鍵の型。`rsa`・`dsa`・`ecdsa`・`ed25519`・`xmss`。
   `grep -n token \` + 改行 + `  /tmp/x/.env\` + 改行 も同じ）。以前は語が `.env\` になって basename が空になり、
   必ず「秘密ではない」と答えていました。継続の直後が空白でない形（`cat /tmp/x/.env\` + 改行 + `--foo`）には反応しません。
   シェルが 1 つの語につなぎ、別のファイルを読むからです。Windows のパス（`type C:\tmp\notes.txt`・
-  `cat C:\tmp\x.txt`）は壊れません。
+  `cat C:\tmp\x.txt`）は壊れません。**継続とみなすのは行末のバックスラッシュが奇数本のときだけです**（シェルと同じ）。
+  偶数本（`echo a\\` + 改行）は打ち消されたバックスラッシュで終わる語なので、改行はふつうの区切りのまま残り、
+  次の行は別のコマンドとして判定します（`cp .env.example /tmp/x/.env\\` + 改行 + `cat /tmp/x/.env` は確認します）。
 - **クラウドの認証情報**: **秘密の置き場の中にある**拡張子の無い `credentials`（`cat /tmp/x/.aws/credentials`・
   `cp /tmp/x/.aws/credentials /tmp/`・`source /tmp/x/.aws/credentials`・`cat /tmp/x/secrets/credentials`）と、
   置き場としての `.aws/`（`cat /tmp/x/.aws/notes2026.pem`）です。`credentials.json` はこれまでどおり名前だけで秘密です。
@@ -192,6 +194,15 @@ SSH の鍵（`id_` + 鍵の型。`rsa`・`dsa`・`ecdsa`・`ed25519`・`xmss`。
   `nohup`・`setsid`・`time`・`command`・`nice`・`stdbuf`・`timeout` です。**広げたのはその直後だけ**なので、引数の位置の語
   （`go test -run Type … .env`・`npm run copy:env .env`・`npm run gc -- .env`）は通ります。
   値を別の語で取る選択肢（`sudo -u deploy CAT …`）は、前置として読み切れないので拾えません。
+- **引用符の組の 2 つの読み方**: 引用符の中を捨てる段は、posix の読み方（左から 1 回で数える。引用符の外と二重引用符の中の
+  `\"` は組を開きも閉じもしない）と Windows の読み方（`\` をただの文字として扱う。PowerShell と同じ）の**両方**で読み、
+  どちらかで当たれば確認します。hook にはどのシェルが実行するかが分からないからです。
+  posix の読み方で捕まえるようになったもの: `cp .env.example x\" ; cat /tmp/x/id_rsa \"`（sh では `\"` はただの文字で、
+  `cat` が実行されます）・`echo "it's" ; cat /tmp/x/.env ; echo 'x'`（先に一重引用符の組だけを落とす数え方では、
+  `'s" ; cat … ; echo '` を 1 組と読んで `cat` が消えていました）。
+  Windows の読み方があるので、`cat "x\" ; cat /tmp/x/.ssh/id_rsa \""`（sh では全体が 1 つの引数ですが、PowerShell では
+  `"x\"` で閉じて後ろの `cat` が実行されます）と `Get-ChildItem "C:\proj\" ; Get-Content "C:\proj\.env"` は確認のままです。
+  Windows の読み方は以前の数え方そのままなので、読み方を足しても確認は減りません。
 
 ### 捕まえないもの（塞がないと決めたもの）
 
@@ -227,9 +238,6 @@ SSH の鍵（`id_` + 鍵の型。`rsa`・`dsa`・`ecdsa`・`ed25519`・`xmss`。
   `` echo `cat /tmp/x/.env` ``。二重引用符の中はデータとして捨て、バッククォートは語の区切りに数えません。
   そのため、置換の中で実際に実行されるコマンドが判定の文字列から消えます。引用符の外の `$(…)`（`echo $(cat /tmp/x/.env)`）は
   `(` で区切るので確認します。
-- **バックスラッシュで打ち消した引用符で挟む形**: `cp .env.example x\" ; cat /tmp/x/id_rsa \"`。
-  引用符の中を捨てる段は `\"` も引用符の組として数えるので、その間のコマンドが判定の文字列から消えます。
-  シェルにとってはこれは引用符ではなく、`cat` はそのまま実行されます。
 
 hook が捕まえるのはうっかりミスだけで、規律の代わりにはなりません。名前で見分けられない秘密（作業中に作った一時ファイル・
 出力に混ざった値）は捕まりません。

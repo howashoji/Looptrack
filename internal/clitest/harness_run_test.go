@@ -241,9 +241,22 @@ func Run(t testing.TB, impl Impl, c Case) Result {
 		t.Fatalf("%s が時間内に終わりませんでした", impl.Name)
 	}
 	host, _ := os.Hostname()
-	norm := &Normalizer{Paths: []string{root, rawTemp(root)}, Repo: repoRoot(), APIBase: api.URL(), Hostname: host, Start: start, End: end}
+	norm := &Normalizer{Exes: exePaths(impl), Paths: []string{root, rawTemp(root)}, Repo: repoRoot(), APIBase: api.URL(), Hostname: host, Start: start, End: end}
 	return Result{Case: c, Code: code, Stdout: stdout.String(), Stderr: stderr.String(), Requests: api.Requests(),
 		Files: snapshot(t, root, "ws", "home"), Norm: norm}
+}
+
+// exePaths は試す looptrack の実行ファイルのパス（そのまま・EvalSymlinks の後・macOS の /private を外した形）。
+// 置き場はケースの一時ディレクトリの外（ビルドの一時ディレクトリか LOOPTRACK_BIN）なので、$TMP には当たらない。
+func exePaths(impl Impl) []string {
+	if len(impl.Argv) == 0 || !filepath.IsAbs(impl.Argv[0]) {
+		return nil
+	}
+	out := []string{impl.Argv[0]}
+	if r, err := filepath.EvalSymlinks(impl.Argv[0]); err == nil {
+		out = append(out, r, rawTemp(r))
+	}
+	return out
 }
 
 // repoRoot はこのリポジトリのルート（internal/clitest の 2 つ上。出力に出るリポジトリのパスを正規化するために使う）。

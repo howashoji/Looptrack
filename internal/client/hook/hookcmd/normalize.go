@@ -75,9 +75,6 @@ func Normalize(cmd string, pos UnwrapPos) string {
 	return StripCommandPrefixes(UnwrapNestedShell(cmd, pos))
 }
 
-// lineContRe は行末の継続（バックスラッシュ + 改行）と、コマンドの末尾に残るバックスラッシュ。
-var lineContRe = regexp.MustCompile(`\\(?:\r?\n|$)`)
-
 // JoinContinuations は行末の継続（バックスラッシュ + 改行）をシェルと同じように取り除いて行をつなぐ。
 //
 // つながずに判定すると、`git \` + 改行 + `commit` は `git` と `commit` が別の行（改行は区切り）に分かれ、
@@ -86,11 +83,48 @@ var lineContRe = regexp.MustCompile(`\\(?:\r?\n|$)`)
 // 取り除くのは**改行（か文字列の終わり）が直後に来るバックスラッシュだけ**。Windows のパスの区切り
 // （C:\tmp\x.txt）は後ろに改行が無いので壊れない。
 //
+// **連なったバックスラッシュの本数を数える。** 奇数本なら最後の 1 本と改行を取り除いてつなぐ。偶数本なら
+// 何も取り除かない。`\\` は打ち消されたバックスラッシュという 1 文字で、その後ろの改行はシェルでも
+// ふつうの区切りのまま残る（`printf 'echo a\\\\\necho NEXT\n' | sh` は `a\` と `NEXT` の 2 行を出す）。
+// 直前の 1 本だけを見てつなぐと、`echo a\\` + 改行 + `git commit` の次の行のコマンドが前の行の語と
+// 1 語（`a\git`）になり、実際に走るコマンドが判定から消える（記録する側では記録されずに黙って通る）。
+// CRLF（`\r\n`）と文字列の終わりにも同じ規則を当てる。
+//
 // **Normalize には含めない**（呼ぶ側が選ぶ）。git ガードは行末の継続を「止めないもの」として文書にしており、
 // Normalize に入れると deny の範囲が黙って広がる。いまこれを呼ぶのは、秘密のガード（ask）と、記録する側の
 // hook（鮮度ガード・引き継ぎの完了の記録）。
 func JoinContinuations(cmd string) string {
-	return lineContRe.ReplaceAllString(cmd, "")
+	var b strings.Builder
+	b.Grow(len(cmd))
+	for i := 0; i < len(cmd); {
+		if cmd[i] != '\\' {
+			b.WriteByte(cmd[i])
+			i++
+			continue
+		}
+		j := i // バックスラッシュの連なりの次
+		for j < len(cmd) && cmd[j] == '\\' {
+			j++
+		}
+		nl := -1 // 連なりの後ろの改行の長さ（-1 は改行でも文字列の終わりでもない）
+		switch {
+		case j == len(cmd):
+			nl = 0
+		case cmd[j] == '\n':
+			nl = 1
+		case cmd[j] == '\r' && j+1 < len(cmd) && cmd[j+1] == '\n':
+			nl = 2
+		}
+		if nl < 0 || (j-i)%2 == 0 {
+			// 継続ではない（後ろが改行でない・偶数本で打ち消し済み）。連なりをそのまま残す
+			b.WriteString(cmd[i:j])
+			i = j
+			continue
+		}
+		b.WriteString(cmd[i : j-1]) // 最後の 1 本と改行だけを落とす
+		i = j + nl
+	}
+	return b.String()
 }
 
 // UnwrapPos は入れ子のシェルをどの位置で当てるか。**呼ぶ側が必ず明示する**（既定値に頼らない）。

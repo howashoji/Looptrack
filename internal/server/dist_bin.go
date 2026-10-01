@@ -13,7 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/relver"
+	"github.com/howashoji/looptrack/internal/updatecheck"
 )
 
 // 実行ファイル（looptrack）の配布（DESIGN.md §5-1「配布と更新」）。
@@ -26,7 +28,9 @@ import (
 // 配布ディレクトリが無い・空なら binaries は空の一覧（既存のクライアントは binaries を読まないので壊れない）。
 // 一覧に出すのは (os, arch) ごとに最も新しい版（relver の順。比べられない版の名前は出さない）の 1 つだけ。
 // SHA-256 はサーバが計算し（ファイルの大きさと更新時刻で覚える）、SHA256SUMS があれば突き合わせる（載っていない・違うものは出さない）。
-// 公開後は GitHub Releases に移る。
+// install.sh で入れたサーバでは、install.sh が配布ディレクトリを受け持つ（入れるときと --upgrade のたびに、取得したリリースの
+// 6 対象の実行ファイルと署名つきの SHA256SUMS を置く。docs/server/DEPLOY.md「クライアントに配る looptrack」）。
+// 配布物がサーバの版にそろっていないこと（置き場が無い・対象が足りない・古い）は、起動時のログと管理者の画面の帯で知らせる（distLagStatus）。
 
 const (
 	binPrefix      = "bin/"
@@ -41,6 +45,9 @@ const (
 var binTargets = map[string]bool{
 	"linux/amd64": true, "linux/arm64": true, "darwin/amd64": true, "darwin/arm64": true, "windows/amd64": true, "windows/arm64": true,
 }
+
+// distTargetOrder は配る対象（binTargets と同じ 6 つ。dist.sh の RELEASE_TARGETS の既定）を、知らせに並べる順で持つ。
+var distTargetOrder = []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64", "windows/amd64", "windows/arm64"}
 
 // distBinaryJSON は配布する実行ファイル 1 つ。
 type distBinaryJSON struct {
@@ -253,4 +260,96 @@ func (s *Server) serveDistBinary(w http.ResponseWriter, r *http.Request, name st
 	w.Header().Set("Content-Disposition", `attachment; filename="`+base+`"`)
 	http.ServeContent(w, r, base, fi.ModTime(), f)
 	return true
+}
+
+// distLag は配布ディレクトリの looptrack がサーバの版にそろっていないこと（起動時のログと管理者の画面の帯で知らせる）。
+type distLag struct {
+	Version string   // サーバの版
+	Unset   bool     // 配布ディレクトリ（LOOPTRACK_DIST_DIR）が無い
+	Missing []string // 配っていない対象（os/arch）
+	Older   []string // サーバの版より古い版を配っている対象（「os/arch 版」）
+}
+
+// distLagStatus は配布物がサーバの版にそろっていなければその中身を返す（そろっていれば nil）。
+// 比べないとき（ローカルモード・比べられない版のサーバ（dev など）・LOOPTRACK_DIST_DIR を空の値で明示した（配らない））も nil。
+// サーバより新しい版を配っているのは古さではないので知らせない。
+func (s *Server) distLagStatus() *distLag {
+	v := s.cfg.Version
+	if s.cfg.LocalMode || !relver.Valid(v) || (s.cfg.DistOff && s.cfg.DistDir == "") {
+		return nil
+	}
+	lag := &distLag{Version: v}
+	if s.cfg.DistDir == "" {
+		lag.Unset = true
+		return lag
+	}
+	have := map[string]distBinaryJSON{}
+	for _, b := range s.distBinaries("") {
+		have[b.OS+"/"+b.Arch] = b
+	}
+	for _, t := range distTargetOrder {
+		b, ok := have[t]
+		switch {
+		case !ok:
+			lag.Missing = append(lag.Missing, t)
+		case relver.Older(b.Version, v):
+			lag.Older = append(lag.Older, t+" "+b.Version)
+		}
+	}
+	if len(lag.Missing) == 0 && len(lag.Older) == 0 {
+		return nil
+	}
+	return lag
+}
+
+// distLagText は知らせの文面（command を渡せば更新の 1 行を添える。画面の帯は 1 行を <code> で別に出すので空にする）。
+func distLagText(lang i18n.Lang, lag *distLag, dir, command string) string {
+	if lag.Unset {
+		return i18n.T(lang, "server.dist.lag.unset", "version", lag.Version) + distLagHint(lang, command)
+	}
+	var detail []string
+	if len(lag.Missing) > 0 {
+		detail = append(detail, i18n.T(lang, "server.dist.lag.missing", "targets", strings.Join(lag.Missing, ", ")))
+	}
+	if len(lag.Older) > 0 {
+		detail = append(detail, i18n.T(lang, "server.dist.lag.older", "targets", strings.Join(lag.Older, ", ")))
+	}
+	return i18n.T(lang, "server.dist.lag.stale", "version", lag.Version, "dir", dir,
+		"detail", strings.Join(detail, i18n.T(lang, "server.dist.lag.sep"))) + distLagHint(lang, command)
+}
+
+// templateLang はテンプレートから渡る .Lang（i18n.Lang か言語の名前。i18n.TFunc と同じ読み方）。
+func templateLang(lang any) i18n.Lang {
+	switch v := lang.(type) {
+	case i18n.Lang:
+		return v
+	case string:
+		if p, ok := i18n.Parse(v); ok {
+			return p
+		}
+	}
+	var l i18n.Lang
+	return l
+}
+
+func distLagHint(lang i18n.Lang, command string) string {
+	if command == "" {
+		return ""
+	}
+	return i18n.T(lang, "server.dist.lag.hint", "command", command)
+}
+
+// LogDistLag は配布物がサーバの版にそろっていなければ、起動時のログに 1 行（Warn）を出す（looptrack serve が起動時に呼ぶ）。
+// LOOPTRACK_DIST_DIR を空の値で明示したとき（配らないと決めた）は、警告ではなく Info の 1 行だけを残す。
+func (s *Server) LogDistLag(lang i18n.Lang) {
+	if s.cfg.DistOff && s.cfg.DistDir == "" && !s.cfg.LocalMode {
+		s.cfg.Logger.Info(i18n.T(lang, "server.dist.lag.off"))
+		return
+	}
+	lag := s.distLagStatus()
+	if lag == nil {
+		return
+	}
+	s.cfg.Logger.Warn(distLagText(lang, lag, s.cfg.DistDir, updatecheck.ServerUpgradeCommand),
+		"version", lag.Version, "dist_dir", s.cfg.DistDir, "missing", strings.Join(lag.Missing, ","), "older", strings.Join(lag.Older, ","))
 }

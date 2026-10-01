@@ -8,6 +8,8 @@
 //   - CommandText(cmd, false): ヒアドキュメントの本文だけ落とす（引数の中身は残す）
 //   - SimpleCommands(cmd): 引用符を外した語の並びを、区切り（; & | ( ) < > 改行）ごとに返す（シェルと同じ分け方）
 //   - CommandWords(cmd): SimpleCommands と同じ分け方で、リダイレクト（記述子・演算子・行き先）を語から外したもの
+//   - CommandTexts(cmd): CommandText(cmd, true) と、その Windows の読み方（CommandTextWin。`\` を打ち消しに使わない）の
+//     両方。名前が Win で終わるもの（StripQuotesWin・SimpleSegmentsWin・CommandWordsWin など）は同じ処理の Windows の読み方
 //
 // 以前の CLI（1.0.0 より前）の文字列の規則（行の分け方・両端の空白の除き方・空白文字の類）に合わせるための部品も置く
 // （SplitLines・IsSpace など）。起動した AI の判定は internal/hookio の ForeignHost にある。
@@ -77,13 +79,84 @@ func HeredocOpen(line string) (string, bool) {
 func isIdentStart(r rune) bool { return r == '_' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' }
 func isIdent(r rune) bool      { return isIdentStart(r) || r >= '0' && r <= '9' }
 
-// StripQuotes は引用符で囲まれた中身を落とす（閉じていない引用符はそのまま残す）。先に ' '、次に " " を落とす。
+// ── 引用符の中を落とす（2 つの読み方）────────────────────────────────────────
+//
+// 同じ文字列でも、どのシェルに渡るかで引用符の組の取り方が違う。hook にはどのシェルが実行するかが分からない
+// （Claude Code の Bash は Windows でも Git Bash だが、Copilot CLI の powershell ツールも同じ経路で届く）ので、
+// **判定する側は 2 つの読み方の両方で読み、どちらかで当たれば当たりとする**（git ガードの posix / Windows 規則の
+// 二重化と同じ考え方）。
+//
+//   - posix の読み方（StripQuotes・QuotedTexts・SimpleSegments）: 左から 1 回で数える。引用符の外と二重引用符の中では
+//     バックスラッシュが次の 1 文字を打ち消す（`\"` は組を開きも閉じもしない）。一重引用符の中は打ち消さない。
+//     sh では `git commit -m "x\" ; git reset --hard \""` は全体が 1 つの引数で、reset は実行されない。
+//   - Windows の読み方（StripQuotesWin・QuotedTextsWin・SimpleSegmentsWin）: バックスラッシュを打ち消しに使わない。
+//     PowerShell では `\` はただの文字なので、同じ文字列の `"x\"` で組が閉じ、後ろの reset が実行される。
+//     組の取り方は以前の hook のまま（先に ' ' の組、次に残りへ " " の組）で、**1 ビットも変えない**。
+//     両方で読んで和を取る限り、読み方を 1 つにしていたときより当たりが減らない（通す側が広がらない）のはこのため。
+//
+// 組の取り方は、落とす側（StripQuotes*）・中身を読む側（QuotedTexts*）・単純コマンドに分ける側（SimpleSegments*）で
+// 読み方ごとに 1 か所にまとめてある。ずれると、落とす側だけが直って読む側が同じ組を見失う。
+
+// StripQuotes は posix の読み方で、引用符で囲まれた中身を落とす（閉じていない引用符から後ろはそのまま残す）。
 func StripQuotes(cmd string) string {
-	return dropPairs(dropPairs(cmd, '\''), '"')
+	out, _ := scanPosix(cmd)
+	return out
+}
+
+// QuotedTexts は posix の読み方で、引用符の組の中身を順に返す（StripQuotes が落とすのと同じ組）。
+func QuotedTexts(text string) []string {
+	_, inner := scanPosix(text)
+	return inner
+}
+
+// scanPosix は posix の読み方の本体。引用符の外の文字をつないだものと、組の中身の並びを返す。
+//
+// 左から 1 回で数えるので、種類の違う引用符が交ざっても組を取り違えない（`"it's" ; cat … ; echo 'x'` の `'` は
+// 二重引用符の中の文字）。先に一重引用符の組だけを落とすと、`'s" ; cat … ; echo '` を 1 組と読み、
+// 実行される cat が判定の文字列から消える。
+func scanPosix(s string) (string, []string) {
+	var b strings.Builder
+	var inner []string
+	for i := 0; i < len(s); {
+		switch c := s[i]; c {
+		case '\\':
+			end := min(i+2, len(s))
+			b.WriteString(s[i:end]) // 打ち消した 1 文字は引用符の外の文字として残す
+			i = end
+		case '\'', '"':
+			j := indexUnescaped(s[i+1:], c, c == '"')
+			if j < 0 {
+				b.WriteString(s[i:]) // 閉じていない引用符。ここから後ろは区切りが信用できないので残す
+				return b.String(), inner
+			}
+			inner = append(inner, s[i+1:i+1+j])
+			i += j + 2
+		default:
+			b.WriteByte(c)
+			i++
+		}
+	}
+	return b.String(), inner
+}
+
+// StripQuotesWin は Windows の読み方で、引用符で囲まれた中身を落とす（閉じていない引用符はそのまま残す）。
+// 先に ' '、次に " " を落とす（以前の hook と同じ）。
+func StripQuotesWin(cmd string) string {
+	return dropPairs(dropPairs(cmd, '\'', nil), '"', nil)
+}
+
+// QuotedTextsWin は Windows の読み方で、引用符の組の中身を順に返す（StripQuotesWin が落とすのと同じ組）。
+func QuotedTextsWin(text string) []string {
+	var out []string
+	for _, q := range []byte{'\'', '"'} {
+		text = dropPairs(text, q, func(inner string) { out = append(out, inner) })
+	}
+	return out
 }
 
 // dropPairs は q で囲まれた組を順に落とす（正規表現 q[^q]*q を空文字に置き換えるのと同じ）。
-func dropPairs(s string, q byte) string {
+// visit が nil でなければ、落とした組の中身を順に渡す。
+func dropPairs(s string, q byte, visit func(string)) string {
 	var b strings.Builder
 	for {
 		i := strings.IndexByte(s, q)
@@ -94,6 +167,9 @@ func dropPairs(s string, q byte) string {
 		if j < 0 {
 			break
 		}
+		if visit != nil {
+			visit(s[i+1 : i+1+j])
+		}
 		b.WriteString(s[:i])
 		s = s[i+1+j+1:]
 	}
@@ -101,13 +177,108 @@ func dropPairs(s string, q byte) string {
 	return b.String()
 }
 
-// CommandText は実際に実行される語だけを返す。quotes = false ならヒアドキュメントの本文だけ落とす。
+// indexUnescaped は s の中で最初に現れる q の位置（esc が真ならバックスラッシュの次の 1 文字は飛ばす）。
+func indexUnescaped(s string, q byte, esc bool) int {
+	for i := 0; i < len(s); i++ {
+		if esc && s[i] == '\\' {
+			i++
+			continue
+		}
+		if s[i] == q {
+			return i
+		}
+	}
+	return -1
+}
+
+// SimpleSegments は posix の読み方で、引用符の外の区切り（; & | 改行 かっこ）で文字列を単純コマンドに分ける。
+// 引用符の中の区切りでは切らない。閉じていない引用符があるときは ok = false（呼ぶ側は分けずに扱う）。
+// 引用符の外と二重引用符の中ではバックスラッシュが次の 1 文字を打ち消す（scanPosix と同じ数え方）。
+//
+// 行末のコメント（語の先頭の # から行末まで）は、引用符の数えに入れない。`cp .env.example .env  # don't …`
+// のようにコメントの中に ' があると、閉じていない引用符と誤認して単純コマンドに分けられなくなる
+// （引用符の外で # が語の先頭に来たときだけコメントとして飛ばす。引用符の中の # はそのまま数える
+// ので `echo '# don't'` のような形を誤って特別扱いしない）。
+func SimpleSegments(raw string) ([]string, bool) { return segments(raw, true) }
+
+// SimpleSegmentsWin は Windows の読み方で SimpleSegments と同じことをする（バックスラッシュを打ち消しに使わない。
+// 以前の hook と同じ分け方）。
+func SimpleSegmentsWin(raw string) ([]string, bool) { return segments(raw, false) }
+
+// segments は SimpleSegments / SimpleSegmentsWin の本体。esc が真ならバックスラッシュが次の 1 文字を打ち消す
+// （引用符の外と二重引用符の中）。
+func segments(raw string, esc bool) ([]string, bool) {
+	var out []string
+	var q byte
+	start := 0
+	for i := 0; i < len(raw); {
+		c := raw[i]
+		if esc && (q == 0 || q == '"') && c == '\\' {
+			i += 2 // 打ち消された 1 文字は読み飛ばす
+			continue
+		}
+		if q == 0 && c == '#' && (i == 0 || isSegmentBreak(raw[i-1])) {
+			nl := strings.IndexByte(raw[i:], '\n')
+			if nl < 0 {
+				break // コメントが文字列の終わりまで続く。その後ろに区切りは無い
+			}
+			i += nl // 次に読む位置は改行そのもの（改行は区切りとしてふだんどおり扱う）
+			continue
+		}
+		if q != 0 {
+			if c == q {
+				q = 0
+			}
+			i++
+			continue
+		}
+		switch c {
+		case '\'', '"':
+			q = c
+		case ';', '&', '|', '\n', '(', ')':
+			out = append(out, raw[start:i])
+			start = i + 1
+		}
+		i++
+	}
+	if q != 0 {
+		return []string{raw}, false
+	}
+	return append(out, raw[start:]), true
+}
+
+// isSegmentBreak は、その直後が語の先頭になる文字（空白と segments の区切り）。
+func isSegmentBreak(c byte) bool {
+	switch c {
+	case ' ', '\t', '\r', '\n', ';', '&', '|', '(', ')':
+		return true
+	}
+	return false
+}
+
+// CommandText は実際に実行される語だけを返す（posix の読み方）。quotes = false ならヒアドキュメントの本文だけ落とす。
+// 判定に使うときは CommandTexts で両方の読み方を見る。
 func CommandText(cmd string, quotes bool) string {
 	text := StripHeredocs(cmd)
 	if quotes {
 		text = StripQuotes(text)
 	}
 	return text
+}
+
+// CommandTextWin は CommandText(cmd, true) の Windows の読み方（StripQuotesWin）。
+func CommandTextWin(cmd string) string {
+	return StripQuotesWin(StripHeredocs(cmd))
+}
+
+// CommandTexts は実際に実行される語を、posix の読み方・Windows の読み方の順に返す（同じなら 1 つだけ）。
+// 判定する側はこの全部に掛け、どれかで当たれば当たりとする。
+func CommandTexts(cmd string) []string {
+	p, w := CommandText(cmd, true), CommandTextWin(cmd)
+	if p == w {
+		return []string{p}
+	}
+	return []string{p, w}
 }
 
 // Separators は単純コマンドの区切り。改行も区切りに含める。

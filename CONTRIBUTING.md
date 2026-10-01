@@ -52,8 +52,14 @@ means for you in practice.
 ```bash
 git clone https://github.com/howashoji/looptrack
 cd looptrack
-go build ./cmd/looptrack
+go build -o bin/looptrack ./cmd/looptrack
 ```
+
+Run the build by its path (`./bin/looptrack …`); `/bin/` is git-ignored. Don't
+copy it to `~/.local/bin` (where the server edition's setup places the
+released binary) and don't use `go install`, which writes to `GOBIN`: a
+development build points at a local server by default and would take over the
+released binary's place.
 
 Start the local MySQL the tests use. It listens on 127.0.0.1:13306 only, and
 its password is for this throwaway container:

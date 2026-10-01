@@ -11,7 +11,7 @@
 //     COPILOT_* は持ち込まない（テストが本番に書き込むのを防ぐ。2026-09-17 に実際に起きたことの再発防止）。
 //   - golden: 終了コード・stdout・stderr・要求の列・書いたファイル（ws と home の中）を正規化（Normalizer）して
 //     1 つのテキストにし、testdata/golden/<ケース名>.golden と比べる。
-//   - 正規化: 一時パス → $TMP、偽 API の URL → $API、ほかの 127.0.0.1 のポート → $PORT、実行中の現在時刻 → $NOW、
+//   - 正規化: 試す looptrack の実行ファイル → $LOOPTRACK、一時パス → $TMP、偽 API の URL → $API、ほかの 127.0.0.1 のポート → $PORT、実行中の現在時刻 → $NOW、
 //     経過時間 → $SEC、ホスト名 → $HOST、乱数（OAuth の state・PKCE）→ $STATE / $PKCE_*、配布物のハッシュ → $SHA256。
 //     クエリ・フォーム・JSON の本文と書いたファイルの JSON はキーの順をそろえる（意味の無い順序の違いを落とす）。
 //     規則そのもののテストは normalize_test.go。
