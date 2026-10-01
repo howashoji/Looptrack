@@ -11,13 +11,14 @@
     <p><strong>{{T .Lang "server.web.account.token_created_warn"}}</strong>{{T .Lang "server.web.account.token_created_hint"}}</p>
     <label>{{T .Lang "server.web.account.token_label"}}<input class="mono" readonly value="{{.NewToken}}" data-new-token></label>
     <p>{{T .Lang "server.web.account.cli_hint_before"}}<code>~/.config/looptrack/credentials.json</code>{{T .Lang "server.web.account.cli_hint_middle"}}<code>%APPDATA%\looptrack\credentials.json</code>{{T .Lang "server.web.account.cli_hint_after"}}</p>
-    <pre><code>looptrack issue login --url {{.LoginURL}}</code></pre>
+    <pre><code>{{template "command_lines" .PasteLogin}}</code></pre>
   </section>
   {{end}}
 
   <section class="panel">
     <h2>{{T .Lang "server.web.account.tokens_h2"}}</h2>
-    <p class="muted">{{T .Lang "server.web.account.tokens_note_before"}}<code>looptrack issue login --browser --url {{.LoginURL}}</code>{{T .Lang "server.web.account.tokens_note_after"}}</p>
+    <p class="muted">{{T .Lang "server.web.account.tokens_note"}}</p>
+    <pre><code>{{template "command_lines" .BrowserLogin}}</code></pre>
     <form method="post" action="{{base}}/account/tokens" class="row">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <label class="grow">{{T .Lang "server.web.account.token_name"}}<input name="name" maxlength="255" required placeholder="{{T .Lang "server.web.account.token_name_placeholder"}}"></label>
@@ -110,3 +111,7 @@
 
 {{define "token_cells"}}<td>{{.ID}}</td><td>{{if eq .Kind "oauth"}}OAuth{{else}}PAT{{end}}</td><td class="name">{{.Name}}</td><td><code>{{.Prefix}}…</code></td>
     <td>{{.Created}}</td><td>{{.Expires}}</td><td>{{.LastUsed}}</td><td>{{.State}}</td>{{end}}
+
+{{define "command_lines"}}{{range $i, $l := .}}{{if $i}}
+{{end}}{{if $l.Label}}# {{$l.Label}}
+{{end}}{{$l.Command}}{{end}}{{end}}

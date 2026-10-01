@@ -3,6 +3,9 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -201,6 +204,9 @@ func (c *Ctx) printSummary(data *jsonorder.Object, limit int64) error {
 	if err := c.printUsageRequests(objects(get(data, "usage_requests", nil)), loc); err != nil {
 		return err
 	}
+	if line := pathMissingNote(c.Lang, c.Root); line != "" {
+		c.Println("\n" + line)
+	}
 	// 導入状態。導入済みで最新なら何も出さない
 	install := asObject(get(data, "install", nil))
 	if truthy(data, "install") && getStr(install, "state", "") != "current" {
@@ -380,4 +386,35 @@ func usageFailureText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) s
 	}
 	return i18n.T(lang, "cli.summary.usage_send_failed", "at", localTimeIn(getStr(o, "at", ""), loc), "reason", why,
 		"count", intOf(get(o, "count", int64(0))), "spooled", spooled)
+}
+
+// lookPathFn・executableFn は PATH の探し方と実行中の looptrack の場所（テストで差し替える）。
+var (
+	lookPathFn   = exec.LookPath
+	executableFn = os.Executable
+)
+
+// pathMissingNote は、サーバ版の導入（控えの置き方が server）で PATH から looptrack を解決できないときの注意（それ以外は ""）。
+// スキル・規律・hook の案内は looptrack を名前で呼ぶので、解決できないと AI が打つコマンドが動かない。直し方は setup の手順の
+// 再実行（置き場を PATH に足す）で、導入済みで手順が返らないときは doctor が PATH を足すコマンドを示す。
+//
+// SessionStart の hook として動くときに見る PATH は、AI のアプリが hook に渡す PATH（アプリのプロセスの環境）で、AI がコマンドを
+// 流すシェルの PATH とは別のもの。シェルの PATH は起動ファイルを読むぶん広いことがあるので、ここで見つからなくてもシェルでは
+// 見つかることがある（アプリを開き直すまでの間など）。直し方はどちらでも「開き直す」なので、案内はそろえる。
+func pathMissingNote(lang i18n.Lang, root string) string {
+	if source, _ := installFiles(root); source != "server" {
+		return ""
+	}
+	if p, err := lookPathFn("looptrack"); err == nil && p != "" {
+		return ""
+	}
+	doctor := "looptrack doctor"
+	if exe, err := executableFn(); err == nil && exe != "" {
+		if runtime.GOOS == "windows" {
+			doctor = "& '" + strings.ReplaceAll(exe, "'", "''") + "' doctor"
+		} else {
+			doctor = `"` + exe + `" doctor`
+		}
+	}
+	return i18n.T(lang, "cli.summary.path_missing", "doctor", doctor)
 }

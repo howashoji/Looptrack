@@ -107,7 +107,7 @@ func (c *Ctx) reportInstall(cl *api.Client, agent, trigger string) (*jsonorder.O
 		x, _ := kit.Get(k)
 		body.Set(k, x)
 	}
-	// 実行ファイルの版。サーバはこれで古さを判定する（【配布スクリプトの更新】→ looptrack self-update）
+	// 実行ファイルの版。サーバはこれで古さを判定する（【配布スクリプトの更新】→ setup ツールが返す取得 + init（--url 付き）の手順）
 	body.Set("client", ClientInfo())
 	path, err := c.ProjectPath("/install")
 	if err != nil {

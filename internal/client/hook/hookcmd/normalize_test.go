@@ -154,4 +154,21 @@ func TestJoinContinuations(t *testing.T) {
 	eqs(t, "Windows のパス", JoinContinuations(`type C:\tmp\notes.txt`), `type C:\tmp\notes.txt`)
 	eqs(t, "打ち消した空白", JoinContinuations(`ls a\ b`), `ls a\ b`)
 	eqs(t, "継続の無い改行", JoinContinuations("git status\ngit push"), "git status\ngit push")
+
+	// 行末のバックスラッシュの本数を数える。奇数本は最後の 1 本と改行を落としてつなぎ、偶数本は改行を残す。
+	// 期待値は実シェルで確かめた（`printf 'echo a\\\\\necho NEXT\n' | sh` は `a\` と `NEXT` の 2 行、
+	// `printf 'echo a\\\\\\\necho NEXT\n' | sh` は `a\echo NEXT` の 1 行）。
+	// 偶数本の改行をつなぐと、次の行のコマンドが前の行の語と 1 語になって判定から消える
+	eqs(t, "1 本（対照: つなぐ）", JoinContinuations("git \\\ncommit -m x"), "git commit -m x")
+	eqs(t, "2 本は改行を残す", JoinContinuations("echo a\\\\\ngit commit -m x"), "echo a\\\\\ngit commit -m x")
+	eqs(t, "3 本は最後の 1 本だけ落とす", JoinContinuations("echo a\\\\\\\ngit commit -m x"), "echo a\\\\git commit -m x")
+	eqs(t, "4 本は改行を残す", JoinContinuations("echo a\\\\\\\\\ngit commit -m x"), "echo a\\\\\\\\\ngit commit -m x")
+	// 文字列の終わりも同じ規則
+	eqs(t, "文字列の終わりの 2 本は残す", JoinContinuations(`cat /p/.env\\`), `cat /p/.env\\`)
+	eqs(t, "文字列の終わりの 3 本は 1 本だけ落とす", JoinContinuations(`cat /p/.env\\\`), `cat /p/.env\\`)
+	// CRLF も同じ規則
+	eqs(t, "CRLF の 2 本は残す", JoinContinuations("echo a\\\\\r\ngit push"), "echo a\\\\\r\ngit push")
+	eqs(t, "CRLF の 3 本は 1 本だけ落とす", JoinContinuations("echo a\\\\\\\r\ngit push"), "echo a\\\\git push")
+	// 改行の前でない連なりは本数に関わらず触らない（UNC のパス）
+	eqs(t, "改行の前でない 2 本", JoinContinuations(`dir \\host\share`), `dir \\host\share`)
 }

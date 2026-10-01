@@ -300,7 +300,10 @@ Git Bash も含む）と、**Windows 規則**（`\` をエスケープとして�
 `if bash -c 'git reset --hard'; then …`・`find . -exec bash -c 'git clean -fd' \;`・`echo don\'t ; bash -c 'git reset --hard'`・
 `case a in a) git clean -fd;; esac`（`)` は区切りなのでこの 1 つは入れ子が無くても止まります）・
 `C:\tools\git.exe add -A`（引用符で囲まない Windows の絶対パス。空白を含まない形。Windows 規則の第 2 の
-分け方で拾います。`C:\tools\notgit.exe add -A` のように `git` を名乗らない実行ファイルは従来どおり通します）。
+分け方で拾います。`C:\tools\notgit.exe add -A` のように `git` を名乗らない実行ファイルは従来どおり通します）・
+`git commit -m "x\" ; git reset --hard \""`・`echo "a\" ; git clean -fd \""`（sh では `\"` が組を閉じず全体が 1 つの引数ですが、
+PowerShell では `\` がただの文字なので `"x\"` で閉じ、`;` の後ろのコマンドが実行されます。Windows 規則の第 2 の分け方がそれを拾います。
+hook にはどのシェルが実行するかが分からないので、これは止めたままにしています）。
 
 ### 止めないもの（設計として塞がない・塞げないと決めたもの。どれも実測）
 

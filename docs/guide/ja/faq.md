@@ -21,6 +21,7 @@ looptrack doctor
 ## 【配布スクリプトの更新】と出る
 
 手元の `looptrack` が、サーバの求める版より古いときの表示です。
+AI に setup ツールを呼ばせると、取得と init をまとめた 1 つのコマンド（`--url` 付き）が返ります。手で直すなら次のとおりです。
 
 ```bash
 looptrack self-update --check --url <サーバの URL>   # 新しい版があるかだけ確かめる

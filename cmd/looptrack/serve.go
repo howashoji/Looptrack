@@ -79,6 +79,7 @@ func serve() int {
 	if err != nil {
 		return fail(err)
 	}
+	h.LogDistLag(cmdLang()) // 配布物（クライアントに配る looptrack）がこの版にそろっていなければ起動時のログに残す
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           h,
@@ -123,6 +124,8 @@ func serveConfig(logger *slog.Logger) (server.Config, string, error) {
 		PublicURL:    os.Getenv("LOOPTRACK_PUBLIC_URL"),
 		Issuer:       strings.TrimSpace(os.Getenv("LOOPTRACK_TOTP_ISSUER")),
 		DistDir:      os.Getenv("LOOPTRACK_DIST_DIR"),
+		DistOff:      envSetEmpty("LOOPTRACK_DIST_DIR"),
+		Version:      version,
 		Logger:       logger,
 		LocalMode:    local,
 	}
@@ -172,6 +175,12 @@ func serveConfig(logger *slog.Logger) (server.Config, string, error) {
 		cfg.TrustedProxies = append(cfg.TrustedProxies, p)
 	}
 	return cfg, addr, nil
+}
+
+// envSetEmpty は環境変数が空の値で設定されている（未設定ではない）か。
+func envSetEmpty(name string) bool {
+	v, ok := os.LookupEnv(name)
+	return ok && v == ""
 }
 
 // secretKeySuffix は、ローカルモード + SQLite で作る鍵のファイルの名前（DB のファイル名にこれを足す）。

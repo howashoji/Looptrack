@@ -129,13 +129,19 @@ func stableVersion(s string) string {
 }
 
 // osLoose は golden との比較から OS の流儀の違いだけを除く（Windows のみ。ほかの OS はそのまま）。
+func osLoose(s string) string { return osLooseFor(runtime.GOOS, s) }
+
+// osLooseFor は osLoose の本体（OS を引数で受け、どの OS の上でも Windows の側を試せるようにする）。
 // golden は POSIX での出力で、Windows の CLI はパスを \ で区切って表示し（filepath の流儀）、
-// ファイルに POSIX の権限が無い（守りは ACL）。この 2 つは両側から同じように消して比べる。
-func osLoose(s string) string {
-	if runtime.GOOS != "windows" {
+// ファイルに POSIX の権限が無い（守りは ACL）。案内のコマンドで実行中の looptrack を指すときは、
+// POSIX のシェル向けの "<パス>" ではなく PowerShell 向けの & '<パス>' で書く（正規化の後は & '$LOOPTRACK'）。
+// この 3 つは両側から同じように消して比べる（& '<パス>' の形そのものは kitinit の TestRerunCommand が確かめる）。
+func osLooseFor(goos, s string) string {
+	if goos != "windows" {
 		return s
 	}
 	s = strings.ReplaceAll(s, `\`, "/")
+	s = strings.ReplaceAll(s, `& '$LOOPTRACK'`, `"$LOOPTRACK"`)
 	return fileModeLine.ReplaceAllString(s, "$1 (mode)")
 }
 

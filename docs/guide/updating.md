@@ -11,7 +11,7 @@ What does happen on its own is this: you're told about a new version (the CLI, t
 
 | Target | What happens automatically | What you do |
 | -- | -- | -- |
-| CLI (`looptrack`) | When your version is out of date, "[Update the distributed files]" is added at the start of an agent session and to MCP tool results — only when the server distributes `looptrack` or sets a minimum supported version. The CLI never checks GitHub releases by itself | Replace it with `looptrack self-update`, then run `looptrack issue init` again in each project |
+| CLI (`looptrack`) | When your version is out of date, "[Update the distributed files]" is added at the start of an agent session and to MCP tool results — only when the server distributes `looptrack` or sets a minimum supported version. The CLI never checks GitHub releases by itself | Have the agent call the setup tool and run the step it returns (one command, with `--url`, that downloads and runs init). To do it by hand, use that same step the setup tool returned |
 | Desktop app | When a new version is out, the top of the tray menu and a strip in the web UI tell you (it checks at startup and every 24 hours). The first start of a new version upgrades your data. The start-at-login registration and the CLI location are also brought in line with the current app. Only with "Install updates automatically" checked (it is not by default) are the replacement and the restart automatic too (macOS and Linux) | On macOS and Linux, choose "Update to version <version>" in the tray. On Windows, replace the whole app |
 | Server | When a new version is out, a strip on administrators' screens, `looptrack doctor` and the server's log tell you (it checks at startup and every 24 hours). A systemd server installed with `install.sh` replaces itself once a day only if you turn that on (off by default) | An administrator replaces it with `install.sh --upgrade` or similar. The administrator also puts the new `looptrack` for users into the distribution directory |
 
@@ -27,7 +27,7 @@ The server compares it with the newest version it distributes. If yours is older
 - at the end of the summary shown at session start (`looptrack hook summary`)
 - to MCP tool results
 
-The notice tells you why, and which command to run.
+The notice tells you why, and how to fix it (call the setup tool and run the step it returns).
 The reason is either "older than the newest one distributed" or "older than the oldest version this server supports".
 You'll see the second only if the administrator has set a minimum version. Then some features won't work correctly until you update.
 
@@ -69,7 +69,7 @@ So after `self-update`, run `init` once more in each project. That brings its ki
 looptrack issue init --project <slug> --url <server URL> --agent <agent>
 ```
 
-When the kit is out of date, the "[Update the distributed files]" notice shows this command too.
+The "[Update the distributed files]" notice does not show this command directly. Have the agent call the setup tool, and you get a single download-and-init command with `--url` (the download is skipped when the `looptrack` in place matches the distributed one). A command from the notice, run in a terminal with neither `--url` nor `LOOPTRACK_API_URL`, would point at your local mode instead.
 Once you've updated, the next session start reports to the server again and the notice goes away.
 
 ## Desktop app
@@ -121,14 +121,16 @@ Servers installed with the `install.sh` of 1.0.0-rc.1 or rc.2 upgrade with the s
 Here's what `--upgrade` does:
 
 1. Downloads the new version (`looptrack_<version>_linux_<arch>_server.tar.gz` from GitHub Releases) and checks its SHA-256 before unpacking it. If the server has `minisign`, it checks the signature too.
+   It also downloads the `looptrack` you distribute to users (all six platforms) and checks it against the same `SHA256SUMS` (see "The looptrack you distribute to users" below).
 2. Stops the service.
 3. With SQLite, copies the database to `backup-<date and time>/` while it is stopped. Back up MySQL yourself (`mysqldump` or similar).
 4. Replaces the binary. The previous version stays at `/usr/local/bin/looptrack.prev`. With compose it builds a new image and keeps the previous version's image.
 5. Runs the migration.
-6. Starts the service and waits for `/healthz` to respond.
+6. Puts the new `looptrack` for users in the distribution directory, then starts the service and waits for `/healthz` to respond. With systemd, if some other process (an old container left running, say) is already answering `/healthz` on the same port once the service is stopped, it replaces nothing and stops with an error naming that port, instead of taking the other process's answer for its own (an unattended upgrade starts the service again and ends as failed). After starting, it also checks that the one listening on the port is the service itself (this needs `ss`; without it, it only checks that the service is active).
 
-Same version? It changes nothing.
+Same version? It doesn't replace the server; it only brings the `looptrack` you distribute to users in line with that version (if it already is, nothing changes).
 MySQL with the minimum grants needs one more step. When a version adds tables, the application user can't read them until it's granted access again after the migration. So `--upgrade` asks for administrative MySQL credentials on the terminal at that point (not shown, not stored), grants access again, and then starts the service.
+A version with migrations creates its tables in the migration after the service stops, and an application user with the minimum grants can't create them. Pass a connection that can, in the environment variable `LOOPTRACK_SETUP_MIGRATE_DSN`. Without it, `--upgrade` tells you so before stopping anything and asks whether to go on; by default it stops there, changing nothing.
 For details, see ["Upgrading (--upgrade)" in DEPLOY.md](../server/DEPLOY.md), written for operators.
 
 ### New-version notices and automatic replacement
@@ -154,7 +156,7 @@ What runs is the copy of `install.sh` placed on the server when you turned it on
 It downloads only the new version's archive. It always checks the signature (the server needs `minisign`), and it never moves to an older version.
 If something fails partway, it goes back to the previous version and starts it again, so the service is never left stopped.
 Container images (compose) aren't replaced automatically. When you hear about a new version, run `--upgrade`.
-With MySQL, a new version that changes the shape of the database (one with migrations to run) isn't replaced automatically either; the server keeps running the current version. Run `--upgrade` on a terminal in that case.
+With MySQL, a new version that changes the shape of the database (one with migrations to run) isn't replaced automatically either; the server keeps running the current version. Run `--upgrade` on a terminal in that case, passing a connection that can create tables (`LOOPTRACK_SETUP_MIGRATE_DSN`).
 For details, see ["New-version notices and automatic replacement" in DEPLOY.md](../server/DEPLOY.md).
 
 ### A server set up with looptrack setup alone
@@ -181,7 +183,13 @@ Replacing the server doesn't update the `looptrack` on users' machines.
 `self-update` and "[Update the distributed files]" use the `looptrack` placed in the server's **distribution directory**.
 You set that directory with `LOOPTRACK_DIST_DIR` in `.env`. Without it, the server doesn't distribute `looptrack`.
 
-To distribute a new version, the administrator replaces what's in the distribution directory:
+**On a server installed with `install.sh`, `install.sh` takes care of it.** Every time it installs or runs `--upgrade` (including the automatic replacement), it fills the directory from the release it downloaded: the binaries for all six platforms, each checked against the signed `SHA256SUMS`, plus that `SHA256SUMS` and its signature.
+The directory is `/usr/local/share/looptrack/dist` under systemd and `<dir>/dist` with compose (mounted read-only at `/dist`), and `install.sh` adds `LOOPTRACK_DIST_DIR` to `.env` if it isn't there.
+A server installed with an older `install.sh` gets this the first time you run `--upgrade` with the new one (even on the same version; restart the service afterwards as it tells you).
+If `LOOPTRACK_DIST_DIR` already points somewhere else, `install.sh` leaves that directory alone. With a `compose.yaml` written by an older setup, add `- ./dist:/dist:ro` under `services.looptrack.volumes` first. Opening the Windows archives (zip) needs `unzip` or `python3` on the server.
+When the distributed `looptrack` doesn't match the server's version (no directory, a platform missing, or an older version), `looptrack serve` says so in its startup log and in a banner for administrators.
+
+Otherwise (a server not installed with `install.sh`, or a directory you manage yourself), the administrator replaces what's in the distribution directory to distribute a new version:
 
 1. Put `looptrack_<version>_<OS>_<CPU>` for each OS (with `.exe` at the end for Windows).
    GitHub Releases ships archives, not bare binaries. Take the `looptrack` out of each `looptrack_<version>_<OS>_<CPU>_server.tar.gz` (`.zip` for Windows) and put it under the name above.

@@ -11,8 +11,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/howashoji/looptrack/internal/client/hook/hookcmd"
 )
 
 type parsed struct {
@@ -27,9 +25,7 @@ type parsed struct {
 func parseGo(cmd string) parsed {
 	pat := &idMatcher{prefix: "TST-", width: 4}
 	p := parsed{Engaged: bashEngagedIDs(cmd, pat), Head: commitMessageHead(cmd), Escape: isEscapeCmd(cmd), FindAll: pat.findAll(cmd), Full: pat.fullMatch(cmd)}
-	run := hookcmd.CommandText(cmd, true)
-	if s, _ := gitWork(run, "commit", "merge", "push"); s >= 0 {
-		w := workLabel(run, s)
+	if w, ok := bashWork(cmd); ok {
 		p.Work = &w
 	}
 	if p.Engaged == nil {
@@ -75,4 +71,38 @@ func TestParseGolden(t *testing.T) {
 		}
 	}
 	t.Logf("以前の実装の記録と比べた入力: %d 件（不一致 %d・以前の入口を含むため比べなかったもの %d）", len(golden)-skipped, fails, skipped)
+}
+
+// TestRecordQuoteReadings は、記録する側（実作業・コミットメッセージの先頭行・参照した ID・抜け道）が
+// 引用符の組を posix と Windows の両方の読み方で読むことを固定する（どちらかで当たれば記録する。
+// 抜け道は記録を止める側なので、両方で当たったときだけ抜け道とする）。
+func TestRecordQuoteReadings(t *testing.T) {
+	pat := &idMatcher{prefix: "TST-", width: 4}
+	// 実作業: posix の読み方でだけ当たる（sh では `'` は二重引用符の中の文字で、commit は実行される）
+	if w, ok := bashWork(`echo "it's" ; git commit -m 'x'`); !ok || !strings.Contains(w, "commit") {
+		t.Errorf("posix の読み方の commit: got %q %v", w, ok)
+	}
+	// 実作業: Windows の読み方でだけ当たる（PowerShell では `"a\"` で閉じ、push は実行される）
+	if w, ok := bashWork(`echo "a\" ; git push \""`); !ok || !strings.Contains(w, "push") {
+		t.Errorf("Windows の読み方の push: got %q %v", w, ok)
+	}
+	// 対照: どちらの読み方でも引用符の中の文
+	if w, ok := bashWork(`echo "git push"`); ok {
+		t.Errorf("引用符の中の push を実作業と数えた: %q", w)
+	}
+	// コミットメッセージの先頭行: posix の読み方でだけ commit に当たる形
+	if got := commitMessageHead(`echo "it's" ; git commit -m 'TST-0001 head'`); got != "TST-0001 head" {
+		t.Errorf("posix の読み方の commit の先頭行: got %q", got)
+	}
+	// 参照した ID（単純コマンドに分けられない形）: posix の読み方でだけ当たる
+	if got := bashEngagedIDs(`echo "it's" ; looptrack issue show TST-0001 ; echo 'x`, pat); !reflect.DeepEqual(got, []string{"TST-0001"}) {
+		t.Errorf("posix の読み方の参照: got %q", got)
+	}
+	// 抜け道: 片方の読み方でだけ当たる形は抜け道にしない（記録を止めない）。対照は両方で当たる形
+	if isEscapeCmd(`echo "it's" ; looptrack issue-freshness ack ; echo 'x`) {
+		t.Error("posix の読み方だけで当たる抜け道で記録を止めた")
+	}
+	if !isEscapeCmd(`looptrack issue-freshness ack ; echo 'x`) {
+		t.Error("前提が崩れています: 両方の読み方で当たる抜け道を認めない")
+	}
 }

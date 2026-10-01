@@ -12,6 +12,7 @@ import (
 func testNormalizer() *Normalizer {
 	start := time.Date(2026, 9, 18, 3, 0, 0, 0, time.UTC) // JST 12:00
 	return &Normalizer{
+		Exes:     []string{"/private/var/folders/ab/T/clitest-looptrack-1/looptrack", "/var/folders/ab/T/clitest-looptrack-1/looptrack"},
 		Paths:    []string{"/private/var/folders/ab/T/TestX/001", "/var/folders/ab/T/TestX/001"},
 		Repo:     "/Users/dev/src/looptrack",
 		APIBase:  "http://127.0.0.1:54321/im",
@@ -27,6 +28,8 @@ func TestNormalizeText(t *testing.T) {
 		{"CRLF", "a\r\nb\r\n", "a\nb\n"},
 		{"一時パス（symlink を解いた形）", "保存: /private/var/folders/ab/T/TestX/001/ws/out.xlsx", "保存: $TMP/ws/out.xlsx"},
 		{"一時パス（解く前の形）", "場所: /var/folders/ab/T/TestX/001/ws", "場所: $TMP/ws"},
+		{"試す looptrack の実行ファイル", `入れるなら "/var/folders/ab/T/clitest-looptrack-1/looptrack" issue init`, `入れるなら "$LOOPTRACK" issue init`},
+		{"試す looptrack（symlink を解いた形）", "/private/var/folders/ab/T/clitest-looptrack-1/looptrack doctor", "$LOOPTRACK doctor"},
 		{"一時ディレクトリの外は変えない", "/var/folders/ab/T/TestY/ws", "/var/folders/ab/T/TestY/ws"},
 		{"リポジトリのパス", "/Users/dev/src/looptrack/deploy/deploy.sh", "$REPO/deploy/deploy.sh"},
 		{"リポジトリへの相対パス", ".claude/skills/x -> ../../../../Users/dev/src/looptrack/skills/x", ".claude/skills/x -> $REPO_REL/skills/x"},
@@ -141,5 +144,25 @@ func TestNormalizeQuery(t *testing.T) {
 		if got := n.Query(c.in); got != c.want {
 			t.Errorf("Query(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// TestOSLooseRunningBin は、Windows の案内のコマンドで実行中の looptrack を指す PowerShell の形（& '$LOOPTRACK'）が、
+// golden（POSIX の "$LOOPTRACK"）と同じに比べられることを確かめる。
+// 対照: Windows 以外では変えない（POSIX の出力の取り違えを隠さない）・試す looptrack 以外の & '<パス>' は "$LOOPTRACK" にしない。
+func TestOSLooseRunningBin(t *testing.T) {
+	golden := `入れるなら "$LOOPTRACK" issue init --project demo --url $API --agent codex,copilot --source server --loop`
+	got := `入れるなら & '$LOOPTRACK' issue init --project demo --url $API --agent codex,copilot --source server --loop`
+	if w, g := osLooseFor("windows", golden), osLooseFor("windows", got); w != g {
+		t.Errorf("Windows の & '$LOOPTRACK' が golden と同じにならない:\n golden %q\n got    %q", w, g)
+	}
+	if osLooseFor("darwin", got) != got || osLooseFor("linux", got) != got {
+		t.Error("Windows 以外で & '$LOOPTRACK' を書き換えた")
+	}
+	if w, g := osLooseFor("darwin", golden), osLooseFor("darwin", got); w == g {
+		t.Error("前提が崩れています: Windows 以外でも golden と同じに比べられた（Windows の側の検査が空振りしている）")
+	}
+	if got := osLooseFor("windows", `& 'C:\x\looptrack.exe' doctor`); got != `& 'C:/x/looptrack.exe' doctor` {
+		t.Errorf("試す looptrack 以外の & '<パス>' を書き換えた: %q", got)
 	}
 }

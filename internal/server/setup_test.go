@@ -340,7 +340,7 @@ func checkLoopAsk(t *testing.T, label, text string, out setupOut) {
 		len(out.Files) != 0 || out.DistURL != "" || out.LoopAnswer != "" {
 		t.Errorf("%s: 問いだけの結果でない: ask=%q steps=%+v files=%d dist=%q", label, out.Ask, out.Steps, len(out.Files), out.DistURL)
 	}
-	// 問いの文面は「後から looptrack issue init --loop で変えられる」を含むので、実行できるコマンドの印で見る
+	// 問いの文面は「後から init の --loop / --remove-loop で変えられる」を含むので、実行できるコマンドの印で見る
 	for _, bad := range []string{"curl", "--agent", "--source server", "--no-loop", "/setup/", "login --browser"} {
 		if strings.Contains(text, bad) {
 			t.Errorf("%s: 問いだけの本文に %q がある:\n%s", label, bad, text)
@@ -422,7 +422,7 @@ func TestSetupTool(t *testing.T) {
 		}
 		// 最初の手順は取得 + init の 1 つ。loop を入れられる AI は答えの旗（--loop）付き
 		first := out.Steps[0].Command
-		if c.want != "other" && (!strings.HasSuffix(first, ` --loop`) || strings.Contains(first, "--no-loop")) {
+		if c.want != "other" && (!strings.HasSuffix(innerCmd(first), ` --loop`) || strings.Contains(first, "--no-loop")) {
 			t.Errorf("%s: loop=yes の取得 + init: %s", c.client, first)
 		}
 		if !strings.Contains(first, `curl -fsSL "$U"`) || !strings.Contains(first, out.DistURL+"/bin/looptrack_v1.0.0_") || !strings.HasPrefix(out.DistURL, e.srv.URL+"/im/setup/") {
@@ -529,7 +529,7 @@ func TestInstallNotice(t *testing.T) {
 
 	// 撤去した 1.0.0 より前の CLI（client の無い通知）は、フックから届いても looptrack への置き換えを求める
 	st := post(map[string]any{"agent": "claude-code", "trigger": "hook", "source": "server", "files": legacyFiles})
-	if st.State != "stale" || strings.Join(st.StaleFiles, ",") != "looptrack" || !strings.Contains(st.UpdateCommand, "looptrack issue init --project req --agent claude-code") {
+	if st.State != "stale" || strings.Join(st.StaleFiles, ",") != "looptrack" || st.UpdateCommand != i18n.T(i18n.JA, "server.mcp.setup.update.refetch") {
 		t.Errorf("1.0.0 より前の CLI の通知: %+v", st)
 	}
 	m.call("list_issues", map[string]any{}, false)
@@ -743,14 +743,20 @@ func TestSetupEndToEnd(t *testing.T) {
 	checkLoopAsk(t, "1 回目", text, setupOf(t, data))
 	_, data = m.call("setup", map[string]any{"loop": "no", "os": runtime.GOOS}, false)
 	out := setupOf(t, data)
-	if !strings.HasSuffix(out.Steps[0].Command, " --no-loop") || !strings.Contains(out.Steps[0].Command, "curl -fsSL") {
+	if !strings.HasSuffix(innerCmd(out.Steps[0].Command), " --no-loop") || !strings.Contains(out.Steps[0].Command, "curl -fsSL") {
 		t.Fatalf("手順: %+v", out.Steps)
 	}
-	if res := sh(nil, out.Steps[0].Command); res.code != 0 {
+	// 取得 + init の後に、変数 U・S・D と関数 sum を呼び出し元のシェルに残さない（全体をサブシェルで包む）
+	if res := sh(nil, out.Steps[0].Command+fetchLeftProbe); res.code != 0 || !strings.HasSuffix(res.stdout, fetchLeftClean) {
 		t.Fatalf("取得と init: %d\n%s\n%s", res.code, res.stdout, res.stderr)
 	}
 	if b, err := os.ReadFile(filepath.Join(home, ".local", "bin", "looptrack")); err != nil || !bytes.Equal(b, bin) {
 		t.Fatalf("取得コマンドが looptrack を置いていない: %v", err)
+	}
+	// 対照: 包む前の中身（取得だけ。置き場は配布物と同じなので取得は省かれる）を流すと残る（検査がシェルの状態を見ていること）
+	if res := sh(nil, fetchOnly(t, out.Steps[0].Command)+fetchLeftProbe); res.code != 0 || !strings.Contains(res.stdout, "left=[http") ||
+		!strings.Contains(res.stdout, "|fn|") {
+		t.Fatalf("前提が崩れています: 包まない形でもシェルに変数・関数が残らない: %d\n%s\n%s", res.code, res.stdout, res.stderr)
 	}
 	sessionStart, settingsEnv := sessionStartHook(t, proj)
 	if settingsEnv["LOOPTRACK_API_URL"] != e.srv.URL+"/im" || settingsEnv["LOOPTRACK_PROJECT"] != "req" {
@@ -822,12 +828,18 @@ func TestSetupEndToEnd(t *testing.T) {
 		t.Errorf("古いときの SessionStart: %s %s", hookText(res.stdout), res.stderr)
 	}
 	m.call("list_issues", map[string]any{}, false)
-	if !strings.Contains(m.notice, "【配布スクリプトの更新】") || !strings.Contains(m.notice, "looptrack issue init --project req --agent claude-code") {
+	if !strings.Contains(m.notice, "【配布スクリプトの更新】") || !strings.Contains(m.notice, i18n.T(i18n.JA, "server.mcp.setup.update.refetch")) ||
+		strings.Contains(m.notice, "issue init") {
 		t.Errorf("古いときの MCP: %q", m.notice)
 	}
+	// setup が返した更新の手順（取得 + init の 1 つ）をそのまま実行する。置き場の looptrack は配布物と同じなので取得を省き、
+	// その looptrack で init だけが走る（--url 付きなので LOOPTRACK_API_URL が無くても向き先を誤らない）
 	out = setupOf(t, second(m.call("setup", map[string]any{"os": runtime.GOOS}, false)))
-	if res := sh(env, `"$HOME/.local/bin/looptrack" issue init --project req --agent claude-code --url `+e.srv.URL+`/im --source server --dist '`+out.DistURL+`'`); res.code != 0 {
-		t.Fatalf("更新: %s %s", res.stdout, res.stderr)
+	if out.Install.State != "stale" || len(out.Steps) != 2 || !strings.Contains(out.Steps[0].Command, "issue init --project req --url "+e.srv.URL+"/im --agent claude-code") {
+		t.Fatalf("更新の手順: %+v", out.Steps)
+	}
+	if res := sh(cliStripAPIEnv(env), out.Steps[0].Command); res.code != 0 || !strings.Contains(res.stderr, i18n.T(i18n.JA, "server.mcp.setup.fetch.skip_same")) {
+		t.Fatalf("更新: %d %s %s", res.code, res.stdout, res.stderr)
 	}
 	if res := sh(env, sessionStartInput+sessionStart); strings.Contains(hookText(res.stdout), cliNoticeMissing) ||
 		strings.Contains(hookText(res.stdout), cliNoticeStale) {
@@ -838,10 +850,37 @@ func TestSetupEndToEnd(t *testing.T) {
 		t.Errorf("更新後も指示が出る: %q", m.notice)
 	}
 	// 手動の確認コマンド
-	if res := sh(env, `"$HOME/.local/bin/looptrack" issue installed --agent claude-code`); res.code != 0 || !strings.HasPrefix(res.stdout, "導入済み（Claude Code・looptrack ") ||
+	// setup が返した確認の手順をそのまま、LOOPTRACK_API_URL・LOOPTRACK_PROJECT の無いシェルで実行する（URL とプロジェクトは手順が前置する）
+	if res := sh(cliStripAPIEnv(env), out.Steps[1].Command); res.code != 0 || !strings.HasPrefix(res.stdout, "導入済み（Claude Code・looptrack ") ||
 		!strings.Contains(res.stdout, "配布物は最新") {
 		t.Errorf("installed: %d %s %s", res.code, res.stdout, res.stderr)
 	}
+	// 確認の手順は利用者の端末に貼られることがあるので、実行の後に URL・プロジェクトを呼び出し元のシェルに残さない
+	// （残ると、同じ端末で別のプロジェクトに移ったときに、そちらの looptrack が黙ってこのプロジェクトに向く）。
+	// 対照: 同じシェルで export の形に直すと残る（検査がシェルの変数を実際に見ていること）
+	after := `; echo "after=[${LOOPTRACK_API_URL-}|${LOOPTRACK_PROJECT-}]"`
+	if res := sh(cliStripAPIEnv(env), out.Steps[1].Command+after); res.code != 0 || !strings.Contains(res.stdout, "導入済み（Claude Code") ||
+		!strings.HasSuffix(res.stdout, "after=[|]\n") {
+		t.Errorf("確認の手順の後にシェルへ値が残った: %d %q %s", res.code, res.stdout, res.stderr)
+	}
+	exported := "export " + strings.Replace(out.Steps[1].Command, ` "$HOME/`, ` && "$HOME/`, 1)
+	if !strings.HasPrefix(exported, "export LOOPTRACK_API_URL=") {
+		t.Fatalf("前提が崩れています: 確認の手順が代入の前置の形でない: %s", out.Steps[1].Command)
+	}
+	if res := sh(cliStripAPIEnv(env), exported+after); !strings.HasSuffix(res.stdout, "after=["+e.srv.URL+"/im|req]\n") {
+		t.Errorf("前提が崩れています: export の形でもシェルに値が残らない（検査が空振りしている）: %q %s", res.stdout, res.stderr)
+	}
+}
+
+// cliStripAPIEnv は env から LOOPTRACK_API_URL・LOOPTRACK_PROJECT を外す（setup の手順が URL とプロジェクトを自分で持つことを確かめる）。
+func cliStripAPIEnv(env []string) []string {
+	var out []string
+	for _, kv := range env {
+		if !strings.HasPrefix(kv, "LOOPTRACK_API_URL=") && !strings.HasPrefix(kv, "LOOPTRACK_PROJECT=") {
+			out = append(out, kv)
+		}
+	}
+	return out
 }
 
 // setupTextMax は未導入の setup の本文の上限。Copilot CLI は大きなツール結果を一時ファイルに逃がし、先頭の
@@ -998,7 +1037,7 @@ func TestSetupWorkspace(t *testing.T) {
 		text, data = m.call("setup", map[string]any{"workspace": ws, "loop": "no"}, false)
 		out = setupOf(t, data)
 		if out.Install.State != "missing" || out.Ask != "" || !strings.Contains(out.Steps[0].Command, "--agent "+c.agent+" --source server --dist") ||
-			!strings.HasSuffix(out.Steps[0].Command, " --no-loop") || !strings.Contains(text, "この作業ディレクトリ（abc-0123-"+c.agent+"）") {
+			!strings.HasSuffix(innerCmd(out.Steps[0].Command), " --no-loop") || !strings.Contains(text, "この作業ディレクトリ（abc-0123-"+c.agent+"）") {
 			t.Errorf("%s: 別の作業ディレクトリの 2 回目: state=%s steps=%+v", c.agent, out.Install.State, out.Steps)
 		}
 		// 導入済み（辞退済み）の作業ディレクトリでは、loop を付けても問いも loop の手順も出ない
@@ -1069,8 +1108,13 @@ func TestSetupAgentEnvPrefix(t *testing.T) {
 	if goos == "windows" {
 		goos = "darwin"
 	}
-	goEnv := "export LOOPTRACK_API_URL=" + base + " LOOPTRACK_PROJECT=req && "
-	cfgRe := regexp.MustCompile(`（(export [^（）]*? config) で確認）`)
+	// 前置は 2 つの形: && でつないだコマンドはサブシェルの中で export（終われば消える）、単純コマンドは export の無い代入。
+	// どちらも値を呼び出し元のシェルに残さない
+	subEnv, simpleEnv := "(export LOOPTRACK_API_URL="+base+" LOOPTRACK_PROJECT=req && ", "LOOPTRACK_API_URL="+base+" LOOPTRACK_PROJECT=req "
+	hasEnv := func(c string) bool {
+		return (strings.HasPrefix(c, subEnv) && strings.HasSuffix(c, ")")) || strings.HasPrefix(c, simpleEnv)
+	}
+	cfgRe := regexp.MustCompile(`（(LOOPTRACK_API_URL=[^（）]*? config) で確認）`)
 
 	for _, tc := range []struct{ label, client, version string }{
 		{"Copilot", "github-copilot-developer", "1.0.86"},
@@ -1088,7 +1132,7 @@ func TestSetupAgentEnvPrefix(t *testing.T) {
 				t.Fatalf("%s: 手順: %+v", tc.label, out.Steps)
 			}
 			for _, c := range cmds {
-				if !strings.HasPrefix(c, goEnv) {
+				if !hasEnv(c) {
 					t.Errorf("%s の手順のコマンドに環境変数が前置されていない: %s", tc.label, c)
 				}
 			}
@@ -1098,7 +1142,7 @@ func TestSetupAgentEnvPrefix(t *testing.T) {
 					cfg = m[1]
 				}
 			}
-			if cfg != goEnv+`"$HOME/.local/bin/looptrack" issue config` {
+			if cfg != simpleEnv+`"$HOME/.local/bin/looptrack" issue config` {
 				t.Errorf("%s: トークンの確認（issue config）のコマンド: %q", tc.label, cfg)
 			}
 
@@ -1118,10 +1162,16 @@ func TestSetupAgentEnvPrefix(t *testing.T) {
 					}
 					return cliResult{so.String(), se.String(), code}
 				}
-				if res := sh(out.Steps[0].Command); res.code != 0 {
+				// 実行の後に値を呼び出し元のシェルに残さない（取得 + init はサブシェル、config の確認は代入の前置）
+				after := `; echo "after=[${LOOPTRACK_API_URL-}|${LOOPTRACK_PROJECT-}]"`
+				// 取得 + init の中身の変数 U・S・D と関数 sum も残さない（Claude Code・other と同じ包み方。前置のサブシェルの中で包む）
+				if res := sh(out.Steps[0].Command + fetchLeftProbe + after); res.code != 0 || !strings.HasSuffix(res.stdout, fetchLeftClean+"after=[|]\n") {
 					t.Fatalf("%s: 取得と init: %d\n%s\n%s", tc.label, res.code, res.stdout, res.stderr)
 				}
-				if res := sh(cfg); res.code != 0 || strings.Contains(res.stderr, "がありません") {
+				if res := sh(fetchOnly(t, out.Steps[0].Command) + fetchLeftProbe); res.code != 0 || !strings.Contains(res.stdout, "|fn|") {
+					t.Fatalf("前提が崩れています: %s: 包まない形でもシェルに関数が残らない: %d\n%s\n%s", tc.label, res.code, res.stdout, res.stderr)
+				}
+				if res := sh(cfg + after); res.code != 0 || strings.Contains(res.stderr, "がありません") || !strings.HasSuffix(res.stdout, "after=[|]\n") {
 					t.Errorf("%s: config の確認: %d\n%s\n%s", tc.label, res.code, res.stdout, res.stderr)
 				}
 				if res := sh(`"$HOME/.local/bin/looptrack" issue config`); res.code == 0 {
@@ -1129,16 +1179,17 @@ func TestSetupAgentEnvPrefix(t *testing.T) {
 				}
 			}
 
-			// PowerShell は $env: で置く
+			// PowerShell は前の値を退避して置き、終わったら（失敗しても）finally で戻す
 			_, data = cp.call("setup", map[string]any{"os": "darwin", "loop": "yes"}, false)
 			for _, c := range commands(setupOf(t, data)) {
-				if !strings.HasPrefix(c, goEnv) {
+				if !hasEnv(c) {
 					t.Errorf("%s の手順（macOS）: %s", tc.label, c)
 				}
 			}
 			_, data = cp.call("setup", map[string]any{"os": "windows", "loop": "yes"}, false)
 			for _, c := range commands(setupOf(t, data)) {
-				if !strings.HasPrefix(c, "$env:LOOPTRACK_API_URL='"+base+"'; $env:LOOPTRACK_PROJECT='req'; ") {
+				if !strings.HasPrefix(c, envWinHead+"; $__ltPrevProject = $env:LOOPTRACK_PROJECT; $env:LOOPTRACK_API_URL = '"+base+"'; $env:LOOPTRACK_PROJECT = 'req'; try { ") ||
+					!strings.HasSuffix(c, " } finally { $env:LOOPTRACK_API_URL = $__ltPrevApiUrl; $env:LOOPTRACK_PROJECT = $__ltPrevProject } }") {
 					t.Errorf("%s の手順（Windows）: %s", tc.label, c)
 				}
 			}

@@ -205,6 +205,7 @@ ID は空白を含みません（採番 ID・文書 ID ともに英数字とハ�
 | 変更の方式 | すべて POST です。`web()` が TOTP 済みのセッションと CSRF を検査し、違えば 403 で何も変えません。結果は同じ画面を描き直し、メッセージで伝えます。スクリプトは使いません（CSP） |
 | パスワード変更 | 現在のパスワードで再認証します。argon2 の同時実行枠を使います。失敗は `login_attempts` に `stage=reauth` で記録し、ログインと同じ回数制限をかけます。成功したら全セッションを破棄し、操作した画面のセッションだけ作り直します |
 | トークン発行 | 用途（必須・255 文字まで）と有効日数（30 / 90 / 180 / 365）を指定します。平文は発行した POST の応答にだけ出し、DB にはハッシュと先頭 12 文字を置きます。無期限にできるのは管理コマンド（`looptrack token create --days 0`）だけです |
+| login の案内 | ブラウザでのログインと、発行したトークンを貼る login のコマンドは、setup が置いた looptrack の絶対パス（`"$HOME/.local/bin/looptrack"`・Windows は `& (Join-Path $env:LOCALAPPDATA 'Programs\looptrack\looptrack.exe')`）に `--url` を付けて示します。サーバは利用者の OS を知らないので、配っている OS ごとに両方を並べます。組み方は setup の手順と同じ（`goSetup.run`）で、配布ディレクトリにどの OS 向けも無ければ PATH の `looptrack` です |
 | 失効 | 一覧には PAT と OAuth の両方が出ます。`user_id` の条件つきの UPDATE で失効させるので、他人の ID や失効済みのものは 404 で何も変えません。OAuth のアクセストークンを失効させると、対の更新トークンも使えなくなります（§3-2） |
 | 利用者管理 | 追加（ログイン名は英数字と `. _ -`・初期パスワード・役割 admin / member）・役割の変更・無効化 / 有効化・パスワードの再設定・TOTP のリセット・プロジェクト権限（viewer / editor / admin / 解除）・トークンの失効ができます。無効化するとセッションを破棄し、トークンも認証時に利用者の無効を見て 401 にします |
 | 自己防衛 | 管理画面から自分自身の役割変更・無効化・TOTP リセット・パスワード再設定はできません（自分のパスワードはアカウント設定で変えます）。有効な管理者が 0 人になる変更も拒否します |
@@ -537,11 +538,32 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
   **公開の資産（GitHub Releases）は書庫**です: `looptrack_<版>_<os>_<arch>_server.tar.gz`（windows は `.zip`）で、中は最上位のディレクトリ 1 つの下の `looptrack`・`NOTICE`・`OFL-BIZUDGothic.txt`・`LICENSE` だけです。
   素の実行ファイル・`install.sh`・`grants.sql` は Releases に上げません。`SHA256SUMS` には書庫の行に加え、書庫の中の実行ファイルを従来の名前 `looptrack_<版>_<os>_<arch>[.exe]` にした行も載せます（書庫から出して配布ディレクトリに置いても、署名つきの一覧で確かめられるように）。
   **サーバの配布ディレクトリ（`LOOPTRACK_DIST_DIR`）と `self-update` は素の実行ファイルの形のまま**です。`/api/v1/dist` に binaries の一覧を足します（配るのは `looptrack_<版>_<os>_<arch>[.exe]` の名前だけで、書庫は置いても出しません）。
+- **install.sh で入れたサーバでは、配布ディレクトリを install.sh が受け持ちます**（利用者の決定。GitHub Releases の資産を直接指す案は採りません）。
+  入れるときと `--upgrade` のたび（timer の回を含む）に、取得したリリースから 6 対象の実行ファイルを取り、署名を確かめた `SHA256SUMS` の `looptrack_<版>_<os>_<arch>[.exe]` の行と照合してから置きます。
+  書庫は書庫の行で照合してから展開し、取り出した実行ファイルもその行で照合します（`--require-signature` の意味は変えません）。`SHA256SUMS`・`SHA256SUMS.minisig` は取得元のものをそのまま置きます。
+  置き場は systemd が `/usr/local/share/looptrack/dist`（root 0755）、compose が `<dir>/dist`（setup の compose.yaml が `./dist:/dist:ro` で入れる）です。`.env` に `LOOPTRACK_DIST_DIR` が無ければ足し、別の置き場を指していれば触りません（管理者が自分で置く配布ディレクトリ）。
+  置き換えは同じディレクトリの中の rename で、実行ファイル → 署名 → `SHA256SUMS` の順です（serve は `SHA256SUMS` に載る名前だけを配るので、途中の形を配りません。compose はディレクトリをコンテナに入れているので、ディレクトリごとは入れ替えません）。
+  新しい版を置くのはサーバを起動する前で、前の版の実行ファイルは起動を確かめた後に片付けます。無人の更新が止めた後に失敗して前の版に戻すときは、配布物も前の版の配布に戻します。
+  取得した版が入っている版より古く `--only-newer` で置き換えない回は、配布ディレクトリにも `.env` にも触りません。同じ版の `--upgrade`（timer の回を含む）は、サーバを置き換えずに配布物だけをその版にそろえます（以前の install.sh で入れたサーバ・欠けた配布物を直す経路）。
+  zip の書庫（windows）を開くには `unzip` か `python3` が要り、どちらも無ければ windows の 2 対象は置かずに注意を出します。
+- **配布物がサーバの版にそろっていなければ知らせます**（`server.distLagStatus`）。配布ディレクトリが無い・6 対象のどれかが無い・サーバの版より古いときに、`looptrack serve` の起動時のログ（Warn）と、admin の画面の共通ヘッダの帯（`layout.html` の `dist_notice`）に出します。
+  直し方は install.sh の `--upgrade` の 1 行です（同じ版でも配布物をそろえる）。ローカルモードと、比べられない版（`dev` など）のサーバと、`LOOPTRACK_DIST_DIR` を空の値で明示した（配らないと決めた）サーバでは比べません（空の明示は起動時のログに Info の 1 行だけを残します。未設定とは `os.LookupEnv` で分けます）。サーバより新しい版を配っているのは知らせません。
 - setup（MCP）は接続した AI の OS に合う取得コマンドと SHA-256 を返します。置き場は管理者権限の要らない場所です（`~/.local/bin`・`%LOCALAPPDATA%\Programs\looptrack`）。
-  置き場に looptrack が既にあれば、取得も置き換えもせずその looptrack で init だけを行います（配布が手元より古いと、置き換えは手元の新しい版を古い版に戻すため）。
-  版の比較は導入済み通知の側だけで行い、古ければ次の setup が `looptrack self-update` を示します。
+  置き場の looptrack が配布物と SHA-256 で同じときだけ取得を省き、違えば（無ければ）取得して確かめ、`.part` から `mv -f` / `Move-Item -Force` で置き換えます（symlink はリンクの先ではなくリンクを置き換えます）。
+  取得・確認・置き換えのどれかで失敗したら `.part` を消して失敗で終えます。取得 + init のコマンドは、どの AI 向けでも全体を sh はサブシェル `( … )`、PowerShell は `& { … }` で包みます（端末に貼られたときに、変数 `U`・`S`・`D` と `/usr/bin/sum` を覆い隠す関数 `sum`、`$ErrorActionPreference` などを呼び出し元のシェルに残さないためです）。
+  **置いた後、置き場が PATH に無ければ利用者の PATH に足します**（利用者の決定。kit・MCP・hook・CLI の文面と AI の許可のパターン `Bash(looptrack issue:*)` は素の `looptrack` のまま）。断片は `internal/setuppath` の 1 か所に置き、setup の手順と doctor が共有します。
+  - 冪等です。いまの PATH に置き場があれば何も書きません。起動ファイルに同じ行があれば足さず、Windows は `Path` に同じ項目（`%…%` を展開し、末尾の `\` を外し、大小を区別せずに比べる）があれば足しません。書けなくても init は続けます（hook は絶対パスで配線され、doctor と要約が知らせます）。
+  - macOS・Linux は利用者の既定のシェル（`$SHELL`）の起動ファイルに、PATH に無いときだけ足す 1 行（`case ":$PATH:" in … esac # looptrack`）を書きます。zsh は `~/.zshenv`（環境に `ZDOTDIR` があって HOME と違えば `$ZDOTDIR/.zshenv` にも。zsh が起動のときに読むのは環境の `ZDOTDIR` の下、無ければ HOME の下の `.zshenv` です。`~/.zshenv` の中で `ZDOTDIR` を決めている利用者のシェルから流すと `ZDOTDIR` が環境にあるので、そこにだけ書くと、`ZDOTDIR` を持たない新しい端末や GUI から起動した AI が読みません）、bash は `~/.bashrc` とログインのシェルが読むファイル（`~/.bash_profile` → `~/.bash_login` → `~/.profile` の最初にあるもの。どれも無ければ `~/.profile`。`~/.bash_profile` を新しく作ると `~/.profile` が読まれなくなるので作りません）、fish は `${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/looptrack.fish`、それ以外（sh・dash・ksh・不明）は `~/.profile` です。
+  - 選んだ理由（根拠）: zsh の文書（Startup/Shutdown Files）では、`.zshenv` だけがログインでも対話でもない `zsh -c` を含む全部の起動で読まれ、`.zprofile` はログイン、`.zshrc` は対話のときだけです。AI のアプリはコマンドを `$SHELL -c` か `-lc` で流します。Codex は `-lc` か `-c`（ソース `codex-rs/core/src/shell.rs`。2026-10-01 に確認）、Claude Code のデスクトップ版の Bash ツールは `/bin/zsh -c 'source <スナップショット> …'`（この開発機の `ps` で実測。2026-10-01）で、どちらも `.zshrc` を読みません。Claude Code はスナップショットの最後の `export PATH=…` で PATH を決めますが、スナップショットを作るアプリのプロセスの PATH は、`.zshrc` にだけ書いた項目を含んでいました（実測。デスクトップのアプリ本体は `PATH=/usr/bin:/bin:/usr/sbin:/sbin` で、子の claude は利用者のシェルの環境を読み直しています。対話のシェルで読み直していると推測しますが、方法は未確認）。`.zshenv` は対話のシェルでも読まれるので、この経路でも効く見込みです。rustup も zsh には `.zshenv`、bash には既存の bash の起動ファイルと `.profile` に書きます（`src/cli/self_update/shell.rs`）。
+  - bash の `-c`（ログインでも対話でもない）はどの起動ファイルも読みません。この形で流す AI では、AI のアプリのプロセスの PATH（利用者のシェルの環境から作られていれば足した行が効く）に頼ります。fish を既定のシェルにしている利用者の AI のシェル（多くは bash か zsh）にはこの行が届かないことがあります（推測・未実測）。Copilot CLI と Codex の実機の確かめは未実施です。
+  - Windows は利用者の環境変数 `Path`（`HKCU\Environment`）に足します。`setx` は 1024 文字で切り詰めるので使いません。`[Environment]::SetEnvironmentVariable('Path', …, 'User')` は値の種類を `REG_SZ` にして `%USERPROFILE%` のような項目を展開されなくするので、レジストリを展開せずに読み（`DoNotExpandEnvironmentNames`）、元の種類（無ければ `REG_EXPAND_SZ`）のまま書きます。開いているアプリ（エクスプローラ）への通知（`WM_SETTINGCHANGE`）は、`SetEnvironmentVariable` の User が書いた後に送るので、使い捨ての変数 `LOOPTRACK_PATH_REFRESH` を置いて消すことで送ります。Windows の実行時の振る舞いは CI（Windows）の実行を見るまで未実証です。
+  - その場の端末: 断片は包み（サブシェル・`& { }`）の中で動くので、貼った端末の PATH は変わりません（包みの外に PATH の変更を残すと「呼び出し元に残さない」に反するため、残しません）。足したとき（または起動ファイルに既にあったとき）は「AI のアプリと端末を開き直す」を出し、setup の手順の見出しも AI にそれを利用者へ伝えさせます。
+  - PATH で解決できないことは、控えの置き方が server のときに `looptrack doctor`（直し方と、PATH を足すだけのコマンド）と SessionStart の要約（setup の手順の再実行と doctor）が知らせます。導入済みだと setup は手順を返さないので、doctor が同じ断片を単独の形で示します。要約が見る PATH は AI のアプリが hook に渡す PATH で、AI がコマンドを流すシェルの PATH（起動ファイルを読むぶん広いことがある）とは別です。
+  置き場にデスクトップ版の symlink（Windows は印つきのコピー）など配布物と違う looptrack があれば、サーバ版の setup は配布物に置き換えます（symlink はリンクだけを置き換え、リンクの先には触りません。利用者の承認済み）。
+  サーバ版の利用者の手元にあるのは setup が配布物から置いた looptrack だけ、という前提です（利用者の決定）。版の新旧は比べず、配布物にそろえます。CLI から SHA-256 をサーバへ送る案（DB の列を足す）は採りません。
+  版の比較は導入済み通知の側だけで行い、古ければ【配布スクリプトの更新】が setup の手順（取得 + init の 1 つ）を示します。
   デスクトップ版はアプリの中の実体を使い、メニューからこの置き場にリンクを作ります。
-- 導入済み通知（§6）に `client.version` を足し、**実行ファイルの版**で【配布スクリプトの更新】を出します。直すのは `looptrack self-update` です。
+- 導入済み通知（§6）に `client.version` を足し、**実行ファイルの版**で【配布スクリプトの更新】を出します。直すのは setup の手順（取得 + init の 1 つ）です。案内と setup の手順は、PATH の looptrack・CLI の既定の接続先・AI の作業環境にだけある環境変数に頼るもの（`self-update`・`--url` の無い init）を返しません（利用者の端末では手元のローカルモードに向くため）。
 - macOS の CLI はブラウザ経由で取得しなければ検疫が付きません。公式の配布物の darwin の実行ファイルは配布元の Developer ID で署名・公証します。
   Windows は当面署名しません。`SHA256SUMS` は minisign で署名し、`self-update` は埋め込んだ公開鍵で確かめます（手順は [RELEASE.md](RELEASE.md)「署名」）。
   `self-update` は配布の一覧の version を、署名された版（`SHA256SUMS` の中の実行ファイルの名前と、リリースの trusted comment `looptrack <版> SHA256SUMS`）と照らし合わせ、違えば置き換えません。手元より古い版へ置き換えるのは `--force` のときだけです。
@@ -854,7 +876,7 @@ systray の OS ごとの仕組み:
 - 起動のたびに、このアプリが作ったものが古ければ直します。古いと見なすのは次の 2 つです。
   - リンクの先が別の場所の .app / AppImage のとき（動かした場合や AppImage のファイル名に入る版が変わった場合）
   - Windows のコピーが同梱のものと違い、かつ置いたときの SHA-256 のままのとき（self-update で新しくしたものは戻しません）
-- PATH は変えません。置き場が PATH に無ければ知らせに足し方を書きます（`looptrack doctor` の案内と同じです。kit の入口は既定の置き場も探します）。
+- PATH は変えません。置き場が PATH に無ければ知らせに足し方を書きます。macOS・Linux の足し方は、setup の取得の手順が使う断片（`internal/setuppath`）をそのまま示します（どの起動ファイルに書くかの規則を 2 か所に書かないため。`looptrack doctor` の案内も同じ断片です）。kit の入口は既定の置き場も探します。
 - **Windows で symlink にしない理由**: 開発者モードか管理者権限が要るためです。
 - **.cmd のシムにしない理由**: hook がシェルを通さずに起動すると動きません。Ctrl+C で「バッチ ジョブを終了しますか」も出ます。
 - **デスクトップ版の exe を CLI に使わない理由**: GUI の実行ファイル（`-H windowsgui`。ダブルクリックでコンソールの窓を出さないため）は標準出力が端末に出ません。
@@ -1011,9 +1033,10 @@ setup が返す 1 コマンド（`looptrack` の取得 → SHA-256 の確認 →
 MCP 接続（OAuth・X-Looptrack-Project）── instructions: 最初に setup
   └ setup ツール → clientInfo から AI の種類を判定 → 手順（取得・init・login・承認）と配布物の SHA-256・期限つき取得 URL
       └ [AI] curl <券 URL>/looptrack_<OS>_<CPU> → SHA-256 を確認 → ~/.local/bin/looptrack（Windows は %LOCALAPPDATA%\Programs\looptrack）に置く
+             → 置き場が PATH に無ければ利用者の PATH に足す（シェルの起動ファイル・Windows は利用者の Path）
              → looptrack issue init --agent <種類> --source server --dist <券 URL>
       └ [AI] looptrack issue login --browser → [利用者] ブラウザでログインと承認（未ログイン時。§3-2）
-      └ [利用者] 再起動とフックの承認
+      └ [利用者] 再起動（PATH の変更もここで効く）とフックの承認
           └ SessionStart のフック: looptrack hook summary --agent <種類> → POST /projects/{slug}/install（実行ファイルの版）
               └ 以後、MCP のツール結果の【導入が未完了】が消える。実行ファイルが古くなると【配布スクリプトの更新】が付く
 ```
@@ -1099,12 +1122,11 @@ MCP の操作を会話に結ぶ:
 
 | 導入状態 | 手順 |
 | -- | -- |
-| missing（通知が無い）・stale で置き方が link 以外 | 表の下の「missing と stale（link 以外）の手順」です |
+| missing（通知が無い）・stale | 表の下の「missing と stale の手順」です |
 | no_hook（手動の通知だけ） | login の確認・フックの承認・確認 |
-| stale で置き方が link | 手元の Looptrack のリポジトリを `git pull` します。確認は `installed` です |
 | current | guide → next（prompt `loop`）から始めます |
 
-missing と stale（link 以外）の手順:
+missing と stale の手順:
 
 - Claude Code / Codex:
   1. [AI] 取得 → SHA-256 確認 → 置き場に置いて `looptrack issue init --project <slug> --url <URL> --agent <種類> --source server --dist <券 URL>`。SHA-256 の確認は macOS・Linux で `shasum -a 256` / `sha256sum` を、Windows で `Get-FileHash` を使います。
@@ -1117,8 +1139,9 @@ missing と stale（link 以外）の手順:
   2. [AI] 環境変数と指示ファイル
   3. login
   4. `installed --agent other`
-
-手元に Looptrack のリポジトリがある場合の代案（そこでビルドした `looptrack` で `looptrack issue init`）も本文に出します。
+- stale（looptrack の通知がある導入。実行ファイルの版か kit の控えが古い）:
+  1. [AI] 上の 1 と同じ取得 + init です。loop の答えがあれば、その旗を付けた 1 つにします（init は 1 回だけ。`self-update` と `--url` の無い init は返しません）。
+  2. [AI] 確認（任意）: 置いた looptrack に `LOOPTRACK_API_URL`・`LOOPTRACK_PROJECT` を前置した `issue installed --agent <種類>` です（AI の作業環境の環境変数に頼りません）。
 
 **loop の問いの 2 段**（利用者の判断 2026-09-19）: 1 つの結果に問いと答えごとの 2 通りのコマンドを並べていた時期がありました。すると AI が問いを示さずにコマンドを実行することがありました（Copilot CLI 1.0.86 の実物で 3 回中 2 回。モデルによる差があります）。問いの段階を飛ばせない形にするため、setup を 2 段にしています。Claude Code・Codex・Copilot で同じ形です。
 
@@ -1143,8 +1166,8 @@ missing と stale（link 以外）の手順:
 答えつきの結果:
 
 - loop の手順は答えに合うコマンド 1 つ（`who: ai`）です。
-- missing・stale（link 以外）では、取得 + init に `--loop` / `--no-loop` の一方を付けた 1 つが最初の手順になります（承認 1 回）。
-- current・no_hook・stale（link・Go 版）では、`init … --loop` / `--no-loop` の 1 つを §8 の位置に挟みます。
+- missing・stale では、取得 + init に `--loop` / `--no-loop` の一方を付けた 1 つが最初の手順になります（承認 1 回）。
+- current・no_hook では、`init … --loop` / `--no-loop` の 1 つを §8 の位置に挟みます。
 - `loop_answer` には使った答えが入ります。
 - 本文の先頭は「AI への指示: 利用者の答え「loop を入れる」（入れない）に合わせた手順。…」です。問いの文面は繰り返しません。
 - yes には hook の承認を添えます。no の手順の見出しには辞退の説明（作業ディレクトリごとに問う）を添えます。
@@ -1176,7 +1199,7 @@ AI が利用者に問わずに `loop` を付けて呼ぶことまでは防げま
 違えばその作業ディレクトリは missing として手順を返します。loop の選択もその作業ディレクトリで問い、本文に最後の通知の作業ディレクトリ・ホスト・時刻を出します。`workspace` を渡さない呼び方と、通知に `workspace` が無いとき（送らない古い CLI）は従来どおりです。
 MCP のツール結果に付ける【導入が未完了】は従来の単位（利用者 × プロジェクト × AI）のままにします。要求に作業ディレクトリが無いためです。setup なら AI が引数で渡せますが、他のツールの呼び出しごとに渡させるのは重すぎます。
 
-**Copilot 向けの手順のコマンド**: Copilot（CLI・VS Code）は `.claude/settings.json` の env を CLI に渡しません。そのため agent が copilot のときは、サーバの URL とプロジェクトの環境変数を手順のすべてのコマンドの前に置きます（login の手順の文中の `config` の確認も含みます）。置くのは `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT` です。`&&` でつないだ後ろのコマンドにも効く形にします。sh は `export A=… B=… && <コマンド>` です。PowerShell は `$env:A='…'; $env:B='…'; <コマンド>` です。Claude Code・Codex・other には付けません。
+**Copilot 向けの手順のコマンド**: Copilot（CLI・VS Code）は `.claude/settings.json` の env を CLI に渡しません。そのため agent が copilot のときは、サーバの URL とプロジェクトの環境変数を手順のすべてのコマンドの前に置きます（login の手順の文中の `config` の確認も含みます）。置くのは `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT` です。手順のコマンドは利用者の端末に貼られることがあるので、値を呼び出し元のシェルに残さない形にします（残ると、同じ端末で別のプロジェクトに移ったときに、そちらの looptrack が黙ってこのプロジェクトに向きます）。sh は、手順のコマンド（`&&` でつないだ取得 + init を含む）をサブシェルの `(export A=… B=… && <コマンド>)` で包みます。文中に示す単純コマンド（`config` の確認・辞退済みの案内の init）と確認の `installed` は `A=… B=… <コマンド>` です。PowerShell は `& { $__ltPrevApiUrl = $env:A; $__ltPrevProject = $env:B; $env:A = '…'; $env:B = '…'; try { <コマンド> } finally { $env:A = $__ltPrevApiUrl; $env:B = $__ltPrevProject } }` で、終わったら（失敗しても）前の値に戻します。退避の変数名は、包む中身（取得の手順の `$U`・`$S`・`$D`・`$B`・`$P`）と重ならない名前にします（PowerShell の変数名は大小を区別しないため）。sh の前置は環境変数の `LOOPTRACK_*` だけで、中身のシェル変数（`U`・`S`・`D`・`sum`）とは重なりません。Claude Code には付けません。ただし更新の後の確認（`installed`）と other の `installed` は、どの AI でも単純コマンドの形で付けます。
 CLI（Go 版）の「サーバの URL がありません」の案内では URL を固定値（本番）で出しません。代わりに `<サーバの URL>`（MCP の接続設定の URL から末尾の `/mcp` を除いたもの）と書きます。ローカルのサーバでは固定値が誤りになるからです。
 
 **期限つきの取得 URL（券）**: `/looptrack/setup/<券>/`（一覧。`GET /api/v1/dist` と同じ JSON）と `/looptrack/setup/<券>/<名前>`（本体・`X-Looptrack-SHA256`）の 2 つです。
@@ -1212,7 +1235,7 @@ CLI の `summary` の末尾には、トークン情報の未付与→ レポー�
 | -- | -- |
 | missing | 【導入が未完了】…導入済み通知が届いていません。setup ツールを呼び、返った手順を利用者の承認を得て実行してください |
 | no_hook | 【導入が未完了】…フックからの通知がまだ届いていません。利用者が Claude Code を再起動し…承認（Codex は /hooks で信頼・Copilot は新しいセッション。CLI はフォルダの信頼） |
-| stale | 【配布スクリプトの更新】…更新: `looptrack issue init --project <slug> --agent <種類> --source server`（link は git pull） |
+| stale | 【配布スクリプトの更新】…更新: setup ツールを呼び、返った手順（looptrack の取得と init をまとめた 1 つのコマンド。--url 付き）を利用者の承認を得て実行する |
 
 ### prompts
 
@@ -1404,7 +1427,7 @@ init（§5-2）と setup（§6）が各プロジェクトへ入れるものを 2
 | 保存 | `agent_installs` に `core_bundle_sha256`・`loop_state`（installed / declined / none。空は送らない古い CLI）・`loop_bundle_sha256`・`loop_version` を持ちます（0009。0008 は担当者の追加が使っています）。検査ではハッシュが 16 進 64 文字で version が 64 文字までかを見て、外れると 400 です |
 | 比較 | サーバの `latestDist` が配布の一覧から `kit/core/` と `kit/loop/` の一式の `bundleSHA256` を作ります（`.looptrack-kit.json` の bundle_sha256 と同じ計算）。**core**: 通知に core があって配布物に kit/core があり、両者が違えば `stale_kit: ["core"]` です。**loop**: `loop_state` が installed で配布物に kit/loop があり、両者が違えば `stale_kit: ["loop"]` です。未選択・辞退・古い CLI・kit/loop の無い配布物では loop を比べません |
 | 状態の JSON | `installStateJSON` に `loop`（installed / declined / none。通知が無いときと古い CLI は none）・`loop_version`・`loop_bundle_sha256`・`latest_loop_bundle_sha256`・`core_bundle_sha256`・`latest_core_bundle_sha256`・`stale_kit` を足します。`GET /install` には `latest_core_bundle_sha256`・`latest_loop_bundle_sha256` を足します |
-| 更新の指示 | 【配布スクリプトの更新】の古いものの一覧に「kit/core 一式」「kit/loop 一式」を並べます。更新コマンドは copy / server なら従来どおり `init --source server` です。link はスクリプトだけなら `git pull` です。kit が古ければ「`git pull` の後に `init` を再実行」です（`.looptrack-kit.json` の控えと skill `/issue` は init が書くためです） |
+| 更新の指示 | 【配布スクリプトの更新】の古いものの一覧に「kit/core 一式」「kit/loop 一式」を並べます。更新は置き方（link / copy / server）に関わらず、setup ツールが返す取得 + init（`--url`・`--source server` 付き）の 1 つです（`git pull` は案内しません。`.looptrack-kit.json` の控えと skill `/issue` は init が書くためです） |
 | 導入済みの文 | current の文の末尾に loop の状態（あり（版）・なし（辞退）・未選択（setup で利用者に問う））を足します（`looptrack issue installed` の表示にも出ます） |
 
 ### setup ツール（§6 への追加）
@@ -1417,12 +1440,11 @@ init（§5-2）と setup（§6）が各プロジェクトへ入れるものを 2
   - `declined` では問いを出さず、「辞退済みのため勧めない（`… --loop` で入る）」の 1 行だけを出します。
   - `installed` では何も出しません。
 - 位置（答えを付けた 2 回目）:
-  - missing・stale（link 以外）では**最初**に置き、取得 + init の手順をこの手順に置き換えます。取得 + init に答えの `--loop` / `--no-loop` を付けた 1 つで、旗の無い取得 + init は出しません。
+  - missing・stale では**最初**に置き、取得 + init の手順をこの手順に置き換えます。取得 + init に答えの `--loop` / `--no-loop` を付けた 1 つで、旗の無い取得 + init は出しません。
     AI は先に問い、答えのコマンドを 1 回実行するだけで導入を終えられます（承認 1 回）。問いが取得と init の後にあると、答えを先に得ていても core の init と `init --loop` の 2 回になっていました。
   - no_hook では login の後（承認の前）に置きます。
-  - stale（link）では git pull の後に置きます。
   - current では最初に置きます。
-- コマンド（取得の無い位置）は `looptrack issue init --project <slug> --agent <種類>` です。置き方が link なら何も足しません。それ以外は `--url <URL> --source server --dist '<券 URL>'` を足します（トークン未登録でも券で取れます）。
+- コマンド（取得の無い位置）は、置き場の looptrack の絶対パス（`"$HOME/.local/bin/looptrack"`・Windows は `& (Join-Path $env:LOCALAPPDATA 'Programs\looptrack\looptrack.exe')`。OS が分からなければ両方）で `issue init --project <slug> --agent <種類> --url <URL> --source server --dist '<券 URL>'` です（トークン未登録でも券で取れます）。辞退済みの案内（`--loop` で入る）も同じ形です。サーバ版の利用者の端末に PATH の looptrack は無い前提なので、setup の結果（本文・構造化データ）と注記には、パスの付かない `looptrack <サブコマンド>` と `--url` の無い init を出しません（配布ディレクトリにその OS 向けが無く、利用者が別の方法で PATH に置く手順だけは例外です）。
 - prompt `loop`（§6）の本文は loop の有無で変えます。
   - loop が入っているときは `/iterate` の手順です（next → 実装 → ゲート（`gates.sh`）→ 問題の起票 → close → next。`loopIteratePromptText`）。
   - 入っていないときは最小ループです（next → 作業 → comment → 検証 → close → next。`loopPromptText`）。

@@ -43,6 +43,9 @@
 #   無人の更新（--yes で端末が無い。timer）は、MySQL で新しい版に未適用の migrate があれば置き換えず、止めた後に失敗すれば
 #   前の実行ファイル（SQLite は DB の控えも）に戻して起動し直し、0 でない終了コードで終わる（サービスを止めたままにしない）。
 #   compose（コンテナのイメージ）は自動では置き換えない（新しい版は looptrack serve が管理画面の帯・doctor・起動時のログで知らせる）。
+# --upgrade（MySQL）は、止める前に新しい版の migrate --check で未適用の migrate を確かめる（systemd・compose とも）。端末の回で
+#   未適用があり、表を作れる接続先（LOOPTRACK_SETUP_MIGRATE_DSN）が無ければ、止めた後に失敗しうると示して続けるかを尋ねる
+#   （既定は続けない。--yes では尋ねずに既定）。続けなければ何も変えずに 0 でない終了コードで終わる。
 set -eu
 
 PROG=install.sh
@@ -72,6 +75,19 @@ AUTO_LIB=/usr/local/lib/looptrack
 AUTO_SH=$AUTO_LIB/install.sh
 AUTO_SVC=/etc/systemd/system/looptrack-upgrade.service
 AUTO_TIMER=/etc/systemd/system/looptrack-upgrade.timer
+# クライアントに配る looptrack の置き場（配布ディレクトリ。serve の LOOPTRACK_DIST_DIR）。入れるときと --upgrade のたびに、
+# 取得したリリースの 6 対象の実行ファイルと署名つきの SHA256SUMS をそろえる（dist_plan・stage_dist・commit_dist）
+DIST_SHARE=/usr/local/share/looptrack
+DIST_SYS=$DIST_SHARE/dist              # systemd（root 0755。サービスは読むだけ。自動の置き換えの写し（${AUTO_LIB}）とは分ける）
+DIST_IN_CONTAINER=/dist                # compose（ホストの <dir>/dist を compose.yaml の ./dist:/dist:ro で入れる）
+DIST_TARGETS="linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64 windows_arm64" # dist.sh の 6 対象
+DIST_HOST=""      # この回に受け持つ配布ディレクトリ（ホストのパス。空なら触らない）
+DIST_ENV=""       # .env の LOOPTRACK_DIST_DIR に書く値
+DIST_ADD_ENV=0    # .env に LOOPTRACK_DIST_DIR を足すか
+DIST_ENV_ADDED=0  # この回に足したか（起動し直すまで効かない）
+DIST_KEEP=""      # 配布ディレクトリに残すファイルの名前（この版の実行ファイル・SHA256SUMS・署名・ライセンス文）
+DIST_ADDED=""     # この回に新しく置いた実行ファイル（無人の更新の戻しで消す）
+DIST_COMMITTED=0  # 置いたか（無人の更新の戻しで、前の SHA256SUMS・署名に戻すか）
 
 # 最初のプロジェクトの slug（MCP の接続設定の X-Looptrack-Project に使う）。
 # setup の引数（--project）・起動前の確認（check_store_access）・印（install.conf）の順に決まる。
@@ -200,6 +216,71 @@ ask() {
 # env_get <KEY> <file> — setup が書く .env（KEY='value'）から値を取る
 env_get() {
   sed -n "s/^$1=//p" "$2" | tail -n 1 | sed "s/^'\(.*\)'\$/\1/; s/^\"\(.*\)\"\$/\1/"
+}
+
+# env_sh_suspects <file> — .env の行のうち、許す形に丸ごと一致しないものを 1 行ずつ出す（キーとして読める行はキーの名前、
+# 読めない行は「行 N」）。値は変数にも標準出力にも標準エラーにも通さない（awk の中で = の左と行番号だけを print する）。
+# 「疑わしいものを探す」のではなく「許した形以外はすべて止める」: sh の . で読むと、値の一部が出る・別のコマンドとして
+# 実行される行を、形を数え上げずに漏れなく止めるため。
+# 見ない行: 空行と、前に空白があってもよい # で始まる行だけ。それ以外は、前の空白と export を剥がした後で、次のどれかに
+# 丸ごと一致しなければ止める（後ろの空白・タブは許す）。KEY は [A-Za-z_][A-Za-z0-9_]*:
+#   (a) KEY='…'        中に ' を含まない（setup が書く形。setup は ' を含む値を拒否する）
+#   (b) KEY="…"        中に $ ` \ " を含まない
+#   (c) KEY=値          引用符なし。空白・タブ・( ) < > ; & | ` $ \ " ' を含まず、~ で始まらない（空の値も許す）
+env_sh_suspects() {
+  awk '
+    BEGIN { q = sprintf("%c", 39) }
+    {
+      line = $0
+      if (line ~ /^[ \t]*$/ || line ~ /^[ \t]*#/) next
+      sub(/^[ \t]+/, "", line)
+      sub(/^export[ \t]+/, "", line)
+      ok = 0
+      key = ""
+      if (line ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
+        i = index(line, "=")
+        key = substr(line, 1, i - 1)
+        v = substr(line, i + 1)
+        sub(/[ \t]+$/, "", v)
+        n = length(v)
+        c = substr(v, 1, 1)
+        if (c == q) {
+          if (n >= 2 && substr(v, n, 1) == q && index(substr(v, 2, n - 2), q) == 0) ok = 1
+        } else if (c == "\"") {
+          if (n >= 2 && substr(v, n, 1) == "\"" && substr(v, 2, n - 2) !~ /[$`\\"]/) ok = 1
+        } else if (c != "~" && index(v, q) == 0 && v !~ /[ \t()<>;&|`$\\"]/) {
+          ok = 1
+        }
+      }
+      if (ok) next
+      if (key != "") print key
+      else print "行 " NR
+    }
+  ' "$1" 2>/dev/null
+}
+
+# check_env_sh <file> — .env を sh の . で読む前に確かめる（sh -n で構文。あわせて env_sh_suspects で、許した形に一致しない行）。
+# 実行はしない。出力は捨てる。
+# sh は構文の誤りのとき、その行（DSN のパスワードを含む）をそのまま出力し、X=a b のような形では b を別のコマンドとして
+# 実行して「b: not found」と値の後ろ側を出し、二重引用符の中の $name は「name: parameter not set」と出すので、読む前に必ず通す:
+# 値を引用せずに括弧や空白などを含む .env（docker compose の env_file や systemd の EnvironmentFile はそのまま受け付ける）が対象。
+# 読めなければ、値を一切出さずに止まる（キーの名前か行番号だけを示す）。.env を sh の . で読む箇所（app_run・grants_apply・
+# precheck_mysql・upgrade のマイグレーション）は、どれも読む前にこの関数を呼ぶ。
+# 許した形は setup が書く形（KEY='…'）を含む。許さない形は、sh で正しく読めるものも止める（X='a' b・"…" の中の $・コメントつきの行など）。
+# 値を単引用符で囲めば必ず通るので、止まっても直し方は 1 つで、うるさく落ちて気づける
+check_env_sh() {
+  [ -f "$1" ] || return 0
+  syn=1
+  if sh -n "$1" >/dev/null 2>&1; then syn=0; fi
+  ek=$(env_sh_suspects "$1" | tr '\n' ' ')
+  if [ "$syn" = 0 ] && [ -z "$ek" ]; then return 0; fi
+  why="許した形（KEY='…'）でない行があり、別のコマンドや展開として読まれます"
+  if [ "$syn" = 1 ]; then why="構文の誤りがあります"; fi
+  [ -n "$ek" ] || ek="（見つかりませんでした。閉じていない引用符などを確かめてください）"
+  die "$1 を sh で読めません（${why}。値はここには出しません）。
+install.sh は設定を sh で読むので、値に空白・括弧・\$ などを含むときは単引用符で囲んでください（例: LOOPTRACK_DSN='user:pass@tcp(127.0.0.1:3306)/im'）。
+許した形でない行のキー（キーとして読めない行は行番号）: $ek
+直してから、もう一度実行してください"
 }
 
 # restrict_sqlite <SQLite のファイル> — 本体・-wal・-shm を本人だけ（0600）にする（looptrack は広い権限を起動時に警告する）。
@@ -348,6 +429,7 @@ try_fetch() {
 # 確かめられない（署名が無い・minisign が無い）ときは注意を出して続ける。--require-signature なら止める
 verify_sums_signature() {
   if ! try_fetch SHA256SUMS.minisig "$TMP/SHA256SUMS.minisig"; then
+    rm -f "${TMP:?}/SHA256SUMS.minisig" # 取れなかった回の残り（配布ディレクトリに写さない）
     [ "$REQUIRE_SIG" = 1 ] && die "取得元に SHA256SUMS.minisig がありません（--require-signature）。何も入れ替えていません"
     warn "取得元に SHA256SUMS の署名（SHA256SUMS.minisig）がありません。SHA-256 の照合だけで進めます（公式の配布物には署名があります）"
     return 0
@@ -465,6 +547,249 @@ place_binary() {
   install -m 0755 "$TMP/looptrack" "$BIN.install-$$"
   mv -f "$BIN.install-$$" "$BIN"
   say "  置いた: ${BIN}（${NEW_VERSION}）"
+}
+
+# ---------------------------------------------------------------- クライアントに配る looptrack（配布ディレクトリ）
+
+# dist_plan — 配布ディレクトリをこのスクリプトが受け持つかを決める（DIST_HOST・DIST_ENV・DIST_ADD_ENV。.env がある時点で呼ぶ）。
+# .env に LOOPTRACK_DIST_DIR が無いか、このスクリプトの置き場を指していれば受け持つ（無ければ足す）。別の置き場を指している・
+# 空の値を書いてある（配らない）ときは、管理者が自分で決めた置き場なので触らない（注意だけ）。
+# compose は、compose.yaml が ./dist をコンテナの /dist に読み取り専用で入れているときだけ受け持つ（setup の compose.yaml にある行。
+# 以前の setup が書いた compose.yaml には無いので、足し方を示して触らない。compose.yaml はこのスクリプトでは書き換えない）
+dist_plan() {
+  DIST_HOST="" DIST_ENV="" DIST_ADD_ENV=0
+  envf="$DIR/.env"
+  if [ "$METHOD" = systemd ]; then
+    host=$DIST_SYS
+    want=$DIST_SYS
+  else
+    host=$DIR/dist
+    want=$DIST_IN_CONTAINER
+    if ! grep -Eq '^[[:space:]]*-[[:space:]]*["'"'"']?\./dist:/dist:ro["'"'"']?[[:space:]]*$' "$DIR/compose.yaml" 2>/dev/null; then
+      warn "$DIR/compose.yaml が配布ディレクトリ（${host}）をコンテナに入れていないので、クライアントに配る looptrack を置きません。compose.yaml の services.looptrack.volumes に「- ./dist:/dist:ro」を足してから、もう一度 --upgrade を実行してください（docs/server/DEPLOY.md の「クライアントに配る looptrack」）"
+      return 0
+    fi
+  fi
+  if [ -f "$envf" ] && grep -q '^LOOPTRACK_DIST_DIR=' "$envf"; then
+    cur=$(env_get LOOPTRACK_DIST_DIR "$envf")
+    if [ "$cur" != "$want" ]; then
+      warn "$envf の LOOPTRACK_DIST_DIR が ${cur:-（空）} を指しているので（管理者が決めた配布ディレクトリ）、クライアントに配る looptrack は置きません。install.sh にそろえさせるときは、その行を消してから --upgrade を実行してください（$want に置いて、新しい版のたびにそろえます）"
+      return 0
+    fi
+  else
+    DIST_ADD_ENV=1
+  fi
+  DIST_HOST=$host
+  DIST_ENV=$want
+}
+
+# add_dist_env — .env に LOOPTRACK_DIST_DIR を足す（無いときだけ。setup が書く形と同じ単引用符）。serve は起動するときに読む
+add_dist_env() {
+  [ -n "$DIST_HOST" ] && [ "$DIST_ADD_ENV" = 1 ] || return 0
+  envf="$DIR/.env"
+  if [ -s "$envf" ] && [ -n "$(tail -c 1 "$envf")" ]; then printf '\n' >>"$envf"; fi
+  printf '%s\n' "# install.sh が足した: クライアントに配る looptrack の置き場（install.sh が入れるときと --upgrade のたびに新しい版にそろえる）" \
+    "LOOPTRACK_DIST_DIR='$DIST_ENV'" >>"$envf"
+  DIST_ADD_ENV=0
+  DIST_ENV_ADDED=1
+  say "  $envf に LOOPTRACK_DIST_DIR='$DIST_ENV' を足しました"
+}
+
+# sums_hash <名前> — 取得元の SHA256SUMS（get_binary が署名を確かめたもの）の <名前> の行の SHA-256（無ければ空）
+sums_hash() {
+  awk -v n="$1" 'NF == 2 { m = $2; sub(/^\*/, "", m); if (m == n) { print tolower($1); exit } }' "$TMP/SHA256SUMS"
+}
+
+# have_unzipper — zip の書庫（windows）から取り出せるか（unzip か python3）
+have_unzipper() { command -v unzip >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; }
+
+# archive_member <書庫> <中のパス> <出力先> — 書庫から 1 ファイルだけを取り出す（照合は呼び出し側）
+archive_member() {
+  case $1 in
+    *.zip)
+      if command -v unzip >/dev/null 2>&1; then
+        unzip -p "$1" "$2" >"$3" 2>/dev/null
+      else
+        python3 -c 'import sys, zipfile
+with zipfile.ZipFile(sys.argv[1]) as z, open(sys.argv[3], "wb") as o:
+    o.write(z.read(sys.argv[2]))' "$1" "$2" "$3" 2>/dev/null
+      fi
+      ;;
+    *) tar -xzOf "$1" "$2" >"$3" 2>/dev/null ;;
+  esac
+}
+
+# dist_unkeep <名前> — DIST_KEEP から 1 つ外す（置けなかった対象）
+dist_unkeep() {
+  k=""
+  for n in $DIST_KEEP; do
+    [ "$n" = "$1" ] || k="$k $n"
+  done
+  DIST_KEEP=$k
+}
+
+# stage_dist — 新しい版のクライアント向けの looptrack（6 対象）を $TMP/dist にそろえる（何も置き換えない。止める前に呼ぶ）。
+# 照合は get_binary と同じ: 署名を確かめた SHA256SUMS の looptrack_<版>_<os>_<arch>[.exe] の行と SHA-256 が合うものだけを使う
+# （書庫は書庫の行で照合してから展開し、取り出した実行ファイルもその行で照合する）。合わなければ何も置き換えずに止まる。
+# 配布ディレクトリに同じ中身がある・サーバに置くものと同じ中身なら取り直さない。SHA256SUMS に無い・取れない・取り出せない
+# 対象は注意を出して飛ばす（その対象は配らない。serve が起動時のログと管理者の帯で知らせる）
+stage_dist() {
+  [ -n "$DIST_HOST" ] || return 0
+  step "クライアントに配る looptrack（${NEW_VERSION}）"
+  rm -rf "${TMP:?}/dist"
+  mkdir -p "$TMP/dist"
+  DIST_KEEP="SHA256SUMS"
+  skipped=""
+  for t in $DIST_TARGETS; do
+    exe=""
+    ext=tar.gz
+    inner=looptrack
+    case $t in windows_*) exe=.exe ext=zip inner=looptrack.exe ;; esac
+    raw="looptrack_${NEW_VERSION}_$t$exe"
+    want=$(sums_hash "$raw")
+    if [ -z "$want" ]; then
+      skipped="$skipped ${t}（SHA256SUMS に無い）"
+      continue
+    fi
+    DIST_KEEP="$DIST_KEEP $raw"
+    if [ -f "$DIST_HOST/$raw" ] && [ "$(sha256_of "$DIST_HOST/$raw")" = "$want" ]; then
+      continue # 置いてあるものと同じ
+    fi
+    if [ "$t" = "linux_$ARCH" ] && [ "$NEW_SHA" = "$want" ]; then
+      cp "$TMP/looptrack" "$TMP/dist/$raw"
+    else
+      arc="looptrack_${NEW_VERSION}_${t}_server.$ext"
+      arc_sha=$(sums_hash "$arc")
+      if [ -n "$arc_sha" ]; then
+        if [ "$ext" = zip ] && ! have_unzipper; then
+          dist_unkeep "$raw"
+          skipped="$skipped ${t}（zip を開く unzip か python3 が無い。Debian・Ubuntu: apt-get install -y unzip）"
+          continue
+        fi
+        # 書庫は元の名前で置く（archive_member は名前の拡張子で zip と tar.gz を分ける）
+        if ! try_fetch "$arc" "$TMP/$arc"; then
+          dist_unkeep "$raw"
+          skipped="$skipped ${t}（${arc} を取れない）"
+          continue
+        fi
+        got=$(sha256_of "$TMP/$arc")
+        [ "$got" = "$arc_sha" ] || die "SHA-256 が合いません: ${arc}（期待 ${arc_sha}・実際 ${got}）。何も入れ替えていません"
+        archive_member "$TMP/$arc" "${arc%."$ext"}/$inner" "$TMP/dist/$raw" ||
+          die "書庫 ${arc} から ${arc%."$ext"}/$inner を取り出せません。何も入れ替えていません"
+        rm -f "${TMP:?}/${arc:?}"
+      elif ! try_fetch "$raw" "$TMP/dist/$raw"; then
+        rm -f "${TMP:?}/dist/$raw"
+        dist_unkeep "$raw"
+        skipped="$skipped ${t}（${raw} を取れない）"
+        continue
+      fi
+    fi
+    got=$(sha256_of "$TMP/dist/$raw")
+    [ "$got" = "$want" ] || die "SHA-256 が合いません: ${raw}（期待 ${want}・実際 ${got}）。何も入れ替えていません"
+  done
+  # ライセンス文（SHA256SUMS に載っていれば、照合して並べる。looptrack は埋め込んだフォントのライセンス文を添えて配る）
+  for f in NOTICE OFL-BIZUDGothic.txt; do
+    want=$(sums_hash "$f")
+    [ -n "$want" ] || continue
+    if [ -f "$DIST_HOST/$f" ] && [ "$(sha256_of "$DIST_HOST/$f")" = "$want" ]; then
+      DIST_KEEP="$DIST_KEEP $f"
+    elif try_fetch "$f" "$TMP/dist/$f" && [ "$(sha256_of "$TMP/dist/$f")" = "$want" ]; then
+      DIST_KEEP="$DIST_KEEP $f"
+    else
+      rm -f "${TMP:?}/dist/$f"
+    fi
+  done
+  cp "$TMP/SHA256SUMS" "$TMP/dist/SHA256SUMS"
+  if [ -f "$TMP/SHA256SUMS.minisig" ]; then
+    cp "$TMP/SHA256SUMS.minisig" "$TMP/dist/SHA256SUMS.minisig"
+    DIST_KEEP="$DIST_KEEP SHA256SUMS.minisig"
+  fi
+  if [ -n "$skipped" ]; then
+    warn "クライアントに配る looptrack のうち、次の対象は置きません（その OS の利用者には配りません）:$skipped"
+  fi
+}
+
+# commit_dist — $TMP/dist を配布ディレクトリに置く。実行ファイル（版ごとに別の名前）→ 署名 → SHA256SUMS の順に、どれも同じ
+# ディレクトリの一時ファイルからの rename で一度に置き換える（serve は SHA256SUMS に載る名前だけを配るので、途中の形を配らない。
+# compose はディレクトリをコンテナに入れているので、ディレクトリごとは入れ替えない）。前の SHA256SUMS・署名は .prev に残し、
+# 前の版の実行ファイルも消さない（無人の更新が止めた後に失敗したら rollback_dist で前の版の配布に戻す。片付けは finish_dist）
+commit_dist() {
+  [ -n "$DIST_HOST" ] || return 0
+  mkdir -p "$DIST_HOST"
+  chmod 0755 "$DIST_HOST"
+  for p in "$TMP/dist"/*; do
+    f=${p##*/}
+    case $f in SHA256SUMS | SHA256SUMS.minisig) continue ;; esac
+    [ -e "$DIST_HOST/$f" ] || DIST_ADDED="$DIST_ADDED $f"
+    install -m 0644 "$TMP/dist/$f" "$DIST_HOST/$f.install-$$"
+    mv -f "$DIST_HOST/$f.install-$$" "$DIST_HOST/$f"
+  done
+  same_sig=0
+  if [ -f "$TMP/dist/SHA256SUMS.minisig" ]; then
+    if cmp -s "$TMP/dist/SHA256SUMS.minisig" "$DIST_HOST/SHA256SUMS.minisig"; then same_sig=1; fi
+  elif [ ! -e "$DIST_HOST/SHA256SUMS.minisig" ]; then
+    same_sig=1
+  fi
+  if [ "$same_sig" = 1 ] && cmp -s "$TMP/dist/SHA256SUMS" "$DIST_HOST/SHA256SUMS"; then
+    say "  ${DIST_HOST} は同じ版です（${NEW_VERSION}）"
+    return 0
+  fi
+  for f in SHA256SUMS SHA256SUMS.minisig; do
+    rm -f "${DIST_HOST:?}/$f.prev"
+    if [ -f "$DIST_HOST/$f" ]; then cp -p "$DIST_HOST/$f" "$DIST_HOST/$f.prev"; fi
+  done
+  DIST_COMMITTED=1
+  if [ -f "$TMP/dist/SHA256SUMS.minisig" ]; then
+    install -m 0644 "$TMP/dist/SHA256SUMS.minisig" "$DIST_HOST/SHA256SUMS.minisig.install-$$"
+    mv -f "$DIST_HOST/SHA256SUMS.minisig.install-$$" "$DIST_HOST/SHA256SUMS.minisig"
+  else
+    rm -f "${DIST_HOST:?}/SHA256SUMS.minisig" # 前の版の署名を残すと、新しい SHA256SUMS と合わない
+  fi
+  install -m 0644 "$TMP/dist/SHA256SUMS" "$DIST_HOST/SHA256SUMS.install-$$"
+  mv -f "$DIST_HOST/SHA256SUMS.install-$$" "$DIST_HOST/SHA256SUMS"
+  say "  置いた: ${DIST_HOST}（${NEW_VERSION}）"
+}
+
+# finish_dist — 配布ディレクトリから、この版で配るもの（DIST_KEEP）以外を片付ける（前の版の実行ファイル・.prev・途中の一時ファイル）。
+# 配布ディレクトリはこのスクリプトが受け持つ置き場なので、ほかの名前も消す
+finish_dist() {
+  [ -n "$DIST_HOST" ] && [ -d "$DIST_HOST" ] || return 0
+  for p in "${DIST_HOST:?}"/* "${DIST_HOST:?}"/.[!.]*; do
+    [ -e "$p" ] || continue
+    case " $DIST_KEEP " in *" ${p##*/} "*) continue ;; esac
+    rm -rf "$p"
+  done
+  DIST_COMMITTED=0
+  DIST_ADDED=""
+  n=0
+  for k in $DIST_KEEP; do
+    case $k in looptrack_*) n=$((n + 1)) ;; esac
+  done
+  say "  配る looptrack: ${NEW_VERSION} の ${n} 対象（${DIST_HOST}）"
+}
+
+# rollback_dist — 無人の更新で前の版に戻すとき（rollback_upgrade）に、配布ディレクトリも前の版の配布に戻す
+rollback_dist() {
+  [ "$DIST_COMMITTED" = 1 ] && [ -n "$DIST_HOST" ] || return 0
+  for f in $DIST_ADDED; do rm -f "${DIST_HOST:?}/$f"; done
+  for f in SHA256SUMS SHA256SUMS.minisig; do
+    if [ -f "$DIST_HOST/$f.prev" ]; then
+      mv -f "$DIST_HOST/$f.prev" "$DIST_HOST/$f"
+    else
+      rm -f "${DIST_HOST:?}/$f"
+    fi
+  done
+  DIST_COMMITTED=0
+  printf '  配布ディレクトリ %s も前の版に戻しました\n' "$DIST_HOST" >&2
+}
+
+# sync_dist — 配布ディレクトリを決めて、新しい版にそろえる（入れるとき・同じ版の --upgrade。戻すものが無い回）
+sync_dist() {
+  dist_plan
+  stage_dist
+  add_dist_env
+  commit_dist
+  finish_dist
 }
 
 # ---------------------------------------------------------------- 状態
@@ -770,6 +1095,7 @@ install_systemd() {
   place_binary
   step "設定（looptrack setup）"
   run_setup "$@"
+  sync_dist # クライアントに配る looptrack（.env に LOOPTRACK_DIST_DIR を足す。setup が .env を書いた後）
   fix_owner_systemd
   step "systemd の unit"
   write_unit
@@ -783,7 +1109,10 @@ install_systemd() {
   if [ -n "$db" ]; then restrict_sqlite "$db"; fi
   systemctl daemon-reload
   systemctl enable looptrack >/dev/null 2>&1
-  systemctl restart looptrack
+  # restart ではなく止める → 別のプロセスが応えていないかを確かめる → 起こす（check_port_not_answered）
+  systemctl stop looptrack >/dev/null 2>&1 || true
+  check_port_not_answered "looptrack のサービスは起動していません。"
+  systemctl start looptrack
   wait_health
 }
 
@@ -808,8 +1137,13 @@ ENTRYPOINT ["/looptrack"]
 CMD ["serve"]
 EOF
   docker build -q -t "$IMAGE:$NEW_VERSION" "$TMP/ctx" >/dev/null
+  say "  作成: $IMAGE:${NEW_VERSION}"
+}
+
+# tag_latest — 作ったイメージを compose.yaml が使う $IMAGE:latest にする（--upgrade では、止める前の確認を通ってから）
+tag_latest() {
   docker tag "$IMAGE:$NEW_VERSION" "$IMAGE:latest"
-  say "  作成: $IMAGE:${NEW_VERSION}（$IMAGE:latest）"
+  say "  $IMAGE:latest を $IMAGE:$NEW_VERSION にしました"
 }
 
 check_docker() {
@@ -826,6 +1160,7 @@ install_compose() {
   step "設定（looptrack setup）"
   run_setup "$@"
   [ -f "$DIR/compose.yaml" ] || die "$DIR/compose.yaml がありません（compose では setup の ① で「チームのサーバ」を選びます。rm $DIR/.env してやり直してください）"
+  sync_dist # クライアントに配る looptrack（compose.yaml が ./dist を /dist に読み取り専用で入れていれば。.env に LOOPTRACK_DIST_DIR='/dist' を足す）
   if [ -d "$DIR/data" ]; then
     # コンテナは uid 65534 で動く（SQLite のファイルを書けるように。im.db は 0600 なので中のファイルごと渡す）
     chown -R 65534:65534 "$DIR/data"
@@ -838,6 +1173,7 @@ install_compose() {
     return
   fi
   build_image
+  tag_latest
   check_store_access
   db=$(sqlite_host_path) # 確認で SQLite を開いたときの -wal・-shm を 0600 に戻す
   if [ -n "$db" ]; then restrict_sqlite "$db"; fi
@@ -859,6 +1195,7 @@ is_mysql() {
 # app_run <looptrack の引数…> — サービスと同じ利用者・同じ設定（.env の LOOPTRACK_DSN）で looptrack を動かす
 app_run() {
   if [ "$METHOD" = systemd ]; then
+    check_env_sh "$DIR/.env" # 呼び出し元が $(…) の中でも、読む前に必ず通す（sh が構文の誤りの行を出力しないように）
     (
       set -a
       # shellcheck disable=SC1090,SC1091
@@ -889,6 +1226,8 @@ check_store_access() {
     return 0
   fi
   step "保存先の確認（サービスと同じ利用者で読めるか）"
+  # store_readable は app_run を $(…) の中で呼ぶので、止めるのは外のここで（中で止まると「権限」の段に進んでしまう）
+  if [ "$METHOD" = systemd ]; then check_env_sh "$DIR/.env"; fi
   if store_readable; then
     return 0
   fi
@@ -940,6 +1279,7 @@ grants_apply() {
     if [ -n "${LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE:-}" ]; then
       set -- "$@" --admin-user "${LOOPTRACK_INSTALL_DB_ADMIN_USER:-root}" --admin-password-file "$LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE"
     fi
+    check_env_sh "$DIR/.env"
     (
       set -a
       # shellcheck disable=SC1090,SC1091
@@ -964,6 +1304,49 @@ health_once() {
   fi
 }
 
+# other_process_answers — 別のプロセスが待ち受けのポートで /healthz に応答していることの説明（文の途中に埋める）
+other_process_answers() {
+  printf '%s' "looptrack のサービスを止めた状態で、127.0.0.1:$PORT$BASE/healthz に別のプロセスが応答しています（止め忘れた古いコンテナや、手で起こした looptrack serve など）"
+}
+
+# check_port_not_answered [<添える文>] — systemd で、looptrack のサービスを止めた後・起こす前に呼ぶ。
+# /healthz に応答があれば、応えているのは別のプロセスなので止める。このまま起こすと looptrack はポートを取れずに
+# 起動に失敗し続けるのに、起動の確認（wait_health）はその別のプロセスの 200 を見て通ってしまう（黙って緑になる）。
+# compose はコンテナの中で確かめるので、この穴は無い（呼ばない）
+check_port_not_answered() {
+  # 止められずに自分のサービスが動いたままなら、その 200 を「別のプロセス」と取り違えないよう先に出し分ける
+  if systemctl is-active --quiet looptrack; then
+    die "looptrack のサービスを止められません（systemctl stop looptrack の後も動いています）。${1:-}systemctl status looptrack・journalctl -u looptrack で確かめてください"
+  fi
+  if health_once; then
+    die "$(other_process_answers)。このまま起動しても looptrack はポート $PORT で待ち受けられず、起動を確かめられません。${1:-}握っているプロセスを ss -ltnp 'sport = :$PORT' で確かめて止めてから、もう一度実行してください"
+  fi
+}
+
+# service_answers — systemd で、/healthz に 200 を返したのが looptrack のサービスかを確かめる。違えば理由を SA_WHY に入れて 1 を返す。
+# unit は Type=simple なので、start の直後から active になる（serve が待ち受けを始めるのは DB を開いた後）。
+# そのため is-active だけでは、起こす前の確認（check_port_not_answered）の後に別のプロセスがポートを取った形
+# （止め忘れた古いコンテナが restart の方針で起き上がる、など）を見分けられない。ss があれば、ポートの待ち受けを持つ PID と
+# サービスの MainPID を突き合わせる（root で動くので、他の利用者のプロセスも見える）。
+# 限界: ss が無い環境では is-active だけに落ちる。その形は別のプロセスの 200 で黙って通る側なので、ss が無いと弱い
+service_answers() {
+  SA_WHY=""
+  if ! systemctl is-active --quiet looptrack; then
+    SA_WHY="looptrack のサービスが動いていません（systemctl is-active looptrack: $(systemctl is-active looptrack 2>/dev/null || true)）。127.0.0.1:$PORT で応えたのは別のプロセスです"
+    return 1
+  fi
+  command -v ss >/dev/null 2>&1 || return 0
+  sa_pid=$(systemctl show -p MainPID --value looptrack 2>/dev/null || true)
+  sa_lines=$(ss -ltnp "sport = :$PORT" 2>/dev/null || true)
+  case $sa_pid in '' | 0) ;; *)
+    if printf '%s\n' "$sa_lines" | grep -q "pid=$sa_pid,"; then return 0; fi
+    ;;
+  esac
+  sa_users=$(printf '%s\n' "$sa_lines" | sed -n 's/.*users:((\(.*\)))$/\1/p' | head -n 1)
+  SA_WHY="127.0.0.1:$PORT の待ち受けを持っているのは looptrack のサービス（MainPID ${sa_pid:-?}）ではなく、別のプロセス（${sa_users:-ss で見えません}）です"
+  return 1
+}
+
 wait_health() {
   step "動作確認（$BASE/healthz）"
   i=0
@@ -979,6 +1362,11 @@ wait_health() {
     fi
     sleep 1
   done
+  # 200 を返したのが今起こしたサービスかを併せて見る（起こした後に別のプロセスがポートを取った形。service_answers）
+  if [ "$METHOD" = systemd ] && ! service_answers; then
+    journalctl -u looptrack -n 30 --no-pager >&2 || true
+    die "/healthz は 200 を返しましたが、${SA_WHY}。起動を確かめられません。握っているプロセスを ss -ltnp 'sport = :$PORT' で確かめて止めてから、もう一度実行してください（上のログ）"
+  fi
   say "  200 OK"
 }
 
@@ -1183,41 +1571,93 @@ backup_sqlite() { # <SQLite のファイル>
 # unattended — 無人の実行か（--yes で、尋ねる端末が無い。自動の置き換えの timer はこれ）
 unattended() { [ "$YES" = 1 ] && ! (: </dev/tty) 2>/dev/null; }
 
-# precheck_unattended_mysql — 無人の更新で、止める前に確かめる（MySQL だけ）。新しい版に未適用の migrate があれば置き換えない。
-# MySQL を最小権限で使うと、migrate の後に新しい表の権限を与え直すには管理用の資格情報が要り、無人では尋ねられないため。
-# また MySQL の DB は控えから戻せないので、migrate が DB を変える更新は無人では行わない（止めた後に戻せるのは実行ファイルだけ）
-precheck_unattended_mysql() {
+# precheck_mysql — MySQL の --upgrade で、止める前（実行ファイル・イメージの latest・印を置き換える前）に、新しい版の
+# looptrack migrate --check で未適用の migrate を確かめる。systemd も compose もここを通る（判定はこの 1 か所）。
+# 未適用があると、止めた後の migrate は表を作れる接続先で流す必要がある。最小権限のアプリ用の利用者（deploy/grants.sql）には
+# 表を作る権限が無いので、LOOPTRACK_SETUP_MIGRATE_DSN が無いまま進むと、サービスを止めた後に migrate が失敗し、止まったまま残る。
+#   無人（unattended）: 未適用があれば置き換えない。migrate の後に新しい表の権限を与え直す管理用の資格情報を無人では尋ねられず、
+#     MySQL の DB は控えから戻せないため（止めた後に戻せるのは実行ファイルだけ）
+#   端末: LOOPTRACK_SETUP_MIGRATE_DSN があれば尋ねずに進む。無ければ未適用の一覧と理由を示し、続けるかを尋ねる。
+#     既定は「続けない」（--yes では尋ねずに既定の答えにする。install の「動かし方」と同じ扱い）。続けないときは何も変えずに止める。
+#     確かめられなかったとき（migrate --check が 0・3 以外）も、止めた後に失敗しうるので同じように尋ねる
+precheck_mysql() {
   is_mysql || return 0
-  step "無人の更新の確認（新しい版が DB の形を変えるか）"
+  step "止める前の確認（新しい版 $NEW_VERSION が DB の形を変えるか）"
   rc=0
-  out=$(
-    set -a
-    # shellcheck disable=SC1090,SC1091
-    . "$DIR/.env"
-    set +a
-    exec "$TMP/looptrack" migrate --check
-  ) 2>&1 || rc=$?
-  case $rc in
-    0) say "  未適用の migrate はありません（DB の形は変わりません）" ;;
-    3)
-      printf '%s\n' "$out" >&2
-      die "新しい版 $NEW_VERSION は DB の形を変えます（上の未適用の migrate）。MySQL では、無人の更新（自動の置き換え）は migrate の後に権限を与え直せないので置き換えません。サービスは今の版 $S_VERSION のまま動いています。端末で $ONE_LINER -s -- --upgrade を実行してください"
-      ;;
-    *)
-      printf '%s\n' "$out" >&2
-      die "新しい版で DB の適用記録を確かめられません（上の出力）。置き換えていません。サービスは今の版 $S_VERSION のまま動いています"
-      ;;
+  if [ "$METHOD" = systemd ]; then
+    check_env_sh "$DIR/.env" # $(…) の外で通す（中で止まると、出力が「確かめられません」の出力に混ざる）
+    out=$(
+      set -a
+      # shellcheck disable=SC1090,SC1091
+      . "$DIR/.env"
+      set +a
+      exec "$TMP/looptrack" migrate --check
+    ) 2>&1 || rc=$?
+  else
+    # 作ったばかりの新しい版のイメージ（${IMAGE}:${NEW_VERSION}。latest はまだ前の版）を、compose の設定（.env・ネットワーク）で動かす。
+    # 動いているコンテナは止めない（compose run は別のコンテナを作る）
+    out=$(
+      cd "$DIR"
+      LOOPTRACK_IMAGE="$IMAGE:$NEW_VERSION" docker compose run --rm --no-deps looptrack migrate --check 2>&1
+    ) || rc=$?
+  fi
+  if [ "$rc" = 0 ]; then
+    say "  未適用の migrate はありません（DB の形は変わりません）"
+    return 0
+  fi
+  printf '%s\n' "$out" >&2
+  if unattended; then
+    if [ "$rc" = 3 ]; then
+      die "新しい版 $NEW_VERSION は DB の形を変えます（上の未適用の migrate）。MySQL では、無人の更新（自動の置き換え）は migrate の後に権限を与え直せないので置き換えません。サービスは今の版 $S_VERSION のまま動いています。端末で $ONE_LINER -s -- --upgrade を実行してください。そのとき、表を作れる接続先を環境変数 LOOPTRACK_SETUP_MIGRATE_DSN で渡します（アプリ用の利用者は表を作れないので、渡さないと止めた後の migrate が失敗します。渡し方は docs/server/DEPLOY.md の「更新（--upgrade）」）"
+    fi
+    die "新しい版で DB の適用記録を確かめられません（上の出力）。置き換えていません。サービスは今の版 $S_VERSION のまま動いています"
+  fi
+  if [ -n "${LOOPTRACK_SETUP_MIGRATE_DSN:-}" ]; then
+    if [ "$rc" = 3 ]; then
+      say "  上の未適用の migrate は、止めた後に表を作れる接続先（LOOPTRACK_SETUP_MIGRATE_DSN）で流します"
+    else
+      warn "新しい版で DB の適用記録を確かめられませんでした（上の出力）。止めた後の migrate は表を作れる接続先（LOOPTRACK_SETUP_MIGRATE_DSN）で流します"
+    fi
+    return 0
+  fi
+  if [ "$rc" = 3 ]; then
+    say "  新しい版 $NEW_VERSION は DB の形を変えます（上の未適用の migrate）。"
+  else
+    say "  新しい版で DB の適用記録を確かめられませんでした（上の出力）。DB の形を変えるかが分かりません。"
+  fi
+  say "  表を作れる接続先（環境変数 LOOPTRACK_SETUP_MIGRATE_DSN）が渡されていないので、止めた後の migrate はアプリ用の接続先（.env の LOOPTRACK_DSN）で流します。"
+  say "  アプリ用の利用者を最小権限（deploy/grants.sql）にしていると表を作れないので、サービスを止めた後に migrate が失敗し、止まったまま残ります。"
+  if [ "$YES" = 1 ]; then
+    say "  --yes なので尋ねず、既定の答え（続けない）にします。"
+    ans=n
+  elif ! (: </dev/tty) 2>/dev/null; then
+    say "  尋ねる端末が無いので、既定の答え（続けない）にします。"
+    ans=n
+  else
+    ask "  それでもサービスを止めて続けますか（y で続ける。既定は続けない）" n
+  fi
+  case $ans in
+    y | Y | yes | YES | Yes) return 0 ;;
   esac
+  die "止めずに終わりました。サービスは今の版 $S_VERSION のまま動いています（実行ファイル・印は変えていません）。表を作れる接続先を環境変数 LOOPTRACK_SETUP_MIGRATE_DSN で渡して、もう一度実行してください（sudo は環境変数を落とします。渡し方は docs/server/DEPLOY.md の「更新（--upgrade）」: https://github.com/howashoji/looptrack/blob/main/docs/server/DEPLOY.md）。アプリ用の利用者が表を作れる構成なら、y と答えて続けられます"
 }
 
 # rollback_upgrade — 無人の更新で、止めた後に失敗したとき（終わりの trap の on_exit・on_signal から呼ぶ）: 前の実行ファイルに戻し、
 # SQLite なら DB を止めた直後の控えに戻し、前の版で起動し直す。MySQL は置き換えの前に「DB の形を変えない」ことを確かめているので
-# （precheck_unattended_mysql）、実行ファイルだけを戻す。印（install.conf）は前の版のまま。呼んだ trap が 0 でない終了コードで終わる
+# （precheck_mysql）、実行ファイルだけを戻す。印（install.conf）は前の版のまま。呼んだ trap が 0 でない終了コードで終わる
 # （timer の service は失敗として journal に残る）
 rollback_upgrade() {
   ROLLBACK=0
   printf '\n==> %s\n' "前の版 ${S_VERSION} に戻して起動し直します（無人の更新なので、サービスを止めたままにしない）" >&2
   systemctl stop looptrack >/dev/null 2>&1 || true
+  # 止めた状態で応答があれば、応えているのは別のプロセス。起こしてはよい（その別のプロセスが止まれば Restart で上がる）が、
+  # 起動の確認はその応答を見てしまうので、「起動し直しました」とは言わずに失敗として終わる
+  rb_other=0
+  if systemctl is-active --quiet looptrack; then
+    printf '%s: エラー: looptrack のサービスを止められないので、前の版 %s に戻せません（systemctl status looptrack・journalctl -u looptrack）\n' "$PROG" "$S_VERSION" >&2
+    return
+  fi
+  if health_once; then rb_other=1; fi
   # 置き換えは rename で一度に（実行中のプロセスが残っていても「Text file busy」にならない。place_binary と同じ）
   if [ "$RB_BIN" = 1 ] && [ -f "$BIN.prev" ]; then
     if ! { cp -p "$BIN.prev" "$BIN.rollback-$$" && mv -f "$BIN.rollback-$$" "$BIN"; }; then
@@ -1226,6 +1666,7 @@ rollback_upgrade() {
       return
     fi
   fi
+  rollback_dist
   rdb=$(sqlite_host_path)
   if [ -n "$rdb" ] && [ -n "$RB_BACKUP" ] && [ -f "$RB_BACKUP/$(basename "$rdb")" ]; then
     rm -f "$rdb" "$rdb-wal" "$rdb-shm"
@@ -1240,6 +1681,11 @@ rollback_upgrade() {
     printf '%s: エラー: 前の版 %s でも起動できません（journalctl -u looptrack）\n' "$PROG" "$S_VERSION" >&2
     return
   fi
+  if [ "$rb_other" = 1 ]; then
+    printf '%s: エラー: 前の版 %s のサービスを起動しましたが、%sので、looptrack が起動したかを確かめられません（新しい版 %s は入れていません）。握っているプロセスを ss -ltnp '"'"'sport = :%s'"'"' で確かめて止めてから、端末で %s -s -- --upgrade を実行してください\n' \
+      "$PROG" "$S_VERSION" "$(other_process_answers)" "$NEW_VERSION" "$PORT" "$ONE_LINER" >&2
+    return
+  fi
   i=0
   while ! health_once; do
     i=$((i + 1))
@@ -1249,6 +1695,11 @@ rollback_upgrade() {
     fi
     sleep 1
   done
+  if ! service_answers; then
+    printf '%s: エラー: 前の版 %s のサービスを起動し、/healthz は 200 を返しましたが、%s。起動を確かめられません（新しい版 %s は入れていません）。握っているプロセスを ss -ltnp '"'"'sport = :%s'"'"' で確かめて止めてから、端末で %s -s -- --upgrade を実行してください\n' \
+      "$PROG" "$S_VERSION" "$SA_WHY" "$NEW_VERSION" "$PORT" "$ONE_LINER" >&2
+    return
+  fi
   printf '%s: 前の版 %s に戻して起動し直しました（新しい版 %s は入れていません）。上の理由を直すか、端末で %s -s -- --upgrade を実行してください\n' \
     "$PROG" "$S_VERSION" "$NEW_VERSION" "$ONE_LINER" >&2
 }
@@ -1262,7 +1713,17 @@ upgrade() {
   check_auto_upgrade # 自動の置き換えを入れられない（compose・minisign なし）なら、何かを変える前に止める
   get_binary
   if [ "$NEW_VERSION" = "$S_VERSION" ] && [ -f "$BIN" ] && [ "$(sha256_of "$BIN")" = "$NEW_SHA" ]; then
-    say "すでに $NEW_VERSION です。何も変えていません。"
+    say "すでに $NEW_VERSION です。サーバは置き換えません。"
+    # クライアントに配る looptrack だけをこの版にそろえる（以前の install.sh で入れた・上げたサーバ・置き場が欠けたとき。
+    # そろっていれば何も変えない）。.env に LOOPTRACK_DIST_DIR を足したときは、起動し直すまで serve は配らない
+    sync_dist
+    if [ "$DIST_ENV_ADDED" = 1 ]; then
+      if [ "$METHOD" = systemd ]; then
+        say "LOOPTRACK_DIST_DIR を .env に足しました。サービスを起動し直すと配り始めます: systemctl restart looptrack"
+      else
+        say "LOOPTRACK_DIST_DIR を .env に足しました。コンテナを作り直すと配り始めます: cd $DIR && docker compose up -d"
+      fi
+    fi
     # 人が動かしたとき（無人でない）は、自動の置き換えの写しもこのスクリプトにそろえる
     if [ -n "$AUTO_UPGRADE" ] || { [ "$AUTO" = on ] && ! unattended; }; then
       warn_auto_mysql
@@ -1276,18 +1737,27 @@ upgrade() {
     return
   fi
   read_env_info
+  # クライアントに配る looptrack を取って確かめる（止める前。照合が合わなければ何も変えずに止まる。置くのは起動の前）
+  dist_plan
+  stage_dist
+  # .env を sh で読めないときは、サービスを止める前に（止めた後の失敗にしない）値を出さずに止める。読む箇所ごとにも通す
+  if [ "$METHOD" = systemd ]; then check_env_sh "$DIR/.env"; fi
   dsn=$(env_get LOOPTRACK_DSN "$DIR/.env")
   # MySQL で、テーブルを作れる利用者を別に使うときは LOOPTRACK_SETUP_MIGRATE_DSN（setup と同じ）
   mdsn=${LOOPTRACK_SETUP_MIGRATE_DSN:-$dsn}
   if [ "$METHOD" = systemd ]; then
-    if unattended; then
-      UNATTENDED=1
-      precheck_unattended_mysql
-    fi
+    if unattended; then UNATTENDED=1; fi
+    precheck_mysql # MySQL で新しい版が DB の形を変えるなら、止める前に止まる（無人は置き換えない・端末は尋ねる）
     step "停止"
     systemctl stop looptrack
     # 無人の更新は、ここから後の失敗（die・裸のコマンドの失敗・中断）で前の版に戻して起動し直す（終わりの trap の rollback_upgrade）
     if [ "$UNATTENDED" = 1 ]; then ROLLBACK=1; fi
+    # 別のプロセスがポートで応えていれば、何も置き換えずに止める（無人の更新では、上の ROLLBACK で起こし直してから失敗として終わる）
+    if [ "$UNATTENDED" = 1 ]; then
+      check_port_not_answered "新しい版 $NEW_VERSION は入れていません。"
+    else
+      check_port_not_answered "新しい版 $NEW_VERSION は入れていません。looptrack のサービスは止まっています。"
+    fi
     db=$(sqlite_host_path)
     if [ -n "$db" ]; then
       backup_sqlite "$db"
@@ -1297,6 +1767,7 @@ upgrade() {
     place_binary
     RB_BIN=1
     step "マイグレーション（$SVC_USER として）"
+    check_env_sh "$DIR/.env"
     (
       set -a
       # shellcheck disable=SC1090,SC1091
@@ -1306,14 +1777,19 @@ upgrade() {
     ) || die "マイグレーションに失敗しました。前の実行ファイルは $BIN.prev にあります（戻すときは mv $BIN.prev $BIN && systemctl start looptrack）。上に「適用:」（英語では Applied:）の行があれば、前の版はその DB で起動しないので、DB もこの更新の前の控え（SQLite は上の「控え:」、MySQL は自分で取った控え）に戻してください"
     check_store_access # 表が増えた更新では権限を与え直すまで読めない（ここで尋ねて与え直す）
     if [ -n "$db" ]; then restrict_sqlite "$db"; fi
+    # 起動する新しい版が起動時に配布物を確かめるので、起動の前に置く（無人の更新が戻すときは rollback_dist で前の版の配布に戻す）
+    add_dist_env
+    commit_dist
     step "起動"
     systemctl daemon-reload || die "systemctl daemon-reload に失敗しました（上の出力）。新しい版 $NEW_VERSION を起動していません"
     systemctl start looptrack || die "新しい版 $NEW_VERSION を起動できません（systemctl start looptrack が失敗しました。理由は journalctl -u looptrack）"
   else
     check_docker
+    build_image  # 止める前の確認に新しい版のイメージを使う（latest はまだ前の版のまま）
+    precheck_mysql # systemd と同じ判定（止める前・何かを置き換える前）
     step "実行ファイル"
     place_binary
-    build_image
+    tag_latest
     step "停止"
     compose stop
     db=$(sqlite_host_path)
@@ -1332,11 +1808,15 @@ upgrade() {
     fi || die "マイグレーションに失敗しました（前のイメージは $IMAGE:${S_VERSION}。compose.yaml の image を戻して up -d）。上に「適用:」（英語では Applied:）の行があれば、前の版はその DB で起動しないので、DB もこの更新の前の控え（SQLite は上の「控え:」、MySQL は自分で取った控え）に戻してください"
     check_store_access # 表が増えた更新では権限を与え直すまで読めない（ここで尋ねて与え直す）
     if [ -n "$db" ]; then restrict_sqlite "$db"; fi
+    # 起動する新しい版が起動時に配布物を確かめるので、起動の前に置く（無人の更新が戻すときは rollback_dist で前の版の配布に戻す）
+    add_dist_env
+    commit_dist
     step "起動"
     compose up -d
   fi
   wait_health
   ROLLBACK=0
+  finish_dist # 前の版の配布物を片付ける（起動を確かめた後）
   NO_START=0
   warn_auto_mysql
   apply_auto_upgrade # 設定どおりに timer を入れ直す / 外す（人が動かしたときは写しをこのスクリプトにそろえる）
@@ -1370,6 +1850,11 @@ uninstall() {
   fi
   AUTO=off
   apply_auto_upgrade # 自動の置き換え（timer）も外す
+  # クライアントに配る looptrack（systemd の置き場。compose の <dir>/dist は設定と一緒に残し、--purge で消える）
+  if [ "$METHOD" = systemd ] && [ -d "$DIST_SYS" ]; then
+    rm -rf "${DIST_SYS:?}"
+    rmdir "$DIST_SHARE" 2>/dev/null || true
+  fi
   rm -f "$BIN" "$BIN.prev" "$STATE" "$CONF_DIR/proxy-examples.txt"
   if [ "$PURGE" = 1 ]; then
     if [ "$METHOD" = systemd ]; then

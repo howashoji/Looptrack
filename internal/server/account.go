@@ -127,12 +127,36 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, p *princi
 	if status == 0 {
 		status = http.StatusOK
 	}
+	loginURL := s.publicBase(r) + s.cfg.BasePath
 	s.render(w, r, status, "account.html", map[string]any{
 		"User": p.User, "CSRF": p.Session.CSRFToken, "Tokens": tokens, "Days": tokenDays, "DefaultDays": defaultTokenDays,
 		"Notice": res.Notice, "Error": res.Error, "NewToken": res.NewToken, "NewName": res.NewName,
-		"MinPassword": auth.MinPasswordLen, "LoginURL": s.publicBase(r) + s.cfg.BasePath,
+		"MinPassword":  auth.MinPasswordLen,
+		"BrowserLogin": s.placedCommandLines(reqLang(r), "issue login --browser --url "+loginURL),
+		"PasteLogin":   s.placedCommandLines(reqLang(r), "issue login --url "+loginURL),
 		"RevokeAction": s.cfg.BasePath + "/account/tokens/revoke", "TwoFactorRequired": policy == store.TwoFactorRequired,
 	})
+}
+
+// commandLine は画面に出すコマンドの 1 行（label は OS の見出し。1 行だけのときは空）。
+type commandLine struct{ Label, Command string }
+
+// placedCommandLines は、setup が置いた looptrack で args を実行するコマンド（画面の案内用）。
+// サーバは利用者の OS を知らないので、配っている OS ごとに置き場の絶対パスで並べる（macOS・Linux と Windows）。
+// 組み方は setup の手順と同じ goSetup.run の 1 か所で、配布ディレクトリにどの OS 向けも無ければ PATH の looptrack になる。
+func (s *Server) placedCommandLines(lang i18n.Lang, args string) []commandLine {
+	g, err := s.goSetupOf(lang, setupIn{}, "", s.distBinaries(""))
+	if err != nil { // 引数の無い呼び出しは誤りにならない。念のため PATH の looptrack に落とす
+		return []commandLine{{Command: "looptrack " + args}}
+	}
+	c, w := g.run(args)
+	if w == "" {
+		return []commandLine{{Command: c}}
+	}
+	return []commandLine{
+		{Label: i18n.T(lang, "server.web.account.cmd_posix"), Command: c},
+		{Label: i18n.T(lang, "server.web.account.cmd_windows"), Command: w},
+	}
 }
 
 // verifyCurrentPassword は再認証。ログインと同じ回数制限をかけ、失敗を記録する。

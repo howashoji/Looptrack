@@ -184,8 +184,8 @@ func TestSetupLoopStep(t *testing.T) {
 	fetchWith := func(out loopSetupOut, agent, flag string) string {
 		return `"$HOME/.local/bin/looptrack" issue init --project req --url ` + e.srv.URL + "/im --agent " + agent + " --source server --dist '" + out.DistURL + "' " + flag
 	}
-	if yes.Install.State != "missing" || yes.Steps[0].Who != "ai" || !strings.HasSuffix(yes.Steps[0].Command, fetchWith(yes, "claude-code", "--loop")) ||
-		!strings.HasSuffix(no.Steps[0].Command, fetchWith(no, "claude-code", "--no-loop")) || !strings.Contains(yes.Steps[0].Command, "curl -fsSL") {
+	if yes.Install.State != "missing" || yes.Steps[0].Who != "ai" || !strings.HasSuffix(innerCmd(yes.Steps[0].Command), fetchWith(yes, "claude-code", "--loop")) ||
+		!strings.HasSuffix(innerCmd(no.Steps[0].Command), fetchWith(no, "claude-code", "--no-loop")) || !strings.Contains(yes.Steps[0].Command, "curl -fsSL") {
 		t.Errorf("missing の取得 + init: yes=%+v no=%+v", yes.Steps[0], no.Steps[0])
 	}
 	// 取得 + init の手順は置き換わるので、ほかは login・再起動・確認の 3 つ
@@ -207,7 +207,7 @@ func TestSetupLoopStep(t *testing.T) {
 	}
 	cp := e.mcpAsClient(ed.token, hdr, "github-copilot-developer", "1.0.86", "2025-06-18")
 	if yes, no := askThenAnswer("copilot・missing", cp, map[string]any{}); !strings.Contains(yes.Steps[0].Command, "--agent copilot") ||
-		!strings.HasPrefix(no.Steps[0].Command, "export LOOPTRACK_API_URL=") {
+		!strings.HasPrefix(no.Steps[0].Command, "(export LOOPTRACK_API_URL=") {
 		t.Errorf("Copilot: %+v", yes.Steps[0])
 	}
 	ot := e.mcpAsClient(ed.token, hdr, "cursor", "1", "")
@@ -220,12 +220,13 @@ func TestSetupLoopStep(t *testing.T) {
 	// 答えの値の検査
 	m.call("setup", map[string]any{"loop": "maybe"}, true)
 
-	// フックの通知（loop 未選択・core 最新）→ current でも 1 回目は問いだけ。答えると init の 1 つ（入れ方の分からない looptrack
-	// の導入なので PATH の looptrack で）
+	// フックの通知（loop 未選択・core 最新）→ current でも 1 回目は問いだけ。答えると init の 1 つ（置き場の looptrack の絶対パスで。
+	// サーバ版の利用者の端末に PATH の looptrack は無い前提）
 	post(installBody("claude-code", "hook", "server", latest.Core, map[string]any{"installed": false}))
 	yes, _ = askThenAnswer("claude-code・current・未選択", m, map[string]any{})
 	if i, step := loopStepOf(yes); yes.Install.State != "current" || i != 0 || step.Who != "ai" ||
-		step.Command != "looptrack issue init --project req --agent claude-code --url "+e.srv.URL+"/im --source server --dist '"+yes.DistURL+"' --loop" {
+		step.Command != `"$HOME/.local/bin/looptrack" issue init --project req --agent claude-code --url `+e.srv.URL+"/im --source server --dist '"+yes.DistURL+"' --loop" ||
+		!strings.HasPrefix(step.CommandWindows, "& (Join-Path $env:LOCALAPPDATA") {
 		t.Errorf("current・未選択: state=%s i=%d %+v", yes.Install.State, i, yes.Steps)
 	}
 	if !strings.Contains(yes.Install.Message, "loop）: 未選択") {
@@ -240,7 +241,9 @@ func TestSetupLoopStep(t *testing.T) {
 	for _, args := range []map[string]any{{}, {"loop": "yes"}} {
 		out := loopSetupOf(t, second(m.call("setup", args, false)))
 		if i, _ := loopStepOf(out); i >= 0 || out.Ask != "" || out.Install.Loop != "declined" || strings.Contains(out.Text, "を入れますか？") ||
-			!strings.Contains(out.Text, "辞退済みのため勧めない") || !strings.Contains(out.Text, "--loop` で入る") {
+			!strings.Contains(out.Text, "辞退済みのため勧めない") ||
+			!strings.Contains(out.Text, "`\"$HOME/.local/bin/looptrack\" issue init --project req --agent claude-code --url "+e.srv.URL+"/im --source server --dist '") ||
+			!strings.Contains(out.Text, "--loop`（Windows は `& (Join-Path") || !strings.Contains(out.Text, "--loop`） で入る") {
 			t.Errorf("declined（%v）: loop=%s steps=%+v\n%s", args, out.Install.Loop, out.Steps, out.Text)
 		}
 	}
@@ -257,7 +260,7 @@ func TestSetupLoopStep(t *testing.T) {
 	post(installBody("codex", "manual", "server", "", map[string]any{"installed": false}))
 	_, no = askThenAnswer("codex・no_hook", cx, map[string]any{})
 	if i, step := loopStepOf(no); no.Install.State != "no_hook" || i != 1 || !strings.Contains(no.Steps[0].Title, "トークン") ||
-		!strings.HasSuffix(step.Command, "--agent codex --url "+e.srv.URL+"/im --source server --dist '"+no.DistURL+"' --no-loop") {
+		!strings.HasSuffix(innerCmd(step.Command), "--agent codex --url "+e.srv.URL+"/im --source server --dist '"+no.DistURL+"' --no-loop") {
 		t.Errorf("no_hook: state=%s i=%d %+v", no.Install.State, i, no.Steps)
 	}
 
@@ -266,7 +269,7 @@ func TestSetupLoopStep(t *testing.T) {
 		"loop": map[string]any{"installed": false}})
 	_, no = askThenAnswer("claude-code・stale", m, map[string]any{})
 	if i, step := loopStepOf(no); no.Install.State != "stale" || i != 0 ||
-		!strings.Contains(step.Command, "curl -fsSL") || !strings.HasSuffix(step.Command, fetchWith(no, "claude-code", "--no-loop")) {
+		!strings.Contains(step.Command, "curl -fsSL") || !strings.HasSuffix(innerCmd(step.Command), fetchWith(no, "claude-code", "--no-loop")) {
 		t.Errorf("stale・未選択: state=%s i=%d %+v", no.Install.State, i, no.Steps)
 	}
 
@@ -393,7 +396,7 @@ func TestInstallKitStale(t *testing.T) {
 	// loop を入れている導入だけ loop の更新を求める
 	st := post(installBody("claude-code", "hook", "server", after.Core, installed))
 	if st.State != "stale" || strings.Join(st.StaleKit, ",") != "loop" || len(st.StaleFiles) != 0 || st.LoopBundle != before.Loop || st.LatestLoopBundle != after.Loop ||
-		!strings.Contains(st.Message, "kit/loop 一式") || strings.Contains(st.Message, "kit/core") || st.UpdateCommand != "looptrack issue init --project req --agent claude-code を再実行する" {
+		!strings.Contains(st.Message, "kit/loop 一式") || strings.Contains(st.Message, "kit/core") || st.UpdateCommand != i18n.T(i18n.JA, "server.mcp.setup.update.refetch") {
 		t.Errorf("loop の更新: %+v", st)
 	}
 	m.call("list_issues", map[string]any{}, false)
@@ -407,7 +410,7 @@ func TestInstallKitStale(t *testing.T) {
 	// core は loop と別に比べる（loop 未導入でも core が古ければ core だけ）。init を再実行する
 	st = post(installBody("claude-code", "hook", "copy", strings.Repeat("0", 64), none))
 	if st.State != "stale" || strings.Join(st.StaleKit, ",") != "core" || !strings.Contains(st.Message, "kit/core 一式") ||
-		st.UpdateCommand != "looptrack issue init --project req --agent claude-code を再実行する" {
+		st.UpdateCommand != i18n.T(i18n.JA, "server.mcp.setup.update.refetch") {
 		t.Errorf("core の更新: %+v", st)
 	}
 	// 配布物に kit/loop が無くなった版（比べられない）では、入っている loop の更新を求めない
@@ -725,7 +728,7 @@ func TestSetupLoopEndToEnd(t *testing.T) {
 	answer := func(ans string) string {
 		t.Helper()
 		out := loopSetupOf(t, second(m.call("setup", map[string]any{"loop": ans, "os": runtime.GOOS}, false)))
-		if i, step := loopStepOf(out); i != 0 || !strings.HasSuffix(step.Command, loopFlag(ans)) || !strings.Contains(step.Command, "curl -fsSL") {
+		if i, step := loopStepOf(out); i != 0 || !strings.HasSuffix(innerCmd(step.Command), loopFlag(ans)) || !strings.Contains(step.Command, "curl -fsSL") {
 			t.Fatalf("loop=%s の最初の手順が答えに合う取得 + init でない: %+v", ans, out.Steps)
 		}
 		return out.Steps[0].Command

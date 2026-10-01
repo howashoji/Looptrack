@@ -184,3 +184,30 @@ func TestComposeLanguage(t *testing.T) {
 		}
 	}
 }
+
+// guide はサーバ版の利用者にも返るので、loop を足す案内に --url の無い `looptrack issue init`（CLI の既定の接続先に向く）を
+// 出さず、MCP の setup ツールに寄せる（setup が置き場の絶対パスと --url 付きのコマンドを返す）。
+// 対照: 「次に読むもの」の注記が実際に出ている（未選択・辞退の行があり、setup ツールへの案内がある）ことを同じテストで確かめる。
+func TestComposeNextReadingNoBareInit(t *testing.T) {
+	in := Input{Slug: "ex", Name: "ex", Prefix: "EX", Width: 4, Role: "editor", Agents: []AgentLoop{
+		{Agent: "claude-code", Label: "Claude Code", Loop: "declined"},
+		{Agent: "codex", Label: "Codex", Loop: "none"},
+	}}
+	for _, c := range []struct {
+		lang i18n.Lang
+		want []string
+	}{
+		{i18n.JA, []string{"| Claude Code | " + i18n.T(i18n.JA, "guide.loop.declined"), "MCP の setup ツールを呼ぶ", "loop=yes"}},
+		{i18n.EN, []string{"| Claude Code | " + i18n.T(i18n.EN, "guide.loop.declined"), "call the MCP setup tool", "loop=yes"}},
+	} {
+		md := Compose(c.lang, in).Markdown
+		for _, w := range c.want {
+			if !strings.Contains(md, w) {
+				t.Fatalf("前提が崩れています: %s の guide に「次に読むもの」の %q が無い:\n%s", c.lang, w, md)
+			}
+		}
+		if strings.Contains(md, "looptrack issue init") {
+			t.Errorf("%s の guide に --url の無い looptrack issue init が残っている:\n%s", c.lang, md)
+		}
+	}
+}

@@ -7,12 +7,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/i18n"
+	"github.com/howashoji/looptrack/internal/setuppath"
 )
 
 func writeFile(t *testing.T, p, body string) {
@@ -185,5 +187,84 @@ func TestDoctorServerUpdate(t *testing.T) {
 	body.Store(`{"binaries":[]}`)
 	if code, out := run(); code != 0 || strings.Contains(out, "サーバに新しい版") || !strings.Contains(out, "向けの looptrack がありません") {
 		t.Errorf("server_update なし（対照: 配布の一覧は読めている）: %d\n%s", code, out)
+	}
+}
+
+// TestDoctorRedoBySource は、doctor の案内が導入の置き方で分かれることを確かめる。控えの置き方が server（サーバ版の setup の
+// 取得 + init）なら、配線のやり直しと更新は MCP の setup ツールの手順（--url の無い init や self-update ではない）、copy など
+// それ以外なら従来どおり looptrack issue init の再実行と self-update。トークンが無いときのログインの案内は、PATH の
+// looptrack ではなく実行中の looptrack の絶対パスで出す。分岐の両側を同じテストで通す。
+func TestDoctorRedoBySource(t *testing.T) {
+	stubs(t, true)
+	executable = func() (string, error) { return fakeBin, nil }
+	server, local := i18n.T(i18n.JA, "kitinit.doctor.redo.server"), i18n.T(i18n.JA, "kitinit.doctor.redo.local")
+	if server == local || !strings.Contains(server, "setup ツール") || !strings.Contains(local, "looptrack issue init") {
+		t.Fatalf("前提が崩れています: やり直しの文が置き方で分かれていない: %q / %q", server, local)
+	}
+	login := `トークンがありません（"` + fakeBin + `" issue login --browser --url https://example.invalid/im）`
+	if runtime.GOOS == "windows" {
+		login = `トークンがありません（& '` + fakeBin + `' issue login --browser --url https://example.invalid/im）`
+	}
+	for _, c := range []struct{ source, want, notWant string }{
+		{"server", server, local},
+		{"copy", local, server},
+		{"link", local, server},
+	} {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, ".codex", "hooks.json"),
+			`{"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "\"/nowhere/looptrack\" hook summary --agent codex"}]}]}}`)
+		writeFile(t, filepath.Join(dir, ".claude", ".looptrack-kit.json"), `{"project": "demo", "source": "`+c.source+`"}`)
+		code, out := doctor(t, dir, map[string]string{"LOOPTRACK_API_URL": "https://example.invalid/im"})
+		missing := "実行ファイル /nowhere/looptrack がありません（" + c.want + "）"
+		if code != 1 || !strings.Contains(out, missing) || strings.Contains(out, c.notWant) {
+			t.Errorf("置き方 %s: やり直しの案内に %q が無い（または %q がある）:\n%s", c.source, missing, c.notWant, out)
+		}
+		if !strings.Contains(out, login) {
+			t.Errorf("置き方 %s: ログインの案内が実行中の looptrack の絶対パスでない（%q が無い）:\n%s", c.source, login, out)
+		}
+	}
+	// 更新の案内（配布の最新との比較。--offline では出ないので、選ぶ関数を直接確かめる）
+	if _, u := doctorRedo(i18n.JA, "server"); u != i18n.T(i18n.JA, "kitinit.doctor.update.server") || strings.Contains(u, "self-update") {
+		t.Errorf("server の更新の案内: %q", u)
+	}
+	if _, u := doctorRedo(i18n.JA, "copy"); u != i18n.T(i18n.JA, "kitinit.doctor.update.local") || !strings.Contains(u, "self-update") {
+		t.Errorf("copy の更新の案内: %q", u)
+	}
+}
+
+// TestDoctorPathMissingBySource は、PATH から looptrack を解決できないときの doctor の注意が、サーバ版の導入（控えの置き方が
+// server）では直し方（setup の手順の再実行と、PATH を足すだけのコマンド）を示すことを確かめる。
+// 検知しない場合（PATH にある）と、ローカルの導入（従来の文）も同じテストで確かめる。
+func TestDoctorPathMissingBySource(t *testing.T) {
+	serverMark := i18n.T(i18n.JA, "kitinit.doctor.redo.server")
+	cmd := setuppath.PosixCommand(i18n.JA)
+	if runtime.GOOS == "windows" {
+		cmd = setuppath.WinCommand(i18n.JA)
+	}
+	for _, c := range []struct {
+		source string
+		onPath bool
+		want   []string
+		not    []string
+	}{
+		{"server", false, []string{"PATH で looptrack が見つかりません", serverMark, cmd}, []string{i18n.T(i18n.JA, "kitinit.doctor.path.missing")}},
+		{"copy", false, []string{i18n.T(i18n.JA, "kitinit.doctor.path.missing")}, []string{serverMark, cmd}},
+		{"server", true, []string{"PATH の looptrack: " + fakeBin}, []string{"PATH で looptrack が見つかりません", cmd}},
+	} {
+		stubs(t, c.onPath)
+		executable = func() (string, error) { return fakeBin, nil }
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, ".claude", ".looptrack-kit.json"), `{"project": "demo", "source": "`+c.source+`"}`)
+		_, out := doctor(t, dir, map[string]string{"LOOPTRACK_API_URL": "https://example.invalid/im"})
+		for _, w := range c.want {
+			if !strings.Contains(out, w) {
+				t.Errorf("置き方 %s・PATH に %v: %q が無い:\n%s", c.source, c.onPath, w, out)
+			}
+		}
+		for _, n := range c.not {
+			if strings.Contains(out, n) {
+				t.Errorf("置き方 %s・PATH に %v: %q がある:\n%s", c.source, c.onPath, n, out)
+			}
+		}
 	}
 }

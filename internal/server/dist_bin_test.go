@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/blake2b"
+
+	"github.com/howashoji/looptrack/internal/i18n"
 )
 
 // 配布ディレクトリの looptrack（GET /api/v1/dist の binaries・本体）・版による導入状態の判定・setup の Go 版の手順。
@@ -214,27 +216,31 @@ func TestInstallGoClient(t *testing.T) {
 		t.Errorf("保存: %+v", row)
 	}
 
-	// 配布中の最新より古い → 【配布スクリプトの更新】と self-update
+	// 配布中の最新より古い → 【配布スクリプトの更新】と、setup ツールの手順（取得 + init）で直す案内。
+	// 案内に self-update や --url の無い init を載せない（利用者の端末では PATH や CLI の既定の接続先に頼れない）
+	refetch := i18n.T(i18n.JA, "server.mcp.setup.update.refetch")
 	dir := t.TempDir()
 	e.s.cfg.DistDir = dir
 	writeDist(t, dir, map[string]string{"looptrack_v1.1.0_darwin_arm64": "new", "looptrack_v2.0.0_linux_amd64": "other-target"})
 	st = post(goBody("v1.0.0", map[string]string{}))
-	if st.State != "stale" || st.LatestClient != "v1.1.0" || strings.Join(st.StaleFiles, ",") != "looptrack" || st.UpdateCommand != "looptrack self-update" ||
+	if st.State != "stale" || st.LatestClient != "v1.1.0" || strings.Join(st.StaleFiles, ",") != "looptrack" || st.UpdateCommand != refetch ||
 		!strings.Contains(st.Message, "【配布スクリプトの更新】Claude Code の作業環境の looptrack（v1.0.0・darwin/arm64）") || !strings.Contains(st.Message, "配布中の最新 v1.1.0 より古い") {
 		t.Errorf("Go 版・古い: %+v", st)
 	}
 	m.call("list_issues", map[string]any{}, false)
-	if !strings.Contains(m.notice, "【配布スクリプトの更新】") || !strings.Contains(m.notice, "looptrack self-update") {
+	if !strings.Contains(m.notice, "【配布スクリプトの更新】") || !strings.Contains(m.notice, refetch) || strings.Contains(m.notice, "self-update") {
 		t.Errorf("MCP の指示: %q", m.notice)
 	}
-	// setup は Go 版の導入が古ければ self-update を示す。loop が未選択なので 1 回目は問いだけ
+	// setup は Go 版の導入が古ければ取得 + init（--url 付き）を示す。loop が未選択なので 1 回目は問いだけ
 	_, data := m.call("setup", map[string]any{}, false)
 	if out := setupOf(t, data); out.Ask != "loop" || len(out.Steps) != 1 || out.Steps[0].Command != "" || strings.Contains(out.Text, "self-update") {
 		t.Errorf("setup（Go 版の導入が古い・1 回目）: %+v\n%s", out.Steps, out.Text)
 	}
 	_, data = m.call("setup", map[string]any{"loop": "yes"}, false)
-	if out := setupOf(t, data); len(out.Steps) != 3 || out.Steps[0].Command != "looptrack self-update" || strings.Contains(out.Text, "curl") ||
-		!strings.HasPrefix(out.Steps[1].Command, "looptrack issue init --project req --agent claude-code") || !strings.HasSuffix(out.Steps[1].Command, " --loop") {
+	// 取得 + init に答えの旗を付けた 1 つと、確認の 2 つ（init は 1 回だけ）
+	if out := setupOf(t, data); len(out.Steps) != 2 || !strings.Contains(out.Steps[0].Command, `curl -fsSL "$U"`) ||
+		!strings.Contains(out.Steps[0].Command, `"$HOME/.local/bin/looptrack" issue init --project req --url `+e.srv.URL+"/im --agent claude-code --source server") ||
+		!strings.HasSuffix(innerCmd(out.Steps[0].Command), " --loop") || strings.Contains(out.Steps[1].Command, "issue init") || strings.Contains(out.Text, "self-update") {
 		t.Errorf("setup（Go 版の導入が古い・loop=yes）: %+v", out.Steps)
 	}
 	// 最新と同じ・比べられない版（dev）は current
@@ -249,17 +255,17 @@ func TestInstallGoClient(t *testing.T) {
 		t.Errorf("最低の版: %+v", st)
 	}
 	e.s.cfg.ClientMinVersion = ""
-	// kit が古い: init の再実行（版も古ければ self-update の後に）
+	// kit も古い: 同じ案内（取得 + init の 1 つで、実行ファイルと kit の両方を直す）
 	body := goBody("v1.0.0", nil)
 	body["core"] = map[string]any{"bundle_sha256": strings.Repeat("0", 64)}
 	st = post(body)
-	if st.State != "stale" || st.UpdateCommand != "looptrack self-update の後に looptrack issue init --project req --agent claude-code を再実行する" {
+	if st.State != "stale" || st.UpdateCommand != refetch || !strings.Contains(st.Message, "kit/core 一式") {
 		t.Errorf("版と kit が古い: %+v", st)
 	}
 	// 手順に載るのは、そのまま実行できるコマンド（UpdateCommand は利用者の言語の案内文なので、そこからは作らない）
 	_, data = m.call("setup", map[string]any{"loop": "yes"}, false)
-	if out := setupOf(t, data); len(out.Steps) != 3 ||
-		out.Steps[0].Command != "looptrack self-update && looptrack issue init --project req --agent claude-code" {
+	if out := setupOf(t, data); len(out.Steps) != 2 || !strings.Contains(out.Steps[0].Command, `curl -fsSL "$U"`) ||
+		!strings.HasSuffix(innerCmd(out.Steps[0].Command), " --loop") || strings.Contains(out.Steps[0].Command, "self-update") {
 		t.Errorf("手順のコマンド: %+v", out.Steps)
 	}
 
@@ -269,7 +275,7 @@ func TestInstallGoClient(t *testing.T) {
 	legacyFiles := map[string]string{"kit.tar.gz": strings.Repeat("b", 64)}
 	if st := post(map[string]any{"agent": "claude-code", "trigger": "hook", "source": "server", "files": legacyFiles}); st.State != "stale" || st.ClientOS != "" ||
 		strings.Join(st.StaleFiles, ",") != "looptrack" || !strings.Contains(st.Message, "1.0.0 より前の CLI で導入されています") ||
-		st.UpdateCommand != "setup ツールの手順で looptrack を取得し、looptrack issue init --project req --agent claude-code を実行する" {
+		st.UpdateCommand != refetch {
 		t.Errorf("以前の CLI の通知: %+v", st)
 	}
 	// setup は取得 + init（hook を looptrack に置き換える）を示す
@@ -277,7 +283,7 @@ func TestInstallGoClient(t *testing.T) {
 	if out := setupOf(t, data); out.Install.State != "stale" || len(out.Steps) == 0 || out.Steps[0].Who != "human" ||
 		!strings.Contains(out.Steps[0].Title, "looptrack を用意して導入する") || !strings.Contains(out.Steps[0].Title, "--no-loop") {
 		// 配布ディレクトリ（darwin/arm64 と linux/amd64 だけ）に、この接続の OS 向けが無いときは利用者の手順になる
-		if len(out.Steps) == 0 || !strings.Contains(out.Steps[0].Command, "issue init --project req") || !strings.HasSuffix(out.Steps[0].Command, " --no-loop") {
+		if len(out.Steps) == 0 || !strings.Contains(out.Steps[0].Command, "issue init --project req") || !strings.HasSuffix(innerCmd(out.Steps[0].Command), " --no-loop") {
 			t.Errorf("setup（以前の CLI の導入）: %+v", out.Steps)
 		}
 	}
@@ -338,7 +344,7 @@ func TestSetupGo(t *testing.T) {
 	}
 	for _, want := range []string{`D="$HOME/.local/bin"`, "Darwin/arm64) U='" + out.DistURL + "/bin/looptrack_v1.0.0_darwin_arm64'; S='" + sums["looptrack_v1.0.0_darwin_arm64"],
 		`sum() { shasum -a 256 "$@"; };;`, `| sum -c -`, `curl -fsSL "$U"`, `"$HOME/.local/bin/looptrack" issue init --project req --url ` + e.srv.URL + "/im --agent claude-code --source server --dist '" + out.DistURL + "' --loop",
-		`"$HOME/.local/bin/looptrack" issue login --browser`, "Claude Code を再起動", "looptrack doctor"} {
+		`"$HOME/.local/bin/looptrack" issue login --browser`, "Claude Code を再起動", `"$HOME/.local/bin/looptrack" doctor`} {
 		if !strings.Contains(all, want) {
 			t.Errorf("macOS の手順に %q が無い:\n%s", want, all)
 		}
@@ -389,7 +395,7 @@ func TestSetupGo(t *testing.T) {
 		return
 	}
 	_, data = m.call("setup", map[string]any{"cli": "looptrack", "os": goos, "loop": "no"}, false)
-	cmd := setupOf(t, data).Steps[0].Command
+	cmd := innerCmd(setupOf(t, data).Steps[0].Command) // 包むサブシェルを外す（init の手前で切って取得だけを流すため）
 	cut := strings.Index(cmd, ` && "$HOME/.local/bin/looptrack" issue init`)
 	if cut < 0 {
 		t.Fatalf("取得コマンドの形: %s", cmd)
@@ -477,7 +483,7 @@ func TestGoClientEndToEnd(t *testing.T) {
 	var st installStateJSON
 	ed.json(200, "POST", "/projects/req/install", map[string]any{"agent": "other", "trigger": "manual", "files": map[string]string{},
 		"client": map[string]any{"version": "v1.0.0", "os": runtime.GOOS, "arch": runtime.GOARCH}}, &st)
-	if st.State != "stale" || st.UpdateCommand != "looptrack self-update" || st.LatestClient != "v9.9.9" {
+	if st.State != "stale" || st.UpdateCommand != i18n.T(i18n.JA, "server.mcp.setup.update.refetch") || st.LatestClient != "v9.9.9" {
 		t.Fatalf("古い版: %+v", st)
 	}
 	// self-update: --check は示すだけ、dev は --force で置き換える（SHA-256 を確かめて実行中のファイルを差し替える）
@@ -567,7 +573,9 @@ func TestPosixFetchShells(t *testing.T) {
 		}
 		home := t.TempDir()
 		cmd := exec.Command(shPath, "-c", g.posixFetch("true"))
-		cmd.Env = append(os.Environ(), "HOME="+home)
+		// 取得の手順は置き場を PATH に足す（起動ファイルに書く）。ZDOTDIR・XDG_CONFIG_HOME が利用者の場所を指したまま
+		// だと、そちらの起動ファイルに書くので、HOME と同じ一時ディレクトリに向ける
+		cmd.Env = append(os.Environ(), "HOME="+home, "ZDOTDIR="+home, "XDG_CONFIG_HOME="+filepath.Join(home, ".config"))
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Errorf("%s で取得のコマンドが通らない: %v\n%s", sh, err, out)
 		} else if _, err := os.Stat(filepath.Join(home, ".local", "bin", "looptrack")); err != nil {

@@ -222,13 +222,16 @@ pwsh -File deploy/release/desktop_smoke.ps1 -Exe <展開先>\Looptrack\Looptrack
 
 ## 2-1. サーバの配布ディレクトリから配る（LOOPTRACK_DIST_DIR）
 
-GitHub Releases を使わずに、looptrack を自分のサーバから配ることもできます（DESIGN.md §5-1「配布と更新」）。
+looptrack を利用者に配るのはサーバの配布ディレクトリです（DESIGN.md §5-1「配布と更新」）。
+**install.sh で入れたサーバでは install.sh が受け持ちます。** 入れるときと `--upgrade`（自動の置き換えの timer を含む）のたびに、取得したリリースの 6 対象の実行ファイルと署名つきの `SHA256SUMS` を置き、`.env` に `LOOPTRACK_DIST_DIR` を足します（手順は [DEPLOY.md](DEPLOY.md)「クライアントに配る looptrack」）。
+下の表は、install.sh を使わずに配布ディレクトリを自分で用意するとき（自分でビルドした版を配る・install.sh で入れていないサーバ）の形です。
 
 | 物 | 中身 |
 | -- | -- |
+| install.sh で入れたサーバ | 配布ディレクトリは install.sh が置く（systemd は `/usr/local/share/looptrack/dist`、compose は `<dir>/dist`）。`.env` の `LOOPTRACK_DIST_DIR` が別の置き場を指していれば、install.sh はそこに触らない（管理者が自分で置く）。自分でビルドした版をそこへ置いても、次の `--upgrade` でリリースの版に置き換わる |
 | 置き方 | `dist.sh build`（署名しないなら `RELEASE_MINISIGN_PUBKEY=` を付け、self-update はハッシュだけを確かめる）と `dist.sh sums` の出力を、サーバの配布ディレクトリに置く（実行ファイル → SHA256SUMS の順に置き、前の版を消す）。出力に入る `install.sh`・`grants.sql` は置いても置かなくてもよい（配布口が配るのは実行ファイルと SHA256SUMS・NOTICE・OFL-BIZUDGothic.txt だけで、ほかの名前は配らない）。**配布ディレクトリは素の実行ファイルの形のまま**で、GitHub Releases の書庫は置かない（置いても一覧に出ず、`/api/v1/dist/bin/<書庫の名前>` は 404）。公式のリリースから置くときは、書庫から `looptrack` を取り出して従来の名前で置き、リリースの `SHA256SUMS`・`SHA256SUMS.minisig` をそのまま置く（SHA256SUMS に従来の名前の行があるので、公式のビルドの self-update が署名で確かめられる。手順は利用者ガイドの updating.md） |
 | 版 | 公開の版（`vX.Y.Z`）か、`v0.0.0-<UTC の年月日時分秒>-<コミット ID>`（Go の擬似版の形。semver のプレリリースとして時刻の順に並ぶ） |
-| サーバ（looptrack serve） | `LOOPTRACK_DIST_DIR=<配布ディレクトリ>`（コンテナなら読み取り専用で入れる）。`GET /api/v1/dist`（と setup の券の一覧）の `binaries: [{name, os, arch, version, sha256, size, url}]` に (os, arch) ごとの最新を出し、`/api/v1/dist/bin/<名前>` で本体を返す。SHA256SUMS に載っていない・ハッシュが違うファイルは配らない。配布ディレクトリが無い・空なら `binaries` は空の一覧 |
+| サーバ（looptrack serve） | `LOOPTRACK_DIST_DIR=<配布ディレクトリ>`（コンテナなら読み取り専用で入れる）。`GET /api/v1/dist`（と setup の券の一覧）の `binaries: [{name, os, arch, version, sha256, size, url}]` に (os, arch) ごとの最新を出し、`/api/v1/dist/bin/<名前>` で本体を返す。SHA256SUMS に載っていない・ハッシュが違うファイルは配らない。配布ディレクトリが無い・空なら `binaries` は空の一覧。配布物がサーバの版にそろっていない（置き場が無い・6 対象のどれかが無い・古い）ときは、起動時のログと admin の画面の帯で知らせる |
 | 最低の対応版 | `.env` に `LOOPTRACK_CLIENT_MIN_VERSION=v…` を書くと、それより古い looptrack の導入に【配布スクリプトの更新】が出る（空なら判定しない） |
 | setup の手順 | looptrack だけ（以前の手順と `LOOPTRACK_SETUP_GO` は撤去した）。配布ディレクトリに looptrack が無ければ取得の手順を示せない旨を出す |
 | 更新 | 利用者の手元で `looptrack self-update`（`--check` で確かめるだけ）。PATH・配線の確認は `looptrack doctor` |
