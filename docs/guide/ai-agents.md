@@ -1,6 +1,6 @@
 # Agent-specific notes
 
-[Guide contents](README.md) · Previous: [Daily use](daily-use.md) · Next: [Administration](admin.md)
+[Guide contents](README.md) · Previous: [Daily use](daily-use.md) · Next: [FAQ / Troubleshooting](faq.md)
 
 ## The common model
 

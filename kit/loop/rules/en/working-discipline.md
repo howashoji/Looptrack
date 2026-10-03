@@ -236,14 +236,14 @@ The highest-priority code of conduct, distilled from the instructions and correc
 ## Optional sections (not injected; adopt only what fits your project)
 
 ### Optional: staying in sync with the remote (when sessions in another environment touch the same repository)
-- Another environment (a cloud session and the like) does not show up in the session list, so **read it mechanically from how far ahead the git remote is**
-  (fetch every branch before you start, and check for branches behind, diverged, locally ahead but unpushed, or parallel and not yet taken in).
+- Another environment (a cloud session and the like) does not show up in the session list, so **read it mechanically from how far ahead the git remote is**.
+  Fetch every branch before you start, and check for branches behind, diverged, locally ahead but unpushed, or parallel and not yet taken in.
 - **Never start a session in another environment while local commits sit unpushed** (that environment branches off an old base, and the work gets done twice).
 - **Never start writing while you are behind.** After taking the changes in, confirm that the premises of the work you started (the version of the requirements or the design) have not changed, then resume.
 - To automate it, put a hook in your own project that fetches on SessionStart / UserPromptSubmit and prints only when there is divergence (do not put it in the kit).
 
 ### Optional: projects whose deliverable is documents
-- **Reflect a change of specification in the original document before you close the work** (never leave it in a side note or in the chat).
+- **Reflect a change of specification in the original document before you close the work.** Never leave it in a side note or in the chat.
 - Keep terminology in one glossary, and never coin a synonym.
 
 ---
@@ -252,8 +252,8 @@ The highest-priority code of conduct, distilled from the instructions and correc
 
 `pre-tool-git-guard` first turns the command string into **the words that actually run**, then looks at whether the
 **first word of a simple command** — split on `;`, `&`, `|`, parentheses and newlines — is `git`. It does that in two
-stages, and it calls **the same code** as the secrets guard and the wait-loop guard (copy a rule into two places and only
-one of them gets fixed next time). The only difference is an argument: **in which position a nested shell is unwrapped**.
+stages, and it calls **the same code** as the secrets guard and the wait-loop guard. Copy a rule into two places and only
+one of them gets fixed next time. The only difference is an argument: **in which position a nested shell is unwrapped**.
 A redirection (`2>&1`, `2>/dev/null`, `>out.log`, `&>/dev/null`) does not end the simple command, and the file descriptor
 attached to the operator with no space (the `2` of `2>&1`) and the target (`/dev/null`) are dropped from the words before judging.
 So `git checkout main 2>&1 | tail -20` goes through as a branch switch, while `git checkout -- <path> 2>&1` is `deny` as before.
@@ -271,10 +271,10 @@ So `git checkout main 2>&1 | tail -20` goes through as a branch switch, while `g
 treated as an escape at all), and fires when either one reads the first word as `git` / `git.exe`. An unquoted
 Windows absolute path (`C:\tools\git.exe`) loses its separators under the posix rule and comes out as
 `C:toolsgit.exe`, which no longer matches — but the Windows rule keeps `C:\tools\git.exe` as one word, unbroken.
-The posix side does not change by a single bit, so Git Bash stays untouched (the author decided on this design,
-"option 1"). **A path with a space that is not quoted** (`C:\Program Files\Git\cmd\git.exe`) is not rescued by
-this doubling either way, because the shell itself splits on the space regardless of which rule is used (quote it
-and it still stops as before).
+The posix side does not change by a single bit, so Git Bash stays untouched. The author decided on this design,
+"option 1". **A path with a space that is not quoted** (`C:\Program Files\Git\cmd\git.exe`) is not rescued by
+this doubling either way, because the shell itself splits on the space regardless of which rule is used. Quote it
+and it still stops as before.
 
 When it pairs up quotes, an escaped `'` (`echo don\'t ; bash -c '…'`) and a `\"` inside double quotes do not count as quotes.
 When it unwraps in command position, a comment (from a `#` at the start of a word to the end of the line) is skipped too.
@@ -313,6 +313,28 @@ tokenizer; a program that does not call itself `git`, such as `C:\tools\notgit.e
 whole thing is one argument, but in PowerShell `\` is an ordinary character, so `"x\"` closes and the command after `;` runs;
 the second, Windows-rule tokenizer catches that. The hook cannot tell which shell will run the command, so these stay stopped).
 
+**An extra reading for heredocs, `$'…'` and comments** (measured): only when the earlier readings do not stop a command, it is read once more.
+A `<<` inside arithmetic or an expansion is not read as an opening. A body handed to a shell — the body of `cat <<EOF | sh`, `bash <<EOF` or `source /dev/stdin <<EOF` — is judged as commands.
+The terminator is read as one word, as the shell reads it, so an `EOF;` line does not end the body. `$'…'` and comments are rewritten before splitting into words.
+Lines from an unterminated quote onwards are not run by the shell, so they are not judged either.
+The forms this reading turns into `deny`: `echo $'it\'s' ; echo x` + newline + `git reset --hard`, `echo x # it's` + newline + `git reset --hard`,
+`git status # don't` + newline + `bash -c 'git reset --hard'`, `bash -c $'git reset --hard'`, `echo $((1<<y))` + newline + `git reset --hard`,
+and `git reset --hard` in the body of `cat <<EOF | sh`.
+The extra reading is slow, so it is never computed for a form the earlier readings already stop. Computed first, it would push a large input past the time limit and let it through.
+The secrets, wait-loop and scope guards carry the same reading.
+
+**Forms it stops by mistake** (measured). Every one of them stops, so whoever steps on it notices on the spot.
+
+- The body of a heredoc whose terminator is quoted with a backslash (`<<\EOF`, `<<-\EOF`, `<< \EOF`).
+  The shell does not run the body, but the guard does not read this form as an opening and judges the body lines as commands.
+  Rewrite it as `<<'EOF'` and it goes through; the shell treats the body the same way. The secrets, wait-loop and scope guards stop on the same form.
+- The body of a heredoc inside a nested shell's quotes: `bash -c 'cat <<EOF` + newline + body + newline + `EOF'`, `eval '…'`,
+  `sh -c "…"`, `sudo bash -c '…'`. The wait-loop guard turns it into `deny` and the scope guard into `ask`; the git and secrets guards let it through.
+- A heredoc body after a line with an unclosed `'` (`echo it's`). The secrets and scope guards turn it into `ask`, the wait-loop guard into `deny`.
+- Forms the scope guard now asks about: a command after `|` or `&` inside a comment (`echo x # it's|` followed by a command), and a command after
+  `|` or `&` following an unclosed `$(cat <<'EOF'`. The shell runs neither.
+  The secrets and wait-loop guards stop these at the base already, and the unclosed `$(cat <<'EOF'` forms are `deny` for the git guard too (the same at the base).
+
 ### What it does not stop (ruled out, or out of reach — all measured)
 
 - **A compound-command word with `git` directly after it**: `if true; then git reset --hard; fi`, `{ git reset --hard; }`,
@@ -328,24 +350,36 @@ the second, Windows-rule tokenizer catches that. The hook cannot tell which shel
 - **A nested shell that is not in command position** (the "merely passed as an argument" forms above). What was let
   through is two classes — **(i) in argument position, running nothing** and **(ii) running somewhere other than the
   local machine** (`ssh`, `docker run`, `docker exec`, `kubectl exec`) — and that is **for the git guard only**.
-  **The secrets guard does not care about the position, so it confirms these** (`ask` is something a person can wave through).
+  **The secrets guard does not care about the position, so it confirms these**, since `ask` is something a person can wave through.
 - **Calling git from some interpreter** (from inside `ruby -e '...'`), **building the command name out of a variable**
   (`G=git; $G reset --hard`), and **aliases and functions** (`alias gr='git reset --hard'; gr`). The string after
   expansion never reaches the hook.
 - **A nested shell two or more levels deep** (`bash -c "bash -c 'git reset --hard'"`). Unwrapping is one level only, by design.
 - **A run-together short option where `c` is not last** (`bash -cx 'git reset --hard'`, `-cl`, `-ce`). A real shell runs it,
   but `-c` is read as the **last** of a run of short options, so it does not match (**it goes through at the base too**).
-- **Handing it over with ANSI-C quoting** (`bash -c $'git reset --hard'`) and **piping into a shell**
-  (`echo 'git reset --hard' | bash`, `| sh`, `| bash -s`).
+- **Piping into a shell** (`echo 'git reset --hard' | bash`, `| sh`, `| bash -s`).
+- **A heredoc whose body is run some other way**: `eval "$(cat <<'EOF' …)"`, `. <(cat <<'EOF' …)`,
+  `while read -r l; do eval "$l"; done <<'EOF'`, `cat <<'EOF' > s.sh && sh s.sh`, `(cat <<'EOF' …) | sh`.
+  The opening line alone does not show that the body runs, so the body is read as data.
+  The same goes for an opening inside a one-line `$(…)` or backquotes (`` echo `cat <<EOF` ``), and `<<` inside an array assignment (`x=(a<<EOF)`).
+  The body of `bash -c 'sh' <<EOF` gets past all four guards: whether a `-c` string reads standard input is beyond what a guard can tell.
+- **The `| sh` of the opening line, or the terminator's name, split by a line continuation**: the body of `cat <<EOF \` + newline + `| sh`, `cat <<EOF | \` + newline + `sh`,
+  and `cat <<EO\` + newline + `F | sh`. The git, wait-loop and scope guards let it through; the secrets guard joins continuations before reading, so it confirms.
+  Split before the opening — `cat \` + newline + `<<EOF | sh` — or with the body's terminator split as `EO\` + newline + `F`, it stops.
+- **A nested shell's quotes swallowing an opening or a quote**: a command on the line after `bash -c 'cat <<EOF'`, `bash -c "cat <<EOF"` or `x=$(bash -c 'cat <<EOF')`
+  gets past the git and secrets guards. A command on the line after `bash -c 'echo "a'` gets past the git guard.
+  The stage that reads the unwrapped contents takes the lines after the closed quote for a body or for quoted text. All of them **go through at the base too**.
 - **Command substitution** (`echo "$(git reset --hard)"`, backticks) and **a line continuation**
   (`git reset --hard` plus a backslash and a newline).
-- **What follows a quote inside a comment** (`git status # don't` + newline + `bash -c 'git reset --hard'`). The unwrapping
-  stage skips the comment, but the stage that splits simple commands counts the `'` in it as an opening quote and takes
-  the next line for quoted text.
 - **An unquoted Windows absolute path that contains a space** (`C:\Program Files\Git\cmd\git.exe clean -fd`).
   Even with the Windows-rule tokenizer added, a space still splits into a separate word under either rule, so
   `words[0]` ends at `C:\Program` and never reaches `git.exe` (**goes through at the base too**). A space-free
   absolute path (`C:\tools\git.exe clean -fd`) is caught — see "Forms measured as `deny`" above. Quoted, it is stopped.
+- **A command whose judgment runs past the deadline (4 seconds)**: the git, secrets, wait-loop and scope guards all let it through
+  without printing anything. That keeps a legitimate long command from being stopped, and the user chose it. The length that reaches
+  the deadline is now far off: measured on a local machine (2026-10), a 300 KB command is judged in under a second and a 1 MB one in 2.3 seconds.
+  While the stage that unwraps nested shells was quadratic in the length, 20–30 KB reached the 4 seconds and a dangerous last line went through in silence.
+  A slower machine can cross the deadline at a shorter length.
 - **Destruction that does not go through `git`** (`rm -rf .git`, `find … -delete`). **The git guard is a hook that looks
   at git commands**; an arbitrary deletion is not what this hook is for (it is a separate problem).
 
@@ -355,5 +389,5 @@ The hook catches nothing but slips, and is no substitute for the discipline.
 
 ## Maintaining this file
 
-- As the discipline grows, write anything project-specific into your project's own rules (this file in the kit is common to every project).
+- As the discipline grows, write anything project-specific into your project's own rules. This file in the kit is common to every project.
 - Never let a correction from the user end with the fix in front of you: promote it into the rules or into memory (the backend of the handoff).

@@ -1,0 +1,18 @@
+# verify/attach-with-list
+$ issue verify DEMO-0001 --list --attach notes.txt
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --attach と --attach-output は --list・--last と一緒に使えません。--list・--last は検証を実行も記録もしないので、添付を付ける先が無いためです
+
+#### requests (0)
+
+#### files (2)
+ws/notes.txt (0644)
+    PASS
+    ok  pkg
+ws/shot.png (0644)
+    (バイナリ 12 バイト sha256=1b56b50ac4e976f488f128cabdcdffb2fc9331d6974bb9968131a415d14ade24)

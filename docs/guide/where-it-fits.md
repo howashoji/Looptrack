@@ -1,6 +1,6 @@
 # Where Looptrack fits: what serves each loop
 
-[Guide contents](README.md) · Previous: [Concepts](concepts.md) · Next: [Getting started](getting-started.md)
+[Guide contents](README.md) · Previous: [Concepts](concepts.md) · Next: [Getting started with the server](server/getting-started.md) · [Getting started with the desktop app](desktop/getting-started.md)
 
 ## The big picture
 
@@ -57,7 +57,7 @@ Diagram not showing up? Here's a text version:
 ## Project rules
 
 Each project can add its own rules for the server to enforce.
-An administrator sets them up. See [Administration](admin.md) for the details.
+An administrator sets them up. See [Administration](server/admin.md) for the details.
 
 | Rule | Effect |
 | -- | -- |

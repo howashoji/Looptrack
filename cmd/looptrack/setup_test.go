@@ -416,7 +416,7 @@ func TestSetupCreatesMissingMySQLDatabase(t *testing.T) {
 		if r.code != 0 {
 			t.Fatalf("%d\n%s\n%s", r.code, r.stdout, r.errOut)
 		}
-		for _, want := range []string{"DB がまだありません", "作成: DB " + name, "作成: 利用者 " + user, "権限を与えました", "アプリ用の利用者 " + user + " で読めました"} {
+		for _, want := range []string{"DB がまだありません", "作成: DB " + name, "作成: 利用者 " + user, "権限を与えました", "アプリ用の利用者 " + user + " に全部の表の権限があります"} {
 			if !strings.Contains(r.stdout, want) {
 				t.Errorf("%q が無い:\n%s", want, r.stdout)
 			}
@@ -443,7 +443,7 @@ func TestSetupCreatesMissingMySQLDatabase(t *testing.T) {
 		if r.code != 0 {
 			t.Fatalf("%d\n%s\n%s", r.code, r.stdout, r.errOut)
 		}
-		for _, want := range []string{"接続先 " + root.Addr, "作成: DB " + name, "作成: 利用者 " + user, "アプリ用の利用者 " + user + " で読めました"} {
+		for _, want := range []string{"接続先 " + root.Addr, "作成: DB " + name, "作成: 利用者 " + user, "アプリ用の利用者 " + user + " に全部の表の権限があります"} {
 			if !strings.Contains(r.stdout, want) {
 				t.Errorf("%q が無い:\n%s", want, r.stdout)
 			}

@@ -20,14 +20,14 @@
 
 ### init の成果物をコミットしておく
 
-クラウド版は、リポジトリを clone した状態から始まります。手元で `init` した成果物も、**コミットしてプッシュしておけばクラウドでそのまま使われます**。
+クラウド版はリポジトリを clone した状態から始まります。手元で `init` した成果物も、**コミットしてプッシュしておけばクラウドでそのまま使われます**。
 対象は `CLAUDE.md` / `AGENTS.md` の管理節・`.claude/settings.json`・`.claude/scripts/`・`.github/hooks/looptrack.json` など。
 一方、手元だけの設定（`~/.claude/`・`settings.local.json`・`~/.codex/`・`~/.copilot/`・`~/.config/looptrack/credentials.json`）はクラウドにはありません。
 
 ### トークン（PAT）の作り方と絞り方
 
-クラウドでは、ブラウザのログイン（`login --browser`・MCP の OAuth）を通せないことがよくあります。そこで**アクセストークン（PAT）を環境変数かシークレットに置きます**。
-置いた値は、そのクラウドの環境を使える人や AI なら読める。そう考えて扱ってください。
+クラウドではブラウザのログイン（`login --browser`・MCP の OAuth）を通せないことがよくあります。そこで**アクセストークン（PAT）を環境変数かシークレットに置きます**。
+置いた値はそのクラウドの環境を使える人や AI なら読めます。そう考えて扱ってください。
 
 1. **クラウド専用の利用者を、管理者に作ってもらいます。** PAT はプロジェクト単位に絞れず、発行した利用者の**全プロジェクトの権限**で動くからです。
    自分の PAT を置いたらどうなるか。自分が参加している全プロジェクトに、クラウドから書けてしまいます。専用の利用者（例: `alice-cloud`）を作り、
@@ -52,7 +52,7 @@
    コミットしてあれば、`LOOPTRACK_API_URL`・`LOOPTRACK_PROJECT` は要りません。init が `.claude/settings.json` の `env` に書いているからです。
    - Pro / Max の API credentials は、プロキシが要求に後から付けるので、値が VM に入りません。ところが CLI も自分で `Authorization` を付けるため、置き換わるかは未確認。当面は環境変数を使ってください。
 3. **MCP（任意）**: claude.ai のコネクタとしてイシュー管理の MCP を追加して有効にすると、許可リストに関係なく Anthropic のサーバ経由で届きます（認証は OAuth）。
-   けど、hook と CLI は VM から直接通信します。だから**MCP を使うときも 1. の許可リストは必要です**。足さないと SessionStart の hook が失敗し、MCP の操作にトークン情報が付きません。
+   それでも hook と CLI は VM から直接通信します。だから**MCP を使うときも 1. の許可リストは必要です**。足さないと SessionStart の hook が失敗し、MCP の操作にトークン情報が付きません。
    リポジトリの `.mcp.json`（init が書くもの・OAuth）が VM の中で認証できるかは未確認。
 4. **hook**: コミットした `.claude/settings.json` の hook（SessionStart の summary・トークン計測・loop）は、クラウドでも動きます。**ただし、リポジトリを 1 つだけ付けたセッションに限ります。**
    複数のリポジトリを付けたセッションや projects のスレッドは、リポジトリの設定を読みません。
@@ -98,7 +98,7 @@
 2. **トークン（CLI）**: リポジトリの Settings > Security > Secrets and variables > **Agents** に、secret `LOOPTRACK_TOKEN`（値は PAT）と variable `LOOPTRACK_API_URL`・`LOOPTRACK_PROJECT` を置きます。
    Agents の secret と variable は、エージェントの環境変数として渡ります（値はログで伏せられます）。**Actions の secret は渡りません。**
 3. **MCP（任意）**: Agents に secret `COPILOT_MCP_IM_AUTHORIZATION`（値は `Bearer <PAT>`）を置いて、リポジトリの Settings > Copilot > MCP servers に次を書きます。
-   `COPILOT_MCP_` で始まる secret は MCP の設定からしか読めず、エージェントのシェルには渡りません。だから CLI 用の `LOOPTRACK_TOKEN` とは別に置きます。
+   `COPILOT_MCP_` で始まる secret は MCP の設定からしか読めず、エージェントのシェルには渡らないので、CLI 用の `LOOPTRACK_TOKEN` とは別に置きます。
 
    ```json
    {
@@ -131,7 +131,7 @@
 
 ## 4. 実物で確かめる
 
-試験用のプロジェクトで行います。使う PAT は、そのプロジェクトだけに参加させた専用の利用者の、30 日のもの（本番の im のイシューは変えません）。
+試験用のプロジェクトで行います。使う PAT はそのプロジェクトだけに参加させた専用の利用者の、30 日のもの（本番の im のイシューは変えません）。
 
 1. 上の手順どおりに、許可リストとトークンを設定します。
 2. CLI で `looptrack issue next` → `looptrack issue comment <ID> "…"` → `looptrack issue close <ID>` を実行します。使える経路なら、MCP でも同じことを。

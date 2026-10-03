@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/ed25519"
@@ -11,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -83,10 +85,28 @@ func leftovers(t *testing.T, dir string) []string {
 	return out
 }
 
+// TestReplaceTarget は置き換えるものを決める。Windows は Looptrack.exe（ふつうのファイル）を通し、隣の unins000.exe の
+// 有無でインストーラ版か zip 版かを分ける（受け入れ条件 2。入れ方の判定は TestWindowsInstallKind）。
 func TestReplaceTarget(t *testing.T) {
 	dir := t.TempDir()
 	img := filepath.Join(dir, "Looptrack.AppImage")
 	os.WriteFile(img, []byte("x"), 0o755)
+	winZip, winInst := filepath.Join(dir, "zip"), filepath.Join(dir, "inst")
+	for _, d := range []string{winZip, winInst} {
+		os.MkdirAll(filepath.Join(d, "cli"), 0o755)
+		os.WriteFile(filepath.Join(d, "Looptrack.exe"), []byte("MZ"), 0o755)
+		os.WriteFile(filepath.Join(d, "cli", "looptrack.exe"), []byte("MZ"), 0o755)
+	}
+	// 同梱の CLI と、アプリが写した CLI の写し（%LOCALAPPDATA%\Programs\looptrack\looptrack.exe）。名前は大小を無視すれば Looptrack.exe と同じ
+	cliCopy := filepath.Join(dir, "Programs", "looptrack", "looptrack.exe")
+	os.MkdirAll(filepath.Dir(cliCopy), 0o755)
+	os.WriteFile(cliCopy, []byte("MZ"), 0o755)
+	// Looptrack.exe だけがあって隣に cli\looptrack.exe が無い（アプリの配置ではない）
+	lone := filepath.Join(dir, "lone")
+	os.MkdirAll(lone, 0o755)
+	os.WriteFile(filepath.Join(lone, "Looptrack.exe"), []byte("MZ"), 0o755)
+	os.WriteFile(filepath.Join(winInst, "unins000.exe"), []byte("MZ"), 0o755)
+	os.WriteFile(filepath.Join(winZip, "looptrack-cli.exe"), []byte("MZ"), 0o755)
 	for _, c := range []struct {
 		name string
 		r    replacer
@@ -99,10 +119,20 @@ func TestReplaceTarget(t *testing.T) {
 		{"Linux で APPIMAGE が無い", replacer{GOOS: "linux"}, "", "desktop.update.err.not_appimage"},
 		{"Linux で APPIMAGE が相対パス", replacer{GOOS: "linux", AppImage: "Looptrack.AppImage"}, "", "desktop.update.err.not_appimage"},
 		{"Linux で APPIMAGE がディレクトリ", replacer{GOOS: "linux", AppImage: dir}, "", "desktop.update.err.not_appimage"},
-		{"Windows", replacer{GOOS: "windows", Launcher: `C:\x\Looptrack.exe`}, "", "desktop.update.err.unsupported_os"},
+		{"Windows の zip 版", replacer{GOOS: "windows", Launcher: filepath.Join(winZip, "Looptrack.exe")}, filepath.Join(winZip, "Looptrack.exe"), ""},
+		{"Windows のインストーラ版", replacer{GOOS: "windows", Launcher: filepath.Join(winInst, "Looptrack.exe")}, filepath.Join(winInst, "Looptrack.exe"), ""},
+		{"Windows の同梱の CLI から起動した", replacer{GOOS: "windows", Launcher: filepath.Join(winZip, "cli", "looptrack.exe")}, "", "desktop.update.err.not_windows_app"},
+		{"Windows のインストーラ版の同梱の CLI から起動した", replacer{GOOS: "windows", Launcher: filepath.Join(winInst, "cli", "looptrack.exe")}, "", "desktop.update.err.not_windows_app"},
+		{"Windows の CLI の写しから起動した", replacer{GOOS: "windows", Launcher: cliCopy}, "", "desktop.update.err.not_windows_app"},
+		{"Windows で隣に cli\\looptrack.exe が無い", replacer{GOOS: "windows", Launcher: filepath.Join(lone, "Looptrack.exe")}, "", "desktop.update.err.not_windows_app"},
+		{"Windows で Looptrack.exe が無い", replacer{GOOS: "windows", Launcher: filepath.Join(dir, "none", "Looptrack.exe")}, "", "desktop.update.err.not_windows_app"},
+		{"Windows で Looptrack.exe でない", replacer{GOOS: "windows", Launcher: filepath.Join(winZip, "looptrack-cli.exe")}, "", "desktop.update.err.not_windows_app"},
+		{"Windows で Launcher が空", replacer{GOOS: "windows"}, "", "desktop.update.err.not_windows_app"},
+		{"Windows で Launcher が相対パス", replacer{GOOS: "windows", Launcher: "Looptrack.exe"}, "", "desktop.update.err.not_windows_app"},
+		{"ほかの OS", replacer{GOOS: "freebsd", Launcher: "/usr/local/bin/looptrack"}, "", "desktop.update.err.unsupported_os"},
 	} {
 		// macOS の .app の組み立ては filepath（Windows では \ 区切り）で行うので、Windows で走らせると / の期待と比べられない。
-		// 置き換えは Windows では unsupported_os（下の「Windows」）なので、この 1 件だけを外す。
+		// この 1 件だけを外す（Windows の行はどの OS でも一時ディレクトリのパスで比べる）。
 		if c.r.GOOS == "darwin" && c.want != "" && runtime.GOOS == "windows" {
 			continue
 		}
@@ -710,5 +740,525 @@ func TestMainAfterUpdateWaitsForLock(t *testing.T) {
 	waitDone(t, done, "--after-update")
 	if u := rec.openedURLs(); len(u) != 0 {
 		t.Errorf("--after-update でブラウザを開いた: %v", u)
+	}
+}
+
+// --- Windows（インストーラ版と zip 版。GOOS を windows にして、どの OS でも一時ディレクトリで走らせる） ---
+
+// winFixture は Windows のアプリのフォルダ（Looptrack.exe・cli\looptrack.exe・NOTICE・OFL-BIZUDGothic.txt）を作る。
+// installer なら隣に unins000.exe も置く（インストーラで入れた形）。
+func winFixture(t *testing.T, installer bool) (dir, cur string) {
+	t.Helper()
+	dir = filepath.Join(t.TempDir(), "Looptrack")
+	os.MkdirAll(filepath.Join(dir, "cli"), 0o755)
+	cur = filepath.Join(dir, "Looptrack.exe")
+	for name, body := range map[string]string{"Looptrack.exe": "MZ old gui", "cli/looptrack.exe": "MZ old cli",
+		"NOTICE": "old notice", "OFL-BIZUDGothic.txt": "old ofl"} {
+		os.WriteFile(filepath.Join(dir, filepath.FromSlash(name)), []byte(body), 0o755)
+	}
+	if installer {
+		os.WriteFile(filepath.Join(dir, "unins000.exe"), []byte("MZ uninstaller"), 0o755)
+	}
+	return dir, cur
+}
+
+// TestWindowsInstallKind は、実行ファイルの隣に unins000.exe があればインストーラ（setup.exe）、無ければ zip を確認で照らし、
+// 資産の名前の末尾が入れ方と合わない結果（控えの last_ok が前の入れ方のものなど）は置き換えに使わないことを確かめる（受け入れ条件 2）。
+func TestWindowsInstallKind(t *testing.T) {
+	_, zipCur := winFixture(t, false)
+	_, instCur := winFixture(t, true)
+	if !installedByInstaller(instCur) || installedByInstaller(zipCur) || installedByInstaller("") {
+		t.Fatalf("unins000.exe での判定が違う（inst=%v zip=%v）", installedByInstaller(instCur), installedByInstaller(zipCur))
+	}
+	// unins000.exe がディレクトリなら、インストーラで入れたものとはみなさない
+	_, dirCur := winFixture(t, false)
+	os.Mkdir(filepath.Join(filepath.Dir(dirCur), "unins000.exe"), 0o755)
+	if installedByInstaller(dirCur) {
+		t.Error("ディレクトリの unins000.exe でインストーラ版とみなした")
+	}
+	if got := desktopAssetFor("windows", "amd64", instCur)("v1.1.0"); got != "Looptrack_v1.1.0_windows_amd64_setup.exe" {
+		t.Errorf("インストーラ版の資産 = %q", got)
+	}
+	if got := desktopAssetFor("windows", "arm64", zipCur)("v1.1.0"); got != "Looptrack_v1.1.0_windows_arm64.zip" {
+		t.Errorf("zip 版の資産 = %q", got)
+	}
+	// unins000.exe は Windows のときだけ見る（ほかの OS は今までどおり）
+	if got := desktopAssetFor("linux", "amd64", instCur)("v1.1.0"); got != "Looptrack_v1.1.0_linux_x86_64.AppImage" {
+		t.Errorf("Linux の資産 = %q", got)
+	}
+
+	setup := signedResult("https://example.invalid/s", "Looptrack_v1.1.0_windows_amd64_setup.exe", []byte("MZ"))
+	zipRes := signedResult("https://example.invalid/z", "Looptrack_v1.1.0_windows_amd64.zip", []byte("PK"))
+	for _, c := range []struct {
+		name string
+		cur  string
+		src  *updatecheck.Result
+		want string // 空なら通る（対照）
+	}{
+		{"インストーラ版に setup.exe（対照）", instCur, setup, ""},
+		{"zip 版に zip（対照）", zipCur, zipRes, ""},
+		{"インストーラ版に zip", instCur, zipRes, "desktop.update.err.asset_not_installer"},
+		{"zip 版に setup.exe", zipCur, setup, "desktop.update.err.asset_not_zip"},
+	} {
+		r := &replacer{GOOS: "windows", Launcher: c.cur}
+		_, err := r.ready(c.src)
+		switch {
+		case c.want == "" && err != nil:
+			t.Errorf("%s: 通らない: %v", c.name, err)
+		case c.want != "" && (err == nil || err.Error() != c.want):
+			t.Errorf("%s: err = %v, want %s", c.name, err, c.want)
+		}
+	}
+	// 合わない結果では apply も何もしない（取得もしない）
+	srv, hits := assetServer(t, []byte("PK"))
+	r := &replacer{GOOS: "windows", Launcher: instCur, Client: srv.Client(), WorkDir: t.TempDir(),
+		Start: func(string, ...string) error { t.Error("合わない資産で起動した"); return nil }}
+	if _, err := r.apply(context.Background(), signedResult(srv.URL+"/z", "Looptrack_v1.1.0_windows_amd64.zip", []byte("PK"))); err == nil ||
+		err.Error() != "desktop.update.err.asset_not_installer" {
+		t.Errorf("apply: err = %v", err)
+	}
+	if *hits != 0 {
+		t.Errorf("合わない資産を取得した（%d 回）", *hits)
+	}
+}
+
+// hasTasksArg は setup.exe の引数に /TASKS（選択肢の指定）があるか。
+func hasTasksArg(args []string) bool {
+	for _, a := range args {
+		if strings.HasPrefix(strings.ToUpper(a), "/TASKS") {
+			return true
+		}
+	}
+	return false
+}
+
+// インストーラ版: setup.exe をデータの置き場の updates に取得して SHA-256 を照らし、起動し直しで setup.exe を無人の引数で起こす。
+// /TASKS は渡さない。Start が失敗しても Looptrack.exe は変わらず、.prev・.failed を作らない（受け入れ条件 3）。
+func TestApplyWindowsInstaller(t *testing.T) {
+	body := []byte("MZ setup v1.1.0")
+	name := "Looptrack_v1.1.0_windows_amd64_setup.exe"
+	// /TASKS を見分けられること（下の「含まない」の対照）。smoke の最初の導入は /TASKS=startup,cli を付ける
+	if !hasTasksArg([]string{"/VERYSILENT", "/TASKS=startup,cli"}) {
+		t.Fatal("前提が崩れています: /TASKS を含む引数を見分けられない")
+	}
+	for _, startErr := range []error{nil, errors.New("CreateProcess failed")} {
+		t.Run(fmt.Sprintf("Start の誤り=%v", startErr), func(t *testing.T) {
+			srv, _ := assetServer(t, body)
+			dir, cur := winFixture(t, true)
+			work := filepath.Join(t.TempDir(), "data", "updates")
+			os.MkdirAll(work, 0o700)
+			old := filepath.Join(work, "Looptrack_v1.0.5_windows_amd64_setup.exe")
+			os.WriteFile(old, []byte("MZ older setup"), 0o644)
+			var started [][]string
+			r := &replacer{GOOS: "windows", Launcher: cur, WorkDir: work, Client: srv.Client(),
+				Start: func(n string, args ...string) error {
+					started = append(started, append([]string{n}, args...))
+					return startErr
+				}}
+			ap, err := r.apply(context.Background(), signedResult(srv.URL+"/s", name, body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			setup := filepath.Join(work, name)
+			if got := readFile(t, setup); got != string(body) {
+				t.Errorf("取得した setup.exe = %q", got)
+			}
+			if _, err := os.Stat(old); !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("前に取得した setup.exe が残っている: %v", err)
+			}
+			if len(started) != 0 {
+				t.Fatalf("relaunch の前に起動した: %v", started)
+			}
+			rerr := ap.relaunch()
+			if !errors.Is(rerr, startErr) {
+				t.Errorf("relaunch = %v, want %v", rerr, startErr)
+			}
+			if len(started) != 1 || started[0][0] != setup {
+				t.Fatalf("起こしたもの = %v, want %s", started, setup)
+			}
+			args := started[0][1:]
+			if len(args) != len(installerArgs)+1 || strings.Join(args[:len(installerArgs)], " ") != "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /RELAUNCH=1" {
+				t.Errorf("setup.exe の引数 = %v", args)
+			}
+			if want := "/LOG=" + filepath.Join(work, "setup.log"); args[len(args)-1] != want {
+				t.Errorf("/LOG = %q, want %q", args[len(args)-1], want)
+			}
+			if hasTasksArg(args) {
+				t.Errorf("/TASKS を渡した（前回の選択肢を引き継がない）: %v", args)
+			}
+			// 戻すものは無い（undo は何もしない）。Looptrack.exe は変わらず、.prev・.failed は作らない
+			if err := ap.undo(); err != nil {
+				t.Errorf("undo = %v", err)
+			}
+			ap.cleanup()
+			if got := readFile(t, cur); got != "MZ old gui" {
+				t.Errorf("Looptrack.exe が変わった: %q", got)
+			}
+			for _, p := range []string{cur + ".prev", cur + ".failed"} {
+				if _, err := os.Stat(p); !errors.Is(err, fs.ErrNotExist) {
+					t.Errorf("%s ができた: %v", filepath.Base(p), err)
+				}
+			}
+			if l := leftovers(t, dir); len(l) != 0 {
+				t.Errorf("一時のものが残っている: %v", l)
+			}
+		})
+	}
+}
+
+// インストーラ版の失敗: SHA-256 が違う・MZ でない。どちらも起こさず、取得物（.part・setup.exe）を残さない（受け入れ条件 3 の補い）。
+func TestApplyWindowsInstallerFailures(t *testing.T) {
+	name := "Looptrack_v1.1.0_windows_amd64_setup.exe"
+	for _, c := range []struct {
+		name        string
+		serve, sign []byte
+		want        string
+	}{
+		{"SHA-256 が違う", []byte("MZ tampered"), []byte("MZ setup"), "desktop.update.err.sha256"},
+		{"MZ でない", []byte("#!/bin/sh"), []byte("#!/bin/sh"), "desktop.update.err.not_pe"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			srv, _ := assetServer(t, c.serve)
+			_, cur := winFixture(t, true)
+			work := t.TempDir()
+			r := &replacer{GOOS: "windows", Launcher: cur, WorkDir: work, Client: srv.Client(),
+				Start: func(string, ...string) error { t.Error("失敗したのに起こした"); return nil }}
+			res := signedResult(srv.URL+"/s", name, c.sign)
+			res.Asset.Size = 0
+			if _, err := r.apply(context.Background(), res); err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("err = %v, want %s", err, c.want)
+			}
+			ents, _ := os.ReadDir(work)
+			if len(ents) != 0 {
+				var names []string
+				for _, e := range ents {
+					names = append(names, e.Name())
+				}
+				t.Errorf("取得物が残っている: %v", names)
+			}
+		})
+	}
+}
+
+// zipEntry は Windows の zip の 1 項目（dir なら body は使わない。symlink ならシンボリックリンクの項目）。
+type zipEntry struct {
+	name, body   string
+	dir, symlink bool
+	declared     uint64 // 0 でなければ、項目に書く大きさ（実際の中身より小さく偽る。圧縮せずに書く）
+}
+
+// appZip は desktop.sh の windows-zip と同じ形の zip（Looptrack/ の下に 4 ファイルとディレクトリの項目）を作る。
+func appZip(t *testing.T, es []zipEntry) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, e := range es {
+		if e.declared > 0 {
+			h := &zip.FileHeader{Name: e.name, Method: zip.Store, CRC32: crc32.ChecksumIEEE([]byte(e.body)),
+				CompressedSize64: uint64(len(e.body)), UncompressedSize64: e.declared}
+			h.SetMode(0o755)
+			w, err := zw.CreateRaw(h)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.Write([]byte(e.body))
+			continue
+		}
+		h := &zip.FileHeader{Name: e.name, Method: zip.Deflate}
+		switch {
+		case e.dir:
+			h.SetMode(fs.ModeDir | 0o755)
+		case e.symlink:
+			h.SetMode(fs.ModeSymlink | 0o777)
+		default:
+			h.SetMode(0o755)
+		}
+		w, err := zw.CreateHeader(h)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !e.dir {
+			w.Write([]byte(e.body))
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func goodZipEntries() []zipEntry {
+	return []zipEntry{
+		{name: "Looptrack/", dir: true},
+		{name: "Looptrack/Looptrack.exe", body: "MZ new gui"},
+		{name: "Looptrack/cli/", dir: true},
+		{name: "Looptrack/cli/looptrack.exe", body: "MZ new cli"},
+		{name: "Looptrack/NOTICE", body: "new notice"},
+		{name: "Looptrack/OFL-BIZUDGothic.txt", body: "new ofl"},
+	}
+}
+
+var winOld = map[string]string{"Looptrack.exe": "MZ old gui", "cli/looptrack.exe": "MZ old cli", "NOTICE": "old notice", "OFL-BIZUDGothic.txt": "old ofl"}
+
+// assertWinFiles は dir の 4 ファイルの中身が want と同じか。
+func assertWinFiles(t *testing.T, dir string, want map[string]string, suffix string) {
+	t.Helper()
+	for name, body := range want {
+		if got := readFile(t, filepath.Join(dir, filepath.FromSlash(name))+suffix); got != body {
+			t.Errorf("%s%s = %q, want %q", name, suffix, got, body)
+		}
+	}
+}
+
+// zip 版: 同じフォルダの一時のディレクトリに取得して 4 ファイルを取り出し、1 つずつ .prev に退けて置き換える。
+// 起動し直しは Looptrack.exe desktop --after-update。起動し直せなければ 4 つとも前の版に戻す（受け入れ条件 4）。
+func TestApplyWindowsZip(t *testing.T) {
+	body := appZip(t, goodZipEntries())
+	srv, _ := assetServer(t, body)
+	dir, cur := winFixture(t, false)
+	os.WriteFile(cur+".prev", []byte("MZ older gui"), 0o755)
+	var started [][]string
+	r := &replacer{GOOS: "windows", Launcher: cur, WorkDir: t.TempDir(), Client: srv.Client(),
+		Start: func(n string, args ...string) error {
+			started = append(started, append([]string{n}, args...))
+			return nil
+		}}
+	ap, err := r.apply(context.Background(), signedResult(srv.URL+"/z", "Looptrack_v1.1.0_windows_amd64.zip", body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertWinFiles(t, dir, map[string]string{"Looptrack.exe": "MZ new gui", "cli/looptrack.exe": "MZ new cli",
+		"NOTICE": "new notice", "OFL-BIZUDGothic.txt": "new ofl"}, "")
+	assertWinFiles(t, dir, winOld, ".prev") // 前の版は .prev に（前の Looptrack.exe.prev は消える）
+	if l := leftovers(t, dir); len(l) != 0 {
+		t.Errorf("一時のものが残っている: %v", l)
+	}
+	if len(started) != 0 {
+		t.Fatalf("relaunch の前に起動した: %v", started)
+	}
+	if err := ap.relaunch(); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{cur, "desktop", "--after-update"}; len(started) != 1 || strings.Join(started[0], " ") != strings.Join(want, " ") {
+		t.Errorf("起動し直し = %v, want %v", started, want)
+	}
+	// 起動し直せなかったときの戻し: 4 つとも前の版に戻り、.prev と .failed は残らない
+	if err := ap.undo(); err != nil {
+		t.Fatal(err)
+	}
+	assertWinFiles(t, dir, winOld, "")
+	for name := range winOld {
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(name)) + ".prev"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("戻した後に %s.prev が残っている: %v", name, err)
+		}
+	}
+	if l := leftovers(t, dir); len(l) != 0 {
+		t.Errorf("戻した後に一時のものが残っている: %v", l)
+	}
+	if l := leftovers(t, filepath.Join(dir, "cli")); len(l) != 0 {
+		t.Errorf("戻した後に cli に一時のものが残っている: %v", l)
+	}
+}
+
+// zip 版で、今のフォルダに無いファイル（利用者が消した NOTICE など）は .prev を作らずに置き、戻すときは消す。
+func TestApplyWindowsZipMissingFile(t *testing.T) {
+	body := appZip(t, goodZipEntries())
+	srv, _ := assetServer(t, body)
+	dir, cur := winFixture(t, false)
+	os.Remove(filepath.Join(dir, "NOTICE"))
+	r := &replacer{GOOS: "windows", Launcher: cur, Client: srv.Client(), Start: func(string, ...string) error { return nil }}
+	ap, err := r.apply(context.Background(), signedResult(srv.URL+"/z", "Looptrack_v1.1.0_windows_amd64.zip", body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(dir, "NOTICE")); got != "new notice" {
+		t.Errorf("NOTICE = %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "NOTICE.prev")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("無かったものの .prev ができた: %v", err)
+	}
+	if err := ap.undo(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "NOTICE")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("戻した後に新しい NOTICE が残っている: %v", err)
+	}
+	if got := readFile(t, cur); got != "MZ old gui" {
+		t.Errorf("戻した後の Looptrack.exe = %q", got)
+	}
+}
+
+// zip 版の失敗: SHA-256 が違う・.. を含む項目・欠けたファイル・シンボリックリンク・同じ名前が 2 つ・大きすぎる・MZ でない・
+// 2 つ目以降の swap の失敗・置き場に書けない。どれも 4 ファイルを今の版のまま（済んだ分は戻す）にし、一時のものを残さない（受け入れ条件 5）。
+func TestApplyWindowsZipFailures(t *testing.T) {
+	good := goodZipEntries()
+	with := func(mod func([]zipEntry) []zipEntry) []zipEntry {
+		return mod(append([]zipEntry(nil), good...))
+	}
+	for _, c := range []struct {
+		name       string
+		entries    []zipEntry
+		tamper     bool  // 署名された SHA-256 と違うものを返す
+		failSwapAt int   // この回の swap を失敗させる（1 から数える。0 は失敗させない）
+		limit      int64 // maxZipEntry（0 は既定）
+		ro         bool
+		want       string
+		keepPrev   bool // 前からある Looptrack.exe.prev が残ること（swap に入る前の失敗）
+	}{
+		{name: "SHA-256 が違う", entries: good, tamper: true, want: "desktop.update.err.sha256", keepPrev: true},
+		{name: ".. を含む項目", entries: with(func(es []zipEntry) []zipEntry {
+			return append(es, zipEntry{name: "Looptrack/../evil.exe", body: "MZ"})
+		}), want: "selfupdate.err.archive_entry", keepPrev: true},
+		{name: "欠けたファイル", entries: with(func(es []zipEntry) []zipEntry { return es[:len(es)-1] }),
+			want: "selfupdate.err.archive_no_binary", keepPrev: true},
+		{name: "シンボリックリンク", entries: with(func(es []zipEntry) []zipEntry {
+			es[4] = zipEntry{name: "Looptrack/NOTICE", body: "/etc/passwd", symlink: true}
+			return es
+		}), want: "selfupdate.err.archive_not_regular", keepPrev: true},
+		{name: "同じ名前が 2 つ", entries: with(func(es []zipEntry) []zipEntry {
+			return append(es, zipEntry{name: "Looptrack/NOTICE", body: "again"})
+		}), want: "selfupdate.err.archive_dup", keepPrev: true},
+		{name: "大きすぎる", entries: good, limit: 4, want: "selfupdate.err.binary_too_large", keepPrev: true},
+		{name: "大きさを偽った項目", entries: with(func(es []zipEntry) []zipEntry {
+			es[4] = zipEntry{name: "Looptrack/NOTICE", body: "notice that is longer than declared", declared: 3}
+			return es
+		}), want: "selfupdate.err.archive_read", keepPrev: true},
+		{name: "MZ でない", entries: with(func(es []zipEntry) []zipEntry {
+			es[1] = zipEntry{name: "Looptrack/Looptrack.exe", body: "#!/bin/sh"}
+			return es
+		}), want: "desktop.update.err.not_pe", keepPrev: true},
+		{name: "2 つ目の swap の失敗", entries: good, failSwapAt: 2, want: "desktop.update.err.replace"},
+		{name: "4 つ目の swap の失敗", entries: good, failSwapAt: 4, want: "desktop.update.err.replace"},
+		{name: "置き場に書けない", entries: good, ro: true, want: "not_writable", keepPrev: true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			body := appZip(t, c.entries)
+			served := body
+			if c.tamper {
+				served = appZip(t, with(func(es []zipEntry) []zipEntry {
+					es[4].body = "tampered"
+					return es
+				}))
+			}
+			srv, _ := assetServer(t, served)
+			dir, cur := winFixture(t, false)
+			os.WriteFile(cur+".prev", []byte("MZ older gui"), 0o755)
+			if c.limit > 0 {
+				orig := maxZipEntry
+				maxZipEntry = c.limit
+				t.Cleanup(func() { maxZipEntry = orig })
+			}
+			if c.ro {
+				if os.Geteuid() == 0 {
+					t.Skip("root では書き込みを拒めない")
+				}
+				if runtime.GOOS == "windows" {
+					t.Skip("Windows ではディレクトリの chmod（読み取り専用の属性も）で中に作ることを拒めない")
+				}
+				os.Chmod(dir, 0o555)
+				t.Cleanup(func() { os.Chmod(dir, 0o755) })
+			}
+			swaps := 0
+			r := &replacer{GOOS: "windows", Launcher: cur, Client: srv.Client(),
+				Start: func(string, ...string) error { t.Error("失敗したのに起動した"); return nil },
+				Swap: func(cur, next, prev string) error {
+					swaps++
+					if swaps == c.failSwapAt {
+						return errors.New("rename: the process cannot access the file")
+					}
+					return swap(cur, next, prev)
+				}}
+			_, err := r.apply(context.Background(), signedResult(srv.URL+"/z", "Looptrack_v1.1.0_windows_amd64.zip", body))
+			var nw *notWritableError
+			switch {
+			case c.want == "not_writable":
+				if !errors.As(err, &nw) || nw.Dir != dir || nw.DMG != "" {
+					t.Fatalf("err = %v, want notWritableError（%s）", err, dir)
+				}
+			case err == nil || !strings.Contains(err.Error(), c.want):
+				t.Fatalf("err = %v, want %s", err, c.want)
+			}
+			// 失敗させた回まで swap に進んだこと（2 つ目以降の失敗の対照。進まずに落ちたなら戻しを確かめていない）
+			if c.failSwapAt > 0 && swaps != c.failSwapAt {
+				t.Errorf("swap を %d 回呼んだ（%d 回目で失敗させるはず）", swaps, c.failSwapAt)
+			}
+			assertWinFiles(t, dir, winOld, "")
+			for _, name := range []string{"cli/looptrack.exe", "NOTICE", "OFL-BIZUDGothic.txt"} {
+				if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(name)) + ".prev"); !errors.Is(err, fs.ErrNotExist) {
+					t.Errorf("%s.prev が残っている: %v", name, err)
+				}
+			}
+			if c.keepPrev {
+				if got := readFile(t, cur+".prev"); got != "MZ older gui" {
+					t.Errorf("前からある Looptrack.exe.prev が変わった: %q", got)
+				}
+			}
+			if l := leftovers(t, dir); len(l) != 0 {
+				t.Errorf("一時のものが残っている: %v", l)
+			}
+			if l := leftovers(t, filepath.Join(dir, "cli")); len(l) != 0 {
+				t.Errorf("cli に一時のものが残っている: %v", l)
+			}
+		})
+	}
+}
+
+// TestCopyLimited は、項目に書かれた大きさとは別に、実際に読んだ大きさが maxZipEntry を超えたら止めることを確かめる
+// （archive/zip は書かれた大きさより多く読むと誤りを返すので、zip を通すとこの分岐には届かない。ここで直に通す）。
+func TestCopyLimited(t *testing.T) {
+	orig := maxZipEntry
+	maxZipEntry = 4
+	t.Cleanup(func() { maxZipEntry = orig })
+	var buf bytes.Buffer
+	// 対照: ちょうど上限なら通る
+	if err := copyLimited(&buf, strings.NewReader("1234"), "z.zip", "Looptrack/NOTICE"); err != nil || buf.String() != "1234" {
+		t.Fatalf("前提が崩れています: 上限ちょうどが通らない: %v %q", err, buf.String())
+	}
+	buf.Reset()
+	if err := copyLimited(&buf, strings.NewReader("12345"), "z.zip", "Looptrack/NOTICE"); err == nil ||
+		!strings.Contains(err.Error(), "selfupdate.err.binary_too_large") {
+		t.Errorf("上限を超えたのに止まらない: %v", err)
+	}
+}
+
+// TestPlaceRemovesMadeDir は、置くために作ったディレクトリを戻すときに消し、前からあったディレクトリは残すことを確かめる。
+func TestPlaceRemovesMadeDir(t *testing.T) {
+	base := t.TempDir()
+	for _, c := range []struct {
+		name    string
+		preDir  bool // 置き先のディレクトリが前からある（対照）
+		wantDir bool // 戻した後にディレクトリが残る
+	}{
+		{"ディレクトリを作った", false, false},
+		{"ディレクトリは前からある（対照）", true, true},
+	} {
+		dir := filepath.Join(base, c.name, "cli")
+		os.MkdirAll(filepath.Dir(dir), 0o755)
+		if c.preDir {
+			os.Mkdir(dir, 0o755)
+		}
+		next := filepath.Join(base, c.name, "next")
+		os.WriteFile(next, []byte("MZ"), 0o755)
+		dst := filepath.Join(dir, "looptrack.exe")
+		m, err := place(swap, dst, next)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if got := readFile(t, dst); got != "MZ" {
+			t.Errorf("%s: 置いた中身 = %q", c.name, got)
+		}
+		if (m.madeDir != "") == c.preDir {
+			t.Errorf("%s: madeDir = %q", c.name, m.madeDir)
+		}
+		if err := (&applied{moves: []move{m}}).undo(); err != nil {
+			t.Fatalf("%s: undo: %v", c.name, err)
+		}
+		_, err = os.Stat(dir)
+		if exists := err == nil; exists != c.wantDir {
+			t.Errorf("%s: 戻した後にディレクトリが残っている = %v, want %v", c.name, exists, c.wantDir)
+		}
+		if _, err := os.Stat(dst); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("%s: 戻した後に置いたものが残っている: %v", c.name, err)
+		}
 	}
 }

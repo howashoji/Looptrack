@@ -2,6 +2,7 @@ package verify
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -47,6 +48,10 @@ type Options struct {
 	// Before はコマンドを始める前、After は終わった後に呼ぶ（表示用。nil なら呼ばない）。skipped は After だけ。
 	Before func(i, n int, command string)
 	After  func(i, n int, r Result)
+	// Full は出力の全文の書き先（nil なら取らない）。コマンドごとに「$ <コマンド>」の行を挟み、切る前の出力をそのまま書く。
+	// skipped のコマンドは見出しの行だけ書く。時間切れの後に残った子孫の書き込みと重なることがあるので、
+	// 並行に書いてよいもの（*os.File など）を渡す。
+	Full io.Writer
 }
 
 // RunAll は commands を順にすべて実行する（失敗しても続ける）。
@@ -56,13 +61,19 @@ func RunAll(commands []string, o Options) []Result {
 	out := make([]Result, 0, n)
 	for i, command := range commands {
 		var r Result
+		if o.Full != nil {
+			fmt.Fprintf(o.Full, "$ %s\n", command)
+		}
 		if remaining := time.Until(deadline); remaining <= 0 {
 			r = Skipped(command)
 		} else {
 			if o.Before != nil {
 				o.Before(i+1, n, command)
 			}
-			r = RunCommand(command, o.Dir, o.Env, min(o.Timeout, remaining))
+			r = RunCommandTo(command, o.Dir, o.Env, min(o.Timeout, remaining), o.Full)
+		}
+		if o.Full != nil {
+			fmt.Fprintf(o.Full, "\n[%s]\n\n", fullStatus(r))
 		}
 		out = append(out, r)
 		if o.After != nil {
@@ -70,6 +81,15 @@ func RunAll(commands []string, o Options) []Result {
 		}
 	}
 	return out
+}
+
+// fullStatus は全文の控えでコマンドの後ろに置く結果の印（言語に依らない形。例「fail exit=3」）。
+// 所要時間は記録の側にあるので、控えには入れない。
+func fullStatus(r Result) string {
+	if r.ExitCode != nil {
+		return r.Status + " exit=" + strconv.Itoa(*r.ExitCode)
+	}
+	return r.Status
 }
 
 // JSON は POST の results の 1 件（キーの順は以前の CLI と同じ）。

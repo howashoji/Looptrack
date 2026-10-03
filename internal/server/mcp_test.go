@@ -258,7 +258,8 @@ func TestMCPTools(t *testing.T) {
 	var total, mcpRows, overrides int
 	e.db.QueryRow(`SELECT COUNT(*), SUM(via = 'mcp' AND session_id = 'claude-sess' AND token_id IS NOT NULL AND actor_user_id = ?), SUM(kind = 'rule_override')
 FROM issue_events`, u.ID).Scan(&total, &mcpRows, &overrides)
-	if total == 0 || total != mcpRows || overrides != 1 {
+	// 上書きは 2 件: REQ-0004 の verify_required_on_close と、既定で入のエビデンスの網（verify_evidence_required）。1 つの理由で両方を通す
+	if total == 0 || total != mcpRows || overrides != 2 {
 		t.Errorf("events=%d mcp=%d overrides=%d", total, mcpRows, overrides)
 	}
 	var viaMCP int

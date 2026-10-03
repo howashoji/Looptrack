@@ -80,10 +80,21 @@ type waitLoop struct {
 // 止めていなかった（引用符を外しても、ループの語がコマンドの位置に来なかったため）。
 // 前置の語は落とさない（hookcmd.Normalize は呼ばない）。`timeout 600 bash -c '…'` の `timeout` は
 // ループの外からの上限なので、落とすと上限が見えなくなる。前置の語の直後は waitLoopKwRe が PrefixRun で見る。
-func waitLoopText(cmd string) string {
-	t := stripHeredocs(cmd)
+func waitLoopText(cmd string) string { return waitLoopTextWith(cmd, stripHeredocs) }
+
+// waitLoopTextWith は waitLoopText のヒアドキュメントを落とす段を strip に替えたもの。
+func waitLoopTextWith(cmd string, strip func(string) string) string {
+	return waitLoopTextPost(cmd, strip, nil)
+}
+
+// waitLoopTextPost は waitLoopTextWith の、入れ子をほどくたびに post を掛けるもの（post が nil なら同じ）。
+func waitLoopTextPost(cmd string, strip, post func(string) string) string {
+	t := strip(cmd)
 	for i := 0; i < 3; i++ { // 入れ子（`bash -c "bash -c '…'"`・`eval "bash -c '…'"`）を数段だけ外す
 		u := hookcmd.UnwrapNestedShell(t, hookcmd.HeadOnly)
+		if post != nil {
+			u = post(u)
+		}
 		if u == t {
 			break
 		}
@@ -93,8 +104,16 @@ func waitLoopText(cmd string) string {
 }
 
 // waitLoops は cmd の中の待ちループ（`until` / `while` のループ本体に `sleep` があるもの）。
-func waitLoops(cmd string) []waitLoop {
-	t := waitLoopText(cmd)
+func waitLoops(cmd string) []waitLoop { return waitLoopsWith(cmd, stripHeredocs) }
+
+// waitLoopsWith は waitLoops のヒアドキュメントを落とす段を strip に替えたもの。
+func waitLoopsWith(cmd string, strip func(string) string) []waitLoop {
+	return waitLoopsPost(cmd, strip, nil)
+}
+
+// waitLoopsPost は waitLoopsWith の、入れ子をほどくたびに post を掛けるもの（waitLoopTextPost）。
+func waitLoopsPost(cmd string, strip, post func(string) string) []waitLoop {
+	t := waitLoopTextPost(cmd, strip, post)
 	outer := waitLoopTimeoutRe.MatchString(t)
 	var out []waitLoop
 	for _, m := range waitLoopKwRe.FindAllStringSubmatchIndex(t, -1) {
@@ -155,9 +174,27 @@ func PreToolWaitLoopGuard(ctx context.Context, ev hookio.Event) (hookio.Result, 
 	}
 	lang := e.lang()
 	loops := waitLoops(cmd)
-	for _, w := range loops {
-		if !w.bounded {
-			return hookio.Result{Deny: i18n.T(lang, "loop.waitloop.deny", "cmd", headStr(w.body, 160)), Kind: "waitloop: unbounded"}, nil
+	// ヒアドキュメントは以前の読み方（stripHeredocs）の後に狭い読み方（stripHeredocsNarrow）でも読む。
+	// 以前の読み方が `<<<EOF` や引用符の中の `<<EOF` を開きと読んで次の行を落としても、狭い読み方ではその行が残る。
+	// 以前の読み方を先に見るので、止める判定は以前より減らない（下の注意は以前の読み方のまま）。
+	// その後に 3 つ目の読み方（hookcmd.StripHeredocsStrict。算術・展開の中の `<<` を開きと読まず、シェルに渡す
+	// 本文を残す）と、それに $'…' とコメントの直し（hookcmd.ShlexFriendly）を重ねたものでも読む。
+	// 追加なので止める側にだけ動く。
+	// 読み方は順に、前の読み方で止まらなかったときだけ計算する（追加の読み方は遅いので、以前の読み方が止める形では
+	// 計算しない。計算すると打ち切りの時間を越えて、以前は止めていた形が通る）。
+	strict := func(s string) string { return strictHeredocs(s) }
+	strictFriendly := func(s string) string { return hookcmd.ShlexFriendly(strictHeredocs(s)) }
+	for _, read := range []func() []waitLoop{
+		func() []waitLoop { return loops },
+		func() []waitLoop { return waitLoopsWith(cmd, stripHeredocsNarrow) },
+		// 追加の読み方では、ほどいた中身にももう一度 3 つ目の読み方を掛ける（中身の本文と、閉じない引用符の行から後ろを落とす）
+		func() []waitLoop { return waitLoopsPost(cmd, strict, strict) },
+		func() []waitLoop { return waitLoopsPost(cmd, strictFriendly, strict) },
+	} {
+		for _, w := range read() {
+			if !w.bounded {
+				return hookio.Result{Deny: i18n.T(lang, "loop.waitloop.deny", "cmd", headStr(w.body, 160)), Kind: "waitloop: unbounded"}, nil
+			}
 		}
 	}
 	// ここから先は止めない（上限はあるので規律には反していない）。待つ先の置き場が無いときだけ注意を返す。

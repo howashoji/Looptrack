@@ -15,7 +15,8 @@
 #         usr/share/doc/looptrack/licenses/ に入れる（deploy/release/licenses/。DESIGN.md §5-4「AppImage の runtime に静的リンクされた部品」）
 #   bash deploy/release/desktop.sh windows-zip <版> <amd64|arm64> <出力先>
 #       → <出力先>/Looptrack_<版>_windows_<arch>.zip（Looptrack\Looptrack.exe＝GUI・アイコンつき、Looptrack\cli\looptrack.exe＝CLI）
-#         アイコンの埋め込みは rsrc（go run で版を固定して取る。MIT）。zip が要る
+#         どちらの exe にもアイコンと版の情報（VERSIONINFO。ProductName・ProductVersion）を入れ、作った直後に読み戻して確かめる。
+#         .syso は go run ./internal/tools/winversion が作る（中で go-winres を go run で版を固定して取る。0BSD）。zip が要る
 #   bash deploy/release/desktop.sh windows-installer <版> <amd64|arm64> <zip か展開したフォルダ> <出力先>
 #       → <出力先>/Looptrack_<版>_windows_<arch>_setup.exe（上の zip の中身をそのまま入れる）
 #         **Windows でだけ動く**（Inno Setup 7 の ISCC が要る。無ければ ISCC=<パス> で渡す）
@@ -55,13 +56,13 @@ APPIMAGE_RUNTIME_LICENSE_NAME="AppImage-type2-runtime-LICENSE.txt"
 APPIMAGE_LICENSES_DIR="deploy/release/licenses"
 APPIMAGE_COMPONENTS="$APPIMAGE_LICENSES_DIR/runtime-components.json"
 APPIMAGE_RELINKING="RELINKING.md"
-# Windows のアイコンの埋め込み（.syso を作る）
-RSRC="github.com/akavel/rsrc@v0.10.2"
+# Windows の exe に入れる資源（アイコンと版の情報）の .syso を作り、できた exe から読み戻す道具
+WINVERSION="./internal/tools/winversion"
 # Windows のインストーラの設定（Inno Setup 7）
 ISS="deploy/release/windows/Looptrack.iss"
 
 usage() {
-  sed -n '2,24p' "$0" >&2
+  sed -n '2,25p' "$0" >&2
   exit 2
 }
 
@@ -334,15 +335,19 @@ windows_zip() {
   CLEANUP+=("$syso")
   top="$work/$APP_NAME"
   mkdir -p "$top/cli"
-  # アイコンを .exe に埋め込む（.syso はこのビルドの間だけ置く。headless の dist.sh のビルドには入れない）
-  go run "$RSRC" -arch "$goarch" -ico "$ICON_DIR/app.ico" -o "$syso"
+  # アイコンと版の情報を .exe に埋め込む（.syso はこのビルドの間だけ置き、失敗しても trap で消す。
+  # headless の dist.sh のビルドには版の情報だけを入れる）。OriginalFilename が違うので exe ごとに作り直す
+  go run "$WINVERSION" syso -version "$version" -arch "$goarch" -original "$APP_NAME.exe" -icon "$ICON_DIR/app.ico" -out "$syso"
   echo "build windows/${goarch}（desktop・GUI）" >&2
   CGO_ENABLED=0 GOOS=windows GOARCH="$goarch" go build -trimpath -tags desktop \
     -ldflags "$(ldflags "$version" "-H=windowsgui")" -o "$top/$APP_NAME.exe" ./cmd/looptrack
+  go run "$WINVERSION" syso -version "$version" -arch "$goarch" -original looptrack.exe -icon "$ICON_DIR/app.ico" -out "$syso"
   echo "build windows/${goarch}（CLI・headless）" >&2
   CGO_ENABLED=0 GOOS=windows GOARCH="$goarch" go build -trimpath \
     -ldflags "$(ldflags "$version")" -o "$top/cli/looptrack.exe" ./cmd/looptrack
   rm -f "$syso"
+  # 版の情報が入ったことを読み戻して確かめる（無い・違うなら止める）
+  go run "$WINVERSION" check -version "$version" "$top/$APP_NAME.exe" "$top/cli/looptrack.exe" >&2
   cp "$OFL_SRC" "$top/OFL-BIZUDGothic.txt"
   cp "$NOTICE_SRC" "$top/NOTICE"
   mkdir -p "$out"

@@ -1,9 +1,58 @@
 # 日々の使い方
 
-[ガイドの目次](README.md) · 前: [始め方](getting-started.md) · 次: [AI ごとの手引き](ai-agents.md)
+[ガイドの目次](README.md) · 前: [サーバ版の始め方](server/getting-started.md) · [デスクトップ版の始め方](desktop/getting-started.md) · 次: [AI ごとの手引き](ai-agents.md)
 
 説明には CLI のコマンドを使います。
 とはいえ、`create_issue`・`next`・`add_comment`・`set_status` といった MCP のツールでも同じことができます。どちらから操作しても、サーバが検査する規則は同じです。
+
+## 最初の 1 周
+
+AI とつないだ後は、サーバ版もデスクトップ版も同じ道をたどります。つなぐまでの手順は[サーバ版](server/getting-started.md)と[デスクトップ版](desktop/getting-started.md)の始め方にあります。まずは 1 周、最初から最後まで回してみましょう。
+下のコマンドは、`LOOPTRACK_API_URL` と `LOOPTRACK_PROJECT` が自分のサーバとプロジェクトを指すターミナルで実行します。サーバ版なら[始め方](server/getting-started.md)の手順 9 で設定済みです。デスクトップ版は [CLI を使う](desktop/using.md#cli-を使う)を見てください。例のプロジェクトは `demo` で、ID の接頭辞は `DEMO` です。
+ターミナルを使いたくない？ 起票も AI に頼めます。
+
+最初のイシューを起票して、1 周を手で回してみましょう。
+
+```bash
+looptrack issue new "README に概要を書く" --type task --body "$(cat <<'EOF'
+README.md にこのリポジトリの概要を 3 行で書く。
+
+## 受け入れ条件
+
+- [ ] README.md がある
+- [ ] 概要が 3 行ある
+
+## 検証コマンド
+
+- `test -f README.md`
+- `test "$(grep -c . README.md)" -ge 3`
+EOF
+)"
+looptrack issue next
+```
+
+`next` が `DEMO-0001` を In Progress にして、本文と受け入れ条件を表示します。
+ここから先は AI の出番です。
+Claude Code を開いて、こう頼みます。
+
+> イシューの next から 1 周回して。受け入れ条件を検証してから close して。
+
+AI は作業を進め、`verify` で検証コマンドを実行して結果を残し、`close` します。
+最後に、手元でも結果を確かめておきましょう。
+
+```bash
+looptrack issue show DEMO-0001
+looptrack issue verify DEMO-0001 --last
+looptrack issue summary
+```
+
+`show` にコメントと Done の状態が出ていれば、最初の 1 周は完了。
+同じイシューは、ブラウザのプロジェクトの画面（`<サーバの URL>/p/demo/`）でも見られます。
+カードを選ぶと詳細が開き、コメント・検証の結果・添付が順に並びます。
+
+![DEMO-0001 の詳細。Done の状態で、方針のコメント・検証コマンドの結果・close のコメント・出力の全文の添付が並ぶ](../images/ja/issue-done.png)
+
+PowerShell ではヒアドキュメントが使えません。本文をファイルに書いてから、`--body (Get-Content -Raw body.md)` で渡してください。
 
 ## 1 日の流れ
 
@@ -12,6 +61,10 @@
 3. AI が `next` で着手し、作業・検証・close を繰り返します。
 4. 判断が要るものは In Review にたまります。都合のよいときに、まとめて答えてください。
 5. 使った人の反応を聞いたら、AI に伝えてイシューに残してもらいましょう。
+
+ブラウザのボードでは、状態ごとの列にイシューが並びます。判断を待っているのは In Review の列です。
+
+![ボードの画面。Backlog から Canceled までの列に、着手可・反応・待ちの印が付いたカードが並ぶ](../images/ja/board.png)
 
 自分の目で確かめたいときは？　次のコマンドが便利です。
 
@@ -94,13 +147,40 @@ looptrack issue verify DEMO-0004 --last   # 直近の記録を出力つきで見
 本文を直すと、それまでの記録は無効に。
 `verify.require_on_close` のプロジェクトでは、直した後に `verify` をもう一度実行しないと Done にできません。
 
-サーバは、節を見出しの語で探します。見出しは `## 検証コマンド`・`## 受け入れ条件` のほか、英語の `## Verify commands`・`## Acceptance criteria` でも書けます（英語の見出しは大文字小文字を区別しません）。
+サーバは節を見出しの語で探します。見出しは `## 検証コマンド`・`## 受け入れ条件` のほか、英語の `## Verify commands`・`## Acceptance criteria` でも書けます（英語の見出しは大文字小文字を区別しません）。
 コメントの先頭の語も英語で OK。`Decision:`（判断:）・`Changes requested:`（差し戻し:）・`Feedback:`（フィードバック:）です。
+
+## 添付（エビデンス）
+
+検証の証跡はファイルのままイシューに添付できます。
+テストの出力の全文・画面のスクリーンショット・生成したレポートといったものです。本体はサーバに残り、誰がいつ付けたかも記録されるので、コメントにパスを書いて済ませる必要はありません。
+
+```bash
+looptrack issue attach DEMO-0004 screenshot.png report.html   # 添付して、添付の ID を出す
+looptrack issue comment DEMO-0004 "画面を直した" --attach after.png
+looptrack issue verify DEMO-0004 --attach-output              # 切る前の出力の全文を verify の記録に付ける
+looptrack issue verify DEMO-0004 --attach coverage.html       # ほかのファイルも記録に付ける（繰り返せる）
+```
+
+- AI は MCP のツールではファイルを送れません。CLI の `issue attach` で送り、返った ID を `report_verify` か `add_comment` の `attachments` に渡す。guide と MCP の案内文が、AI にこの手順を指示します。
+- ブラウザでは、コメントの欄でファイルを選ぶ・ドラッグ&ドロップする・スクリーンショットを貼り付けるの 3 通りで添付できます。ドロワーに添付の一覧が出て、画像はその場で見られる。
+- テキストのファイルに秘密らしいもの（トークンやパスワードの形）があると、CLI は 1 件も送らずに止まります。サーバでは中身を隠せないからです。
+- 添付は消せません。秘密を誤って添付したときは、管理者に本体の消去を頼んでください（[管理者の手引き](server/admin.md#添付の上限と消去)）。
+- 上限の既定は 1 ファイル 20MiB、1 プロジェクト 1GiB です。
+
+下の例は作った画面のスクリーンショットを添付し、In Review で判断を仰いでいるところです。
+
+![In Review のイシューの詳細。「判断してほしい点:」のコメントと、添付した画像がその場に出る](../images/ja/in-review.png)
+
+**Done にするには、既定でエビデンスが要ります。**
+本文に検証コマンドがあるイシューは、いまの本文に対する最新の verify の記録に添付が無いと、サーバが Done を拒否します。記録そのものが無いときも同じ。
+`verify` に `--attach-output` か `--attach` を付けて実行すれば通ります。`issue attach` だけで付けた添付は verify の記録に付かないので、この条件を満たしません。
+プロジェクトでこの網を切るには、プロジェクト別ルールの `verify.require_evidence` を `false` にします（[管理者の手引き](server/admin.md#プロジェクト別ルールの設定)）。
 
 ## コメントの型
 
 コメントは追記だけ。書き換えも削除もできません。
-意味は、先頭の語で分けます。
+意味は先頭の語で分けます。
 
 | 先頭 | 誰が書くか | いつ | 例 |
 | -- | -- | -- | -- |
@@ -161,6 +241,10 @@ looptrack issue new "ログイン画面の e2e テスト" --type test --traces D
 looptrack issue matrix
 ```
 
+ブラウザのトレースでも、同じ対応表を見られます。
+
+![トレースの画面。要件 DEMO-0002 から設計・実装・テストのイシューと状態をたどれる](../images/ja/trace.png)
+
 ある要件を traces で指すイシューがすべて閉じると、close の応答に「要件 <ID> の下位がすべて完了しました」と出ます。
 出たら、要件の受け入れ条件を確かめる番。満たしていれば、要件も close します。
 
@@ -180,7 +264,7 @@ looptrack issue push DEMO-0004    # 反映する（作業コピーは消える�
 
 ## 作業ツリーの後始末
 
-1 つの課題ごとに worktree を作って進めていると、取り込み済みの作業ツリーとブランチがたまっていきます。やがて、どれが使われているのか分からなくなる。
+1 つの課題ごとに worktree を作って進めていると、取り込み済みの作業ツリーとブランチがたまっていきます。やがて、どれが使われているのか分からなくなります。
 片付けの判断に要る材料は、`looptrack worktree` が集めてくれます。
 
 ```bash
@@ -191,7 +275,7 @@ looptrack worktree mark          # いまのセッションがこの作業ツリ
 looptrack worktree mark --yes    # 別のセッションの印があっても上書きする
 ```
 
-消えるのは、次の条件を**すべて**満たすものだけ。それ以外は、理由を付けて残します。
+消えるのは、次の条件を**すべて**満たすものだけ。それ以外は理由を付けて残します。
 
 - 本体の作業ツリーではない
 - 既定のブランチに取り込み済み
@@ -224,3 +308,27 @@ loop を入れていれば、片付けられるものや失われかけている
 - ルールで拒否された操作を、MCP や edit といった別の経路で回避する
 - アクセストークンを会話・コミット・イシュー・ログに書く
 - 本番のデータをそのままイシューに貼る（マスクするか ID だけを書く）
+
+## 表示の言語（日本語 / 英語）
+
+文面は日本語か英語で表示されます。`LOOPTRACK_LANG` で指定してもいいし、端末とブラウザの設定に任せても構いません。
+
+```bash
+LOOPTRACK_LANG=en looptrack issue list   # このコマンドだけ
+export LOOPTRACK_LANG=ja                 # このシェルの間
+```
+
+| 順 | コマンドライン | 画面・MCP |
+| -- | -- | -- |
+| 1 | `LOOPTRACK_LANG` | URL の `?lang=ja` / `?lang=en`（その要求だけ） |
+| 2 | `LC_ALL` → `LC_MESSAGES` → `LANG` | `LOOPTRACK_LANG`（CLI が明示の指定として送る） |
+| 3 | 英語 | `/account` で選ぶ「表示の言語」（設定なしにもできる） |
+| 4 | — | `Accept-Language` |
+| 5 | — | 英語 |
+
+`/account` の「表示の言語」を選んでおけば、ヘッダを送れない MCP の接続でもその言語で返ってきます。
+「設定なし」に戻すと、これまでどおりブラウザや端末の設定に従います。
+
+AI が読む文も同じです。MCP の `instructions`・`guide` の本文・ツールの説明は、接続ごとに同じ順で言語が決まります。
+プロジェクトに配る rules は日英の両方を置き、hook が実行時に上と同じ順で選ぶ仕組み。
+skill だけは違います。`looptrack issue init` が導入時の言語の 1 本だけを置くので、言語を変えたら `looptrack issue init` をもう一度実行してください。

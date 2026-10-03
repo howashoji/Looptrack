@@ -30,6 +30,11 @@ func jsonArg(lang i18n.Lang) *Arg {
 	return &Arg{Name: "--json", Kind: Bool, Help: i18n.T(lang, "cli.arg.json")}
 }
 
+// attachArg は --attach FILE（繰り返せる。comment と verify で共通）。
+func attachArg(lang i18n.Lang) *Arg {
+	return &Arg{Name: "--attach", Append: true, Metavar: "FILE", Help: i18n.T(lang, "cli.arg.attach")}
+}
+
 func join(lists ...[]*Arg) []*Arg {
 	var out []*Arg
 	for _, l := range lists {
@@ -117,6 +122,12 @@ func IssueCommand(lang i18n.Lang) *Command {
 			{Name: "comment", Help: i18n.T(lang, "cli.cmd.comment"), Run: cmdComment, Args: []*Arg{
 				{Name: "id"},
 				{Name: "text", Help: i18n.T(lang, "cli.arg.comment.text")},
+				attachArg(lang),
+			}},
+			{Name: "attach", Help: i18n.T(lang, "cli.cmd.attach"), Run: cmdAttach, Args: []*Arg{
+				{Name: "id"},
+				{Name: "files", Nargs: "+", Metavar: "FILE", Help: i18n.T(lang, "cli.arg.attach.files")},
+				jsonArg(lang),
 			}},
 			{Name: "status", Help: i18n.T(lang, "cli.cmd.status"), Run: cmdStatus, Args: []*Arg{
 				{Name: "id"},
@@ -161,6 +172,8 @@ func IssueCommand(lang i18n.Lang) *Command {
 				{Name: "--total-timeout", Dest: "total_timeout", Kind: Float, Default: verifyTotalTimeout, Help: i18n.T(lang, "cli.arg.verify.total_timeout")},
 				{Name: "--list", Kind: Bool, Help: i18n.T(lang, "cli.arg.verify.list")},
 				{Name: "--last", Kind: Bool, Help: i18n.T(lang, "cli.arg.verify.last")},
+				attachArg(lang),
+				{Name: "--attach-output", Dest: "attach_output", Kind: Bool, Help: i18n.T(lang, "cli.arg.verify.attach_output")},
 				jsonArg(lang),
 			}},
 			{Name: "summary", Help: i18n.T(lang, "cli.cmd.summary"), Run: cmdSummary, Args: []*Arg{

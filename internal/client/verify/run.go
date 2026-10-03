@@ -26,11 +26,18 @@ func Shell() (string, error) { return findShell() }
 // RunCommand は 1 コマンドを `<shell> -c` で実行する。
 // 時間切れは子孫まで止めて status timeout・exit_code null にする。シグナルで終わったら 128 + 番号（シェルと同じ）。
 func RunCommand(command, dir string, env []string, timeout time.Duration) Result {
+	return RunCommandTo(command, dir, env, timeout, nil)
+}
+
+// RunCommandTo は RunCommand に、出力の全文の書き先 full を足したもの（nil なら RunCommand と同じ）。
+// full には切る前の出力をそのままのバイトで書く（マスクも文字コードの読み直しもしない。読む側が FullText で整える）。
+// 書き先の誤りは無視する（全文の控えが取れなくても、検証の結果は変えない）。
+func RunCommandTo(command, dir string, env []string, timeout time.Duration, full io.Writer) Result {
 	shell, err := Shell()
 	if err != nil {
 		return launchFailed(command, err)
 	}
-	return runWith(shell, command, dir, env, timeout)
+	return runWithFull(shell, command, dir, env, timeout, full)
 }
 
 // launchFailed は起動できなかった結果。出力の末尾に足す文面は、コマンドを走らせた人の言語で書く
@@ -41,6 +48,10 @@ func launchFailed(command string, err error) Result {
 }
 
 func runWith(shell, command, dir string, env []string, timeout time.Duration) Result {
+	return runWithFull(shell, command, dir, env, timeout, nil)
+}
+
+func runWithFull(shell, command, dir string, env []string, timeout time.Duration, full io.Writer) Result {
 	started := time.Now()
 	cmd := exec.Command(shell, "-c", command)
 	cmd.Dir, cmd.Env = dir, env
@@ -68,9 +79,13 @@ func runWith(shell, command, dir string, env []string, timeout time.Duration) Re
 	defer t.close()
 
 	buf := &tailBuffer{max: KeepBytes}
+	var sink io.Writer = buf
+	if full != nil {
+		sink = io.MultiWriter(buf, ignoreErrors{full})
+	}
 	readDone := make(chan struct{})
 	go func() {
-		io.Copy(buf, r)
+		io.Copy(sink, r)
 		close(readDone)
 	}()
 	waitDone := make(chan error, 1)
@@ -127,4 +142,12 @@ func runWith(shell, command, dir string, env []string, timeout time.Duration) Re
 		res.Status = StatusFail
 	}
 	return res
+}
+
+// ignoreErrors は書き込みの誤りを飲み込む（全文の控えの失敗で、末尾の保持まで止めないため）。
+type ignoreErrors struct{ w io.Writer }
+
+func (e ignoreErrors) Write(p []byte) (int, error) {
+	_, _ = e.w.Write(p)
+	return len(p), nil
 }

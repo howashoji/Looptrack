@@ -27,7 +27,11 @@ import (
 //	looptrack grants print [--db <名前>] [--user <名前>]   GRANT 文を出す（既定は LOOPTRACK_DSN の DB 名・利用者名）
 //	looptrack grants apply [--admin-user <名前>] [--admin-password-file <パス>] [--yes]
 //	    管理用の資格情報を端末から尋ね（表示しない・保存しない）、DB とアプリ用の利用者が無ければ確かめてから作り、
-//	    表が無ければ作り（migrate）、GRANT を流し、アプリ用の利用者（LOOPTRACK_DSN）で読めることを確かめる
+//	    表が無ければ作り（migrate）、GRANT を流し、アプリ用の利用者（LOOPTRACK_DSN）で全部の表の権限がそろったことを確かめる
+//	looptrack grants check
+//	    アプリ用の利用者（LOOPTRACK_DSN）に、grants.sql が挙げる全部の表の権限があるかを確かめる。
+//	    そろっていれば 0、足りなければ足りない表と権限を出して 3（migrate --check の「未適用あり」と同じ値）。
+//	    インストーラは migrate の後にこれを呼び、3 なら管理用の資格情報を尋ねて与え直す（表が増えた更新でも気づくため）
 //
 // 表ごとの GRANT は表ができてからしか流せない（DB 単位で与えると表単位で取り消せない）ので、インストーラは
 // setup（表を作る）の後にこれを呼ぶ。管理用の資格情報は接続にだけ使い、ファイル・環境変数・引数に残さない。
@@ -81,6 +85,8 @@ func runGrants(ctx context.Context, args []string, getenv func(string) string, s
 		return grantsPrint(args[1:], getenv, stdout, stderr, lang)
 	case "apply":
 		return grantsApply(ctx, args[1:], getenv, stdout, stderr, lang, ask)
+	case "check":
+		return grantsCheck(ctx, args[1:], getenv, stdout, stderr, lang)
 	case "-h", "--help", "help":
 		fmt.Fprintln(stdout, i18n.T(lang, "cmd.usage.grants"))
 		return 0
@@ -171,6 +177,47 @@ func grantsApply(ctx context.Context, args []string, getenv func(string) string,
 	return 0
 }
 
+// checkGrants は権限の確かめ（looptrack grants check と、grants apply の最後の確かめ）。テストが差し替えて、
+// apply の最後の確かめがこれを通っていることを確かめる。
+var checkGrants = dbgrants.Check
+
+// grantsCheckMissing は looptrack grants check が「権限が足りない」ときの終了コード（接続できないなどの誤りの 1 と分ける）。
+const grantsCheckMissing = 3
+
+func grantsCheck(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer, lang i18n.Lang) int {
+	fs := flag.NewFlagSet("grants check", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	cfg, err := grantsTarget(getenv)
+	if err != nil {
+		return failTo(stderr, lang, err)
+	}
+	if cfg == nil {
+		fmt.Fprintln(stdout, i18n.T(lang, "cmd.grants.sqlite"))
+		return 0
+	}
+	app, err := store.Open(getenv("LOOPTRACK_DSN"))
+	if err != nil {
+		return failTo(stderr, lang, err)
+	}
+	defer app.Close()
+	missing, err := checkGrants(ctx, app)
+	if err != nil {
+		return failTo(stderr, lang, i18n.Errorf("cmd.err.grants_check", "reason", err))
+	}
+	if len(missing) > 0 {
+		fmt.Fprintln(stderr, i18n.T(lang, "cmd.grants.check_missing", "user", cfg.User, "missing", dbgrants.FormatMissing(missing)))
+		return grantsCheckMissing
+	}
+	fmt.Fprintln(stdout, i18n.T(lang, "cmd.grants.verified", "user", cfg.User))
+	return 0
+}
+
 // grantsApplyOptions は applyGrants の設定。
 type grantsApplyOptions struct {
 	target    *mysql.Config // アプリ用の接続先（appDSN を読んだもの）
@@ -181,7 +228,8 @@ type grantsApplyOptions struct {
 }
 
 // applyGrants は looptrack grants apply の中身。管理用の資格情報を尋ね（表示しない・保存しない）、DB とアプリ用の利用者が
-// 無ければ確かめてから作り、表が無ければ作り（migrate）、GRANT を流し、アプリ用の利用者で読めることを確かめる。
+// 無ければ確かめてから作り、表が無ければ作り（migrate）、GRANT を流し、アプリ用の利用者で全部の表の権限がそろったことを
+// 確かめる（looptrack grants check と同じ dbgrants.Check）。
 // looptrack grants apply と、DB がまだ無いときの looptrack setup（setupwiz.Options.PrepareDatabase）の両方がこれを呼ぶ
 // （DB・利用者を作るかの判断と作り方を 1 か所に置くため）。
 func applyGrants(ctx context.Context, o grantsApplyOptions, stdout io.Writer, lang i18n.Lang, ask prompter) error {
@@ -316,15 +364,18 @@ func applyGrants(ctx context.Context, o grantsApplyOptions, stdout io.Writer, la
 	}
 	fmt.Fprintln(stdout, i18n.T(lang, "cmd.grants.applied", "n", len(stmts)))
 
-	// アプリ用の利用者（LOOPTRACK_DSN）で読めること
+	// アプリ用の利用者（LOOPTRACK_DSN）で、全部の表の権限がそろったこと（looptrack grants check と同じ確かめ）
 	app, err := store.Open(o.appDSN)
 	if err != nil {
 		return err
 	}
 	defer app.Close()
-	var n int
-	if err := app.QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_migrations").Scan(&n); err != nil {
+	missing, err := checkGrants(ctx, app)
+	if err != nil {
 		return i18n.Errorf("cmd.err.grants_verify", "reason", err)
+	}
+	if len(missing) > 0 {
+		return i18n.Errorf("cmd.err.grants_verify", "reason", dbgrants.FormatMissing(missing))
 	}
 	fmt.Fprintln(stdout, i18n.T(lang, "cmd.grants.verified", "user", cfg.User))
 	return nil

@@ -89,26 +89,40 @@ func TestKitUsesLooptrackCLI(t *testing.T) {
 // snippetDoc は docs/templates/CLAUDE-snippet.md（init が CLAUDE.md に入れる節の写し）。
 const snippetDoc = "../../../docs/templates/CLAUDE-snippet.md"
 
-const snippetDocHead = `<!-- プロジェクト側の CLAUDE.md に入る節（<slug> はプロジェクト名、<URL> はサーバの URL）。looptrack issue init が
-     <!-- looptrack:begin … --> / <!-- looptrack:end --> で囲んで入れる。正本は internal/client/kitinit/texts.go の claudeSnippet。
-     この写しと一致することを internal/client/kitinit の TestClaudeSnippetDoc が確かめる（-update で書き直す）。手で貼らない。 -->
+const snippetDocHead = `<!-- プロジェクト側の CLAUDE.md に入る節です（<slug> はプロジェクト名、<URL> はサーバの URL）。looptrack issue init が
+     <!-- looptrack:begin … --> / <!-- looptrack:end --> で囲んで入れます。正本は internal/client/kitinit/texts.go の claudeSnippet。
+     この写しと一致することを internal/client/kitinit の TestClaudeSnippetDoc が確かめます（-update で書き直します）。手で貼らないでください。 -->
 
 `
 
-// TestClaudeSnippetDoc は文書の写しが init の入れる節と同じことを確かめる。
+// snippetDocEN は英語の写し（docs/templates/en/CLAUDE-snippet.md）。kit と同じく、訳は en/ に同じ名前で置く。
+const snippetDocEN = "../../../docs/templates/en/CLAUDE-snippet.md"
+
+const snippetDocHeadEN = `<!-- The section that goes into a project's CLAUDE.md when init runs in English (<slug> is the project name, <URL> the server URL).
+     looptrack issue init wraps it in <!-- looptrack:begin … --> / <!-- looptrack:end -->. The source is claudeSnippetEN in internal/client/kitinit/texts.go.
+     TestClaudeSnippetDoc in internal/client/kitinit checks that this copy matches (-update rewrites it). Do not paste it by hand. -->
+
+`
+
+// TestClaudeSnippetDoc は文書の写し（日英）が init の入れる節と同じことを確かめる。
 func TestClaudeSnippetDoc(t *testing.T) {
-	want := snippetDocHead + fill(claudeSnippet, "<slug>", "<URL>")
-	if *update {
-		if err := os.WriteFile(snippetDoc, []byte(want), 0o644); err != nil {
+	for _, d := range []struct{ path, want string }{
+		{snippetDoc, snippetDocHead + fill(claudeSnippet, "<slug>", "<URL>")},
+		{snippetDocEN, snippetDocHeadEN + fill(claudeSnippetEN, "<slug>", "<URL>")},
+	} {
+		if *update {
+			os.MkdirAll(filepath.Dir(d.path), 0o755)
+			if err := os.WriteFile(d.path, []byte(d.want), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		got, err := os.ReadFile(d.path)
+		if err != nil {
 			t.Fatal(err)
 		}
-		return
-	}
-	got, err := os.ReadFile(snippetDoc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != want {
-		t.Errorf("%s が init の節と違います（go test ./internal/client/kitinit -run TestClaudeSnippetDoc -update で書き直す）:%s", snippetDoc, firstDiff(want, string(got)))
+		if string(got) != d.want {
+			t.Errorf("%s が init の節と違います（go test ./internal/client/kitinit -run TestClaudeSnippetDoc -update で書き直す）:%s", d.path, firstDiff(d.want, string(got)))
+		}
 	}
 }

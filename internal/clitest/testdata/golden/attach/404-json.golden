@@ -1,0 +1,26 @@
+# attach/404-json
+$ issue attach DEMO-0001 shot.png notes.txt --json
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: イシューが見つかりません: DEMO-0999
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/attachments?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: image/png
+  X-Looptrack-Client: cli
+  X-Looptrack-Filename: shot.png
+  X-Looptrack-Lang: ja
+  body:
+    (バイナリ 12 バイト sha256=1b56b50ac4e976f488f128cabdcdffb2fc9331d6974bb9968131a415d14ade24)
+
+#### files (2)
+ws/notes.txt (0644)
+    PASS
+    ok  pkg
+ws/shot.png (0644)
+    (バイナリ 12 バイト sha256=1b56b50ac4e976f488f128cabdcdffb2fc9331d6974bb9968131a415d14ade24)

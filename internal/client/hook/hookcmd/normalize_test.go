@@ -172,3 +172,15 @@ func TestJoinContinuations(t *testing.T) {
 	// 改行の前でない連なりは本数に関わらず触らない（UNC のパス）
 	eqs(t, "改行の前でない 2 本", JoinContinuations(`dir \\host\share`), `dir \\host\share`)
 }
+
+// TestNormalizeLines は、ほどいた引用符を改行に替えること（中身のヒアドキュメントの終端の行が `EOF;` にならない）。
+// 対照: Normalize は ; に替える（以前のまま）。
+func TestNormalizeLines(t *testing.T) {
+	in := "bash -c 'cat <<EOF\nx\nEOF'\ngit status"
+	if got, want := NormalizeLines(in, HeadOnly), "bash -c \ncat <<EOF\nx\nEOF\n\ngit status"; got != want {
+		t.Errorf("NormalizeLines(%q) = %q、期待 %q", in, got, want)
+	}
+	if got, want := Normalize(in, HeadOnly), "bash -c ;cat <<EOF\nx\nEOF;\ngit status"; got != want {
+		t.Errorf("前提が崩れています（Normalize の結果が変わった）: Normalize(%q) = %q、期待 %q", in, got, want)
+	}
+}

@@ -296,7 +296,7 @@ func (s *Server) accountTOTPSubmit(w http.ResponseWriter, r *http.Request, p *pr
 		s.internalError(w, r, err)
 		return
 	}
-	if err := s.startSession(w, r, p.User, true, true); err != nil {
+	if err := s.startSession(w, r, p.User, true, true, p.Session.Persistent); err != nil {
 		s.internalError(w, r, err)
 		return
 	}
@@ -337,7 +337,7 @@ func (s *Server) accountTOTPDisable(w http.ResponseWriter, r *http.Request, p *p
 		s.internalError(w, r, err)
 		return
 	}
-	if err := s.startSession(w, r, p.User, true, false); err != nil {
+	if err := s.startSession(w, r, p.User, true, false, p.Session.Persistent); err != nil {
 		s.internalError(w, r, err)
 		return
 	}

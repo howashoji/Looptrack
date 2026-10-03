@@ -168,6 +168,17 @@ func Output(raw []byte) string {
 	return domain.TailBytes(domain.MaskSecrets(DecodeReplace(raw[i:])), OutputBytes)
 }
 
+// FullText は出力の全文（Options.Full に書いたもの）を添付する形にする。Output と同じく、UTF-8 として不正なら
+// Windows の ANSI コードページとして読み直し（codepage.go）、不正な並びを置き換え、秘密をマスクする。切りはしない。
+func FullText(raw []byte) string {
+	if !utf8.Valid(raw) {
+		if s, ok := decodeLegacy(codePage(), raw); ok {
+			return domain.MaskSecrets(s)
+		}
+	}
+	return domain.MaskSecrets(DecodeReplace(raw))
+}
+
 // DecodeReplace は bytes.decode("utf-8", errors="replace") と同じ置き換えをする。
 // 不正な並びは「正しい並びの最長の先頭部分」ごとに 1 つの U+FFFD にする（Go の strings.ToValidUTF8 は連続した不正を 1 つにまとめ、
 // utf8.DecodeRune は 1 バイトずつ置き換えるので、どちらとも違う）。

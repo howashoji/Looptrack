@@ -1,7 +1,9 @@
 # CI: Go・node のテストと lint、クロスビルドの確認を回す。
 # 手順・前提は docs/server/RELEASE.md。
 #
-# 起動（2026-09-21 に push と pull_request の契機を外した）:
+# 起動:
+#   - push（main）と pull_request: ジョブが回るのは公開のリポジトリ（github.com/howashoji/looptrack）だけ。ほかのリポジトリ
+#     （フォークなど）では run はできるが、ジョブは全部飛ばす（各ジョブの if:）。重いジョブはここでは回らない。
 #   - 手動（workflow_dispatch）: 本番の配置・配布物の更新・リリースのタグの直前と、Windows に関わる変更を
 #     まとめた区切り（1 日 0〜2 回）。回す SHA は手元の全検査（CONTRIBUTING.md の「Running the tests」）が緑のものだけ。
 #     入力 full は既定で入っているので、手を加えずに起こすと重いジョブも回る。軽いぶんだけで足りるときは外す
@@ -26,6 +28,9 @@
 name: ci
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   schedule:
     # 毎週月曜の 05:00 JST（日曜 20:00 UTC）。重いジョブはここでまとめて回す。
     - cron: "0 20 * * 0"
@@ -54,6 +59,10 @@ jobs:
     name: go (gofmt・vet・mod tidy・govulncheck)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # push と pull_request で回すのは公開のリポジトリだけ（フォークの Actions の枠を使わない）。
+    # 週次と手動はどのリポジトリでも回す。下の「契機に関わらず回る」ジョブはどれも同じ条件を持つ。
+    # リポジトリは URL で比べる（式の == は大文字と小文字を区別しない）。
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || format('{0}/{1}', github.server_url, github.repository) == 'https://github.com/howashoji/looptrack'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -80,6 +89,7 @@ jobs:
     name: go test (linux・MySQL 8.4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || format('{0}/{1}', github.server_url, github.repository) == 'https://github.com/howashoji/looptrack'
     services:
       mysql:
         # deploy/dev/compose.yaml と同じ版。パスワードはこのジョブの使い捨てのコンテナ専用。
@@ -150,6 +160,7 @@ jobs:
     name: go test (windows・DB なし)
     runs-on: windows-latest
     timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || format('{0}/{1}', github.server_url, github.repository) == 'https://github.com/howashoji/looptrack'
     defaults:
       run:
         shell: bash
@@ -289,6 +300,7 @@ jobs:
     name: デスクトップ版のビルド（linux/amd64・cgo なし）
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || format('{0}/{1}', github.server_url, github.repository) == 'https://github.com/howashoji/looptrack'
     env:
       CGO_ENABLED: "0"
       GOOS: linux
@@ -365,6 +377,7 @@ jobs:
     name: 検査（shellcheck・node・actionlint・NOTICE）
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || format('{0}/{1}', github.server_url, github.repository) == 'https://github.com/howashoji/looptrack'
     steps:
       - uses: actions/checkout@v7
         with:

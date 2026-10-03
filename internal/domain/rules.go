@@ -34,10 +34,14 @@ type Rules struct {
 // 「## 検証コマンド」節を持つイシューを Statuses（既定 Done だけ）にするとき、直近の verify が現在の本文に対する
 // 全件成功であることを求める（理由付きで上書き可）。経路（AI・人）を問わない。
 // Message は 3 つの状態（記録なし・本文が変わった・失敗）で共通の上書き（{id} {status} {command} {state} {failed}）。
+//
+// RequireEvidence はエビデンスの網（CheckEvidence）の強さ。未設定（nil）は入で、ルールを何も設定していない
+// プロジェクトにも効く。false にしたプロジェクトでは拒否の代わりに注意だけを返す。RequireOnClose とは独立に効く。
 type VerifyRule struct {
-	RequireOnClose bool     `json:"require_on_close"`
-	Statuses       []string `json:"statuses,omitempty"`
-	Message        string   `json:"message,omitempty"`
+	RequireOnClose  bool     `json:"require_on_close"`
+	Statuses        []string `json:"statuses,omitempty"`
+	Message         string   `json:"message,omitempty"`
+	RequireEvidence *bool    `json:"require_evidence,omitempty"`
 }
 
 // UsageRule はトークン計測（DESIGN.md §9-5）の強さ。RequireOnClose が false（既定）なら警告だけで、
@@ -214,7 +218,7 @@ type Violation struct {
 	Rule        string
 	Message     string
 	Msg         i18n.Msg // 既定の文面の ID（設定された文面のときは ID が空）
-	Overridable bool     // 理由付きで上書きできる（usage_required_on_close・verify_required_on_close）
+	Overridable bool     // 理由付きで上書きできる（usage_required_on_close・verify_required_on_close・verify_evidence_required）
 }
 
 func (v *Violation) Error() string { return v.Message }
@@ -395,6 +399,67 @@ func (r *Rules) CheckVerify(lang i18n.Lang, c VerifyCheck) (*Override, *Violatio
 	v := violation(lang, "verify_required_on_close", r.Verify.Message, vars, m)
 	v.Overridable = true
 	return nil, v
+}
+
+// エビデンスの状態（EvidenceCheck.State）。
+const (
+	EvidenceNone    = "none"    // いまの本文に対する verify の記録が無い（記録なし・最後の記録の後に本文が変わった）
+	EvidenceMissing = "missing" // いまの本文に対する最新の記録に添付が無い
+	EvidencePresent = "present" // いまの本文に対する最新の記録に添付がある
+)
+
+// EvidenceCheck は Done にするときのエビデンスの判定材料。
+type EvidenceCheck struct {
+	ID             string
+	To             string
+	HasCommands    bool   // 本文に検証コマンドが 1 件以上ある
+	State          string // EvidenceNone / EvidenceMissing / EvidencePresent
+	Creating       bool   // 起票（ID はまだ無い）
+	OverrideReason string
+}
+
+// RequiresEvidence はエビデンスの網で拒否するか（verify.require_evidence）。未設定は入。
+// nil のルール（何も設定していないプロジェクト）でも true を返す。
+func (r *Rules) RequiresEvidence() bool {
+	if r == nil || r.Verify == nil || r.Verify.RequireEvidence == nil {
+		return true
+	}
+	return *r.Verify.RequireEvidence
+}
+
+// CheckEvidence は、本文に検証コマンドがあるイシューを Done にするとき、いまの本文に対する最新の verify の記録に
+// 添付（エビデンス）があるかを判定する。対象は Done だけ（Canceled は検証せずに終わらせる状態なので見ない）。
+// verify.require_evidence が入（既定）なら理由付きで上書きできる違反を返し、上書きしたら Override を返す。
+// 切なら止めずに注意の文面（notice。lang の言語）だけを返す。成否（失敗した記録か）は見ない（それは verify.require_on_close の役目）。
+func (r *Rules) CheckEvidence(lang i18n.Lang, c EvidenceCheck) (override *Override, v *Violation, notice string) {
+	if c.To != "Done" || !c.HasCommands || c.State == EvidencePresent {
+		return nil, nil, ""
+	}
+	var m i18n.Msg
+	switch {
+	case c.Creating:
+		m = i18n.M("domain.rules.verify_evidence_required.create", "status", c.To, "command", VerifyCommand("<ID>"))
+	case c.State == EvidenceMissing:
+		m = i18n.M("domain.rules.verify_evidence_required.missing", "id", c.ID, "command", VerifyCommand(c.ID))
+	default:
+		m = i18n.M("domain.rules.verify_evidence_required.none", "id", c.ID, "command", VerifyCommand(c.ID))
+	}
+	if !r.RequiresEvidence() {
+		id, command := c.ID, VerifyCommand(c.ID)
+		if c.Creating {
+			id, command = i18n.T(lang, "domain.rules.new_issue"), VerifyCommand("<ID>")
+		}
+		if c.State == EvidenceMissing {
+			return nil, nil, i18n.T(lang, "domain.rules.verify_evidence_notice.missing", "id", id, "command", command)
+		}
+		return nil, nil, i18n.T(lang, "domain.rules.verify_evidence_notice.none", "id", id, "command", command)
+	}
+	if reason := strings.TrimSpace(c.OverrideReason); reason != "" {
+		return &Override{Rule: "verify_evidence_required", Reason: reason}, nil, ""
+	}
+	v = violation(lang, "verify_evidence_required", "", nil, m)
+	v.Overridable = true
+	return nil, v, ""
 }
 
 var checkbox = regexp.MustCompile(`[-*]\s*\[[ xX]\]`)

@@ -53,6 +53,13 @@ export function fill(s, kv) {
 // tx は文面の取り出し（無ければ空文字）。t は loadTexts が返す形のオブジェクト。
 function tx(t, key, kv) { return fill((t && t[key]) || "", kv); }
 
+// countText は件数 n で単数と複数を分ける文面を返す。n が 1 で key + "_one" の文面があればそれを、無ければ key を使う。
+// 英語は "1 project" と "2 projects" を分け、日本語は両方に同じ文面を置くので結果は変わらない。
+export function countText(t, key, n, kv) {
+  const one = Number(n) === 1 && t && t[key + "_one"];
+  return tx(t, one ? key + "_one" : key, Object.assign({ n }, kv));
+}
+
 export function makeRenderer(prefix) {
   const PREFIX = String(prefix || "REQ");
   const PREFIX_ESC = PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -220,6 +227,34 @@ export function matchFeedback(it, on) {
   return !on || feedbackPending(it) > 0;
 }
 
+/* ---------------- 本文のコメント節の見出し ---------------- */
+// COMMENT_SECTION はサーバの本文でコメント節を始める見出しの行（mdformat.CommentSection と同じ綴り）。
+// 本文とコメントを分ける構造の目印なので、保存した本文では言語に関わらずこの綴りのまま訳さない。
+export const COMMENT_SECTION = "## コメント";
+
+// localizeCommentHeading は、描画する前の本文のコメント節の見出しを画面の言語の見出し（t.comments_heading）に置き換える。
+// 置き換えるのは mdformat.Parse が節の区切りとみなす行だけ（最初の 1 行で、コードブロックの外にあるもの）。
+// コメントの中やコードブロックの中の同じ行は、書かれたとおりに残す。文面が無ければ本文をそのまま返す。
+export function localizeCommentHeading(body, t) {
+  const label = tx(t, "comments_heading");
+  if (!label) return body;
+  const lines = String(body || "").split("\n");
+  let fenced = false, marker = "";
+  for (let i = 0; i < lines.length; i++) {
+    const s = lines[i].replace(/^\s+/, "");
+    if (s.startsWith("```") || s.startsWith("~~~")) {
+      if (!fenced) { fenced = true; marker = s.slice(0, 3); }
+      else if (s.replace(/\s+$/, "").startsWith(marker)) fenced = false;
+      continue;
+    }
+    if (!fenced && lines[i] === COMMENT_SECTION) {
+      lines[i] = "## " + label;
+      return lines.join("\n");
+    }
+  }
+  return body;
+}
+
 /* ---------------- 画面からの起票・状態の変更・コメント ---------------- */
 // フォームは既存の REST API（POST …/issues・…/status・…/comments）を Cookie のセッション + X-CSRF-Token で呼ぶ。
 // 出すかどうかはサーバが board に付ける can_edit（editor 以上）で決める。viewer には出さない（API も 403 を返す）。
@@ -293,14 +328,132 @@ export function statusForm(opt) {
     + overrideField(t) + formError + note + "</form>";
 }
 
-// commentForm は詳細ドロワーのコメントの追記フォーム。canEdit でなければ空文字。
+// commentForm は詳細ドロワーのコメントの追記フォーム。canEdit でなければ空文字（viewer には添付の操作も出さない）。
+// 添付はファイルの選択・ドラッグ&ドロップ・クリップボードの画像の貼り付けで「送る前の一覧」（pending）に積み、
+// 送信のときに 1 つずつ添付の REST へ送ってから、返った ID をコメントに付ける。本文が空なら添付だけを送る。
 export function commentForm(opt) {
-  const { canEdit, it, t } = opt || {};
+  const { canEdit, it, t, pending } = opt || {};
   if (!canEdit || !it) return "";
   return '<form class="issue-form" data-action="comment" data-id="' + attr(it.id) + '">'
-    + "<label>" + esc(tx(t, "comment_label")) + '<textarea name="text" rows="3" required></textarea></label>'
+    + "<label>" + esc(tx(t, "comment_label")) + '<textarea name="text" rows="3"></textarea></label>'
+    + '<div class="att-drop" data-attach-drop>'
+    + '<label class="att-pick">' + esc(tx(t, "att_pick")) + '<input type="file" multiple data-attach-input></label>'
+    + '<span class="att-hint">' + esc(tx(t, "att_hint")) + "</span></div>"
+    + '<ul class="att-pending" data-attach-pending>' + pendingList(pending, t) + "</ul>"
+    + '<p class="att-status" role="status" hidden></p>'
     + formError
     + '<div class="actions"><button type="submit">' + esc(tx(t, "comment_submit")) + "</button></div></form>";
+}
+
+/* ---------------- 添付 ---------------- */
+
+// formatSize はバイト数を短く描く（単位の記号は言語に依らない）。
+export function formatSize(n) {
+  let v = Number(n) || 0, i = 0;
+  const units = ["B", "KiB", "MiB", "GiB"];
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return (i === 0 || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(1)) + " " + units[i];
+}
+
+// pendingList は送る前の添付の一覧（li の並び）。items は {name, size, sent}。sent は送り終えてコメント待ちのもの（外せない）。
+export function pendingList(items, t) {
+  return (items || []).map((f, i) => '<li class="att-item' + (f.sent ? " sent" : "") + '"><span class="att-name">' + esc(f.name) + "</span>"
+    + ' <span class="att-meta">' + esc(formatSize(f.size)) + (f.sent ? " · " + esc(tx(t, "att_sent")) : "") + "</span>"
+    + (f.sent ? "" : ' <button type="button" class="att-remove" data-attach-remove="' + i + '" aria-label="'
+      + attr(tx(t, "att_remove", { name: f.name })) + '">×</button>')
+    + "</li>").join("");
+}
+
+// showInline は添付を画像として埋め込むかを返す。決めるのはサーバ（一覧の inline。本体の GET が inline で返すときだけ true）で、
+// ここでは形式を判定し直さない。SVG だけは、サーバの値に関わらずどの経路でも img にしない（スクリプトを持てる形式のため）。
+export function showInline(a) {
+  return !!a && a.inline === true && !a.purged && !/^image\/svg/i.test(String(a.media_type || "").trim());
+}
+
+// attachmentList はドロワーの添付の一覧。消去済みは名前と「消去済み」だけ、画像はその場で表示し、ほかはダウンロードのリンクにする。
+// list は GET …/attachments の attachments（古い順）。値は必ず esc / attr を通す。
+export function attachmentList(list, t) {
+  if (!list || !list.length) return '<p class="att-none">' + esc(tx(t, "att_none")) + "</p>";
+  return '<ul class="att-list">' + list.map(a => {
+    const name = String(a.filename || "");
+    if (a.purged) {
+      return '<li class="att-item purged" data-attachment="' + attr(a.id) + '"><span class="att-name">' + esc(name) + "</span>"
+        + ' <span class="tag">' + esc(tx(t, "att_purged")) + "</span></li>";
+    }
+    const url = safeURL(a.url);
+    const meta = ' <span class="att-meta">' + esc(formatSize(a.size)) + "</span>";
+    if (showInline(a)) {
+      return '<li class="att-item image" data-attachment="' + attr(a.id) + '">'
+        + '<a href="' + attr(url) + '" target="_blank" rel="noopener noreferrer"><img class="att-img" src="' + attr(url) + '" alt="' + attr(name) + '" loading="lazy"></a>'
+        + '<span class="att-name">' + esc(name) + "</span>" + meta + "</li>";
+    }
+    return '<li class="att-item" data-attachment="' + attr(a.id) + '"><a href="' + attr(url) + '" download="' + attr(name) + '">' + esc(name) + "</a>"
+      + meta + ' <span class="att-meta">' + esc(a.media_type || "") + "</span></li>";
+  }).join("") + "</ul>";
+}
+
+// uploadRequest は添付 1 つを送る要求（fetch の引数）を作る。本文はファイルそのもの、名前は X-Looptrack-Filename に
+// パーセントで符号化して入れる（CLI の issue attach と同じ経路）。画面のセッション（Cookie）と X-CSRF-Token で送る。
+export function uploadRequest(base, id, slug, file, csrf) {
+  return {
+    url: base + "/api/v1/issues/" + encodeURIComponent(id) + "/attachments?project=" + encodeURIComponent(slug),
+    init: {
+      method: "POST", credentials: "same-origin", cache: "no-store", body: file,
+      headers: {
+        "Content-Type": (file && file.type) || "application/octet-stream",
+        "X-Looptrack-Filename": encodeURIComponent((file && file.name) || "file"),
+        "X-CSRF-Token": csrf || ""
+      }
+    }
+  };
+}
+
+// sendComment はコメントのフォームの送信の本体（board.js が画面の表示を受け持ち、Node の検査はここを直接呼ぶ）。
+// 送る前の添付（pending.files）を 1 つずつ添付の REST へ送り、返った ID を pending.uploaded に積んでからコメントに付ける。
+// 本文（前後の空白を除く）も添付も無ければ何も送らない。サーバは空のコメントを拒まず、追記したコメントは消せないからだ。
+// 本文が空で添付だけがあるときは、コメントを書かずに添付だけを送る。途中で失敗したら、送り終えた添付は uploaded に残す
+// （もう一度送るとコメントに付く）。戻り値は {ok} か {ok: false, error} か {ok: false, login: true}（セッション切れ）。
+// 通信そのものの失敗は投げる。
+export async function sendComment(opt) {
+  const { fetch: f, base, slug, id, csrf, pending, t, onProgress, onUploaded } = opt;
+  const text = String(opt.text || "").trim();
+  if (!text && !pending.files.length && !pending.uploaded.length) return { ok: false, error: tx(t, "att_empty") };
+  while (pending.files.length) {
+    const file = pending.files[0];
+    if (onProgress) onProgress(tx(t, "att_sending", { name: file.name, n: pending.uploaded.length + 1, total: pending.uploaded.length + pending.files.length }));
+    const req = uploadRequest(base, id, slug, file, csrf);
+    const r = await f(req.url, req.init);
+    const data = await r.json().catch(() => null);
+    if (r.status === 401) return { ok: false, login: true };
+    if (!r.ok || !data || !data.attachment) {
+      return { ok: false, error: tx(t, "att_upload_failed", { name: file.name, reason: apiErrorMessage(r.status, data, t) }) };
+    }
+    pending.files.shift();
+    pending.uploaded.push({ id: data.attachment.id, name: file.name, size: file.size });
+    if (onUploaded) onUploaded();
+  }
+  if (!text) return { ok: true };
+  const req = formRequest("comment", id, slug, { text, attachments: pending.uploaded.map(u => u.id) }, t);
+  const r = await f(base + req.path, {
+    method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf || "" },
+    body: JSON.stringify(req.body)
+  });
+  const data = await r.json().catch(() => null);
+  if (r.status === 401) return { ok: false, login: true };
+  if (!r.ok) return { ok: false, error: apiErrorMessage(r.status, data, t) };
+  return { ok: true };
+}
+
+// pastedName は貼り付けた画像の名前を決める。ブラウザが付ける名前が無い・汎用の「image.png」のときだけ、日時の名前に替える
+// （貼り付けのたびに同じ名前が並ばないように）。
+export function pastedName(name, type, now) {
+  const n = String(name || "").trim();
+  if (n && !/^image\.[a-z0-9]+$/i.test(n)) return n;
+  const ext = ({ "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" })[String(type || "").toLowerCase()] || "png";
+  const d = now instanceof Date ? now : new Date();
+  const p = v => String(v).padStart(2, "0");
+  return "paste-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + "." + ext;
 }
 
 // formRequest はフォームの値（name → 値）から API の要求（base からのパスと JSON）を作る。t は画面の文面（起票の本文の見出しに使う）。
@@ -316,6 +469,11 @@ export function formRequest(action, id, slug, v, t) {
     if (s("comment")) body.comment = s("comment");
     return { path: "/api/v1/issues/" + encodeURIComponent(id) + "/status", body: withOverride(body) };
   }
-  if (action === "comment") return { path: "/api/v1/issues/" + encodeURIComponent(id) + "/comments", body: { text: s("text") } };
+  if (action === "comment") {
+    const body = { text: s("text") };
+    const ids = (v && v.attachments) || [];
+    if (ids.length) body.attachments = ids.slice();
+    return { path: "/api/v1/issues/" + encodeURIComponent(id) + "/comments", body };
+  }
   return null;
 }

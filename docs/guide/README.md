@@ -9,23 +9,31 @@ Server design and deployment details? Those live in separate documents for devel
 
 日本語: [ja/README.md](ja/README.md)
 
-## Reading order
+## Choosing an edition
+
+Looptrack comes in two editions. Installing it and connecting your AI agent differ between them, and everything after that is shared.
+
+| Edition | Good for | Start here |
+| -- | -- | -- |
+| Desktop app | Using it alone on one PC, without a terminal. Double-click to start it, finish setup in the browser, and connect your agent by chat | [Desktop app](desktop/README.md) |
+| Server | A server several people share, or a server you run for yourself from a terminal. Set it up with `looptrack setup` or `install.sh` | [Server edition](server/README.md) |
+
+On your own, on one PC, with no terminal? Take the desktop app.
+
+## Shared sections
+
+These sections apply to both editions.
 
 | # | Section | What it covers |
 | -- | -- | -- |
 | 1 | [Concepts](concepts.md) | What loop engineering is, and why the issue is the source of truth |
 | 2 | [Where Looptrack fits](where-it-fits.md) | Which feature serves which of the three loops |
-| 3 | [Getting started](getting-started.md) | From installing the server to your first full loop |
-| 4 | [Daily use](daily-use.md) | Filing issues, acceptance criteria, verify commands, comment types, assignees |
-| 5 | [Agent-specific notes](ai-agents.md) | Claude Code, Codex, GitHub Copilot, and other agents |
-| 6 | [Administration](admin.md) | Users, permissions, two-factor auth, project rules, token reports |
-| 7 | [FAQ / Troubleshooting](faq.md) | Common messages and what to do about them |
-| 8 | [Desktop app](desktop.md) | Using it alone on one PC without a terminal: download, first launch, tray, connect an AI agent by chat, update, uninstall |
-| 9 | [Updating](updating.md) | Updating the CLI, the desktop app, and the server: what is automatic and what is manual, `self-update`, `install.sh --upgrade`, the looptrack you distribute to users |
-| 10 | [Token reports](token-report.md) | What token usage is recorded and what is not, how it is attributed to issues, and how to make the PDF report and record it in the ledger |
+| 3 | [Daily use](daily-use.md) | Your first loop, filing issues, acceptance criteria, verify commands, comment types, assignees, the display language |
+| 4 | [Agent-specific notes](ai-agents.md) | Claude Code, Codex, GitHub Copilot, and other agents |
+| 5 | [FAQ / Troubleshooting](faq.md) | Common messages and what to do about them |
+| 6 | [Token reports](token-report.md) | What token usage is recorded and what is not, how it is attributed to issues, and how to make the PDF report and record it in the ledger |
 
-New here? Read 1 → 3 → 4.
-Using it by yourself on one PC, with no terminal? Start with 8.
+New here? Read 1, then the getting-started page of your edition, then 3.
 
 ## Terms
 

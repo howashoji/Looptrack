@@ -233,7 +233,7 @@ func (s *Server) accountPassword(w http.ResponseWriter, r *http.Request, p *prin
 		s.internalError(w, r, err)
 		return
 	}
-	if err := s.startSession(w, r, p.User, true, p.Session.TOTPVerified); err != nil {
+	if err := s.startSession(w, r, p.User, true, p.Session.TOTPVerified, p.Session.Persistent); err != nil {
 		s.internalError(w, r, err)
 		return
 	}

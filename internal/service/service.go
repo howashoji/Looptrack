@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	_ "time/tzdata" // コンテナに tzdata が無くても Asia/Tokyo を使う
 
@@ -31,6 +32,7 @@ const (
 	Conflict                             // 版の不一致・採番の衝突
 	Rejected                             // 規則により受け付けない（クローズ済みの編集等）
 	PreconditionRequired                 // 版の指定が無い
+	TooLarge                             // 本文（添付のファイル）が上限を超える（HTTP は 413）
 )
 
 // Error は利用者に返すエラー。Message は次に何をすべきかを含める。
@@ -155,6 +157,11 @@ type Service struct {
 	DB  *sql.DB
 	Now func() time.Time
 	Loc *time.Location // created / updated / コメント見出しの時刻（以前の CLI と同じローカル時刻。既定 Asia/Tokyo）
+	// AttachDir は添付の本体の置き場（AttachDirFromEnv・デスクトップは DataDir/attachments）。空なら添付の操作だけが
+	// 「置き場が設定されていない」で失敗し、ほかの操作はそのまま動く（attachments.go）
+	AttachDir string
+	// attachMu は本体の置き換え（添付の rename とメタデータの記録・消去の記録と本体の削除）を、このプロセスの中で 1 つずつにする
+	attachMu sync.Mutex
 }
 
 // New は Service を作る。
@@ -301,7 +308,7 @@ func (s *Service) Create(ctx context.Context, a Actor, p store.Project, in Creat
 		if err := checkProjectActive(ctx, tx, p); err != nil {
 			return err
 		}
-		var verifyOverride *domain.Override
+		var verifyOverride, evidenceOverride *domain.Override
 		if rules != nil {
 			if v := rules.CheckTransition(lang, domain.Transition{Type: in.Type, To: in.Status, Creating: true}); v != nil {
 				return ruleError(v)
@@ -314,6 +321,15 @@ func (s *Service) Create(ctx context.Context, a Actor, p store.Project, in Creat
 				}
 				verifyOverride = vo
 			}
+		}
+		// エビデンスの網（verify.require_evidence。既定は入なのでルールが無くても見る）。起票ではエビデンスの付いた記録は
+		// ありえない。切にしたプロジェクトの注意は、起票の応答に載せる欄が無いので出さない（状態の変更の経路だけで出す）
+		if len(domain.VerifyCommands(in.Body)) > 0 {
+			eo, v, _ := rules.CheckEvidence(lang, domain.EvidenceCheck{To: in.Status, HasCommands: true, State: domain.EvidenceNone, Creating: true, OverrideReason: in.OverrideReason})
+			if v != nil {
+				return ruleError(v)
+			}
+			evidenceOverride = eo
 		}
 		id := domain.FormatID(p.Prefix, p.Width, n)
 		doc := domain.NewDocument(id, in, s.stamp(now), lang)
@@ -330,7 +346,7 @@ func (s *Service) Create(ctx context.Context, a Actor, p store.Project, in Creat
 			Author: s.author(a, now), Detail: map[string]any{"status": in.Status, "type": in.Type, "sections": domain.NewSectionHashes(doc.BodyMain)}}); err != nil {
 			return err
 		}
-		if err := s.recordOverride(ctx, tx, a, p, issueID, now, verifyOverride); err != nil {
+		if err := s.recordOverride(ctx, tx, a, p, issueID, now, verifyOverride, evidenceOverride); err != nil {
 			return err
 		}
 		evs, err := assign.apply(ctx, tx, issueID)
@@ -450,16 +466,34 @@ func (s *Service) mutate(ctx context.Context, a Actor, p store.Project, issueID 
 
 // Comment はコメントを追記する（クローズ済みにも追記できる。以前の CLI と同じ）。
 func (s *Service) Comment(ctx context.Context, a Actor, p store.Project, issueID int64, text string) (*Issue, error) {
+	return s.CommentAttach(ctx, a, p, issueID, text, nil)
+}
+
+// CommentAttach はコメントを追記し、そのイシューの添付の ID を記録に付ける（attachments が空なら Comment と同じ）。
+// 添付の ID はコメントの本文には書かず、issue_events の detail.attachments にだけ残す（本文は人の書いたまま）。
+func (s *Service) CommentAttach(ctx context.Context, a Actor, p store.Project, issueID int64, text string, attachments []int64) (*Issue, error) {
 	rules, err := rulesOf(p)
 	if err != nil {
 		return nil, err
 	}
-	return s.mutate(ctx, a, p, issueID, 0, func(_ *sql.Tx, doc *mdformat.Document, it domain.Issue, now string) (change, error) {
+	return s.mutate(ctx, a, p, issueID, 0, func(tx *sql.Tx, doc *mdformat.Document, it domain.Issue, now string) (change, error) {
 		if v := rules.CheckText(a.Lang, it.ID, "", text); v != nil {
 			return change{}, ruleError(v)
 		}
+		refs, err := attachmentRefs(ctx, tx, issueID, attachments)
+		if err != nil {
+			return change{}, err
+		}
+		// コメントは追記専用で消せないので、本文（前後の空白を除く）も添付も無いものは残さない
+		if strings.TrimSpace(text) == "" && len(refs) == 0 {
+			return change{}, errm(Invalid, "comment_empty", i18n.M("service.err.comment_empty", "id", it.ID))
+		}
 		domain.AppendComment(doc, now, text)
-		return change{kind: "comment", detail: map[string]any{"seq": len(doc.Comments)}}, nil
+		detail := map[string]any{"seq": len(doc.Comments)}
+		if len(refs) > 0 {
+			detail["attachments"] = refs
+		}
+		return change{kind: "comment", detail: detail}, nil
 	})
 }
 
@@ -475,6 +509,12 @@ type StatusResult struct {
 	// AcceptanceNotice は、受け入れ条件が雛形のまま着手したときの注意（止めない。domain.AcceptanceStartNotice）。
 	// 経路（REST・MCP・CLI・Web）はこれをそのまま応答に載せる。対象外なら空
 	AcceptanceNotice string
+	// EvidenceNotice は、verify.require_evidence を切にしたプロジェクトで、エビデンスの無いまま Done にしたときの注意
+	// （止めない。domain.Rules.CheckEvidence）。経路は AcceptanceNotice と同じく応答に載せる。対象外なら空
+	EvidenceNotice string
+	// CommentAdded は、同時にコメントを作ったか。本文が空白だけのコメントは作らず状態の変更だけ通すので、
+	// 要求に comment があったかではなく、これで応答の「コメント追記」の行を決める（経路ごとに判定しない）
+	CommentAdded bool
 }
 
 // SetStatus は状態を変える。comment があれば同時に追記する（status --comment と同じ）。
@@ -498,7 +538,8 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 	if err != nil {
 		return nil, err
 	}
-	var from, acceptanceNotice string
+	var from, acceptanceNotice, evidenceNotice string
+	var commentAdded bool
 	var assigned *assignPlan
 	it, err := s.mutate(ctx, a, p, issueID, 0, func(tx *sql.Tx, doc *mdformat.Document, cur domain.Issue, now string) (change, error) {
 		if expectFrom != "" && cur.Status != expectFrom {
@@ -515,16 +556,18 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 		if err != nil {
 			return change{}, err
 		}
-		overrides, err := s.checkStatus(ctx, tx, a, rules, p, issueID, doc, cur, status, comment, overrideReason)
+		overrides, notice, err := s.checkStatus(ctx, tx, a, rules, p, issueID, doc, cur, status, comment, overrideReason)
 		if err != nil {
 			return change{}, err
 		}
+		evidenceNotice = notice
 		// 受け入れ条件が雛形のままの着手は止めずに知らせる（close の関門に後で止められる前に。next もここを通る）
 		acceptanceNotice = rules.AcceptanceStartNotice(a.Lang, domain.AcceptanceStart{ID: cur.ID, From: cur.Status, To: status,
 			HasSection: domain.HasAcceptanceSection(doc.BodyMain), Filled: domain.AcceptanceFilled(doc.BodyMain)})
 		from = domain.SetStatus(doc, status, now)
 		detail := map[string]any{"from": from, "to": status}
-		if comment != "" {
+		commentAdded = strings.TrimSpace(comment) != "" // 空白だけなら、コメントは作らず状態の変更だけ通す
+		if commentAdded {
 			domain.AppendComment(doc, now, comment)
 			detail["comment_seq"] = len(doc.Comments)
 		}
@@ -538,7 +581,7 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 	if err != nil {
 		return nil, err
 	}
-	res := &StatusResult{Issue: it, From: from, AcceptanceNotice: acceptanceNotice}
+	res := &StatusResult{Issue: it, From: from, AcceptanceNotice: acceptanceNotice, EvidenceNotice: evidenceNotice, CommentAdded: commentAdded}
 	if assigned != nil {
 		res.AssigneeChanged, res.AssigneeFrom, res.AssigneeAuto = true, assigned.from.Login, assigned.auto
 	}
@@ -599,9 +642,53 @@ func (s *Service) UsageNotice(ctx context.Context, lang i18n.Lang, a Actor, p st
 }
 
 // checkStatus は状態変更をプロジェクト別ルールで判定する（変更はしない）。違反は ruleError。
-// 返すのは記録する上書き（遷移の規則と、クローズ時のトークン情報 usage.require_on_close）。
+// 返すのは記録する上書き（遷移の規則と、クローズ時のトークン情報 usage.require_on_close・エビデンス）と、
+// 止めずに知らせる注意（verify.require_evidence を切にしたプロジェクトでエビデンスの無い Done。無ければ空）。
 // next の候補の判定（In Progress 化）も同じ関数を通る。
+// エビデンスの網はルールを何も設定していないプロジェクトにも効く（既定は入）ので、ルールの判定とは別に最後に見る。
 func (s *Service) checkStatus(ctx context.Context, q store.Queryer, a Actor, rules *domain.Rules, p store.Project, issueID int64,
+	doc *mdformat.Document, cur domain.Issue, status, comment, overrideReason string) ([]*domain.Override, string, error) {
+	overrides, err := s.checkRules(ctx, q, a, rules, p, issueID, doc, cur, status, comment, overrideReason)
+	if err != nil {
+		return nil, "", err
+	}
+	override, notice, err := s.checkEvidence(ctx, q, a, rules, issueID, doc, cur, status, overrideReason)
+	if err != nil {
+		return nil, "", err
+	}
+	return append(overrides, override), notice, nil
+}
+
+// checkEvidence は、本文に検証コマンドが 1 つ以上あるイシューを Done にするとき、いまの本文に対する最新の verify の記録に
+// 添付（エビデンス）があるかを見る（verify.require_evidence。判定は domain.Rules.CheckEvidence）。
+// 「最新」は verify.require_on_close と同じ直近の 1 件（store.LastVerify）で、その後に本文が変わっていれば記録なしと同じに扱う。
+// 経路（AI・人・REST・MCP・CLI・Web）を問わない。Done への遷移はすべて setStatus を通るので、判定はここと起票（Create）の 2 か所だけ。
+func (s *Service) checkEvidence(ctx context.Context, q store.Queryer, a Actor, rules *domain.Rules, issueID int64,
+	doc *mdformat.Document, cur domain.Issue, status, overrideReason string) (*domain.Override, string, error) {
+	if status != "Done" || len(domain.VerifyCommands(doc.BodyMain)) == 0 {
+		return nil, "", nil
+	}
+	last, err := store.LastVerify(ctx, q, issueID)
+	if err != nil {
+		return nil, "", err
+	}
+	state := domain.EvidenceNone
+	if last != nil && last.BodySHA256 == domain.BodySHA256(doc.BodyMain) {
+		state = domain.EvidenceMissing
+		if len(last.Attachments) > 0 {
+			state = domain.EvidencePresent
+		}
+	}
+	override, v, notice := rules.CheckEvidence(a.Lang, domain.EvidenceCheck{ID: cur.ID, To: status, HasCommands: true, State: state, OverrideReason: overrideReason})
+	if v != nil {
+		return nil, "", ruleError(v)
+	}
+	return override, notice, nil
+}
+
+// checkRules はプロジェクトが設定したルール（遷移・本文・受け入れ条件・verify.require_on_close・usage）の判定。
+// ルールが無ければ何も見ない。
+func (s *Service) checkRules(ctx context.Context, q store.Queryer, a Actor, rules *domain.Rules, p store.Project, issueID int64,
 	doc *mdformat.Document, cur domain.Issue, status, comment, overrideReason string) ([]*domain.Override, error) {
 	if rules == nil {
 		return nil, nil

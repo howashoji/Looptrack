@@ -147,7 +147,7 @@ func TestMCPToolDefinitionsPerUserLang(t *testing.T) {
 	// ja・en の両方の値として出ている。件数は対訳表の ID の数と一致する（実装の登録の実数）。
 	covered := map[string]bool{}
 	for _, id := range mcpToolDefIDs() {
-		ja, en := i18n.T(i18n.JA, id), i18n.T(i18n.EN, id)
+		ja, en := i18n.T(i18n.JA, id, mcpArgParams...), i18n.T(i18n.EN, id, mcpArgParams...) // {max_refs} など埋め込みは展開してから比べる
 		for pos, da := range defA {
 			if da == ja && defB[pos] == en {
 				covered[id] = true
@@ -174,7 +174,7 @@ func TestMCPToolDefinitionsPerUserLang(t *testing.T) {
 	for pos, da := range defA {
 		found := false
 		for _, id := range mcpToolDefIDs() {
-			if i18n.T(i18n.JA, id) == da && i18n.T(i18n.EN, id) == defB[pos] {
+			if i18n.T(i18n.JA, id, mcpArgParams...) == da && i18n.T(i18n.EN, id, mcpArgParams...) == defB[pos] {
 				found = true
 				break
 			}

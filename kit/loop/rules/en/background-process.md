@@ -76,6 +76,9 @@ The parent reads that line in the report and, where there is a discrepancy, corr
   exist yet is the right way to wait, so it is not stopped).
   A wait loop wrapped by a prefix word or by `eval` (`sudo sh -c '…'`, `nohup bash -c '…' &`, `setsid sh -c '…'`, `time while …`,
   `eval "while true; …"`, `sudo -u deploy sh -c '…'`) is stopped too (the prefix words and the unwrapping are the same code as the git guard's and the secrets guard's).
+  When the earlier readings do not stop it, the same extra heredoc reading as the git guard's is applied. A wait loop on the line after
+  a `<<` inside arithmetic, or in the body of `cat <<EOF | sh`, is stopped too. A heredoc body inside a nested shell's quotes is a form it stops by mistake.
+  A wait loop in the body of `bash -c 'sh' <<EOF` goes through (**it goes through at the base too**).
   **It still catches nothing but slips**: a prefix word not on the list (`caffeinate bash -c '…'`) and argument position
   (`ssh host bash -c '…'`, `docker run img bash -c '…'`) go straight through, leaving the detection by elapsed time below.
 - **Right after a child finishes (SubagentStop) and at the end of a turn (Stop)**: `stop-runaway-background-process`.

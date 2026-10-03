@@ -79,7 +79,7 @@ looptrack issue usage attach DEMO-0004          # この会話の累計をイシ
 ```
 
 `summary` の末尾には、直近 7 日の自分の操作のうち、トークン情報がまだ付いていないものが並びます。
-必須にしたいなら、プロジェクト別ルール `usage.require_on_close` を設定しておきましょう（[管理者の手引き](admin.md)）。
+必須にしたいなら、プロジェクト別ルール `usage.require_on_close` を設定しておきましょう（[管理者の手引き](server/admin.md)）。
 設定すると、AI はその会話のトークン情報が無いままイシューを Done・Canceled にできなくなります。CLI は自動で付けてから、1 回だけやり直します。
 
 ## レポートの作り方
@@ -157,5 +157,5 @@ skill の保存先は `~/Documents/トークンレポート/<slug>/`（`TOKEN_RE
 | `TOKEN_REPORT_DIR` | 利用者の環境変数 | skill がレポートを保存する場所 |
 | `TOKEN_REPORT_FONT` | 利用者の環境変数 | PDF の TrueType フォント |
 
-プロジェクト別ルールの設定には `looptrack project rules set` を使います（[管理者の手引き](admin.md)）。
+プロジェクト別ルールの設定には `looptrack project rules set` を使います（[管理者の手引き](server/admin.md)）。
 設計の全体は [DESIGN.md](../../server/DESIGN.md) §9-5 にあります。

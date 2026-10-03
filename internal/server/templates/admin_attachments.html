@@ -1,0 +1,86 @@
+{{define "admin_attachments.html"}}{{template "head" (headData .Lang (T .Lang "server.web.admin_attachments.title"))}}
+{{template "nav" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.admin_attachments.title"}}</h1>
+  <p class="muted">{{T .Lang "server.web.common.back_prefix"}}<a href="{{base}}/admin/users">{{T .Lang "server.web.common.admin_users"}}</a>{{T .Lang "server.web.common.back_suffix"}}</p>
+  {{template "messages" .}}
+  {{if not .Available}}<p class="error" role="alert" data-attach-unavailable>{{T .Lang "server.web.admin_attachments.unavailable"}}</p>{{end}}
+  <section class="panel" id="limits">
+    <h2>{{T .Lang "server.web.admin_attachments.limits_h2"}}</h2>
+    <p class="muted">{{T .Lang "server.web.admin_attachments.limits_note"}}</p>
+    <ul>
+      <li>{{T .Lang "server.web.admin_attachments.max_file"}} <strong data-limit="file">{{.MaxFile}}</strong></li>
+      <li>{{T .Lang "server.web.admin_attachments.max_project"}} <strong data-limit="project">{{.MaxProject}}</strong></li>
+    </ul>
+    <form method="post" action="{{base}}/admin/attachments/limits" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.admin_attachments.max_file_mib"}}<input name="max_file_mib" type="number" min="1" step="1" inputmode="numeric" value="{{.MaxFileMiB}}" required></label>
+      <label>{{T .Lang "server.web.admin_attachments.max_project_mib"}}<input name="max_project_mib" type="number" min="1" step="1" inputmode="numeric" value="{{.MaxProjectMiB}}" required></label>
+      <button type="submit">{{T .Lang "server.web.admin_attachments.limits_submit"}}</button>
+    </form>
+  </section>
+  <section class="panel" id="usage">
+    <h2>{{T .Lang "server.web.admin_attachments.usage_h2"}}</h2>
+    <table class="list">
+      <thead><tr><th>{{T .Lang "server.web.admin_attachments.th_project"}}</th><th>{{T .Lang "server.web.admin_attachments.th_count"}}</th><th>{{T .Lang "server.web.admin_attachments.th_bytes"}}</th><th>{{T .Lang "server.web.admin_attachments.th_percent"}}</th><th>{{T .Lang "server.web.admin_attachments.th_purged"}}</th></tr></thead>
+      <tbody>
+      {{range .Usage}}
+      <tr data-usage="{{.Slug}}"{{if .Archived}} class="inactive"{{end}}>
+        <td><a href="{{base}}/admin/attachments?project={{.Slug}}">{{.Name}}</a> <span class="muted">{{.Slug}}</span></td>
+        <td>{{.Count}}</td><td>{{.Bytes}}</td><td>{{if .Over}}<strong>{{.Percent}}%</strong>{{else}}{{.Percent}}%{{end}}</td><td>{{.Purged}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="5" class="muted">{{T .Lang "server.web.admin_projects.no_projects"}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+  <section class="panel" id="list">
+    <h2>{{T .Lang "server.web.admin_attachments.list_h2"}}</h2>
+    <p class="muted">{{T .Lang "server.web.admin_attachments.purge_note"}}</p>
+    <form method="get" action="{{base}}/admin/attachments" class="row">
+      <label>{{T .Lang "server.web.admin_attachments.filter_project"}}<input name="project" value="{{.FilterProject}}" autocomplete="off"></label>
+      <label>{{T .Lang "server.web.admin_attachments.filter_issue"}}<input name="issue" value="{{.FilterIssue}}" autocomplete="off"></label>
+      <button type="submit" class="small">{{T .Lang "server.web.admin_attachments.filter_submit"}}</button>
+    </form>
+    <p class="muted">{{T .Lang "server.web.admin_attachments.shown" "n" .Shown}}</p>
+    <table class="list">
+      <thead><tr><th>{{T .Lang "server.web.admin_attachments.th_id"}}</th><th>{{T .Lang "server.web.admin_attachments.th_issue"}}</th><th>{{T .Lang "server.web.admin_attachments.th_name"}}</th><th>{{T .Lang "server.web.admin_attachments.th_size"}}</th><th>{{T .Lang "server.web.admin_attachments.th_created"}}</th><th>{{T .Lang "server.web.admin_attachments.th_purge"}}</th></tr></thead>
+      <tbody>
+      {{range .Rows}}
+      <tr data-attachment="{{.ID}}"{{if .Purged}} class="inactive"{{end}}>
+        <td>{{.ID}}</td>
+        <td><a href="{{base}}/p/{{.Project}}/#{{.Issue}}">{{.Issue}}</a></td>
+        <td>{{.Filename}} <span class="muted">{{.Type}}</span></td>
+        <td>{{.Size}}</td><td>{{.Created}}</td>
+        <td>{{if .Purged}}<span class="muted" data-purged>{{T $.Lang "server.web.admin_attachments.purged"}}</span>{{else}}
+          <form method="post" action="{{base}}/admin/attachments/{{.ID}}/purge" class="row tight">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}">
+            <input type="hidden" name="project" value="{{$.FilterProject}}"><input type="hidden" name="issue" value="{{$.FilterIssue}}">
+            <input name="reason" maxlength="255" required autocomplete="off" placeholder="{{T $.Lang "server.web.admin_attachments.reason_placeholder"}}" aria-label="{{T $.Lang "server.web.admin_attachments.reason"}}">
+            <button type="submit" class="danger small">{{T $.Lang "server.web.admin_attachments.purge_submit"}}</button>
+          </form>{{end}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="6" class="muted">{{T $.Lang "server.web.admin_attachments.none"}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+  <section class="panel" id="changes">
+    <h2>{{T .Lang "server.web.admin_security.changes_h2"}}</h2>
+    {{with .Changes}}
+    <table class="list">
+      <thead><tr><th>{{T $.Lang "server.web.admin_security.th_at"}}</th><th>{{T $.Lang "server.web.admin_security.th_actor"}}</th><th>{{T $.Lang "server.web.admin_security.th_via"}}</th><th>{{T $.Lang "server.web.admin_attachments.th_setting"}}</th><th>{{T $.Lang "server.web.admin_security.th_change"}}</th><th>{{T $.Lang "server.web.admin_security.th_ip"}}</th></tr></thead>
+      <tbody>
+      {{range .}}
+      <tr data-setting-change><td>{{.At}}</td><td>{{.Actor}}</td><td>{{.Via}}</td><td>{{.Setting}}</td><td>{{.From}} → {{.To}}</td><td>{{.IP}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">{{T .Lang "server.web.admin_security.changes_none"}}</p>
+    {{end}}
+  </section>
+</main>
+{{template "foot"}}{{end}}

@@ -4,8 +4,11 @@
 #   bash deploy/install_test.sh                 systemd なしの確認（ubuntu:24.04・ubuntu:22.04・debian:12）+ systemd 入りのコンテナで実起動
 #   INSTALL_TEST_SYSTEMD=0 bash deploy/install_test.sh    systemd の実起動を省く（apt で systemd を入れるイメージを作るため数分かかる）
 #   INSTALL_TEST_COMPOSE=1 bash deploy/install_test.sh    compose の実起動も試す（Docker のソケットをコンテナに渡す。下の注意）
+#     既定（INSTALL_TEST_COMPOSE を付けない）では compose の場面は回らない。「全場面が通った」と伝えるときは、compose を含めたかを添える
+#   INSTALL_TEST_COMPOSE_PORT=18091 …                     compose の場面がホストの 127.0.0.1 に公開するポート（既定 18090。使われていれば始める前に止まる）
 #   INSTALL_TEST_IMAGES="debian:12" bash deploy/install_test.sh
 #   INSTALL_TEST_INTERACTIVE=0 …                           対話の確認（script の疑似端末から setup の問いに答える）を省く
+#   bash deploy/install_test.sh --check-pipe-grep <ファイル>   パイプで grep -q に渡す行のうち、許可の印が無いものを出す（Docker は使わない）
 #
 # 材料の looptrack は deploy/release/dist.sh で作る（版 v0.0.0-installtest1 と …2。Docker の CPU に合わせた linux/<arch> だけ）。
 # 取得元は 2 つの形: /dist・/dist2 は dist.sh build の出力（素の実行ファイル。install.sh と grants.sql もその中に入る。
@@ -15,7 +18,7 @@
 # コンテナの /src はリポジトリの deploy/。
 #
 # 確かめること:
-#   plain（systemd なし・各イメージ）: --from なしは <リポジトリ>/releases/latest/download から取る / Linux 以外では何も変えずに止まる /
+#   plain（systemd なし・各イメージ）: 確認の書き方の見張り（出力を受け取ってから比べると、一致する大きな出力で「出ない」側が NG。印の無い「コマンド | grep -q」がこのファイルにあれば NG）/ --from なしは <リポジトリ>/releases/latest/download から取る / Linux 以外では何も変えずに止まる /
 #     書庫（Releases の形）: 1 バイト変えた書庫・署名の不一致・中の実行ファイルが SHA256SUMS の行と違う書庫では何も入れない、
 #     照合してから展開した looptrack を置く（素の実行ファイルは取らない）・--version でその版 /
 #     dist.sh build の出力のディレクトリをそのまま取得元にする（install.sh と grants.sql が入り
@@ -47,7 +50,13 @@
 #     管理用の資格情報が合わなければ権限を与えず起動せずに止まり、.env を残す / もう一度実行すると尋ねるところから続き、
 #     アプリ用の利用者を作って権限を与え（DB 名・利用者名は im・im_app 以外）、起動と動作確認まで 1 回で進む /
 #     尋ねた管理用のパスワードが /etc/looptrack・/var/lib/looptrack・/opt・インストーラの出力・シェルの履歴・ps の引数に残らない
-#     （対照: そのパスワードで与えた権限が SHOW GRANTS に出る）/ 権限の欠けた表がある状態の --upgrade も尋ねて与え直して起動する /
+#     （対照: そのパスワードで与えた権限が SHOW GRANTS に出る）/ 権限の欠けた表がある状態の --upgrade も尋ねて与え直して起動する
+#     （欠けさせる表は 2 通り: projects（読めない側）と attachments だけ（ほかの表は読めるので、読めるかだけの確認では気づけない側）。
+#     無人の更新の戻しは両方、端末の --upgrade は projects で）/ install.sh の権限の確かめの分岐（偽の app_run。grants check が
+#     2 で終わったとき、使い方に grants check が無ければ前の版として進み、あれば注意を出して権限の段へ）/
+#     1.0.0-rc.5（タグ v1.0.0-rc.5。開発側は public/v1.0.0-rc.5。そのソースから作る /dist5）をその版の install.sh で入れ、
+#     イシューを作ってから、端末の --upgrade で新しい版に上げる: 0007 が適用され、増えた表（attachments）の不足を示して
+#     「MySQL の権限」の段で尋ねて与え直し、上げた後に添付が上がり一覧が 200 になる /
 #     DB が無い構成: setup が管理用の資格情報を 1 回だけ尋ね、DB を作るかを確かめてから DB・アプリ用の利用者を作り、migrate して起動まで進む・
 #     「作らない」と答えると何も作らず（.env も書かず）、流す CREATE DATABASE を示して止まる / 対照: 既にある DB は作り直さない（表と行が残る）
 #   rc2（同じコンテナ）: 1.0.0-rc.2 の install.sh（開発側のタグ）で入れたサーバを、新しいインストーラの --upgrade --version で上げる
@@ -91,6 +100,76 @@
 # shellcheck disable=SC2015,SC2016,SC2329
 set -euo pipefail
 
+# pipe_grep_scan <ファイル> — 単独の | の右に grep -q 系（-qF・-qx・-qE・-rqF・-q -F・--quiet など）が来る行のうち、
+# 行末に「# pipe-grep-ok: <理由>」の印が無いものを「行番号: 行」で出す。pipefail の下の コマンド | grep -q は、一致したのに
+# 偽になりうる（下の contains の注釈）。新しく足した行を黙って通さないよう、plain の場面がこのファイル自身に当てて、出れば NG にする。
+# 許すのは pipefail の無い sh の中（sh -c '…' など）と見張りの前提の行だけで、印に理由を書く。
+# 読み方: || と \| は | に数えない。コメントと二重引用符の中（文）は捨てる。単引用符の中と sh -c "…" の中はコードとして見る
+# （sh -c '…'・printf の unit の中身）。ヒアドキュメントの中身は飛ばす。行末の | で次の行に続く形も見る。
+# ヒアドキュメントの始まりは、引用符の中・$((…))・((…)) の中を除いて探す（1<<k や printf '…<<EOF' を始まりと読むと、
+# 終わりの語の行まで後ろを丸ごと飛ばし、黙って緑になる）。終わりが無いままファイルが終わったら、その旨を出す（呼ぶ側は NG）。
+pipe_grep_scan() {
+  awk '
+    function scan(s,   i, c, n, out, top) {
+      out = ""; bare = ""; n = length(s)
+      for (i = 1; i <= n; i++) {
+        c = substr(s, i, 1); top = st[sp]
+        if (top == "s") { if (c == "\047") { sp--; bare = bare c } else bare = bare " "; out = out c; continue }
+        if (top == "d") {
+          if (c == "\\") { i++; out = out "  "; bare = bare "  "; continue }
+          if (c == "\"") { sp--; out = out c; bare = bare c; continue }
+          if (c == "$" && substr(s, i + 1, 1) == "(" && substr(s, i + 2, 1) != "(") { st[++sp] = "c"; dep[sp] = 1; i++; out = out "$("; bare = bare "$("; continue }
+          out = out " "; bare = bare " "; continue
+        }
+        if (top == "D") {
+          if (c == "\\") { out = out substr(s, i, 2); bare = bare "  "; i++; continue }
+          if (c == "\"") { sp--; bare = bare c } else bare = bare " "
+          out = out c; continue
+        }
+        if (top == "a") {
+          if (c == "(") dep[sp]++
+          if (c == ")" && --dep[sp] == 0) sp--
+          out = out c; bare = bare " "; continue
+        }
+        if (c == "\\") { out = out substr(s, i, 2); bare = bare "  "; i++; continue }
+        if (c == "#" && (i == 1 || substr(s, i - 1, 1) ~ /[ \t;(]/)) break
+        if (c == "\047") { st[++sp] = "s"; out = out c; bare = bare c; continue }
+        if (c == "\"") { st[++sp] = (out ~ /-c[ \t]*$/) ? "D" : "d"; out = out c; bare = bare c; continue }
+        if (c == "(" && substr(s, i + 1, 1) == "(") { st[++sp] = "a"; dep[sp] = 2; i++; out = out "(("; bare = bare "  "; continue }
+        if (top == "c" && c == "(") dep[sp]++
+        if (top == "c" && c == ")" && --dep[sp] == 0) sp--
+        out = out c; bare = bare c
+      }
+      return out
+    }
+    BEGIN { sp = 0; st[0] = ""; G = "grep([ \t]+-[A-Za-z]+)*[ \t]+(-[A-Za-z]*q[A-Za-z]*|--quiet|--silent)([ \t]|$)" }
+    hd != "" { t = $0; sub(/^[ \t]+/, "", t); if (t == hd) hd = ""; prev = 0; next }
+    {
+      code = scan($0)
+      ok = $0 ~ /# pipe-grep-ok: [^ ]/
+      hit = code ~ ("(^|[^|\\\\])[|][ \t]*" G) || (prev && code ~ ("^[ \t]*" G))
+      if (hit && !ok && !(prev && prevok)) print FNR ": " $0
+      prev = code ~ /(^|[^|\\])[|][ \t]*$/; prevok = ok
+      if (match(bare, /(^|[^<])<<-?[ \t]*[^< \t]/)) {
+        p = RSTART; if (substr(bare, p, 2) != "<<") p++
+        r = substr($0, p)
+        if (match(r, /^<<-?[ \t]*(\047[^\047]*\047|"[^"]*"|\\?[A-Za-z_][A-Za-z_0-9]*)/)) {
+          hd = substr(r, 1, RLENGTH); gsub(/[<\047"\\ \t-]/, "", hd); hdline = FNR
+        }
+      }
+    }
+    END {
+      if (hd != "") print hdline ": ヒアドキュメントの終わりの語（" hd "）が無いままファイルが終わった（後ろを調べていない）"
+    }
+  ' "$1"
+}
+if [ "${1:-}" = --check-pipe-grep ]; then
+  [ -n "${2:-}" ] || { echo "使い方: bash deploy/install_test.sh --check-pipe-grep <ファイル>" >&2; exit 2; }
+  found=$(pipe_grep_scan "$2")
+  [ -z "$found" ] || { printf '%s\n' "$found"; exit 1; }
+  exit 0
+fi
+
 # ---------------------------------------------------------------- コンテナの中（--in-container <場面>）
 
 if [ "${1:-}" = --in-container ]; then
@@ -110,6 +189,11 @@ if [ "${1:-}" = --in-container ]; then
     shift
     if "$@" >/dev/null 2>&1; then ok "$d"; else ng "$d"; fi
   }
+  # コマンドの出力の確認は、出力を受け取ってから比べる（contains "$(コマンド 2>&1)" <パターン>）。コマンド | grep -q は
+  # pipefail の下で、一致したのに偽になる: grep が一致して先に終わると、まだ書いているコマンドが SIGPIPE（141）で落ちる。
+  # コマンドが一致する行を出してから 0 でない終了になる（cat が無いファイルを含む）ときも同じ。「出ない」側の確認
+  # （… && ng || ok）では、一致しても ok になる（黙って緑）。ファイルはパイプを通さず grep -q で直接読む
+  # （-q は一致すれば、読めないファイルがあっても 0）。見張りは plain の場面の「確認の書き方」
   contains() { grep -q -- "$2" <<<"$1"; }
   # wait_for <ファイル> <文字列> <秒> — ファイルに文字列が出るまで待つ（上限つき）
   wait_for() {
@@ -154,8 +238,6 @@ if [ "${1:-}" = --in-container ]; then
       [ -z "$(ls /tmp/looptrack-install.* 2>/dev/null)" ]
   }
   PERM_WARN='本人以外も読めます\|can be read by users other than you' # looptrack serve が SQLite の DB の権限が広いときに出す警告（ja・en）
-  # journal の検索は、出力を受け取ってから grep する（journalctl … | grep -q は、pipefail の下で grep が先に終わると journalctl が
-  # SIGPIPE で 0 でない終了になり、一致したのに「無い」と読まれる。「出ない」側の確認では、一致しても ok になる）
   # クライアントに配る looptrack（配布ディレクトリ）。serve が配布物の遅れを知らせるログの文面（ja・en）
   DISTD=/usr/local/share/looptrack/dist
   DIST_LAG='クライアントに配る looptrack\|looptrack distributed to clients'
@@ -257,6 +339,84 @@ if [ "${1:-}" = --in-container ]; then
 
   case $scenario in
     plain)
+      echo "== 権限の確かめ（install.sh の store_grants_complete）: grants check の終了コードごとの分岐（偽の app_run）"
+      # 終了コード 2 は「grants check を持たない前の版」と「知っているのに 2（Go の panic も 2）」の 2 通り。使い方で見分ける
+      sgc=$(awk '/^store_grants_complete\(\) \{/,/^}/' /src/install.sh)
+      contains "$sgc" "app_run grants check" && ok "前提: install.sh から store_grants_complete を取り出せた" || ng "前提が崩れています: store_grants_complete を取り出せない"
+      # sgc_case <grants check の終了コード> <grants help の出力> — 「戻り値 注意の有無 ${out}」を 1 行で出す
+      sgc_case() {
+        (
+          FAKE_RC=$1
+          FAKE_HELP=$2
+          app_run() {
+            case "$1 $2" in
+              "grants check") echo check-out; return "$FAKE_RC" ;;
+              "grants help") printf '%s\n' "$FAKE_HELP"; return 0 ;;
+            esac
+            return 9
+          }
+          warn() { echo "WARN: $*" >&2; }
+          eval "$sgc"
+          out=
+          r=0
+          store_grants_complete 2>/tmp/sgc.err || r=$?
+          w=0
+          if grep -q WARN /tmp/sgc.err; then w=1; fi
+          echo "$r $w $out"
+        )
+      }
+      old_help=$'Usage:\n  looptrack grants print [--db <name>]\n  looptrack grants apply [--yes]'
+      new_help=$'Usage:\n  looptrack grants print [--db <name>]\n  looptrack grants check'
+      [ "$(sgc_case 0 "$new_help")" = "0 0 " ] && ok "0: そろっている" || ng "0 の分岐: $(sgc_case 0 "$new_help")"
+      [ "$(sgc_case 3 "$new_help")" = "1 0 check-out" ] && ok "3: 足りない → 権限の段へ（不足を出力に入れる）" || ng "3 の分岐: $(sgc_case 3 "$new_help")"
+      [ "$(sgc_case 2 "$old_help")" = "0 0 " ] && ok "2 で、使い方に grants check が無い（前の版）→ これまでどおり進む" || ng "2・前の版の分岐: $(sgc_case 2 "$old_help")"
+      [ "$(sgc_case 2 "$new_help")" = "1 1 check-out" ] && ok "2 で、使い方に grants check がある（panic など）→ 注意を出して権限の段へ" || ng "2・知っているのに 2 の分岐: $(sgc_case 2 "$new_help")"
+      [ "$(sgc_case 1 "$new_help")" = "0 1 " ] && ok "ほか（確かめの失敗）→ 注意を出して進む" || ng "1 の分岐: $(sgc_case 1 "$new_help")"
+      # 対照: 本物の新しい版の使い方には grants check がある（見分けの目印が実物と合っている。日英とも）
+      for l in ja en; do
+        h=$(LOOPTRACK_LANG=$l "/dist/looptrack_v0.0.0-installtest1_linux_$CARCH" grants help 2>&1) || true
+        contains "$h" "looptrack grants check" && ok "対照: 新しい版の grants help（${l}）に grants check がある" || ng "新しい版の grants help（${l}）: $h"
+      done
+
+      echo "== 確認の書き方: 出力を受け取ってから比べる（「出ない」側の確認が、一致したのに ok にならない）"
+      # big_out <行> — <行> を先に出し、そのあとパイプの容量（64KiB）を大きく超えて書き続ける
+      big_out() {
+        printf '%s\n' "$1"
+        head -c 4194304 /dev/zero | tr '\0' x
+      }
+      r=0
+      big_out MARK | grep -q MARK || r=$? # pipe-grep-ok: 見張りの前提（直す前の形が壊れることを確かめる）
+      [ "$r" != 0 ] && ok "前提: 直す前の形（コマンド | grep -q）は、一致しても 0 でない終了（${r}）になる" ||
+        ng "前提が崩れています（大きな出力の コマンド | grep -q が一致して 0 で終わった。下の見張りが穴を通っていない）"
+      r=$(contains "$(big_out MARK)" MARK && echo NG || echo ok)
+      [ "$r" = NG ] && ok "一致する大きな出力では「出ない」側の確認（contains … && ng || ok）が NG になる" || ng "一致する大きな出力で「出ない」側の確認が ok になった"
+      r=$(contains "$(big_out OTHER)" MARK && echo NG || echo ok)
+      [ "$r" = ok ] && ok "対照: 一致しない大きな出力では ok になる" || ng "一致しない大きな出力で「出ない」側の確認が NG になった"
+      # 一致する行を出してから 0 でない終了になるコマンド（cat が無いファイルを含むときの形）
+      printf 'MARK\n' >/tmp/witness.hist
+      r=0
+      cat /tmp/witness.hist /tmp/witness.none 2>/dev/null | grep -qF MARK || r=$? # pipe-grep-ok: 見張りの前提（直す前の形が壊れることを確かめる）
+      [ "$r" != 0 ] && ok "前提: 直す前の形（cat <無いファイルを含む> | grep -qF）は、一致しても 0 でない終了（${r}）になる" ||
+        ng "前提が崩れています（無いファイルを含む cat | grep -qF が一致して 0 で終わった）"
+      grep -qF MARK /tmp/witness.none /tmp/witness.hist 2>/dev/null && ok "ファイルを直接読む grep -qF は、無いファイルがあっても一致すれば 0" ||
+        ng "無いファイルを含む grep -qF が一致を見落とした"
+      grep -qF OTHER /tmp/witness.none /tmp/witness.hist 2>/dev/null && ng "無いファイルを含む grep -qF が一致しないのに 0 になった" ||
+        ok "対照: 一致しなければ 0 でない"
+      rm -f /tmp/witness.hist
+      echo "== パイプで grep -q に渡す行の見張り（このファイル自身に当てる）"
+      printf '%s\n' 'x | grep -q y && ng z' 'x || grep -q y' "grep -q 'a\\|b' f" 'ok "x | grep -q y"' '# x | grep -q y' 'x | grep -q y # pipe-grep-ok: 対照' 'x |' '  grep -qF y' 'x | grep -c y' 'n=$((1<<k))' "printf '%s' 'cat <<EOF'" '((m<<=1))' 'x | grep -q z' >/tmp/pipe-grep.sample # pipe-grep-ok: 見張りの対照の入力
+      r=$(pipe_grep_scan /tmp/pipe-grep.sample | cut -d: -f1 | tr '\n' ' ')
+      [ "$r" = "1 8 13 " ] && ok "対照: 印の無い行（行をまたぐ形も・1<<k と引用符の中の <<EOF の後ろも）を拾い、||・\\|・文・コメント・印つき・grep -c は拾わない" ||
+        ng "前提が崩れています（見張りの対照で拾った行が ${r:-（なし）}。1・8・13 のはず）"
+      printf '%s\n' 'cat <<EOF' 'x | grep -q y' >/tmp/pipe-grep.sample # pipe-grep-ok: 見張りの対照の入力
+      r=$(pipe_grep_scan /tmp/pipe-grep.sample)
+      contains "$r" "ヒアドキュメントの終わりの語（EOF）が無いまま" && ok "対照: ヒアドキュメントの終わりが無いままファイルが終わると、その旨を出す" ||
+        ng "前提が崩れています（終わりの無いヒアドキュメントで出たもの: ${r:-（なし）}）"
+      rm -f /tmp/pipe-grep.sample
+      r=$(pipe_grep_scan "${BASH_SOURCE[0]}")
+      [ -z "$r" ] && ok "このファイルに、印の無い「コマンド | grep -q」が無い" ||
+        ng "パイプで grep -q に渡す行に印がありません（出力を受け取ってから contains で比べる。pipefail の無い sh の中なら行末に # pipe-grep-ok: <理由>）: $r"
+
       echo "== 取得元（--from なしは <リポジトリ>/releases/latest/download）"
       out=$($I --from-server https://im.example.com --yes 2>&1) && ng "--from-server を受け付けた" || true
       contains "$out" "不明な引数です: --from-server" && ok "--from-server は受け付けない" || ng "--from-server の表示: $out"
@@ -407,7 +567,7 @@ if [ "${1:-}" = --in-container ]; then
       contains "$out" "proxy_pass http://127.0.0.1:8090;" && ok "nginx の設定例" || ng "nginx の設定例"
       contains "$out" "reverse_proxy 127.0.0.1:8090" && ok "Caddy の設定例" || ng "Caddy の設定例"
       check "実行ファイル" test -x /usr/local/bin/looptrack
-      check "利用者 looptrack（ログインできないシェル）" sh -c 'getent passwd looptrack | grep -q nologin'
+      check "利用者 looptrack（ログインできないシェル）" sh -c 'getent passwd looptrack | grep -q nologin' # pipe-grep-ok: sh -c の中（pipefail なし）
       check ".env は root 600" sh -c '[ "$(stat -c %U:%a /etc/looptrack/.env)" = root:600 ]'
       check "LOOPTRACK_DSN は /var/lib/looptrack" grep -qx "LOOPTRACK_DSN='sqlite:/var/lib/looptrack/im.db'" /etc/looptrack/.env
       check "LOOPTRACK_LISTEN は 127.0.0.1" grep -qx "LOOPTRACK_LISTEN='127.0.0.1:8090'" /etc/looptrack/.env
@@ -415,8 +575,8 @@ if [ "${1:-}" = --in-container ]; then
       check "systemd では data も compose.yaml も作らない" sh -c '[ ! -e /etc/looptrack/data ] && [ ! -e /etc/looptrack/compose.yaml ]'
       contains "$out" "systemctl enable --now looptrack" && ok "setup の起動の案内は systemd" || ng "起動の案内: $out"
       contains "$out" "docker compose up" && ng "systemd なのに compose の案内" || ok "compose の案内を出さない"
-      admin project list 2>&1 | grep -q '^web ' && ok "setup の直後にプロジェクト web（--project）" || ng "プロジェクト: $(admin project list 2>&1)"
-      admin member list web 2>&1 | grep -q alice && ok "管理者 alice が web に参加" || ng "参加: $(admin member list web 2>&1)"
+      contains "$(admin project list 2>&1)" '^web ' && ok "setup の直後にプロジェクト web（--project）" || ng "プロジェクト: $(admin project list 2>&1)"
+      contains "$(admin member list web 2>&1)" alice && ok "管理者 alice が web に参加" || ng "参加: $(admin member list web 2>&1)"
       check "unit のサンドボックス" grep -q '^ProtectSystem=strict' /etc/systemd/system/looptrack.service
       check "unit は looptrack で動く" grep -q '^User=looptrack' /etc/systemd/system/looptrack.service
       check "印（METHOD=systemd・STARTED=no）" sh -c 'grep -q ^METHOD=systemd /etc/looptrack/install.conf && grep -q ^STARTED=no /etc/looptrack/install.conf'
@@ -426,6 +586,8 @@ if [ "${1:-}" = --in-container ]; then
       # クライアントに配る looptrack: 取得元（…1）の SHA256SUMS にあるのは linux/<arch> だけなので、その 1 つと SHA256SUMS を置き、
       # ほかの 5 対象は置かずに注意を出す（対照: …2 の 6 対象は systemd の場面の --upgrade で確かめる）
       check ".env に LOOPTRACK_DIST_DIR を足す（単引用符）" grep -qx "LOOPTRACK_DIST_DIR='$DISTD'" /etc/looptrack/.env
+      check ".env に LOOPTRACK_ATTACH_DIR を足す（StateDirectory の中）" grep -qx "LOOPTRACK_ATTACH_DIR='/var/lib/looptrack/attachments'" /etc/looptrack/.env
+      check "添付の置き場は looptrack の所有・750" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/attachments)" = looptrack:750 ]'
       r=$(dist_matches v0.0.0-installtest1 /dist/SHA256SUMS 1) && ok "配布ディレクトリにこの版の linux/${CARCH}（SHA256SUMS と一致）" || ng "配布ディレクトリ: $r"
       check "配布ディレクトリは root 755・ファイルは 644" sh -c '[ "$(stat -c %U:%a '"$DISTD"')" = root:755 ] && [ "$(stat -c %a '"$DISTD"'/SHA256SUMS)" = 644 ]'
       contains "$out" "次の対象は置きません" && contains "$out" "windows_arm64（SHA256SUMS に無い）" && ok "SHA256SUMS に無い対象は置かずに知らせる" || ng "足りない対象の表示: $out"
@@ -460,8 +622,8 @@ if [ "${1:-}" = --in-container ]; then
       wait "$spid" 2>/dev/null || true
       grep -q "$PERM_WARN" /tmp/serve.log && ng "DB の権限の警告が出た: $(grep "$PERM_WARN" /tmp/serve.log)" || ok "DB の権限の警告を出さない"
       # 配布物が足りない（linux/<arch> だけ）ので、起動時のログに知らせる（対照: そろった後に出ないことは systemd の場面の --upgrade で）
-      grep "$DIST_LAG" /tmp/serve.log | grep -q 'windows/arm64' && ok "起動時のログに配布物の不足（windows/arm64 など）を出す" || ng "配布物の不足のログ: $(cat /tmp/serve.log)"
-      admin user list 2>&1 | grep -q alice && ok "管理者 alice" || ng "管理者: $(admin user list 2>&1)"
+      contains "$(grep "$DIST_LAG" /tmp/serve.log)" 'windows/arm64' && ok "起動時のログに配布物の不足（windows/arm64 など）を出す" || ng "配布物の不足のログ: $(cat /tmp/serve.log)"
+      contains "$(admin user list 2>&1)" alice && ok "管理者 alice" || ng "管理者: $(admin user list 2>&1)"
 
       echo "== --uninstall（データを残す）→ 入れ直す"
       out=$($I --uninstall 2>&1) || ng "uninstall が失敗: $out"
@@ -473,10 +635,11 @@ if [ "${1:-}" = --in-container ]; then
       out=$($I --from /dist --yes --method systemd --no-start -- "${SETUP[@]}" 2>&1) || ng "入れ直しが失敗: $out"
       contains "$out" "作成済みです" && ok "setup を飛ばす" || ng "入れ直しの表示: $out"
       [ "$(grep -c '^LOOPTRACK_DIST_DIR=' /etc/looptrack/.env)" = 1 ] && ok "入れ直しても LOOPTRACK_DIST_DIR は 1 行のまま" || ng "LOOPTRACK_DIST_DIR の行: $(grep -c '^LOOPTRACK_DIST_DIR=' /etc/looptrack/.env)"
+      [ "$(grep -c '^LOOPTRACK_ATTACH_DIR=' /etc/looptrack/.env)" = 1 ] && ok "入れ直しても LOOPTRACK_ATTACH_DIR は 1 行のまま" || ng "LOOPTRACK_ATTACH_DIR の行: $(grep -c '^LOOPTRACK_ATTACH_DIR=' /etc/looptrack/.env)"
       r=$(dist_matches v0.0.0-installtest1 /dist/SHA256SUMS 1) && ok "入れ直すと配布ディレクトリも置き直す" || ng "入れ直しの配布ディレクトリ: $r"
       [ "$key" = "$(grep ^LOOPTRACK_SECRET_KEY /etc/looptrack/.env)" ] && ok "LOOPTRACK_SECRET_KEY は同じ" || ng "LOOPTRACK_SECRET_KEY が変わった"
       check "入れ直しで広い DB（644）を 600 に直す" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/im.db)" = looptrack:600 ]'
-      admin user list 2>&1 | grep -q alice && ok "データ（管理者）が残る" || ng "データが残らない"
+      contains "$(admin user list 2>&1)" alice && ok "データ（管理者）が残る" || ng "データが残らない"
 
       echo "== --uninstall --purge"
       out=$($I --uninstall --purge --yes 2>&1) || ng "purge が失敗: $out"
@@ -502,6 +665,7 @@ if [ "${1:-}" = --in-container ]; then
       # クライアントに配る looptrack: compose.yaml が ./dist をコンテナの /dist に読み取り専用で入れ、.env は /dist を指し、ホストの ./dist に置く
       check "compose.yaml は ./dist を /dist に読み取り専用で入れる" grep -qE '^ +- \./dist:/dist:ro$' /opt/looptrack/compose.yaml
       check ".env の LOOPTRACK_DIST_DIR はコンテナの中の /dist" grep -qx "LOOPTRACK_DIST_DIR='/dist'" /opt/looptrack/.env
+      check "compose.yaml は添付の置き場を ./data の中に決める" grep -qE '^ +LOOPTRACK_ATTACH_DIR: /data/attachments$' /opt/looptrack/compose.yaml
       r=$(DISTD=/opt/looptrack/dist dist_matches v0.0.0-installtest1 /dist/SHA256SUMS 1) && ok "compose の配布ディレクトリ（/opt/looptrack/dist）" || ng "compose の配布ディレクトリ: $r"
       out=$($I --from /dist --yes 2>&1) || ng "compose の 2 回目が失敗"
       contains "$out" "設定済みです" && ok "compose の 2 回目は設定済み" || ng "compose の 2 回目: $out"
@@ -552,7 +716,7 @@ if [ "${1:-}" = --in-container ]; then
       grep -q 設定まで終わりました /tmp/tty.out && ok "対話で最後まで進む" || ng "対話: $(tr -d '\r' </tmp/tty.out | tail -n 30)"
       check "対話の結果（systemd・SQLite・127.0.0.1）" sh -c "grep -q ^METHOD=systemd /etc/looptrack/install.conf && grep -qx \"LOOPTRACK_DSN='sqlite:/var/lib/looptrack/im.db'\" /etc/looptrack/.env && grep -qx \"LOOPTRACK_LISTEN='127.0.0.1:8090'\" /etc/looptrack/.env"
       grep -q correct-horse-battery /tmp/tty.out && ng "パスワードが端末に出た" || ok "パスワードを表示しない"
-      admin user list 2>&1 | grep -q admin && ok "管理者 admin" || ng "管理者: $(admin user list 2>&1)"
+      contains "$(admin user list 2>&1)" admin && ok "管理者 admin" || ng "管理者: $(admin user list 2>&1)"
       ;;
 
     systemd)
@@ -726,7 +890,7 @@ if [ "${1:-}" = --in-container ]; then
       check "前の実行ファイル" test -x /usr/local/bin/looptrack.prev
       check "--upgrade で DB を 600 に直す" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/im.db)" = looptrack:600 ]'
       grep -q "$PERM_WARN" <<<"$(journalctl -u looptrack -o cat --no-pager --since "@$since")" && ng "更新の後に権限の警告が出た" || ok "更新の後は権限の警告を出さない"
-      admin user list 2>&1 | grep -q alice && ok "データ（管理者）が残る" || ng "データが残らない"
+      contains "$(admin user list 2>&1)" alice && ok "データ（管理者）が残る" || ng "データが残らない"
       r=$(web_login http://127.0.0.1:8090/looptrack) && ok "更新の後も同じパスワードと二段階認証でログインできる $r" || ng "更新の後のログイン: $r"
       # 2 回目は配布物の中の install.sh で（dist.sh build の出力の並びのまま更新の経路に入れる）
       cmp -s /src/install.sh /dist2/install.sh && ok "更新先の配布物の install.sh はリポジトリの写し" || ng "/dist2/install.sh が deploy/install.sh と違う"
@@ -744,17 +908,22 @@ if [ "${1:-}" = --in-container ]; then
       rm -rf /etc/looptrack /var/lib/looptrack /usr/local/bin/looptrack /usr/local/bin/looptrack.prev
       ;;
 
-    mysql-nodb-decline | mysql-nodb | mysql-bad | mysql-good | mysql-upgrade | mysql-auto-pending | mysql-auto-fail | mysql-auto-ok | mysql-manual-nomig | mysql-auto-timer | mysql-fakemig-decline | mysql-fakemig-dsn | mysql-fakemig-back)
+    mysql-nodb-decline | mysql-nodb | mysql-bad | mysql-good | mysql-upgrade | mysql-auto-pending | mysql-auto-fail | mysql-auto-ok | mysql-manual-nomig | mysql-auto-timer | mysql-fakemig-decline | mysql-fakemig-dsn | mysql-fakemig-back | mysql-rc5-install | mysql-rc5-upgrade)
       # MySQL を最小権限で使う構成（テスト専用の MySQL のコンテナ im0151-mysql。DB ltdb と表を作る利用者 lt_migrate は
       # 手元の側で先に作ってある。アプリ用の利用者 lt_app は無い → インストーラが尋ねたついでに作る）。
       # mysql-nodb*: DB ltnew は無い（表を作る利用者 lt_newmig と、その権限だけが手元の側で先にある）→ DB もインストーラが作る。
       # 管理用のパスワード（ADMIN_PW。テスト用の値）は疑似端末から答えるだけで、引数・ファイルには書かない
       export LOOPTRACK_SETUP_DSN="lt_app:${APP_PW}@tcp(im0151-mysql:3306)/ltdb?parseTime=true"
       export LOOPTRACK_SETUP_MIGRATE_DSN="lt_migrate:${MIG_PW}@tcp(im0151-mysql:3306)/ltdb?parseTime=true"
-      case $scenario in mysql-nodb*)
-        export LOOPTRACK_SETUP_DSN="lt_new:${APP_PW}@tcp(im0151-mysql:3306)/ltnew?parseTime=true"
-        export LOOPTRACK_SETUP_MIGRATE_DSN="lt_newmig:${MIG_PW}@tcp(im0151-mysql:3306)/ltnew?parseTime=true"
-        ;;
+      case $scenario in
+        mysql-nodb*)
+          export LOOPTRACK_SETUP_DSN="lt_new:${APP_PW}@tcp(im0151-mysql:3306)/ltnew?parseTime=true"
+          export LOOPTRACK_SETUP_MIGRATE_DSN="lt_newmig:${MIG_PW}@tcp(im0151-mysql:3306)/ltnew?parseTime=true"
+          ;;
+        mysql-rc5*)
+          export LOOPTRACK_SETUP_DSN="lt_rc5:${APP_PW}@tcp(im0151-mysql:3306)/ltrc5?parseTime=true"
+          export LOOPTRACK_SETUP_MIGRATE_DSN="lt_rc5mig:${MIG_PW}@tcp(im0151-mysql:3306)/ltrc5?parseTime=true"
+          ;;
       esac
       SETUPM=(--store mysql --public-url https://im.example.com --admin-login alice --admin-name Alice --admin-password-file /root/pw --two-factor required --project web)
       # with_tty <出力> <管理用の利用者> <パスワード> <コマンド> [<問いの文字列> <答え>]… — script の疑似端末でコマンドを動かし、
@@ -823,7 +992,7 @@ if [ "${1:-}" = --in-container ]; then
           check "サービスが動いている" systemctl is-active looptrack
           grep -rqF -- "$ADMIN_PW" /etc/looptrack /var/lib/looptrack /opt 2>/dev/null && ng "管理用のパスワードが設定・データの置き場に残った" || ok "設定・データの置き場に管理用のパスワードが無い"
           grep -qF -- "$ADMIN_PW" /tmp/mysql-nodb.log && ng "管理用のパスワードがインストーラの出力に出た" || ok "インストーラの出力に管理用のパスワードが無い"
-          cat /root/.bash_history /root/.sh_history /root/.ash_history 2>/dev/null | grep -qF -- "$ADMIN_PW" && ng "シェルの履歴に残った" || ok "シェルの履歴に管理用のパスワードが無い"
+          grep -qF -- "$ADMIN_PW" /root/.bash_history /root/.sh_history /root/.ash_history 2>/dev/null && ng "シェルの履歴に残った" || ok "シェルの履歴に管理用のパスワードが無い"
           [ -s /tmp/ps.snap1 ] && ok "パスワードを答えた直後の ps を取った" || ng "ps を取れていない"
           grep -qF -- "$ADMIN_PW" /tmp/ps.snap1 /tmp/ps.snap2 && ng "ps の引数に管理用のパスワードが出た" || ok "ps の引数に管理用のパスワードが無い"
           grep -q "lt_new:${APP_PW}@" /etc/looptrack/.env && ok "対照: .env にはアプリ用の接続先（LOOPTRACK_DSN）がある" || ng ".env の LOOPTRACK_DSN"
@@ -850,7 +1019,7 @@ if [ "${1:-}" = --in-container ]; then
           contains "$out" "作成: DB" && ng "既にある DB を作ろうとした: $out" || ok "対照: DB が既にあれば作らない"
           contains "$out" "作成: 利用者 lt_app" && ok "アプリ用の利用者を作った（im_app 以外の名前）" || ng "利用者の作成の表示: $out"
           contains "$out" "権限を与えました" && ok "権限を与えた" || ng "権限の表示: $out"
-          contains "$out" "アプリ用の利用者 lt_app で読めました" && ok "アプリ用の利用者で読めることを確かめた" || ng "読めたの表示: $out"
+          contains "$out" "アプリ用の利用者 lt_app に全部の表の権限があります" && ok "アプリ用の利用者に全部の表の権限があることを確かめた" || ng "読めたの表示: $out"
           contains "$out" "200 OK" && ok "/healthz を待った" || ng "起動の表示: $out"
           contains "$out" "インストールが終わりました" && ok "1 回の実行で最後まで進む" || ng "終わりの表示: $out"
           check "サービスが動いている" systemctl is-active looptrack
@@ -858,7 +1027,7 @@ if [ "${1:-}" = --in-container ]; then
           # 尋ねた管理用のパスワードが残っていない（対照: SHOW GRANTS は手元の側で確かめる）
           grep -rqF -- "$ADMIN_PW" /etc/looptrack /var/lib/looptrack /opt 2>/dev/null && ng "管理用のパスワードが設定・データの置き場に残った" || ok "設定・データの置き場に管理用のパスワードが無い"
           grep -qF -- "$ADMIN_PW" /tmp/mysql-good.log /tmp/mysql-bad.log && ng "管理用のパスワードがインストーラの出力に出た" || ok "インストーラの出力に管理用のパスワードが無い"
-          cat /root/.bash_history /root/.sh_history /root/.ash_history 2>/dev/null | grep -qF -- "$ADMIN_PW" && ng "シェルの履歴に残った" || ok "シェルの履歴に管理用のパスワードが無い"
+          grep -qF -- "$ADMIN_PW" /root/.bash_history /root/.sh_history /root/.ash_history 2>/dev/null && ng "シェルの履歴に残った" || ok "シェルの履歴に管理用のパスワードが無い"
           [ -s /tmp/ps.snap1 ] && ok "パスワードを答えた直後の ps を取った" || ng "ps を取れていない"
           grep -qF -- "$ADMIN_PW" /tmp/ps.snap1 /tmp/ps.snap2 && ng "ps の引数に管理用のパスワードが出た" || ok "ps の引数に管理用のパスワードが無い"
           grep -q "lt_app:${APP_PW}@" /etc/looptrack/.env && ok "対照: .env にはアプリ用の接続先（LOOPTRACK_DSN）がある" || ng ".env の LOOPTRACK_DSN"
@@ -874,17 +1043,18 @@ if [ "${1:-}" = --in-container ]; then
           contains "$out" "==> 停止" && ng "止めてから確かめた" || ok "止める前に確かめる"
           [ "$before" = "$(systemctl show -p ActiveEnterTimestampMonotonic looptrack)" ] && ok "サービスを止めていない（起動し直していない）" || ng "サービスが起動し直された"
           check "動いている" systemctl is-active looptrack
-          check "版はそのまま（印も）" sh -c '/usr/local/bin/looptrack version | grep -q installtest1 && grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf'
+          check "版はそのまま（印も）" sh -c '/usr/local/bin/looptrack version | grep -q installtest1 && grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf' # pipe-grep-ok: sh -c の中（pipefail なし）
           ;;
         mysql-auto-fail)
           echo "== MySQL: 無人の更新で、止めた後に失敗（権限の欠けた表）→ 前の版に戻して起動し直す"
+          systemctl reset-failed looptrack
           rc=0
           out=$($I --upgrade --from /dist2 --yes 2>&1 </dev/null) || rc=$?
           [ "$rc" != 0 ] && ok "0 でない終了コード（${rc}）" || ng "失敗したのに 0 で終わった: $out"
           contains "$out" "未適用の migrate はありません" && ok "対照: 事前の確かめは通った（DB の形は変わらない）" || ng "事前の確かめの表示: $out"
           contains "$out" "==> 停止" && ok "止めて置き換えを始めた" || ng "置き換えを始めていない: $out"
           contains "$out" "前の版 v0.0.0-installtest1 に戻して起動し直しました（新しい版 v0.0.0-installtest2 は入れていません）" && ok "前の版に戻したと示す" || ng "戻しの表示: $out"
-          check "前の版で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1'
+          check "前の版で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1' # pipe-grep-ok: sh -c の中（pipefail なし）
           check "/healthz が 200" env LOOPTRACK_HEALTH_URL=http://127.0.0.1:8090/looptrack/healthz /usr/local/bin/looptrack healthcheck
           check "印は前の版のまま" grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf
           ;;
@@ -910,7 +1080,7 @@ if [ "${1:-}" = --in-container ]; then
           contains "$out" "最新です（適用するマイグレーションはありません）" && ok "migrate は未適用 0 件で通った" || ng "migrate の表示: $out"
           contains "$out" "CREATE command denied" && ng "migrate が CREATE の権限を求めた: $out" || ok "migrate が CREATE の権限を求めない"
           contains "$out" "更新しました: v0.0.0-installtest2 → v0.0.0-installtest1" && ok "置き換わった" || ng "更新の表示: $out"
-          check "…1 で動いている（印も）" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1 && grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf'
+          check "…1 で動いている（印も）" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1 && grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf' # pipe-grep-ok: sh -c の中（pipefail なし）
           ;;
         mysql-auto-timer)
           echo "== MySQL（最小権限）: timer の service（LOOPTRACK_SETUP_MIGRATE_DSN の無い環境）の無人の更新で、DB の形を変えない新しい版に置き換わる（取得元は latest が …2 の /gh2）"
@@ -933,7 +1103,7 @@ if [ "${1:-}" = --in-container ]; then
           contains "$j" "CREATE command denied" && ng "migrate が CREATE の権限を求めた: $(tail -n 30 <<<"$j")" || ok "migrate が CREATE の権限を求めない"
           contains "$j" "更新しました: v0.0.0-installtest1 → v0.0.0-installtest2" && ok "置き換わった" || ng "更新の表示: $(tail -n 30 <<<"$j")"
           contains "$j" "前の版" && ng "戻しが走った: $(tail -n 30 <<<"$j")" || ok "戻しは走らない"
-          check "…2 で動いている（印も。設定は on のまま）" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest2 && grep -qx VERSION=v0.0.0-installtest2 /etc/looptrack/install.conf && grep -qx AUTO_UPGRADE=on /etc/looptrack/install.conf'
+          check "…2 で動いている（印も。設定は on のまま）" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest2 && grep -qx VERSION=v0.0.0-installtest2 /etc/looptrack/install.conf && grep -qx AUTO_UPGRADE=on /etc/looptrack/install.conf' # pipe-grep-ok: sh -c の中（pipefail なし）
           # 次の場面（mysql-auto-ok）のために外し、起動の数えを戻す
           out=$($I --auto-upgrade off 2>&1) || ng "off が失敗: $out"
           rm -f /usr/local/bin/minisign /root/minisign.args
@@ -1008,14 +1178,14 @@ UPEOF
           contains "$out" "管理用の利用者（" && ng "管理用の資格情報を尋ねた: $out" || ok "管理用の資格情報を尋ねない"
           contains "$out" "読めました" && ok "アプリ用の利用者で読めることを確かめた" || ng "読めたの表示: $out"
           contains "$out" "更新しました: v0.0.0-installtest2 → v0.0.0-installtest3" && ok "上がった" || ng "更新の表示: $out"
-          check "…3 で動いている（印も）" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest3 && grep -qx VERSION=v0.0.0-installtest3 /etc/looptrack/install.conf'
+          check "…3 で動いている（印も）" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest3 && grep -qx VERSION=v0.0.0-installtest3 /etc/looptrack/install.conf' # pipe-grep-ok: sh -c の中（pipefail なし）
           check "/healthz が 200" env LOOPTRACK_HEALTH_URL=http://127.0.0.1:8090/looptrack/healthz /usr/local/bin/looptrack healthcheck
           check "アプリ用の利用者（.env の LOOPTRACK_DSN）で読める" admin project list
           ls /tmp/tmp.* >/dev/null 2>&1 && ng "管理用のパスワードの一時ファイルが残った" || ok "管理用のパスワードの一時ファイルは消えた"
           grep -rqF -D skip -- "$ADMIN_PW" /etc/looptrack /var/lib/looptrack /tmp /root 2>/dev/null && ng "管理用のパスワードが /opt/mysql/.env の外（設定・データ・/tmp・/root・出力）に残った" ||
             ok "管理用のパスワードは /opt/mysql/.env の外（設定・データ・/tmp・/root・出力）に無い"
           grep -qF -- "$ADMIN_PW" /opt/mysql/.env && ok "対照: /opt/mysql/.env には管理用のパスワードがある（検索は働いている）" || ng "前提: /opt/mysql/.env"
-          cat /root/.bash_history /root/.sh_history 2>/dev/null | grep -qF -- "$ADMIN_PW" && ng "シェルの履歴に残った" || ok "シェルの履歴に管理用のパスワードが無い"
+          grep -qF -- "$ADMIN_PW" /root/.bash_history /root/.sh_history 2>/dev/null && ng "シェルの履歴に残った" || ok "シェルの履歴に管理用のパスワードが無い"
           rm -rf /opt/mysql /root/upgrade-with-root.sh
           ;;
         mysql-fakemig-back)
@@ -1026,7 +1196,7 @@ UPEOF
           out=$($I --upgrade --from /dist2 --yes 2>&1 </dev/null) || rc=$?
           [ "$rc" = 0 ] && ok "0 で終わる" || ng "…2 に戻せない（${rc}）: $out"
           contains "$out" "更新しました: v0.0.0-installtest3 → v0.0.0-installtest2" && ok "…2 に戻った" || ng "更新の表示: $out"
-          check "…2 で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest2'
+          check "…2 で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest2' # pipe-grep-ok: sh -c の中（pipefail なし）
           systemctl reset-failed looptrack
           ;;
         mysql-upgrade)
@@ -1037,6 +1207,47 @@ UPEOF
           contains "$out" "更新しました" && ok "更新が終わる" || ng "更新の表示: $out"
           check "サービスが動いている" systemctl is-active looptrack
           grep -qF -- "$ADMIN_PW" /tmp/mysql-up.log && ng "更新の出力に管理用のパスワードが出た" || ok "更新の出力に管理用のパスワードが無い"
+          ;;
+        mysql-rc5-install)
+          echo "== MySQL（最小権限）: 1.0.0-rc.5 の版（attachments の表を持たない）を、その版の install.sh で入れ、イシューを 1 件作る"
+          systemctl reset-failed looptrack 2>/dev/null || true
+          pwf=$(umask 077 && mktemp)
+          printf '%s\n' "$ADMIN_PW" >"$pwf"
+          rc=0
+          out=$(LOOPTRACK_INSTALL_DB_ADMIN_USER=root LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE=$pwf sh /dist5/install.sh --from /dist5 --yes --method systemd -- "${SETUPM[@]}" 2>&1) || rc=$?
+          rm -f "$pwf"
+          [ "$rc" = 0 ] && ok "rc.5 の install.sh で入った" || ng "rc.5 の install.sh で入らない（${rc}）: $(tail -n 30 <<<"$out")"
+          contains "$out" "権限を与えました" && ok "rc.5 の版の権限（attachments を含まない grants.sql）を与えた" || ng "rc.5 の権限の表示: $out"
+          check "rc.5 で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q v1.0.0-rc.5' # pipe-grep-ok: sh -c の中（pipefail なし）
+          h=$(/usr/local/bin/looptrack grants help 2>&1) || true
+          contains "$h" "looptrack grants check" && ng "rc.5 の grants help に grants check がある（前の版の見分けが崩れる）: $h" || ok "対照: rc.5 の grants help に grants check は無い（前の版として見分けられる）"
+          (umask 077 && admin token create --name rc5 alice >/root/rc5.tok 2>/dev/null) || ng "rc.5 でトークンを作れない"
+          out=$(LOOPTRACK_TOKEN=$(head -n 1 /root/rc5.tok) LOOPTRACK_API_URL=http://127.0.0.1:8090/looptrack LOOPTRACK_PROJECT=web \
+            /usr/local/bin/looptrack issue new --type task "rc.5 で作ったイシュー" 2>&1) || ng "rc.5 でイシューを作れない: $out"
+          contains "$out" "WEB-0001" && ok "rc.5 でイシュー WEB-0001 を作った" || ng "イシューの作成の表示: $out"
+          ;;
+        mysql-rc5-upgrade)
+          echo "== MySQL（最小権限）: rc.5 → 新しい版（…2。0007 で attachments の表が増える）を端末の --upgrade で。増えた表の不足に気づいて尋ね、与え直し、添付が上がる"
+          systemctl reset-failed looptrack 2>/dev/null || true
+          with_tty /tmp/mysql-rc5.log root "$ADMIN_PW" "sh /src/install.sh --upgrade --from /dist2" || ng "rc.5 からの upgrade が失敗: $(tr -d '\r' </tmp/mysql-rc5.log | tail -n 30)"
+          out=$(tr -d '\r' </tmp/mysql-rc5.log)
+          contains "$out" "未適用: 0007_attachments.sql" && ok "止める前に 0007 を未適用と示す" || ng "未適用の表示: $out"
+          grep -q '^適用: 0007_attachments.sql' <<<"$out" && ok "0007 を適用した（表を作る接続先で）" || ng "migrate の表示: $out"
+          contains "$out" "attachments (SELECT, INSERT)" && ok "増えた表（attachments）の不足を示す" || ng "不足の表示: $out"
+          contains "$out" "==> MySQL の権限" && ok "「MySQL の権限」の段に進んだ" || ng "権限の段に進まない（読める表があるので見落とした）: $out"
+          contains "$out" "権限を与えました" && ok "尋ねて権限を与え直した" || ng "権限の表示: $out"
+          contains "$out" "更新しました: v1.0.0-rc.5 → v0.0.0-installtest2" && ok "更新が終わる" || ng "更新の表示: $out"
+          grep -qF -- "$ADMIN_PW" /tmp/mysql-rc5.log && ng "更新の出力に管理用のパスワードが出た" || ok "更新の出力に管理用のパスワードが無い"
+          check "アプリ用の利用者に全部の表の権限がある（grants check）" admin grants check
+          printf 'evidence\n' >/tmp/rc5-ev.txt
+          out=$(LOOPTRACK_TOKEN=$(head -n 1 /root/rc5.tok) LOOPTRACK_API_URL=http://127.0.0.1:8090/looptrack LOOPTRACK_PROJECT=web \
+            /usr/local/bin/looptrack issue attach WEB-0001 /tmp/rc5-ev.txt 2>&1) || ng "添付が上がらない: $out"
+          contains "$out" "WEB-0001 に添付した" && ok "上げた後に添付が上がる" || ng "添付の表示: $out"
+          (umask 077 && printf 'Authorization: Bearer %s\n' "$(head -n 1 /root/rc5.tok)" >/root/rc5.hdr)
+          code=$(curl -s -o /tmp/rc5-att.json -w '%{http_code}' -H @/root/rc5.hdr http://127.0.0.1:8090/looptrack/api/v1/issues/WEB-0001/attachments)
+          [ "$code" = 200 ] && grep -q '"filename":"rc5-ev.txt"' /tmp/rc5-att.json && ok "添付の一覧が 200 で、上げた添付を含む" || ng "添付の一覧: $code $(cat /tmp/rc5-att.json)"
+          rm -f /root/rc5.tok /root/rc5.hdr
+          $I --uninstall --purge --yes >/dev/null 2>&1 || ng "rc.5 の場面の purge が失敗"
           ;;
       esac
       ;;
@@ -1050,15 +1261,18 @@ UPEOF
       contains "$out" "更新しました: v0.0.0-installtest1 → v0.0.0-installtest2" && ok "rc.2 の install.conf を読んで上げる" || ng "更新の表示: $out"
       case "$(/usr/local/bin/looptrack version)" in "looptrack v0.0.0-installtest2（"*) ok "版が変わった" ;; *) ng "版: $(/usr/local/bin/looptrack version)" ;; esac
       check "動いている" systemctl is-active looptrack
-      # .env は元の行をそのまま残し、足すのはクライアントに配る looptrack の置き場（LOOPTRACK_DIST_DIR）の 1 行と注釈だけ
+      # .env は元の行をそのまま残し、足すのはクライアントに配る looptrack の置き場（LOOPTRACK_DIST_DIR）と
+      # 添付の置き場（LOOPTRACK_ATTACH_DIR）の 2 行と注釈だけ
       n=$(wc -l </tmp/env.rc2)
       [ "$(head -n "$n" /etc/looptrack/.env)" = "$(cat /tmp/env.rc2)" ] && ok ".env の元の行はそのまま" || ng ".env の元の行が変わった"
-      [ "$(tail -n +"$((n + 1))" /etc/looptrack/.env | grep -v '^#')" = "LOOPTRACK_DIST_DIR='$DISTD'" ] &&
-        ok ".env に足したのは LOOPTRACK_DIST_DIR の 1 行だけ" || ng ".env に足した行: $(tail -n +"$((n + 1))" /etc/looptrack/.env)"
+      [ "$(tail -n +"$((n + 1))" /etc/looptrack/.env | grep -v '^#')" = "LOOPTRACK_DIST_DIR='$DISTD'
+LOOPTRACK_ATTACH_DIR='/var/lib/looptrack/attachments'" ] &&
+        ok ".env に足したのは LOOPTRACK_DIST_DIR と LOOPTRACK_ATTACH_DIR の 2 行だけ" || ng ".env に足した行: $(tail -n +"$((n + 1))" /etc/looptrack/.env)"
+      check "--upgrade で添付の置き場を作る（looptrack の所有・750）" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/attachments)" = looptrack:750 ]'
       curl -fsS "$GH_URL/releases/download/v0.0.0-installtest2/SHA256SUMS" >/tmp/gh-v2.sums
       r=$(dist_matches v0.0.0-installtest2 /tmp/gh-v2.sums 6 2>&1) || true
       [ -z "$r" ] && ok "rc.2 で入れたサーバも --upgrade で配布ディレクトリが 6 対象になる" || ng "rc.2 の後の配布ディレクトリ: $r"
-      admin user list 2>&1 | grep -q alice && ok "データ（管理者）が残る" || ng "データが残らない"
+      contains "$(admin user list 2>&1)" alice && ok "データ（管理者）が残る" || ng "データが残らない"
       $I --uninstall --purge --yes >/dev/null 2>&1 || ng "rc.2 の分の purge が失敗"
       ;;
 
@@ -1120,8 +1334,8 @@ UPEOF
       run_timer_service && ok "timer の service が 0 で終わる" || ng "timer の service が失敗: $(upgrade_journal "$since" | tail -n 30)"
       version_is v0.0.0-installtest2 && ok "新しい版に上がった" || ng "版: $(/usr/local/bin/looptrack version)"
       check "サービスが動いている" systemctl is-active looptrack
-      upgrade_journal "$since" | grep -q "SHA256SUMS の署名を確かめました" && ok "署名を確かめてから置き換えた" || ng "署名の表示: $(upgrade_journal "$since" | tail -n 30)"
-      upgrade_journal "$since" | grep -q "更新しました: v0.0.0-installtest1 → v0.0.0-installtest2" && ok "更新の記録が journal に残る" || ng "更新の表示: $(upgrade_journal "$since" | tail -n 30)"
+      contains "$(upgrade_journal "$since")" "SHA256SUMS の署名を確かめました" && ok "署名を確かめてから置き換えた" || ng "署名の表示: $(upgrade_journal "$since" | tail -n 30)"
+      contains "$(upgrade_journal "$since")" "更新しました: v0.0.0-installtest1 → v0.0.0-installtest2" && ok "更新の記録が journal に残る" || ng "更新の表示: $(upgrade_journal "$since" | tail -n 30)"
       check "印は新しい版で、設定は on のまま" sh -c 'grep -qx VERSION=v0.0.0-installtest2 /etc/looptrack/install.conf && grep -qx AUTO_UPGRADE=on /etc/looptrack/install.conf'
       # 無人の更新（書庫・署名必須）でも、クライアントに配る looptrack が 6 対象になる（windows は zip から取り出して照合）
       curl -fsS "$GH2_URL/releases/latest/download/SHA256SUMS" >/tmp/gh2.sums
@@ -1129,10 +1343,10 @@ UPEOF
       r=$(dist_matches v0.0.0-installtest2 /tmp/gh2.sums 6) && ok "timer の更新で配布ディレクトリが新しい版の 6 対象（書庫から取り出し、署名つきの SHA256SUMS と一致）" || ng "timer の更新の配布ディレクトリ: $r"
       check "署名（SHA256SUMS.minisig）も取得元のまま置く" cmp -s "$DISTD/SHA256SUMS.minisig" /tmp/gh2.minisig
       check "更新の後も timer は有効" systemctl is-enabled looptrack-upgrade.timer
-      admin user list 2>&1 | grep -q alice && ok "データ（管理者）が残る" || ng "データが残らない"
+      contains "$(admin user list 2>&1)" alice && ok "データ（管理者）が残る" || ng "データが残らない"
       since=$(date +%s)
       run_timer_service || ng "2 回目の timer の service が失敗"
-      upgrade_journal "$since" | grep -q "すでに v0.0.0-installtest2 です" && ok "同じ版なら何もしない" || ng "同じ版の表示: $(upgrade_journal "$since" | tail -n 20)"
+      contains "$(upgrade_journal "$since")" "すでに v0.0.0-installtest2 です" && ok "同じ版なら何もしない" || ng "同じ版の表示: $(upgrade_journal "$since" | tail -n 20)"
       grep -q '^# probe: timer の回は写しを書き換えない' "$COPY" && ok "timer の回は写しを新しくしない" || ng "timer の回で写しが書き換わった"
       out=$(LOOPTRACK_INSTALL_REPO="$GH2_URL" LOOPTRACK_INSTALL_ALLOW_HTTP=1 $I --upgrade 2>&1) || ng "人の --upgrade が失敗: $out"
       cmp -s /src/install.sh "$COPY" && ok "人が --upgrade を動かすと、写しをそのスクリプトにそろえる" || ng "人の --upgrade の後も写しが古い"
@@ -1145,7 +1359,7 @@ UPEOF
       run_timer_service || ng "古い取得元の timer の service が失敗"
       # 対照: 上の timer の更新（…1 → …2）では配布ディレクトリが置き換わっている（dist_matches の確認）
       [ "$dsnap" = "$(dist_snap)" ] && ok "置き換えないとき（--only-newer）は配布ディレクトリも変えない" || ng "--only-newer で配布ディレクトリが変わった"
-      upgrade_journal "$since" | grep -q "取得した版 v0.0.0-installtest1 は入っている版 v0.0.0-installtest2 より新しくないので、置き換えません" &&
+      contains "$(upgrade_journal "$since")" "取得した版 v0.0.0-installtest1 は入っている版 v0.0.0-installtest2 より新しくないので、置き換えません" &&
         ok "古い版には置き換えない" || ng "--only-newer の表示: $(upgrade_journal "$since" | tail -n 20)"
       version_is v0.0.0-installtest2 && ok "版はそのまま" || ng "版が変わった: $(/usr/local/bin/looptrack version)"
       check "サービスは動いたまま" systemctl is-active looptrack
@@ -1178,7 +1392,7 @@ UPEOF
         [ "$(grep -c -- "$HEAD_LINE" <<<"$o")" = 1 ] && ok "$name: 戻しは 1 回だけ走る" || ng "$name: 戻しの回数が 1 でない（$(grep -c -- "$HEAD_LINE" <<<"$o")）: $o"
         contains "$o" "$DONE_LINE" && ok "$name: 前の版に戻したと示す" || ng "$name: 戻しの表示: $o"
         contains "$o" "でも起動できません" && ng "$name: 前の版でも起動できなかった: $o" || true
-        check "$name: 前の版で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1'
+        check "$name: 前の版で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1' # pipe-grep-ok: sh -c の中（pipefail なし）
         check "$name: /healthz が 200" env LOOPTRACK_HEALTH_URL=http://127.0.0.1:8090/looptrack/healthz /usr/local/bin/looptrack healthcheck
         check "$name: 印は前の版のまま" grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf
         r=$(dist_matches v0.0.0-installtest1 /dist/SHA256SUMS 1) && ok "$name: 配布ディレクトリも前の版の配布のまま（戻した）" || ng "$name: 配布ディレクトリ: $r"
@@ -1189,13 +1403,13 @@ UPEOF
         out=$($I --upgrade --from /dist2 --yes 2>&1 </dev/null) || rc=$?
       }
       out=$($I --from /dist --yes --method systemd -- "${SETUP[@]}" 2>&1) || ng "install が失敗: $out"
-      check "前提: …1 で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1'
+      check "前提: …1 で動いている" sh -c 'systemctl is-active looptrack && /usr/local/bin/looptrack version | grep -q installtest1' # pipe-grep-ok: sh -c の中（pipefail なし）
 
       echo "== 新しい版が起動しない（systemctl start looptrack の失敗）"
       # 新しい版（…2）だけを起動させない unit の追加設定（ExecStartPre が失敗すると systemctl start が失敗する。前の版は起動できる）
       REFUSE=/etc/systemd/system/looptrack.service.d/zz-test-refuse-new.conf
       mkdir -p "${REFUSE%/*}"
-      printf '[Service]\nExecStartPre=+/bin/sh -c "! /usr/local/bin/looptrack version | grep -q installtest2"\n' >"$REFUSE"
+      printf '[Service]\nExecStartPre=+/bin/sh -c "! /usr/local/bin/looptrack version | grep -q installtest2"\n' >"$REFUSE" # pipe-grep-ok: unit の ExecStartPre の sh の中（pipefail なし）
       systemctl daemon-reload
       unattended_upgrade
       contains "$out" "エラー: 新しい版 v0.0.0-installtest2 を起動できません（systemctl start looptrack が失敗しました" &&
@@ -1383,19 +1597,66 @@ UPEOF
     compose)
       d=$3
       export LOOPTRACK_INSTALL_IMAGE=imtest0151
-      SETUPC=("${SETUP[@]}" --port 18090)
+      # data/ はホストのディレクトリの bind mount。Linux の Docker Engine は所有者を保つが、macOS の Docker Desktop は chown を保たず、
+      # 同じファイルの stat の所有者が、あるときは 65534・あるときは 0 と読める（install.sh の chown -R 65534 の結果を表さない）。
+      # 保たないときは所有者を比べず、権限（600）だけを比べる。どちらで比べたかは出力に出す
+      # owner_kept <ディレクトリ> — そこで chown 65534 が保たれるか（保たれなかったときの所有者は PROBE_UID）
+      owner_kept() {
+        mkdir -p "$1"
+        : >"$1/.owner-probe"
+        chown 65534:65534 "$1/.owner-probe" 2>/dev/null || true
+        PROBE_UID=$(stat -c %u "$1/.owner-probe")
+        rm -f "$1/.owner-probe"
+        [ "$PROBE_UID" = 65534 ]
+      }
+      # 対照: 所有者を保つ場所（このコンテナの中のディレクトリ）では「保つ」と判定し、所有者まで比べる形が所有者の違いで落ちる
+      if owner_kept /tmp/owner-ctl; then
+        : >/tmp/owner-ctl/db
+        chown 65534:65534 /tmp/owner-ctl/db
+        chmod 600 /tmp/owner-ctl/db
+        [ "$(stat -c %u:%a /tmp/owner-ctl/db)" = 65534:600 ] && ok "対照: コンテナの中では所有者を保つと判定し、65534:600 と読める" ||
+          ng "前提が崩れています（コンテナの中で 65534:600 と読めない: $(stat -c %u:%a /tmp/owner-ctl/db)）"
+        chown 0:0 /tmp/owner-ctl/db
+        [ "$(stat -c %u:%a /tmp/owner-ctl/db)" = 65534:600 ] && ng "前提が崩れています（所有者 0 でも 65534:600 と読める）" ||
+          ok "対照: 所有者が違えば（$(stat -c %u:%a /tmp/owner-ctl/db)）所有者まで比べる形は落ちる"
+      else
+        ng "前提が崩れています（コンテナの中のディレクトリでも chown 65534 が保たれないと判定した: ${PROBE_UID}）"
+      fi
+      rm -rf /tmp/owner-ctl
+      # 省略した比較は 1 件ずつ記録し、手元の最後の行で数を出す（黙って通さない）
+      SKIPS_FILE="$(dirname "$d")/install_test-skips.txt"
+      skips=0
+      if owner_kept "$d"; then
+        DB_FMT=%u:%a DB_WANT=65534:600 DB_LABEL="uid 65534・600"
+        ok "前提: bind mount が所有者を保つ（DB の所有者 65534 まで比べる）"
+      else
+        DB_FMT=%a DB_WANT=600 DB_LABEL="600（所有者は比べない）"
+        echo "  省略: 以下の DB の比較では所有者（uid 65534）を比べない。この Docker の bind mount は chown を保たない（chown 65534 の後の所有者が ${PROBE_UID}）ので、権限（600）だけを比べる"
+      fi
+      db_perm() { stat -c "$DB_FMT" "$d/data/im.db" 2>&1; }
+      db_perm_check() { # <説明>
+        local v
+        v=$(db_perm)
+        if [ "$v" = "$DB_WANT" ]; then ok "$1"; else ng "$1（期待 ${DB_WANT}・実際 ${v}）"; fi
+        if [ "$DB_FMT" = %a ]; then
+          skips=$((skips + 1))
+          echo "  省略: 「$1」の所有者（uid 65534）"
+          printf '%s\n' "$1" >>"$SKIPS_FILE"
+        fi
+      }
+      SETUPC=("${SETUP[@]}" --port "${COMPOSE_PORT:?}")
       echo "== compose で実起動（非対話）"
       out=$($I --from /dist --yes --method compose --dir "$d" -- "${SETUPC[@]}" 2>&1) || ng "install が失敗: $out"
       contains "$out" "200 OK" && ok "/healthz を待った" || ng "起動の表示: $out"
       check "コンテナが動いている" sh -c '[ "$(docker container inspect -f {{.State.Status}} looptrack)" = running ]'
       check "イメージ imtest0151:v0.0.0-installtest1" docker image inspect imtest0151:v0.0.0-installtest1
-      check "data/im.db は uid 65534・600" sh -c "[ \"\$(stat -c %u:%a $d/data/im.db)\" = 65534:600 ]"
+      db_perm_check "data/im.db は $DB_LABEL"
       # 第三者のライセンス文。イメージは scratch なのでシェルが無く、docker cp で取り出して looptrack licenses と突き合わせる
       docker cp looptrack:/NOTICE - 2>/dev/null | tar -xO >/tmp/notice.image || true
       docker exec looptrack /looptrack licenses >/tmp/notice.bin 2>/dev/null || true
       check "イメージに /NOTICE がある" sh -c 'grep -q "third-party notices" /tmp/notice.image'
       check "/NOTICE が looptrack licenses と同じ" cmp -s /tmp/notice.image /tmp/notice.bin
-      docker logs looptrack 2>&1 | grep -q "$PERM_WARN" && ng "DB の権限の警告が出た" || ok "DB の権限の警告を出さない"
+      contains "$(docker logs looptrack 2>&1)" "$PERM_WARN" && ng "DB の権限の警告が出た" || ok "DB の権限の警告を出さない"
       # ログインはコンテナ looptrack のネットワークに入った使い捨てのコンテナから（looptrack は scratch でシェルも curl も無い）。
       # 待ち受けは .env の LOOPTRACK_LISTEN のポート（compose.yaml はホストの 127.0.0.1 の同じ番号に公開する）
       login_in_im() {
@@ -1410,12 +1671,14 @@ UPEOF
       contains "$out" "設定済みです" && ok "2 回目は設定済み" || ng "2 回目: $out"
       echo "== --upgrade（広い権限の DB で。以前の版が作った 0644）"
       chmod 644 "$d/data/im.db"
+      # 対照: 同じ比べ方が、広い権限の DB で落ちる（下の「600 に直す」が比べ方の誤りで素通りしないこと）
+      if [ "$(db_perm)" = "$DB_WANT" ]; then ng "前提が崩れています（chmod 644 の直後でも ${DB_WANT} と読める: $(db_perm)）"; else ok "対照: chmod 644 の直後は ${DB_WANT} と読めない（$(db_perm)）"; fi
       out=$($I --upgrade --from /dist2 2>&1) || ng "upgrade が失敗: $out"
       contains "$out" "更新しました" && ok "更新の表示" || ng "更新の表示: $out"
-      check "新しいイメージで動く" sh -c 'docker exec looptrack /looptrack version | grep -q installtest2'
-      check "--upgrade で DB を 600 に直す" sh -c "[ \"\$(stat -c %u:%a $d/data/im.db)\" = 65534:600 ]"
-      docker logs looptrack 2>&1 | grep -q "$PERM_WARN" && ng "更新の後に権限の警告が出た" || ok "更新の後は権限の警告を出さない"
-      (cd "$d" && LOOPTRACK_IMAGE=imtest0151:latest docker compose run --rm --no-deps looptrack user list 2>&1) | grep -q alice && ok "データ（管理者）が残る" || ng "データが残らない"
+      check "新しいイメージで動く" sh -c 'docker exec looptrack /looptrack version | grep -q installtest2' # pipe-grep-ok: sh -c の中（pipefail なし）
+      db_perm_check "--upgrade で DB を 600 に直す（${DB_LABEL}）"
+      contains "$(docker logs looptrack 2>&1)" "$PERM_WARN" && ng "更新の後に権限の警告が出た" || ok "更新の後は権限の警告を出さない"
+      contains "$(cd "$d" && LOOPTRACK_IMAGE=imtest0151:latest docker compose run --rm --no-deps looptrack user list 2>&1)" alice && ok "データ（管理者）が残る" || ng "データが残らない"
       r=$(login_in_im) && ok "更新の後も同じパスワードと二段階認証でログインできる $(grep -v '^totp-state:' <<<"$r")" || ng "更新の後のログイン: $r"
       check "SQLite の控え" sh -c "ls -d $d/data/backup-*/im.db"
       echo "== --uninstall --purge"
@@ -1435,11 +1698,46 @@ UPEOF
       unset LOOPTRACK_SETUP_MIGRATE_DSN
       mkdir -p "$d"
       printf 'services:\n  looptrack:\n    networks: [default, cnet]\nnetworks:\n  cnet:\n    external: true\n    name: im0151-cnet\n' >"$d/compose.override.yaml"
-      SETUPCM=(--store mysql --public-url https://im.example.com --admin-login alice --admin-name Alice --admin-password-file /root/pw --two-factor required --project web --port 18090)
+      SETUPCM=(--store mysql --public-url https://im.example.com --admin-login alice --admin-name Alice --admin-password-file /root/pw --two-factor required --project web --port "${COMPOSE_PORT:?}")
       echo "== compose + MySQL で実起動（非対話・…1）"
       out=$($I --from /dist --yes --method compose --dir "$d" -- "${SETUPCM[@]}" 2>&1) || ng "install が失敗: $out"
       contains "$out" "インストールが終わりました" && ok "入った" || ng "install の表示: $out"
       check "コンテナが動いている" sh -c '[ "$(docker container inspect -f {{.State.Status}} looptrack)" = running ]'
+      # MySQL でも添付の本体はディスクに置く（read_only のコンテナで書けるのは ./data を入れた /data だけ）
+      check "MySQL の compose.yaml も ./data を /data に入れる" grep -qE '^ +- \./data:/data$' "$d/compose.yaml"
+      check "MySQL の compose.yaml は添付の置き場を /data/attachments に決める" grep -qE '^ +LOOPTRACK_ATTACH_DIR: /data/attachments$' "$d/compose.yaml"
+      # data/ はホストの bind mount。chown を保たない Docker（macOS の Docker Desktop など）では所有者を読めないので、
+      # compose の場面と同じく試しのファイルで確かめ、保たないときは比べずに省略として記録する（黙って通さない）
+      : >"$d/data/.owner-probe"
+      chown 65534:65534 "$d/data/.owner-probe" 2>/dev/null || true
+      probe=$(stat -c %u "$d/data/.owner-probe")
+      rm -f "$d/data/.owner-probe"
+      if [ "$probe" = 65534 ]; then
+        check "MySQL の data は uid 65534（コンテナが添付を書ける）" sh -c '[ "$(stat -c %u '"$d"'/data)" = 65534 ]'
+      else
+        echo "  省略: 「MySQL の data は uid 65534」の所有者（この bind mount は chown を保たない。chown 65534 の後の所有者が ${probe}）"
+        printf '%s\n' "MySQL の data は uid 65534" >>"$(dirname "$d")/install_test-skips.txt"
+      fi
+      contains "$out" "添付の置き場が無い" && ng "setup が書いた compose.yaml なのに置き場が無いと注意した: $out" || ok "setup が書いた compose.yaml には置き場の注意を出さない"
+      # 対照: 以前の setup が書いた MySQL の compose.yaml（./data も置き場も無い）なら注意を出す。install.sh の関数を
+      # main を動かさずに読み込み、warn_compose_attach だけを呼ぶ（.env は保存先が MySQL だと分かる 1 行だけの写し）
+      sed 's/^main "\$@"$/:/' /src/install.sh >/tmp/install-lib.sh
+      grep -qx ':' /tmp/install-lib.sh || ng "前提が崩れています（install.sh の最後の main \"\$@\" の行が見つからない）"
+      for c in old new; do
+        mkdir -p "/tmp/attach-$c"
+        printf '%s\n' "LOOPTRACK_DSN='app:pw@tcp(mysql:3306)/im?parseTime=true'" >"/tmp/attach-$c/.env"
+        if [ "$c" = old ]; then
+          grep -v -e 'LOOPTRACK_ATTACH_DIR' -e '^ *- \./data:/data$' "$d/compose.yaml" >"/tmp/attach-$c/compose.yaml"
+        else
+          cp "$d/compose.yaml" "/tmp/attach-$c/compose.yaml"
+        fi
+      done
+      grep -q 'LOOPTRACK_ATTACH_DIR' /tmp/attach-old/compose.yaml && ng "前提が崩れています（古い形の compose.yaml を作れない）"
+      w=$(sh -c '. /tmp/install-lib.sh; METHOD=compose; DIR=/tmp/attach-old; warn_compose_attach' 2>&1)
+      contains "$w" "添付の置き場が無い" && ok "対照: 古い MySQL の compose.yaml（置き場なし）なら注意を出す" || ng "古い MySQL の compose.yaml で注意が出ない: $w"
+      w=$(sh -c '. /tmp/install-lib.sh; METHOD=compose; DIR=/tmp/attach-new; warn_compose_attach' 2>&1)
+      [ -z "$w" ] && ok "同じ呼び方で、setup が書いた compose.yaml には何も出さない" || ng "setup が書いた compose.yaml で出た: $w"
+      rm -rf /tmp/attach-old /tmp/attach-new /tmp/install-lib.sh
       echo "== compose + MySQL: 端末の --upgrade で、新しい版（…3・偽の migrate 9001）が DB の形を変え、表を作る接続先が無い → 止める前に止まる"
       csnap() {
         docker container inspect -f '{{.Id}} {{.State.StartedAt}} {{.Image}}' looptrack
@@ -1459,7 +1757,7 @@ UPEOF
       grep -qx '==> 実行ファイル' <<<"$out" && ng "実行ファイルの段に進んだ: $out" || ok "実行ファイルの段（置き換え）に進まない"
       [ "$snap" = "$(csnap)" ] && ok "コンテナ（ID・起動時刻・イメージ）・latest のタグ・実行ファイル・印は変わっていない" || ng "変わった: 前 $snap / 後 $(csnap)"
       check "コンテナが動いている" sh -c '[ "$(docker container inspect -f {{.State.Status}} looptrack)" = running ]'
-      check "コンテナは前の版（…1）" sh -c 'docker exec looptrack /looptrack version | grep -q installtest1'
+      check "コンテナは前の版（…1）" sh -c 'docker exec looptrack /looptrack version | grep -q installtest1' # pipe-grep-ok: sh -c の中（pipefail なし）
       check "印の版も前の版" grep -qx VERSION=v0.0.0-installtest1 /etc/looptrack/install.conf
       echo "== 片付け"
       $I --uninstall --purge --yes >/dev/null 2>&1 || ng "purge が失敗"
@@ -1476,11 +1774,13 @@ UPEOF
       exit 0
       ;;
   esac
+  skipped=""
+  if [ "${skips:-0}" -gt 0 ]; then skipped="・省略した比較 ${skips} 件"; fi
   if [ "$fails" -gt 0 ]; then
-    echo "失敗: $fails 件（${scenario}）" >&2
+    echo "失敗: $fails 件（${scenario}${skipped}）" >&2
     exit 1
   fi
-  echo "すべて通りました（${scenario}）"
+  echo "すべて通りました（${scenario}${skipped}）"
   exit 0
 fi
 
@@ -1501,11 +1801,15 @@ NETWORKS=()
 # ベースイメージ（中身を変えたらタグを上げる。同じ名前の古いイメージを使い回さないため）
 SYSTEMD_BASE=im0151-systemd-base:v4 # + curl・openssl（ログインの確認）・Caddy・nginx（設定例の確認）・iproute2（install.sh の ss）・unzip（windows の書庫）
 COMPOSE_BASE=im0151-compose-base:v2 # + curl・openssl（ログインの確認）
+# compose の場面がホストの 127.0.0.1 に公開するポート（compose.yaml の ports。ホストのほかのプロセスと重なると bind できない）
+COMPOSE_PORT=${INSTALL_TEST_COMPOSE_PORT:-18090}
+export COMPOSE_PORT
 HTTP_PID=""
 COMPOSE_RAN=0
 cleanup() {
   if [ -n "$HTTP_PID" ]; then kill "$HTTP_PID" 2>/dev/null || true; fi
-  for c in "${CONTAINERS[@]}"; do docker rm -f "$c" >/dev/null 2>&1 || true; done
+  # 空の配列は macOS の bash 3.2 では set -u で unbound になる（compose を始める前に止まったときなど）。NETWORKS と同じ書き方にする
+  for c in ${CONTAINERS[@]+"${CONTAINERS[@]}"}; do docker rm -f "$c" >/dev/null 2>&1 || true; done
   for n in ${NETWORKS[@]+"${NETWORKS[@]}"}; do docker network rm "$n" >/dev/null 2>&1 || true; done
   if [ "$COMPOSE_RAN" = 1 ]; then
     # compose の確認で作った looptrack（始める前に同じ名前のコンテナが無いことを確かめている）
@@ -1550,6 +1854,21 @@ if [ "${INSTALL_TEST_MYSQL:-1}" = 1 ] && { [ "${INSTALL_TEST_SYSTEMD:-1}" = 1 ] 
   rm -rf "$WORK/src3"
 else
   mkdir -p "$WORK/dist3"
+fi
+# 1.0.0-rc.5（attachments の表を持たない最後の版）: タグのソースから作る /dist5（素の形。その版の install.sh も入る）。
+# 公開側のタグは v1.0.0-rc.5、開発側は public/v1.0.0-rc.5。どちらも無ければ空のまま（rc.5 からの更新の場面は NG で省く）
+mkdir -p "$WORK/dist5"
+if [ "${INSTALL_TEST_MYSQL:-1}" = 1 ] && [ "${INSTALL_TEST_SYSTEMD:-1}" = 1 ]; then
+  for rc5 in v1.0.0-rc.5 public/v1.0.0-rc.5; do
+    if git rev-parse -q --verify "$rc5^{commit}" >/dev/null; then
+      mkdir -p "$WORK/src5"
+      git archive "$rc5" | tar xf - -C "$WORK/src5"
+      (cd "$WORK/src5" && RELEASE_CMDS=looptrack RELEASE_TARGETS="linux/$ARCH" bash deploy/release/dist.sh build v1.0.0-rc.5 "$WORK/dist5" 2>/dev/null &&
+        bash deploy/release/dist.sh sums "$WORK/dist5" 2>/dev/null)
+      rm -rf "$WORK/src5"
+      break
+    fi
+  done
 fi
 # README の 1 行が取るもの（raw.githubusercontent.com の main の deploy/install.sh の読み替え）
 mkdir -p "$WORK/raw/deploy"
@@ -1616,7 +1935,7 @@ run_systemd() {
   HTTP_PID=$!
   disown "$HTTP_PID"
   docker run -d --name im0151-systemd --add-host=host.docker.internal:host-gateway --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
-    --tmpfs /run --tmpfs /run/lock -v "$REPO/deploy:/src:ro" -v "$WORK/dist1:/dist:ro" -v "$WORK/dist2:/dist2:ro" -v "$WORK/dist2bad:/dist2bad:ro" -v "$WORK/dist3:/dist3:ro" -v "$WORK/old:/old:ro" \
+    --tmpfs /run --tmpfs /run/lock -v "$REPO/deploy:/src:ro" -v "$WORK/dist1:/dist:ro" -v "$WORK/dist2:/dist2:ro" -v "$WORK/dist2bad:/dist2bad:ro" -v "$WORK/dist3:/dist3:ro" -v "$WORK/dist5:/dist5:ro" -v "$WORK/old:/old:ro" \
     "$SYSTEMD_BASE" >/dev/null
   wait_systemd || return 1
   local web="-e GH_URL=http://host.docker.internal:$port/gh -e RAW_URL=http://host.docker.internal:$port/raw/deploy/install.sh"
@@ -1714,15 +2033,24 @@ run_mysql() {
   [ "$(mysql_root "SELECT v FROM ltdb.keep_check" 2>&1)" = kept ] && echo "  ok: 対照: 既にあった DB ltdb の表と行が残る（作り直さない）" ||
     { echo "  NG: 既にあった DB ltdb の表・行が残っていない" >&2; status=1; }
   mysql_root "DROP TABLE ltdb.keep_check" || status=1
-  # 表が増えた更新と同じ症状（権限の欠けた表がある）を作ってから --upgrade
+  # 権限の欠けた表がある状態を 2 通り作って --upgrade する:
+  #   読めない側: projects の権限が無い（project list から読めない）
+  #   表が増えた側: attachments の権限だけが無い（projects などほかの表は読める。読めるかだけの確認では気づけない形）
+  # まず読めない側
   mysql_root "REVOKE ALL PRIVILEGES ON ltdb.projects FROM 'lt_app'@'%'" || status=1
   # 無人の更新（自動の置き換え）: 新しい版に未適用の migrate がある DB（最後の適用記録を一時的に外す）では置き換えない
   mysql_root "CREATE TABLE ltdb.sm_hold AS SELECT * FROM ltdb.schema_migrations ORDER BY version DESC LIMIT 1; DELETE FROM ltdb.schema_migrations WHERE version = (SELECT version FROM ltdb.sm_hold)" || status=1
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-auto-pending || status=1
   mysql_root "INSERT INTO ltdb.schema_migrations SELECT * FROM ltdb.sm_hold; DROP TABLE ltdb.sm_hold" || status=1
-  # 止めた後の失敗（権限の欠けた表）では前の版に戻す
+  # 止めた後の失敗（権限の欠けた表）では前の版に戻す。読めない側（projects）と、表が増えた側（attachments だけ）の両方で
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-auto-fail || status=1
+  mysql_root "GRANT SELECT, INSERT, UPDATE ON ltdb.projects TO 'lt_app'@'%'; REVOKE ALL PRIVILEGES ON ltdb.attachments FROM 'lt_app'@'%'" || status=1
+  docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-auto-fail || status=1
+  # 端末の --upgrade は読めない側で（表が増えた側の端末の --upgrade は下の rc.5 からの更新と偽の migrate の場面）
+  mysql_root "GRANT SELECT, INSERT ON ltdb.attachments TO 'lt_app'@'%'; REVOKE ALL PRIVILEGES ON ltdb.projects FROM 'lt_app'@'%'" || status=1
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-upgrade || status=1
+  grep -q '`ltdb`.`projects`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_app'@'%'" 2>&1)" &&
+    echo "  ok: 読めない側の端末の --upgrade で projects の権限を与え直した" || { echo "  NG: 端末の --upgrade の後も projects の権限が無い" >&2; status=1; }
   # 表を作る利用者（LOOPTRACK_SETUP_MIGRATE_DSN）を渡さない更新: アプリ用の利用者は schema_migrations に SELECT だけ
   grep -q 'GRANT SELECT ON `ltdb`.`schema_migrations` TO `lt_app`@`%`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_app'@'%'" 2>&1)" &&
     echo "  ok: 前提: lt_app は schema_migrations に SELECT だけ（grants.sql の最小権限）" || { echo "  NG: lt_app の schema_migrations の権限" >&2; status=1; }
@@ -1735,7 +2063,7 @@ run_mysql() {
   # 表が増えた更新と同じ症状（権限の欠けた表）も作っておき、(b) で管理用のパスワードのファイルが使われることを確かめる
   n=$(mysql_root "SELECT COUNT(*) FROM ltdb.schema_migrations WHERE version = 9001" 2>&1)
   [ "$n" = 0 ] && echo "  ok: 前提: 偽の migrate（9001）は未適用" || { echo "  NG: 前提: 9001 の記録: $n" >&2; status=1; }
-  mysql_root "REVOKE ALL PRIVILEGES ON ltdb.projects FROM 'lt_app'@'%'" || status=1
+  mysql_root "REVOKE ALL PRIVILEGES ON ltdb.attachments FROM 'lt_app'@'%'" || status=1
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-fakemig-decline || status=1
   n=$(mysql_root "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'ltdb' AND TABLE_NAME = 'installtest_fake'" 2>&1)
   [ "$n" = 0 ] && echo "  ok: (a) 偽の migrate の表は作られていない（DB を変えていない）" || { echo "  NG: (a) で installtest_fake ができた: $n" >&2; status=1; }
@@ -1744,15 +2072,34 @@ run_mysql() {
   [ "$n" = 1 ] && echo "  ok: (b) 偽の migrate（9001）の適用記録がある" || { echo "  NG: (b) 9001 の記録: $n" >&2; status=1; }
   n=$(mysql_root "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'ltdb' AND TABLE_NAME = 'installtest_fake'" 2>&1)
   [ "$n" = 1 ] && echo "  ok: (b) 偽の migrate の表ができた" || { echo "  NG: (b) installtest_fake: $n" >&2; status=1; }
-  grep -q '`ltdb`.`projects`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_app'@'%'" 2>&1)" &&
-    echo "  ok: (b) 欠けた表の権限を与え直した（管理用のパスワードのファイルで）" || { echo "  NG: (b) の後も projects の権限が無い" >&2; status=1; }
+  grep -q '`ltdb`.`attachments`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_app'@'%'" 2>&1)" &&
+    echo "  ok: (b) 欠けた表の権限を与え直した（管理用のパスワードのファイルで）" || { echo "  NG: (b) の後も attachments の権限が無い" >&2; status=1; }
   # 片付け: 偽の migrate の記録と表を外し（…1・…2 はこの番号を持たないので、残すと新しい版で migrate した DB として拒む）、…2 に戻す
   mysql_root "DELETE FROM ltdb.schema_migrations WHERE version = 9001; DROP TABLE ltdb.installtest_fake" || status=1
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-fakemig-back || status=1
   # 対照: 権限をそろえた後（上の --upgrade が与え直した）の無人の更新は置き換わる
   docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-auto-ok || status=1
-  grep -q '`ltdb`.`projects`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_app'@'%'" 2>&1)" &&
-    echo "  ok: --upgrade で欠けた表の権限を与え直した" || { echo "  NG: --upgrade の後も projects の権限が無い" >&2; status=1; }
+  grep -q '`ltdb`.`attachments`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_app'@'%'" 2>&1)" &&
+    echo "  ok: --upgrade で欠けた表の権限を与え直した" || { echo "  NG: --upgrade の後も attachments の権限が無い" >&2; status=1; }
+  # 1.0.0-rc.5（attachments の表を持たない版）を最小権限で入れ、新しい版へ端末の --upgrade で上げる（表が増えた本物の更新）。
+  # 別の DB ltrc5・アプリ用の利用者 lt_rc5・表を作る利用者 lt_rc5mig を使う（上の場面の DB ltdb には触らない）
+  if [ -s "$WORK/dist5/install.sh" ]; then
+    mysql_root "CREATE DATABASE ltrc5 CHARACTER SET utf8mb4 COLLATE utf8mb4_bin; CREATE USER 'lt_rc5mig'@'%' IDENTIFIED BY '$MIG_PW'; GRANT ALL ON ltrc5.* TO 'lt_rc5mig'@'%';" || status=1
+    docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-rc5-install || status=1
+    n=$(mysql_root "SHOW GRANTS FOR 'lt_rc5'@'%'" 2>&1)
+    if grep -q '`ltrc5`.`projects`' <<<"$n" && ! grep -q '`ltrc5`.`attachments`' <<<"$n"; then
+      echo "  ok: 前提: rc.5 の権限は projects にあり、attachments には無い"
+    else
+      echo "  NG: 前提: rc.5 の lt_rc5 の SHOW GRANTS: $n" >&2
+      status=1
+    fi
+    docker exec -e ADMIN_PW -e APP_PW -e MIG_PW im0151-systemd bash /src/install_test.sh --in-container mysql-rc5-upgrade || status=1
+    grep -q 'GRANT SELECT, INSERT ON `ltrc5`.`attachments` TO `lt_rc5`@`%`' <<<"$(mysql_root "SHOW GRANTS FOR 'lt_rc5'@'%'" 2>&1)" &&
+      echo "  ok: rc.5 からの --upgrade で、増えた表（attachments）の権限を与え直した" || { echo "  NG: rc.5 からの --upgrade の後も attachments の権限が無い" >&2; status=1; }
+  else
+    echo "タグ v1.0.0-rc.5（開発側は public/v1.0.0-rc.5）が無いため、rc.5 からの更新の確認を省きます" >&2
+    status=1
+  fi
   docker network disconnect im0151-net im0151-systemd >/dev/null 2>&1 || true
   return $status
 }
@@ -1769,6 +2116,14 @@ run_compose() {
     echo "looptrack という名前のコンテナがあるため compose の確認を省きます" >&2
     return 1
   fi
+  case $COMPOSE_PORT in
+    '' | *[!0-9]*) echo "INSTALL_TEST_COMPOSE_PORT は数で指定してください: $COMPOSE_PORT" >&2; return 1 ;;
+  esac
+  # 使われているポートでは compose の起動が bind できず、確認が大量の NG に化ける。始める前に止めて、替え方を示す
+  if (exec 3<>"/dev/tcp/127.0.0.1/$COMPOSE_PORT") 2>/dev/null; then
+    echo "ホストの 127.0.0.1:$COMPOSE_PORT を別のプロセスが使っているため compose の確認を省きます（INSTALL_TEST_COMPOSE_PORT で替えられます）" >&2
+    return 1
+  fi
   if ! docker image inspect "$COMPOSE_BASE" >/dev/null 2>&1; then
     printf 'FROM ubuntu:24.04\nRUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends docker.io docker-compose-v2 curl ca-certificates openssl && rm -rf /var/lib/apt/lists/*\n' |
       docker build -q -t "$COMPOSE_BASE" - >/dev/null
@@ -1778,7 +2133,7 @@ run_compose() {
   CONTAINERS+=(im0151-compose)
   docker run --rm --name im0151-compose -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$WORK/compose:$WORK/compose" -v "$REPO/deploy:/src:ro" -v "$WORK/dist1:/dist:ro" -v "$WORK/dist2:/dist2:ro" \
-    -e BASE_IMAGE="$COMPOSE_BASE" "$COMPOSE_BASE" bash /src/install_test.sh --in-container compose "$WORK/compose/opt" || return 1
+    -e COMPOSE_PORT -e BASE_IMAGE="$COMPOSE_BASE" "$COMPOSE_BASE" bash /src/install_test.sh --in-container compose "$WORK/compose/opt" || return 1
   [ "${INSTALL_TEST_MYSQL:-1}" = 1 ] || return 0
   echo
   echo "######## ubuntu:24.04 + docker compose + MySQL（止める前の確認を、新しい版のイメージで）"
@@ -1801,7 +2156,7 @@ run_compose() {
     { echo "DB の用意に失敗（compose 用）" >&2; return 1; }
   APP_PW="$cpw" docker run --rm --name im0151-compose-mysql --network im0151-cnet -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$WORK/compose:$WORK/compose" -v "$REPO/deploy:/src:ro" -v "$WORK/dist1:/dist:ro" -v "$WORK/dist3:/dist3:ro" \
-    -e APP_PW -e BASE_IMAGE="$COMPOSE_BASE" "$COMPOSE_BASE" bash /src/install_test.sh --in-container compose-mysql "$WORK/compose/optm"
+    -e APP_PW -e COMPOSE_PORT -e BASE_IMAGE="$COMPOSE_BASE" "$COMPOSE_BASE" bash /src/install_test.sh --in-container compose-mysql "$WORK/compose/optm"
 }
 
 status=0
@@ -1810,5 +2165,18 @@ if [ "${INSTALL_TEST_INTERACTIVE:-1}" = 1 ]; then run_interactive || status=1; f
 if [ "${INSTALL_TEST_SYSTEMD:-1}" = 1 ]; then run_systemd || status=1; fi
 if [ "${INSTALL_TEST_COMPOSE:-0}" = 1 ]; then run_compose || status=1; fi
 echo
-if [ $status = 0 ]; then echo "install_test: すべて通りました"; else echo "install_test: 失敗があります" >&2; fi
+# compose の場面は既定では回らないので、通ったと伝えるときに含めたかが分かるよう、最後の行に添える
+# 省略した比較（compose の場面で、chown 65534 が保たれない bind mount のため DB と data の所有者を比べなかったもの）の数も添える
+if [ "${INSTALL_TEST_COMPOSE:-0}" = 1 ] && [ "$COMPOSE_RAN" != 1 ]; then
+  ran_compose="compose の場面は回せていない（上の理由）"
+elif [ "${INSTALL_TEST_COMPOSE:-0}" = 1 ]; then
+  nskip=0
+  if [ -f "$WORK/compose/install_test-skips.txt" ]; then nskip=$(wc -l <"$WORK/compose/install_test-skips.txt" | tr -d ' '); fi
+  if [ "$nskip" -gt 0 ]; then
+    ran_compose="compose の場面を含む・省略した比較 ${nskip} 件: chown 65534 が保たれない bind mount（macOS の Docker Desktop など）なので、DB と data の所有者を比べていない"
+  else
+    ran_compose="compose の場面を含む・省略した比較 0 件"
+  fi
+else ran_compose="compose の場面は含まない（INSTALL_TEST_COMPOSE=1 で含める）"; fi
+if [ $status = 0 ]; then echo "install_test: すべて通りました（${ran_compose}）"; else echo "install_test: 失敗があります（${ran_compose}）" >&2; fi
 exit $status

@@ -184,8 +184,13 @@ func Run(c *cli.Ctx, v *cli.Values) error {
 	if !isDir(target) {
 		return i18n.Errorf("kitinit.init.err.no_target", "dir", target)
 	}
-	if cli.IsSelfRepo(target) { // 自分自身には導入しない（判定は cli.IsSelfRepo の 1 か所）
-		return i18n.Errorf("kitinit.init.err.target_is_repo", "dir", target)
+	// 自分自身（kit の正本）には導入しない（判定は cli.IsSelfRepo の 1 か所）。何も書かずに成功で終える。
+	// 失敗にしないのは、サーバが別名の worktree からの setup では正本と判定できず、取得 + init の 1 つの
+	// コマンドを返すことがあるため。ここで失敗にすると、取得は済んだのにコマンド全体が失敗で終わる。
+	// --dry-run・--remove-loop も同じく何もしない。
+	if cli.IsSelfRepo(target) {
+		c.Println(i18n.T(c.Lang, "kitinit.init.self_repo", "dir", target))
+		return nil
 	}
 	if o.RemoveLoop {
 		return removeLoop(c, o, target)
@@ -722,7 +727,7 @@ func (in *installer) planClaude() error {
 	}
 	addPermission(data)
 	putJSON(p, rel, data, before, existed)
-	upsertBlock(p, "CLAUDE.md", fill(claudeSnippet, o.Project, in.url))
+	upsertBlock(p, "CLAUDE.md", claudeMDBody(p.Lang, in.url, o.Project))
 	if !o.NoSkill {
 		in.planCoreSkill("issue", kitSkill, true)
 		// token-report。以前の CLI（1.0.0 より前）の init はリポジトリの skills/token-report へのディレクトリの
@@ -857,7 +862,7 @@ func (in *installer) planCodexEnv() {
 		if trimSpace(cur) != "" {
 			next = strings.TrimRight(cur, "\n") + "\n\n"
 		}
-		p.Text(codexConfig, next+codexConfigNote+"\n"+section)
+		p.Text(codexConfig, next+codexConfigNoteFor(p.Lang)+"\n"+section)
 		return
 	}
 	ok := true
@@ -940,7 +945,7 @@ func hasClaudeHooks(p *Plan) bool {
 
 func (in *installer) planAgentsMD() {
 	p, o := in.plan, in.o
-	upsertBlock(p, "AGENTS.md", agentsMDBody(o.agents, in.url, o.Project))
+	upsertBlock(p, "AGENTS.md", agentsMDBody(p.Lang, o.agents, in.url, o.Project))
 	if in.loopOn {
 		agent := "copilot"
 		if has(o.agents, "codex") {
@@ -952,10 +957,14 @@ func (in *installer) planAgentsMD() {
 }
 
 // upsertBlock は CLAUDE.md / AGENTS.md の管理節を入れる・差し替える。
+//
+// 節は印で見分ける。始まりの印は言語ごとに違うので日英のどちらでも見つけ、節を丸ごと p.Lang の本文と印に
+// 差し替える（言語を変えて打ち直しても節は 1 つのまま）。
 func upsertBlock(p *Plan, rel, body string) {
 	cur, _ := readFile(p.path(rel))
-	block := blockBegin + "\n" + body + blockEnd + "\n"
-	begin, end := strings.Index(cur, blockBegin), strings.Index(cur, blockEnd)
+	block := blockBeginFor(p.Lang) + "\n" + body + blockEnd + "\n"
+	begin := blockBeginAt(cur)
+	end := strings.Index(cur, blockEnd)
 	var next string
 	switch {
 	case begin != -1 && end > begin:

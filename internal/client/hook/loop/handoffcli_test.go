@@ -423,3 +423,93 @@ func TestHandoffAppendMarkRoundTrip(t *testing.T) {
 	}
 	t.Logf("--drop-marks の後: 印 %d 件・%d バイト", strings.Count(string(dropped), writerMarkPrefix), len(dropped))
 }
+
+// TestHandoffHelpAndMistypedFlag は、-h / --help が使い方を出して何も書かないことと、
+// 選択肢の打ち間違いに見える語（-x）が本文として書かれないことを見る。
+//
+// 以前は -h が本文として追記され、使い方を見るつもりの呼び出しが成功で終わっていた。
+// 対照（本文として通すもの）を同じテストの中に置く。対照が通らなければ、拒否が広すぎるか、
+// そもそも書き込みの経路が死んでいて「書かれない」の確認が空振りしている。
+func TestHandoffHelpAndMistypedFlag(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "handoff.md")
+	const seed = "## もとの節\n\nもとの本文\n"
+	if err := os.WriteFile(p, []byte(seed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e := handoffTestEnv(dir, map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-a"})
+	const usageHead = "使い方:\n  looptrack handoff append"
+
+	// 使い方を出す形: 終了コード 0・標準出力に使い方・標準エラーは空・ファイルは 1 バイトも変わらない
+	for _, args := range [][]string{
+		{"append", "--file", p, "-h"},
+		{"append", "--file", p, "--help"},
+		{"append", "-h", "--file", p},
+		{"compact", "--file", p, "-h"},
+		{"compact", "--file", p, "--help"},
+		{"-h"},
+		{"--help"},
+	} {
+		before := sha256of(t, p)
+		code, out, errOut := runHandoff(e, "標準入力の本文", args...)
+		if code != handoffExitOK {
+			t.Errorf("%v: exit %d（0 のはず）: %s", args, code, errOut)
+		}
+		if !strings.HasPrefix(out, usageHead) {
+			t.Errorf("%v: 標準出力が使い方ではありません: %q", args, out)
+		}
+		if errOut != "" {
+			t.Errorf("%v: 標準エラーに出ています: %q", args, errOut)
+		}
+		if after := sha256of(t, p); after != before {
+			t.Errorf("%v: 使い方を出すだけのはずがファイルが変わりました", args)
+		}
+	}
+
+	// 打ち間違いに見える語は bad_flag で止める（書かない）。--help=値 の形も同じ
+	for _, args := range [][]string{
+		{"append", "--file", p, "-x"},
+		{"append", "--file", p, "-help"},
+		{"compact", "--file", p, "-x"},
+		{"append", "--file", p, "--help=1"},
+	} {
+		before := sha256of(t, p)
+		code, _, errOut := runHandoff(e, "", args...)
+		if code != handoffExitUsage {
+			t.Errorf("%v: exit %d（%d のはず）: %s", args, code, handoffExitUsage, errOut)
+		}
+		if !strings.Contains(errOut, "選択肢が正しくありません") {
+			t.Errorf("%v: bad_flag の文面が出ていません: %q", args, errOut)
+		}
+		if after := sha256of(t, p); after != before {
+			t.Errorf("%v: 拒否したのにファイルが変わりました", args)
+		}
+	}
+
+	// 対照: 本文として通すものは、実際に追記が起きる（起きなければ、上の「書かれない」は空振りかもしれない）
+	for _, c := range []struct {
+		name  string
+		stdin string
+		args  []string
+		want  string // 追記された本文に含まれるはずの語
+	}{
+		{"ふつうの本文", "", []string{"append", "--file", p, "普通の本文"}, "普通の本文"},
+		{"箇条の本文", "", []string{"append", "--file", p, "- 項目 A\n- 項目 B"}, "- 項目 B"},
+		{"標準入力（-）", "標準入力から来た本文", []string{"append", "--file", p, "-"}, "標準入力から来た本文"},
+		{"-- の後ろの語", "", []string{"append", "--file", p, "--", "-h"}, "\n-h\n"},
+	} {
+		before, _ := os.ReadFile(p)
+		code, _, errOut := runHandoff(e, c.stdin, c.args...)
+		if code != handoffExitOK {
+			t.Errorf("%s: exit %d: %s", c.name, code, errOut)
+			continue
+		}
+		after, _ := os.ReadFile(p)
+		if !strings.HasPrefix(string(after), string(before)) {
+			t.Errorf("%s: 既存の内容が壊れました", c.name)
+		}
+		if added := string(after[len(before):]); !strings.Contains(added, c.want) {
+			t.Errorf("%s: 追記に %q が入っていません: %q", c.name, c.want, added)
+		}
+	}
+}

@@ -335,7 +335,7 @@ func (s *Server) issueUsage(ctx context.Context, pr store.Project, row store.Iss
 // issueUsageText は CLI の usage show と同じ形の表（MCP の issue_usage。時刻は UTC）。
 func issueUsageText(lang i18n.Lang, u issueUsageJSON) string {
 	var b strings.Builder
-	b.WriteString(i18n.T(lang, "server.api.usage.issue_total", "issue", u.Issue, "total", num(u.TotalTokens), "stages", u.StageCount,
+	b.WriteString(i18n.TN(lang, "server.api.usage.issue_total", u.StageCount, "issue", u.Issue, "total", num(u.TotalTokens), "stages", u.StageCount,
 		"excluded", num(u.ExcludedTotal.Total()), "inconsistent", u.Inconsistent) + "\n")
 	if len(u.Stages) == 0 {
 		b.WriteString(i18n.T(lang, "server.api.usage.issue_empty", "issue", u.Issue))
@@ -438,7 +438,9 @@ func usageMissingText(lang i18n.Lang, c usageCoverageJSON) string {
 	if len(ids) > 5 {
 		ids, more = ids[:5], i18n.T(lang, "server.api.usage.missing_more")
 	}
-	return i18n.T(lang, "server.api.usage.missing", "count", c.Missing, "days", c.Days,
+	return i18n.T(lang, "server.api.usage.missing",
+		"count", i18n.MN("server.api.usage.missing_count", c.Missing, "n", c.Missing),
+		"days", i18n.MN("server.api.usage.days", c.Days, "n", c.Days),
 		"ids", strings.Join(ids, " "), "more", more, "command", domain.UsageAttachCommand("<ID>"))
 }
 
@@ -480,8 +482,11 @@ func usageCoverageText(lang i18n.Lang, c usageCoverageJSON) string {
 	if c.Rate != nil {
 		rate = fmt.Sprintf("%.1f%%", *c.Rate*100)
 	}
-	b.WriteString(i18n.T(lang, "server.api.usage.coverage", "rate", rate, "days", c.Days, "who", who,
-		"target", c.Target, "attached", c.Attached, "missing", c.Missing, "humans", c.Humans) + "\n")
+	b.WriteString(i18n.T(lang, "server.api.usage.coverage", "rate", rate,
+		"days", i18n.MN("server.api.usage.days", c.Days, "n", c.Days), "who", who,
+		"target", i18n.MN("server.api.usage.ai_operations", c.Target, "n", c.Target),
+		"attached", c.Attached, "missing", c.Missing,
+		"humans", i18n.MN("server.api.usage.human_operations", c.Humans, "n", c.Humans)) + "\n")
 	if c.Missing == 0 {
 		b.WriteString(i18n.T(lang, "server.api.usage.coverage_none"))
 		return b.String()

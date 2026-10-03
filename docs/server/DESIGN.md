@@ -1,7 +1,7 @@
 # Looptrack サーバ設計
 
-複数のプロジェクトのイシューを 1 つのサーバ（Go の単一バイナリ・MySQL または SQLite）で管理し、
-コーディング AI に CLI・リモート MCP・hook で渡し、人がブラウザで読む。**この文書は現在の仕様を述べる。**
+複数のプロジェクトのイシューを 1 つのサーバ（Go の単一バイナリ・MySQL または SQLite）で管理します。
+コーディング AI には CLI・リモート MCP・hook で渡し、人はブラウザで読みます。**この文書は現在の仕様を述べます。**
 製品としての説明は [README.md](../../README.md)、AI からの使い方は [AI-GUIDE.md](../AI-GUIDE.md)。
 
 ## 1. 概要
@@ -99,7 +99,7 @@ Markdown で書いたイシューを取り込んでも、下のように分け�
 | `setting_changes` | at, name, old_value（空は未設定）, new_value, actor_user_id（NULL 可）, via（web / command / migration / cli / api / mcp）, note, ip | 設定の変更の記録です。**アプリ用の DB ユーザーは SELECT・INSERT のみ**です（追記専用）。撤去したゼロバグゲートの切り替えの記録（`zero_bug_gate:<slug>`）も、追記専用なのでそのまま残ります（§9-1「ゼロバグゲート（撤去済み・2026-09-20）」） |
 | `project_members` | project_id, user_id, role（viewer / editor / admin） | 参加者だけが見られます（既定で非公開） |
 | `api_tokens` | user_id, name, prefix, hash（SHA-256）, scopes, project_ids, expires_at, last_used_at, revoked_at | 平文は発行時に 1 回だけ表示します |
-| `web_sessions` | id_hash, user_id, csrf_token, mfa_passed, **totp_verified**（0010）, created_at, expires_at, last_seen_at, ip, user_agent | Cookie `looptrack_session`（Path=/looptrack, Secure, HttpOnly, SameSite=Strict）です。mfa_passed はログインの段階を終えたか、totp_verified はそのとき TOTP を入力したかを表します |
+| `web_sessions` | id_hash, user_id, csrf_token, mfa_passed, **totp_verified**（0010）, persistent（`migrations/0008_web_sessions_persistent.sql`）, created_at, expires_at, last_seen_at, ip, user_agent | Cookie `looptrack_session`（Path=/looptrack, Secure, HttpOnly, SameSite=Strict）です。mfa_passed はログインの段階を終えたか、totp_verified はそのとき TOTP を入力したかを表します。期限は発行から 7 日で、無操作 12 時間でも切れます。persistent はログイン画面の「ログインしたままにする」で発行したセッションです。無操作では切らず、期限を最終アクセスから 400 日に延ばし続けます。400 日は Chrome が Cookie の期限を打ち切る上限です。延ばすのは最終アクセスの更新（5 分おき）と同じ時機で、そのとき Cookie も出し直します。TOTP の段の仮のセッション（10 分）もこの値を持ち、作り直すとき（TOTP の入力・登録と解除・パスワード変更）は元のセッションの値を引き継ぎます。定期の掃除は期限切れを消し、無操作 12 時間で消すのは persistent でないものだけです |
 | `oauth_*` | clients（動的登録）, auth_codes（PKCE）, refresh_tokens（更新トークン・系列と対のアクセストークン・§3-2）, 発行トークンは api_tokens に kind 付きで保存 | MCP・CLI（login --browser）用です |
 | `project_guides` | project_id（PK）, content（MEDIUMTEXT）, source, updated_at | プロジェクトの運用文書です（§5-2・マイグレーション 0005） |
 | `mcp_connections` | id（発行した Mcp-Session-Id）, user_id, token_id, client_name, client_version, agent, protocol_version, project, user_agent, created_at, last_seen_at, closed_at | MCP の接続ごとの clientInfo です（§6・マイグレーション 0007）。30 日使われなければ消します |
@@ -151,7 +151,7 @@ Markdown ファイルでイシューを管理してきたプロジェクトを�
   往復一致を確かめてから切り替えられるので、取り込みで情報が落ちていないことを機械で保証できます。
 - 載せ替えはプロジェクト単位です。起票を止める → 最後の取り込み → verify → プロジェクト側の設定を API モードへ → hook・skill・案内の節を更新、の順に進めます。
 - **載せ替えた後は DB が正本です**。Markdown への定期的な書き出しはしません。`looptrack export` でいつでも Markdown を書き出せるので、データは閉じ込められません。
-  バックアップは DB のダンプで取ります。
+  バックアップは DB のダンプで取ります。添付の本体はディスクにあるので、添付の置き場も控えます（§2-4）。`export` は添付も書き出しますが、`import` は添付を運びません。
 - アーカイブ済みのプロジェクト（`archived_at` が NULL でない）は `looptrack export` が既定で外します。`--archived` を付けると、そのプロジェクトも書き出します。
   `looptrack import` は、取り込み先の slug がすでにアーカイブ済みなら拒否します（内容を差し替えると、アーカイブしたはずのプロジェクトが使える状態に戻ってしまうため）。
 
@@ -176,7 +176,7 @@ ID の項目（blocked_by / traces / refs）は、どの経路でも 1 要素 = 
 2. API・MCP の呼び出し側は配列を組み立てているので、空白入りの要素は呼び出し側の誤りです。黙って直すと誤りに気づけません。
 3. 人がシェルで打つ CLI だけは空白区切りが自然なので、CLI 側で分けて送ります（サーバの規則は 1 つのまま）。
 
-ID は空白を含みません（採番 ID・文書 ID ともに英数字とハイフン）。そのため ID の項目に限れば、拒否しても正しい入力を失うことはありません。
+ID は空白を含みません（採番 ID・文書 ID ともに英数字とハイフン）。ID の項目に限れば、拒否しても正しい入力を失うことはありません。
 
 **取り込んだデータの補正（`looptrack repair-lists`）**: クローズ済みの本文・項目は変更できないという規則（§4）の**例外**として、管理コマンドだけが補正します。
 値の意味は変えず（`"A B"` → `["A", "B"]`）、逆引きから漏れるという保存形式の問題を直すだけだからです。経緯（本文・コメント・状態）は失われません。
@@ -192,6 +192,132 @@ ID は空白を含みません（採番 ID・文書 ID ともに英数字とハ�
   運用中のサーバでは `looptrack repair-lists`（dry-run）→ 中身を確かめる → `looptrack repair-lists --apply` の順に実行します。
 - マイグレーションでなくコマンドにした理由は 3 つです。dry-run で対象と差分を見せてから書けること・監査記録の主体（via admin）と理由を残せること・
   labels のように判断の要る項目を外せることです。スキーマの変更はありません（issue_events.kind に CHECK は無いため）。
+
+### 2-4. 添付（エビデンスのファイル）
+
+テストの結果をイシューに記録するとき、エビデンスのファイル（スクリーンショット・ログ・レポート）を添えられるようにする。
+サーバ版とデスクトップ版の両方が対象です。Done の網（`verify.require_evidence`）の判定は §9-3 の「エビデンスの網」に、AI への指示の文面は §9-2 の「AI への案内」にあります。
+
+それまでのテスト結果の記録（`service.RecordVerify`）は、出力をマスクして 4,096 バイトに切り、`issue_events` の detail に残すだけでした。
+全文はどこにも残らず、証跡はコメントにパスを書いて済ませていたのです。要求の本文も JSON だけで、上限は 2MiB（`maxRequestBody`）。
+
+#### 決めたこと
+
+1. **本体はディスクに置き、メタデータは DB に置く。** DB に置けばバックアップは 1 系統で済みます。それでも DB のファイルが肥大するほうを重く見ました。
+2. **メタデータは追記専用で、本体だけを管理者が消去できる。** 秘密を誤って添付したときの逃げ道です。消去したことは `issue_events` に残します。
+3. **上限は管理者の画面で設定する。** 1 ファイルの上限（既定 20MiB）と 1 プロジェクトの上限（既定 1GiB）の 2 つです。
+4. スキーマを足すので、v1.0.0 の前に入れます。
+5. **AI に検証させるときは、エビデンスを取って Looptrack に上げるよう指示が必ず届く経路を作る。** 添付できるだけでは AI は使いません。
+   経路は 1 つに頼らず、サーバが返す文面（MCP の案内文・`guide`・verify の計画の文面）と kit の rules・skill の両方に置きます。
+6. **エビデンスの無い検証で Done にしようとしたら拒否する。** プロジェクト別ルールの新しいキー `verify.require_evidence` の既定は入です。
+   理由付きの上書きは通して記録に残し、切にしたプロジェクトでは注意だけを返します。
+   対象は本文に検証コマンドがあるイシュー（`Rules.CheckVerify` が働くのと同じ範囲）で、いまの本文に対する最新の verify の記録に添付が 1 つも無ければ拒みます。
+   記録そのものが無いときも拒否に含めます。添付できない旧版のクライアント（1.0.0-rc.5 まで）の利用者は、理由付きの上書きでしか Done にできなくなります。
+7. **置き場が決まらなければ、添付だけを使えなくする。** サーバは起動し、添付の API は「置き場が設定されていない」と返します。
+   setup の対話と install.sh は置き場を既定で設定します。SQLite とデスクトップは DB の隣に自動で決まる。
+8. install.sh の `--upgrade` の控えに添付の本体は含めない。本体は sha256 の名前で置き、上書きも移動もしないので、DB だけが戻っても本体は残ります。
+   どこからも指されなくなった本体は、整合の検査（`repair-attachments`）が報告します。
+9. **上限は全プロジェクトで共通の 1 値。** プロジェクトごとには変えません。
+
+#### データ
+
+| テーブル | 主な列 | 備考 |
+| -- | -- | -- |
+| `attachments` | id, project_id, issue_id, sha256, size, filename, media_type, created_at, author_user_id, token_id, via | 添付 1 件が 1 行。**アプリ用の DB ユーザーは SELECT・INSERT のみ**（追記専用。SQLite はトリガで拒否） |
+| `attachment_purges` | attachment_id, through_attachment_id, sha256, actor_user_id, via, reason | 本体を消去した記録。これも追記専用で、行を UPDATE して印を付ける形にはしない |
+
+migrations は MySQL と SQLite の両方に足し（0007）、`deploy/grants.sql` は 2 つの表に SELECT・INSERT だけを与えます。
+添付すると `issue_events` に kind=`attach`、消去すると kind=`attach_purge` が残ります。
+上限の 2 つは `system_settings` に置き、変更は `setting_changes` に記録します（`two_factor` と同じ形）。値はリクエストごとに DB から読むので、変えれば再起動せずに次の添付から効きます。
+
+本体のパスは `<置き場>/<sha256 の先頭 2 字>/<次の 2 字>/<sha256>`。
+置き場の中の `.tmp` に書いて fsync し、rename してからメタデータを入れる順です。既にある本体は上書きしません。
+同じ内容を 2 回添付すると、本体は 1 つで行は 2 つ。
+
+消去は本体のファイルを消し、`attachment_purges` に 1 行を足します。
+効くのは消去の時点で同じ本体を指していた添付すべてです（`through_attachment_id` まで）。読むと「消去済み」（`attachment_purged`）を返し、一覧には `purged` が立つ。
+秘密を消すための操作なので、同じ本体を指すほかの添付にも効くのが正しい形です。消去の後に同じ内容を添付し直したものは、消去済みに数えません。
+
+1 ファイルの上限を超える添付（413・`attachment_too_large`）も、プロジェクトの上限（消去していない添付の size の合計）を超える添付（`attachment_quota`）も、本体とメタデータのどちらも残さずに拒みます。
+
+#### 置き場
+
+置き場は次の順で決まります（`service.AttachDirFromEnv`。サーバの更新の確認が状態のファイルを置く場所と同じ考え方）。
+
+1. 環境変数 `LOOPTRACK_ATTACH_DIR`
+2. `$STATE_DIRECTORY/attachments`（systemd の `StateDirectory`）
+3. SQLite の DB と同じディレクトリの `attachments`
+
+どれも無ければ添付は使えません（決めたことの 7）。MySQL でも本体はディスクに置きます。
+
+| 動かし方 | 置き場 | 決め方 |
+| -- | -- | -- |
+| systemd（install.sh） | `/var/lib/looptrack/attachments` | install.sh が `.env` に `LOOPTRACK_ATTACH_DIR` を書く（入れるときと `--upgrade` のたび。既にあれば触らない）。`StateDirectory` の中なので `ProtectSystem=strict` のままで書ける |
+| compose（setup） | ホストの `<dir>/data/attachments`（コンテナの `/data/attachments`） | setup の compose.yaml が `./data:/data` を入れ、`environment` に `LOOPTRACK_ATTACH_DIR` を書く。SQLite も MySQL も同じ |
+| デスクトップ | `DataDir/attachments` | デスクトップ版が決める（`desktop.Paths.Attachments`） |
+
+compose の置き場を `.env` ではなく compose.yaml に書くのは、volume と同じファイルに置くためです。
+以前の setup が書いた MySQL の compose.yaml は `read_only` で書ける volume を持ちません。
+そこに `.env` の置き場だけが入ると、volume の外を指したまま書けずに失敗します。compose.yaml に書けば、volume の無い compose.yaml は「置き場が無い」ままになる。
+
+バックアップは DB と添付の 2 系統になります。手順は `docs/server/DEPLOY.md` の「添付の置き場とバックアップ」。
+DB と置き場の食い違い（本体の欠け・どこからも指されない本体）は、管理者のサブコマンド `looptrack repair-attachments` が `repair-lists` と同じ形で調べます。
+`--apply` が無ければ報告だけ。`--apply` はどこからも指されない本体を消しますが、書かれて 1 時間（`service.OrphanGrace`）以内のものは残します。添付の途中（rename の後・メタデータの前）の本体を消さないため。
+
+#### 経路
+
+規則は `internal/service` の 1 か所（`attachments.go`）に置き、REST・CLI・MCP・Web はそれを呼びます。
+
+- **REST**: 4 つの経路です（§4 の表）。
+  - `POST /api/v1/issues/{id}/attachments` で添付します。本文はファイルそのもので、名前は `X-Looptrack-Filename`（UTF-8 をパーセントで符号化）、形式は `Content-Type` で渡す。editor 以上。
+  - `GET /api/v1/issues/{id}/attachments` は一覧で、メタデータだけを返します。消去済みも `purged` を立てて載せる。
+  - `GET /api/v1/attachments/{id}` は本体です。
+  - `POST /api/v1/attachments/{id}/purge` は本体の消去で、管理者だけ。本文は `{"reason": "…"}`。
+  - 一覧と POST の応答の項目は `id`・`issue`・`project`・`filename`・`media_type`・`size`・`sha256`・`created_at`・`via`・`purged`・`url`・`inline` です。
+    `inline` は本体の GET が画面の中に表示できる形で返るかを示します。画面はこれが真のものだけを画像として埋め込み、形式を自分で判定し直しません。
+  - この経路だけ本文の上限を 1 ファイルの上限に合わせ、読み取りと書き込みの締切を 10 分に延ばします（配布物の送信の `binWriteWindow` と同じやり方）。
+  - コメント（`POST /issues/{id}/comments`）と verify の記録（`POST /issues/{id}/verify`）は、本文の `attachments` に添付の ID を並べて付けます。付けた ID は `issue_events` の detail の `attachments` に残る。
+- **CLI**: `looptrack issue attach <ID> <ファイル>...` が添付の ID を出します。`issue comment` と `issue verify` には `--attach <ファイル>`（繰り返せる）を、verify には切る前の出力を全文添付する `--attach-output` を足しました。
+- **MCP**: バイナリは受けません。AI は CLI で送り、返った ID を `report_verify` か `add_comment` の `attachments` に渡す。`get_issue` は本文の末尾と構造化した結果の `attachments` に添付の一覧を載せます。
+- **Web**: コメントのフォームでファイルを選ぶ・ドラッグ&ドロップする・スクリーンショットを貼り付けます。ドロワーに添付の一覧を出し、`inline` の画像はその場で表示する。
+  管理者の画面 `/admin/attachments` に、上限の設定・使用量・本体の消去を置きます（`/admin/attachments/limits`・`/admin/attachments/{id}/purge`）。
+- **デスクトップ**: 中のサーバが同じ画面を配るので、作るものはサーバ版と同じです。
+
+権限の判定も `internal/service` の 1 か所です。一覧と本体を読むのは閲覧できる人、添付するのは editor 以上、消去するのは管理者（利用者の役割 admin）。
+参加していない人には、無いイシュー・無い添付と同じ 404 を返します。
+
+#### 安全
+
+- 画面の中で表示するのは png・jpeg・gif・webp だけで、申告した形式と本体の先頭から推した形式が一致するときに限ります（`service.AttachmentServeType`）。
+  ほかは `application/octet-stream` と `Content-Disposition: attachment` で返します。画像を名乗る HTML をそのまま表示させないためです。
+- 添付の経路のどの応答にも `Content-Security-Policy: sandbox; default-src 'none'` と `X-Content-Type-Options: nosniff` を付ける。認証の前に付けるので 401 にも付きます。
+- 中身はサーバではマスクできません。CLI はテキストのファイルに検証の出力と同じ秘密の検査（`domain.FindSecret`）を当て、当たれば 1 件も送らずに止めます。止めた理由には行と規則の語だけを出し、値は出さない。
+- 前段のプロキシにも本文の上限があります。nginx の `client_max_body_size` は既定で 1MB なので、1 ファイルの上限に合わせて広げる（`docs/server/DEPLOY.md`）。
+
+#### 書き出し・取り込み
+
+**往復で運ぶのは書き出しだけです。** `looptrack export` は添付のあるプロジェクトについて、本体を `<out>/<slug>/attachments/<sha256>` に、目録を `<out>/<slug>/attachments.json` に書きます（`internal/transfer/attachments.go`）。
+添付の無いプロジェクトには目録もディレクトリも書かないので、そうしたプロジェクトの書き出しはこれまでと同じ形です。
+
+| 目録の欄 | 中身 |
+| -- | -- |
+| `format`・`project` | 目録の形の版（いまは 1）と slug |
+| `attachments[]` | `id`・`issue`・`filename`・`media_type`・`size`・`sha256`・`created_at`（RFC 3339・UTC）・`author`（作者の login）・`via`・`purged`・`missing`・`file`（`attachments/<sha256>`。書き出さなかったものは空）・`refs` |
+| `refs[]` | その添付を付けた記録。`kind`（`comment` か `verify`）・`comment`（イシューの何番目のコメントか。1 から）・`at` |
+
+消去済みの添付は目録に載せますが、本体は書きません。同じ本体を指す添付が何件あっても、本体のファイルは 1 つです。
+置き場が決まっていない・本体が欠けている・本体が SHA-256 と合わないときは、その添付を `missing` として目録に載せ、書き出しは最後まで続けます。
+そのうえで問題を `NG` の行で出し、終了コードを 1 にする。欠けた書き出しを、完全なものに見せないため。
+本体は写しながら SHA-256 を数え、合わなければ書きません。
+
+`looptrack verify-files --root <out>` は、目録を持つプロジェクトについて、書き出した本体のバイトが目録の SHA-256 と一致するかを確かめます。DB は不要。
+目録が `attachments/<sha256>` の外を指していれば読まずに `NG` にし、目録の `missing` も `NG` に数えます。
+読むのは通常のファイルだけで、目録の `size` までです。シンボリックリンク・ディレクトリ・デバイスと、大きさが目録と違う本体は読まずに `NG`（リンクをたどると書き出しの外のファイルを「一致」と数え、終わりの無いものでは止まらないため）。目録と本体のディレクトリも同じく、リンクの先は読みません。
+
+**`looptrack import` は添付を運びません。** 取り込むには作者の利用者・経路・コメントとの結び付き（`issue_events` の detail）を移し先の DB に作り直す必要があります。
+`attachments.via` の CHECK も作者の外部キーも取り込みを想定していないので、DB の形を変えずにはできません。
+目録があるプロジェクトを取り込むと、運ばなかったことを件数つきで 1 行出します（黙って捨てない）。
+添付を含めた控えと移し替えは、DB と置き場の 2 系統で取ります（`docs/server/DEPLOY.md` の「添付の置き場とバックアップ」）。
 
 ## 3. 認証と権限
 
@@ -230,12 +356,12 @@ ID は空白を含みません（採番 ID・文書 ID ともに英数字とハ�
 | 一覧（ハブ・`GET /api/v1/projects`・MCP `list_projects`・MCP の既定プロジェクト） | `store.MemberProjects` | 参加分・役割は `project_members` の値 | 参加分 |
 | 解決（slug・ID を指定した操作: `/looptrack/p/<slug>/`・`/api/v1/projects/<slug>/…`・`/api/v1/issues/<id>`・`activity`・CLI の `LOOPTRACK_PROJECT`・MCP の `project` 引数と ID） | `store.AccessibleProjects` | 全件です。役割は `project_members` に行があればその値、無ければ viewer です（`store.NonMemberAdminRole`） | 参加分 |
 
-**アーカイブ済みのプロジェクト（`projects.archived_at` が NULL でない）は、どちらにも出しません**（`store.UserMemberships` と `store.AccessibleProjects` の 1 か所で外す。
-利用者の役割にかかわらず、管理者の `?all=1` も同じ）。そのため一覧（ハブ・REST・MCP・ログイン済みの CLI）に出ず、slug・ID を指定した
+**アーカイブ済みのプロジェクト（`projects.archived_at` が NULL でない）は、どちらにも出しません**。外すのは `store.UserMemberships` と `store.AccessibleProjects` の 1 か所で、
+利用者の役割にかかわらず、管理者の `?all=1` も同じです。そのプロジェクトは一覧（ハブ・REST・MCP・ログイン済みの CLI）に出ず、slug・ID を指定した
 閲覧・書き込みは「見つからない」（404）になります。書き込みは service の入口（起票の `Create` と、既存イシューを変える `mutate`。
 コメント・状態・担当・編集・検証の記録・補正がここを通る）でも、DB から読み直した `archived_at` で拒みます（`Rejected`・`project_archived`）。
 一覧の解決を通らない呼び出し（サーバ側の管理コマンド）にも効かせるためです。全件を見るのは管理画面（`store.ListProjects`）と、
-書き出し・補正の全件指定だけです（補正の全件指定はアーカイブ済みを外します）。
+書き出し・補正の全件指定だけです。補正の全件指定はアーカイブ済みを外します。
 
 - **`GET /api/v1/projects?all=1`**（`true` も可・`0` / `false` / 無しは既定）: 管理者だけが使えます。全プロジェクトを返し、参加していないものは
   `role: "viewer"`・`member: false` です（解決の役割と同じ）。**管理者以外が付けると 403 `forbidden`** になります。黙って参加分を返すと、呼び出し側が「全件」と取り違えるからです。
@@ -257,7 +383,7 @@ ID は空白を含みません（採番 ID・文書 ID ともに英数字とハ�
 CLI のログインに要る人手を 2 つだけにします。**AI が実行する `looptrack issue login --browser` と、利用者のブラウザでのログイン・承認**です。
 `/account` で発行したトークンを CLI に貼り直す作業が無くなります。
 MCP 用の OAuth 2.1（認可コード・PKCE・承認画面・`api_tokens` の kind=oauth）をそのまま使い、別の認可コードの発行経路は作りません。
-トークンの保存は §1-3 の「API モードの詳細」の「トークン」の行のとおりです（`/me` で検証してから `credentials.json` に 0600 で書きます）。トークンは CLI のプロセスとサーバの間の HTTP の本文だけを通ります。
+トークンの保存は §1-3 の「API モードの詳細」の「トークン」の行のとおりです。`/me` で検証してから `credentials.json` に 0600 で書きます。トークンは CLI のプロセスとサーバの間の HTTP の本文だけを通ります。
 
 #### 流れ（`looptrack issue login --browser [--url URL]`）
 
@@ -295,7 +421,7 @@ MCP 用の OAuth 2.1（認可コード・PKCE・承認画面・`api_tokens` の 
 アクセストークンの期限は利用者から見えません。更新トークンは使うたびに延びるので、**90 日のあいだに一度でも使う端末は切れません**。
 上限（例: 1 年で必ず再ログイン）を設けないのは、定期的な再ログインが生まれるからです。代わりに止める手段を 3 つ持ちます。
 アカウント画面での失効（一覧の「looptrack（ホスト名）」を失効させると、対の更新トークンも止まります）・利用者の無効化・再利用の検知です。
-90 日は、使わなくなった端末（持ち出し・廃棄）に残った値が自然に無効になるまでの長さです。アクセストークンの既定の有効日数とも揃えてあります。
+90 日という期限は、使わなくなった端末（持ち出し・廃棄）に残った値が自然に無効になるまでの長さです。アクセストークンの既定の有効日数とも揃えてあります。
 アクセストークンを 1 時間のように短くしても、ファイルが漏れた場合の防御にはなりません。credentials.json には更新トークンも並んで置かれるからです。
 
 #### CLI の自動更新
@@ -328,7 +454,7 @@ MCP 用の OAuth 2.1（認可コード・PKCE・承認画面・`api_tokens` の 
 
 ### 3-3. ローカルモードとセットアップ未完了
 
-1 人で手元だけで使うときは、認証を省きます（127.0.0.1 に固定します）。ここではその実装と、管理者がいないサーバの扱いを説明します。
+1 人で手元だけで使うときは、認証を省いて 127.0.0.1 に固定します。ここではその実装と、管理者がいないサーバの扱いを説明します。
 
 #### ローカルモード（`LOOPTRACK_LOCAL_MODE=1`）
 
@@ -347,7 +473,7 @@ MCP 用の OAuth 2.1（認可コード・PKCE・承認画面・`api_tokens` の 
 
 #### ローカルモードのブラウザ経由の攻撃への備え
 
-認証を省くと、利用者のブラウザで開いた**別のサイト**が `http://127.0.0.1:8090/looptrack/…` を叩けてしまいます。そこで認証の代わりに、次の対策で止めます（ServeHTTP の先頭・全経路）。
+認証を省くと、利用者のブラウザで開いた**別のサイト**が `http://127.0.0.1:8090/looptrack/…` を叩けてしまいます。認証の代わりに、次の対策で止めます。置き場所は ServeHTTP の先頭で、全経路が対象。
 
 | 攻撃 | 対策 |
 | -- | -- |
@@ -373,7 +499,7 @@ MCP 用の OAuth 2.1（認可コード・PKCE・承認画面・`api_tokens` の 
 
 「管理者」は、無効化されていない `role = 'admin'` の利用者です（`store.CountActiveAdmins`）。一般の利用者や無効化された管理者しかいなければ、未完了のままです。
 通常モードでは、一度いると分かったら以後は数えません。画面は管理者を 0 人にする変更を拒否しますが、管理コマンドで 0 人にしたときは再起動まで検査しません。0 人の間は要求ごとに数えるので、`looptrack setup` で作られればサーバを再起動せずに通ります。
-ローカルモードは要求ごとに利用者を引くので、その結果で判定します。テストでは `Config.AllowNoAdmin` でこの検査を外せます（serve は常に検査します）。
+ローカルモードは要求ごとに利用者を引くので、その結果で判定します。テストでは `Config.AllowNoAdmin` でこの検査を外せます。serve は常に検査します。
 
 #### setup の直後にブラウザだけで起票できるようにする
 
@@ -386,7 +512,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | (b) ローカルモードの全プロジェクトへの参加 | 要求ごとに（利用者を引いた直後）、参加の行が無いすべてのプロジェクトへローカルの利用者を admin で参加させます（`store.ProjectsWithoutMember`・`AddMemberIfAbsent`）。役割を要求ごとに計算するのではなく、**行を作ります**。担当者の候補（`AssignableMembers`）と一覧（`MemberProjects`）も参加の行で決まるからです。**既存の行は変えません**。画面で自分を viewer・editor にしたものはそのままで、外した参加は次の要求で admin に戻ります。チームのサーバ（通常モード）では行いません |
 | (c) 画面からプロジェクトを作る | `POST /looptrack/admin/projects`（slug・prefix・name）です。MCP の `create_project`（slug・name・description・prefix・width）も同じ処理（`service.CreateProject`。管理者でなければ Forbidden）を呼びます。setup がプロジェクトを見つけられないときは、管理者には `create_project` で作れること（prefix と width は後から変えられないので、AI が値を利用者に確かめる）を、管理者でない利用者には管理者に頼むことを、エラーの文面に添えます。管理者だけが使え、管理者以外には 404 を返します。CSRF の検査もあります。プロジェクトの作成と作った人の admin での参加を 1 つのトランザクションで行い、そのプロジェクトのボードへ移ります。プロジェクト管理の画面に「プロジェクトを作る」を置き、ハブの空の表示と案内からそこへリンクします。チームのサーバでも使えます。権限の規則は同じです。作った人は明示的に参加し、ほかの管理者は参加するまで閲覧のみです |
 
-最初の管理者・二段階認証の設定・最初のプロジェクト・参加の行は、`setupwiz.Provision` が 1 つのトランザクションで作ります。`looptrack setup` と画面版の初回設定が同じ関数を呼び、失敗したら何も残しません。そのため `store.SetTwoFactorPolicy` とは別に、呼び出し元のトランザクションで行う `SetTwoFactorPolicyTx` があります。
+最初の管理者・二段階認証の設定・最初のプロジェクト・参加の行は、`setupwiz.Provision` が 1 つのトランザクションで作ります。`looptrack setup` と画面版の初回設定が同じ関数を呼び、失敗したら何も残しません。1 つのトランザクションに収めるため、`store.SetTwoFactorPolicy` とは別に呼び出し元のトランザクションで行う `SetTwoFactorPolicyTx` があります。
 `looptrack user add` はこの流れを通らず、単独で利用者を作ります（`addUser`）。
 
 採らなかった案:
@@ -434,6 +560,10 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | `POST /issues/{id}/assign` | 担当者の変更（`{assignee, override_reason}`・§9-2） | `assign` |
 | `GET /issues/{id}/verify` | 検証コマンドの一覧・本文の版・直近の記録（§9-3-3・viewer 可） | `verify --list` / `--last`・MCP `verify_issue` |
 | `POST /issues/{id}/verify` | 手元で実行した検証コマンドの結果の記録（コメント + `issue_events` kind `verify`・§9-3-3・editor 以上） | `verify`・MCP `report_verify`（同じ検査・自己申告の印が付く） |
+| `POST /issues/{id}/attachments` | 添付（本文はファイルそのもの・名前は `X-Looptrack-Filename` にパーセント符号化・形式は `Content-Type`・editor 以上・§2-4） | `attach`・`comment --attach`・`verify --attach` / `--attach-output` |
+| `GET /issues/{id}/attachments` | 添付の一覧（メタデータだけ・消去済みは `purged`・画面に画像として出すかは `inline`・§2-4） | ドロワーの添付の一覧（MCP `get_issue` は同じ一覧を service から読む） |
+| `GET /attachments/{id}` | 添付の本体（閲覧できる人・§2-4「安全」） | 画面のリンク |
+| `POST /attachments/{id}/purge` | 添付の本体の消去（`{"reason"}`・管理者だけ・§2-4。管理者の画面 `/admin/attachments` は同じ処理をフォームで呼ぶ） | （CLI・MCP には無い） |
 | `GET /projects/{slug}/matrix` | トレース表 + 警告 2 種 | `matrix` / `index` |
 | `GET /projects/{slug}/summary` | SessionStart 用（① 進行中・ready 上位 ② In Review と滞留 ③ 未応答のフィードバック の 3 層と、トークン情報の未付与の件数・§9-3-7） | `summary` |
 | `GET /activity?ids=&since=` | ID ごとの最終更新イベント時刻 | `activity` |
@@ -460,8 +590,8 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | `GET /issues/{id}` | ID は大文字小文字を区別しません。`?project=<slug>` でプロジェクトの中に限れます（ファイルモードの find と同じ範囲）。`?format=md` は `show` と同じ全文です（CLI は末尾に改行を 1 つ足して表示します）。`ETag: "<version>"` を返します |
 | `PATCH /issues/{id}` | `If-Match: <version>` が必須です。本文は `{"markdown": 全文}`、項目は `{"title", "type", "priority", "parent", "labels", "blocked_by", "traces", "refs"}` で送ります（併用はできません）。**id・created・status・assignee・コメント節（preamble とコメント）は変えられません**。担当は `/assign` で変えます。担当が他人なら 422 で、`override_reason` を付ければ通します（担当は替えない・§9-2）。状態は `/status`、追記は `/comments` です。送ったコメント節が現在のコメントの先頭部分なら、後から付いたコメントを保持します。クローズ済みは 422 です。updated はサーバが設定します。ファイル名（title 由来）は変えません |
 | `POST /projects/{slug}/issues` | `{"title", "type", "status", "priority", "parent", "labels"[], "blocked_by"[], "traces"[], "refs"[], "body"}` です。既定値は CLI の `new` と同じです。リストの値は前後の空白を除き、空のものを捨てます。カンマ・改行は 400 です。**blocked_by / traces / refs は途中に空白を含む値も 400** です（§2-3・labels は空白可）。201 で `{"issue": 詳細, "path": "open/<ファイル名>"}` を返します |
-| `POST /issues/{id}/comments` | `{"text"}` です（空文字も可）。クローズ済みにも追記できます（経緯を足せるようにするため）。`message` は CLI の出力です（`コメント追記: <ID>`） |
-| `POST /issues/{id}/status` | `{"status", "comment"}` です。`messages` は CLI の出力行です（`<ID>: <旧> → <新>` と、コメントがあれば `コメント追記: <ID>`） |
+| `POST /issues/{id}/comments` | `{"text"}` です。本文（前後の空白を除く）も添付も無いコメントは 400（`comment_empty`）で拒み、何も残しません（コメントは消せないため。判定は service の 1 か所）。添付だけのコメントは通りますが、REST では `"text":""` を付ける必要があります（`text` を省くと従来どおり 400（`invalid_argument`）で、添付があっても拒みます）。クローズ済みにも追記できます（経緯を足せるようにするため）。`message` は CLI の出力です（`コメント追記: <ID>`） |
+| `POST /issues/{id}/status` | `{"status", "comment"}` です。`messages` は CLI の出力行です（`<ID>: <旧> → <新>` と、コメントを作ったときだけ `コメント追記: <ID>`）。空白だけのコメントは作らず、状態の変更だけ通します（`コメント追記` の行も出しません。MCP の `set_status` も同じ） |
 | 一覧 | `list` / `ready` は `{"items": [...], "count"}` を返します。項目は frontmatter の値と `closed` `version` `file_name`、未知のキー（`extra`）です。**In Progress の項目には `other_session`（要求のセッション ID と最後に着手したイベントのセッション ID が比べられて違う）・`cross_path_session`（経路が違って比べられない）と `started_ago`（着手からの経過）が付きます**。判定は summary と同じで、CLI と MCP は「別のセッションが着手しています」の 1 行を出します。セッション ID が分からない経路では付きません。`all` / `reverse` は `1` / `true` です。`has_feedback=1` は未応答のフィードバックを持つものだけに絞り、**既定でクローズ済みも含めます**（`all` と同じ）。項目には `feedback_pending`（未応答の件数）が付きます（§9-3-6） |
 | `GET /projects/{slug}/matrix` | JSON（rows / untested / orphans）を返します。`?format=md` は matrix.md と同じ文字列です |
 | `GET /projects/{slug}/summary` | counts（open / in_progress / in_review / ready / open_bugs / by_status）・進行中・In Review・ready 上位（`?limit=`、既定 5）を返します。`usage_missing` は呼び出した利用者の AI 操作のうち、直近 7 日でトークン情報が付いていないものです（count・issues・command・message・§9-5）。`usage_requests` は未完了のトークンレポート作成依頼です（§9-5）。3 層の追加キー（§9-3-7・既存のキーは変えない）は、`in_review[]` の各項目の `review_since`・`review_hours`・`review_stale`（48 時間超）・`review_age`・`verify_self_reported`、`feedback`（`count`・`issue_count`・`issues[]`: id・title・status・pending・first_at・excerpt）、`counts` の `in_review_stale`・`feedback_pending` です |
@@ -473,7 +603,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 ### 5-1. クライアント（CLI・hook・レポート）の形
 
 利用者の手元で動くもの（CLI・鮮度ガード・トークン情報の収集と送信・トークンレポートの PDF・kit の hook）は
-すべて Go で書き、サーバと同じ実行ファイル `looptrack` に入れます。**手元の依存を実行ファイル 1 つにする**ためです。
+すべて Go で書き、サーバと同じ実行ファイル `looptrack` に入れます。**手元の依存を実行ファイル 1 つにする**ため。
 
 - Windows に最初から入っている処理系は限られていて、bash の hook も動きません（権限の確認・プロセスグループの停止・起動名・symlink など）。
 - デスクトップ版は CLI を同梱します。実行環境ごと同梱すると重くなります。
@@ -530,7 +660,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 - どの AI から呼ばれたかは**配線で `--agent` を必ず渡します**。入力からの推測は予備にとどめます（誤判定すると出力の形を間違えるためです）。
 - **fail-open**: panic・タイムアウト・想定外の入力でも exit 0 で終わり、作業を止めません。送信の切り離しには POSIX で setsid を、Windows で DETACHED_PROCESS を使います。
 - runaway の検知では OS ごとにプロセスの木を作ります（/proc・sysctl・ToolHelp32）。verify の打ち切りには POSIX でプロセスグループを、Windows で Job Object を使います。
-- kit の manifest は `runner: looptrack` で、windows・copilot の欄を持ちます（§8）。hook のケースは Go の表駆動テストで確かめます。
+- kit の manifest は `runner: looptrack` で、AI ごとの欄は codex と copilot です（§8）。Windows の欄はありません。hook のケースは Go の表駆動テストで確かめます。
 
 #### 配布と更新
 
@@ -552,7 +682,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
   置き場の looptrack が配布物と SHA-256 で同じときだけ取得を省き、違えば（無ければ）取得して確かめ、`.part` から `mv -f` / `Move-Item -Force` で置き換えます（symlink はリンクの先ではなくリンクを置き換えます）。
   取得・確認・置き換えのどれかで失敗したら `.part` を消して失敗で終えます。取得 + init のコマンドは、どの AI 向けでも全体を sh はサブシェル `( … )`、PowerShell は `& { … }` で包みます（端末に貼られたときに、変数 `U`・`S`・`D` と `/usr/bin/sum` を覆い隠す関数 `sum`、`$ErrorActionPreference` などを呼び出し元のシェルに残さないためです）。
   **置いた後、置き場が PATH に無ければ利用者の PATH に足します**（利用者の決定。kit・MCP・hook・CLI の文面と AI の許可のパターン `Bash(looptrack issue:*)` は素の `looptrack` のまま）。断片は `internal/setuppath` の 1 か所に置き、setup の手順と doctor が共有します。
-  - 冪等です。いまの PATH に置き場があれば何も書きません。起動ファイルに同じ行があれば足さず、Windows は `Path` に同じ項目（`%…%` を展開し、末尾の `\` を外し、大小を区別せずに比べる）があれば足しません。書けなくても init は続けます（hook は絶対パスで配線され、doctor と要約が知らせます）。
+  - 冪等です。いまの PATH に置き場があれば何も書きません。起動ファイルに同じ行があれば足さず、Windows は `Path` に同じ項目があれば足しません。比べるときは `%…%` を展開して末尾の `\` を外し、大小を区別しません。書けなくても init は続けます（hook は絶対パスで配線され、doctor と要約が知らせます）。
   - macOS・Linux は利用者の既定のシェル（`$SHELL`）の起動ファイルに、PATH に無いときだけ足す 1 行（`case ":$PATH:" in … esac # looptrack`）を書きます。zsh は `~/.zshenv`（環境に `ZDOTDIR` があって HOME と違えば `$ZDOTDIR/.zshenv` にも。zsh が起動のときに読むのは環境の `ZDOTDIR` の下、無ければ HOME の下の `.zshenv` です。`~/.zshenv` の中で `ZDOTDIR` を決めている利用者のシェルから流すと `ZDOTDIR` が環境にあるので、そこにだけ書くと、`ZDOTDIR` を持たない新しい端末や GUI から起動した AI が読みません）、bash は `~/.bashrc` とログインのシェルが読むファイル（`~/.bash_profile` → `~/.bash_login` → `~/.profile` の最初にあるもの。どれも無ければ `~/.profile`。`~/.bash_profile` を新しく作ると `~/.profile` が読まれなくなるので作りません）、fish は `${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/looptrack.fish`、それ以外（sh・dash・ksh・不明）は `~/.profile` です。
   - 選んだ理由（根拠）: zsh の文書（Startup/Shutdown Files）では、`.zshenv` だけがログインでも対話でもない `zsh -c` を含む全部の起動で読まれ、`.zprofile` はログイン、`.zshrc` は対話のときだけです。AI のアプリはコマンドを `$SHELL -c` か `-lc` で流します。Codex は `-lc` か `-c`（ソース `codex-rs/core/src/shell.rs`。2026-10-01 に確認）、Claude Code のデスクトップ版の Bash ツールは `/bin/zsh -c 'source <スナップショット> …'`（この開発機の `ps` で実測。2026-10-01）で、どちらも `.zshrc` を読みません。Claude Code はスナップショットの最後の `export PATH=…` で PATH を決めますが、スナップショットを作るアプリのプロセスの PATH は、`.zshrc` にだけ書いた項目を含んでいました（実測。デスクトップのアプリ本体は `PATH=/usr/bin:/bin:/usr/sbin:/sbin` で、子の claude は利用者のシェルの環境を読み直しています。対話のシェルで読み直していると推測しますが、方法は未確認）。`.zshenv` は対話のシェルでも読まれるので、この経路でも効く見込みです。rustup も zsh には `.zshenv`、bash には既存の bash の起動ファイルと `.profile` に書きます（`src/cli/self_update/shell.rs`）。
   - bash の `-c`（ログインでも対話でもない）はどの起動ファイルも読みません。この形で流す AI では、AI のアプリのプロセスの PATH（利用者のシェルの環境から作られていれば足した行が効く）に頼ります。fish を既定のシェルにしている利用者の AI のシェル（多くは bash か zsh）にはこの行が届かないことがあります（推測・未実測）。Copilot CLI と Codex の実機の確かめは未実施です。
@@ -568,11 +698,20 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
   Windows は当面署名しません。`SHA256SUMS` は minisign で署名し、`self-update` は埋め込んだ公開鍵で確かめます（手順は [RELEASE.md](RELEASE.md)「署名」）。
   `self-update` は配布の一覧の version を、署名された版（`SHA256SUMS` の中の実行ファイルの名前と、リリースの trusted comment `looptrack <版> SHA256SUMS`）と照らし合わせ、違えば置き換えません。手元より古い版へ置き換えるのは `--force` のときだけです。
   署名の確かめ方（minisign）・trusted comment の読み方・実行ファイルの名前・`SHA256SUMS` の引き方は `internal/relsig` の 1 か所に置き、`self-update` と下の「新しい版の確認」が共有します。
+- `self-update` の取得元は 2 つ。`--from` が無ければ、`--url` か `LOOPTRACK_API_URL` があればサーバの配布（`/api/v1/dist`）、どちらも無ければ GitHub のリリースから取ります。
+  片方で失敗しても、もう片方へは自動で切り替えません（利用者の決定）。`--from github` と `--url` を一緒に渡すと終了コード 2。
+  GitHub の経路（`internal/client/selfupdate/github.go`）は、下の「新しい版の確認」の `updatecheck.Checker` で版を選んで署名と版を確かめます。資産の名前は `updatecheck.ArchiveAsset`（サーバ版の書庫）。
+  書庫は上限つきで取り、署名された `SHA256SUMS` の書庫の行と照合してから `<書庫の名前から拡張子を除いたもの>/looptrack[.exe]` だけを取り出す。
+  `..` を含む名前のある書庫は丸ごと拒み、別名・ふつうでないファイル・上限を超える大きさは取り出しません。
+  取り出した中身は同じ `SHA256SUMS` の `relsig.BinaryName` の行と照合し直し、サーバの経路と同じ置き換え（Windows は `.old`）で入れる。
+  署名は必須です。公開鍵の無いビルドは GitHub に問い合わせずに止まり、`LOOPTRACK_UPDATE_URL` で確認先を差し替えても置き換えません。`LOOPTRACK_UPDATE_CHECK=off` なら問い合わせません（サーバの経路はこの値を見ない）。
+  置き換えるのは今の版より新しい版があるときだけで、`--force` は受けません（終了コード 2）。古い版へ戻す道を作らないためです。
+  `.app` の中と install.sh で入れたサーバは、この経路でも置き換えません。hook の中からは呼びません。
 
 #### 新しい版の確認（デスクトップ版・サーバ版の共通部分）
 
 `internal/updatecheck` に置きます。知らせ方（トレイ・画面の帯・管理画面・doctor・起動時のログ）と置き換えは、デスクトップ版とサーバ版がそれぞれ受け持ちます。
-呼んでいるのはデスクトップ版（§5-4「新しい版の知らせ」）と `looptrack serve`（下の「サーバ版の知らせと自動の置き換え」）です。
+呼んでいるのはデスクトップ版（§5-4「新しい版の知らせ」）・`looptrack serve`（下の「サーバ版の知らせと自動の置き換え」）・`self-update` の GitHub の経路（上の「配布と更新」）です。
 
 | 項目 | 決定 |
 | -- | -- |
@@ -590,7 +729,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 
 #### サーバ版の知らせと自動の置き換え
 
-`looptrack serve`（チームのサーバ・ローカルモードの serve とも。`cmd/looptrack/serve_update.go`）は、上の確認で新しい版を知らせます。**置き換えは既定では行いません**（利用者の決定。自動の置き換えは `install.sh --auto-upgrade on` で有効にしたときだけ）。コンテナのイメージは自動では置き換えず、知らせるだけです。
+`looptrack serve`（チームのサーバ・ローカルモードの serve とも。`cmd/looptrack/serve_update.go`）は、上の確認で新しい版を知らせます。**置き換えは既定では行いません**。これは利用者の決定で、自動の置き換えは `install.sh --auto-upgrade on` で有効にしたときだけ。コンテナのイメージは自動では置き換えず、知らせるだけです。
 
 | 項目 | 決定 |
 | -- | -- |
@@ -679,7 +818,7 @@ guide が返す Markdown の中身:
 - 候補が無ければ `action: none` になります。`ready` / `summary` を見て利用者に相談するよう返します。
 - 着手（started）したら CLI はトークンのスナップショットを送ります（§9-5 の経路 ①。op は status）。
 - started の応答にも、他の状態変更と同じく `usage_notice`（§9-5 の経路 ③）が載ります。CLI は付与に失敗したときだけ表示します（`after_change`）。MCP はツール結果の本文の末尾に付けます。
-- In Progress への判定も `set_status` と同じ関数（`checkStatus`）を通ります。そのため `usage.require_on_close` などトークン計測の規則も同じように効きます（In Progress は対象外）。
+- In Progress への判定も `set_status` と同じ関数（`checkStatus`）を通ります。`usage.require_on_close` などトークン計測の規則も同じように効きます。In Progress は対象外。
 
 #### init（導入の一発化）
 
@@ -722,7 +861,7 @@ GitHub Copilot に書くもの:
 
 - `.github/hooks/looptrack.json` に SessionStart の `summary --agent copilot --hook-json` を書きます。このファイルは VS Code のエージェントモードと Copilot CLI の両方が読みます。
 - 形は `{"version": 1, "hooks": {<イベント>: [{type, command, timeoutSec, matcher?}]}}` です。イベント名は PascalCase で書きます。CLI を VS Code 互換の入力（snake_case）にそろえます。
-- VS Code は標準出力を JSON として読みます。そのため `hookSpecificOutput.additionalContext` に包みます。
+- VS Code は標準出力を JSON として読むので、`hookSpecificOutput.additionalContext` に包みます。
 - コマンドに `LOOPTRACK_API_URL=… LOOPTRACK_PROJECT=…` を前置します。パスは `git rev-parse --show-toplevel` から引きます。
 - `AGENTS.md` の案内節も書きます（**操作は MCP のツールが主**）。Codex と一緒なら Codex の案内に「GitHub Copilot から使うとき」を足した 1 節にします。
 - トークン計測は `looptrack hook usage --agent copilot --event <イベント>` を PostToolUse・Stop・SessionEnd に matcher なしで配線します。送るのは OpenTelemetry のファイル出力を有効にした利用者だけです。
@@ -733,22 +872,22 @@ GitHub Copilot に書くもの:
   - `.mcp.json` は Claude Code と共用なので使いません。
   - `~/.copilot/mcp-config.json` は案内だけです。
 - hook の 1 件は `command` と同じ `bash`（CLI）を持ちます。Windows 用の `powershell`（CLI・PowerShell 7）/ `windows`（VS Code・5.1）も持ちます。`powershell` / `windows` には `command` と同じ `looptrack hook …` を置きます。環境変数の前置は PowerShell の形です（Windows での実物は未確認です）。
-- CLAUDE.md の管理節は Copilot も読みます。そこで冒頭に「Claude Code 向け。Copilot・Codex は AGENTS.md」と書きます。
+- CLAUDE.md の管理節は Copilot も読むので、冒頭に「Claude Code 向け。Copilot・Codex は AGENTS.md」と書きます。
 - `.claude/settings.json` に hooks があれば「Copilot はそれも読む」と知らせます（kit/README.ja.md「Copilot での対応」）。
 
 | 性質 | 内容 |
 | -- | -- |
 | 書くだけ | 承認は利用者が行います。Claude Code なら再起動とフックの確認です。Codex ならターミナルの `codex` の `/hooks` で信頼します（デスクトップ版にも効きます）。完全な無人化はしません |
 | 冪等・マージ | 既存の設定は消しません。同じ hook がどこかのコマンドに既にあれば足しません。matcher が同じグループがあればそこへ足します。意味が変わらなければファイルを書き直しません（書式の差で差分を出しません）。再実行すると「変更はありません」と出ます |
-| 案内節 | `<!-- looptrack:begin … -->` 〜 `<!-- looptrack:end -->` で囲み、再実行では節の中だけを差し替えます。手で入れた「## 課題管理（イシュー管理サーバ）」節があれば触らずに知らせます。skill は init が作ったもの（印つき）だけを上書きします |
-| 衝突 | 既存の `LOOPTRACK_PROJECT` / `LOOPTRACK_API_URL` と違う値は `--force` が無ければ拒否します。壊れた JSON は直すよう案内して止まります。**Looptrack のリポジトリ自身には導入しません**（拒否します） |
+| 案内節 | `<!-- looptrack:begin … -->` 〜 `<!-- looptrack:end -->` で囲み、再実行では節の中だけを差し替えます。本文と始まりの印は init の言語（日本語か英語）で選びます。始まりの印は日英のどちらでも同じ節と見るので、言語を変えて打ち直しても節は 1 つのまま差し替わります。手で入れた「## 課題管理（イシュー管理サーバ）」節があれば触らずに知らせます。skill は init が作ったもの（印つき）だけを上書きします |
+| 衝突 | 既存の `LOOPTRACK_PROJECT` / `LOOPTRACK_API_URL` と違う値は `--force` が無ければ拒否します。壊れた JSON は直すよう案内して止まります。**Looptrack のリポジトリ自身（kit の正本）には導入しません**。何も書かずに成功で終え、正本では init が要らない旨を出します（`--dry-run`・`--remove-loop` も同じ）。失敗にしないのは、サーバが正本と判定できずに取得と init をまとめたコマンドを返したとき、取得は済んだのにコマンドが失敗で終わらないようにするためです |
 | 控え | 変更するファイルとリンクは `.claude/.looptrack-init-backup/<時刻>/` に控えます（中に `.gitignore`）。`--dry-run` は差分だけを表示して何も書きません |
 | kit の置き方 | `link`（手元に Looptrack のリポジトリがあるとき）は相対 symlink を張ります。`copy` は実体を置きます。`server`（手元に無いとき）は `GET /api/v1/dist` の一覧（SHA-256）と本体を取ります。**ハッシュが一致しなければ何も書かずに止まります**。取得元は `--dist <URL>`（setup ツールの期限つき URL。トークン不要）があればそこです。無ければ `/api/v1/dist`（トークンが要ります）です。copy / server は `.claude/.looptrack-kit.json` に取得元とハッシュを控えます（更新の判定用。§8） |
 | 配布 | `kit/embed.go` が kit（`kit/core/…`・`kit/loop/…`）をバイナリに埋め込みます。`GET /api/v1/dist` は `{files: [{name, sha256, size}]}` を返します。`GET /api/v1/dist/{name}` は本体（`X-Looptrack-SHA256`）を返します。認証は他の API と同じでトークンが要ります。トークンの無い端末向けには、setup ツールが期限つきの取得 URL（`/looptrack/setup/<券>/`）を返します（§6） |
 
 #### MCP
 
-接続時の instructions で次を指示します（最後の 1 行の全文は §9-3-5）。
+接続時の instructions で次を指示します。最後の 1 行の全文は §9-3-5 に載せています。
 
 - 「最初に setup を 1 回呼ぶ」
 - 「次に guide を 1 回呼ぶ」
@@ -761,8 +900,8 @@ GitHub Copilot に書くもの:
 
 `list` / `ready` / `summary` の表では、ID・BLOCKED・ASSIGNEE の幅を**その一覧の中身に合わせて広げます**。既定の幅（ID 9・BLOCKED 8・ASSIGNEE 12）より狭くはしません。
 固定幅だと BLOCKED に ID が 2 つ入るだけで幅を超えます。するとその行だけ ASSIGNEE と TITLE が右にずれます。
-BLOCKED は 26 文字（ID 3 つ弱）を上限とし、超える値は 25 文字 +「…」に切ります（全部は `show` で見られます）。
-中身が既定の幅に収まる一覧の文字列は変わりません（ゴールデンテストの比較が保てます）。CLI と MCP の `rowsText` は同じ規則を使います。
+BLOCKED は 26 文字（ID 3 つ弱）を上限とし、超える値は 25 文字 +「…」に切ります。全部を見るなら `show`。
+中身が既定の幅に収まる一覧の文字列は変わらないので、ゴールデンテストの比較が保てます。CLI と MCP の `rowsText` は同じ規則を使います。
 
 ### 5-4. デスクトップ版
 
@@ -773,7 +912,7 @@ BLOCKED は 26 文字（ID 3 つ弱）を上限とし、超える値は 25 文�
 - `internal/client/desktop/tray`: トレイ（desktop ビルドだけ）
 - `internal/localserve`: 同じプロセスでローカルモードのサーバを動かします（`looptrack serve` と共用）
 
-配布物の組み立ては `deploy/release/desktop.sh` です（RELEASE.md「デスクトップ版」）。
+配布物の組み立ては `deploy/release/desktop.sh` です。手順は RELEASE.md「デスクトップ版」。
 
 #### 起動
 
@@ -785,7 +924,7 @@ BLOCKED は 26 文字（ID 3 つ弱）を上限とし、超える値は 25 文�
 | オプション | `--background`（ブラウザを開きません。ログイン時の自動起動が使います）・`--after-update`（置き換えた後の起動し直し。前のインスタンスがロックを放すのを待ちます。下の「置き換え」）・`--no-tray`・`--status`（起動中なら URL を出して 0、無ければ 1）・`--quit`。`--quit` は起動中のものを止めます。トレイが出ない環境やインストーラの逃げ道です。unix では SIGTERM を送ります。Windows ではトレイの窓（`SystrayClass`）に `WM_CLOSE` を送り、止まらなければ TerminateProcess で止めます（SQLite は WAL なので壊れません） |
 | インストーラ用 | `--enable-autostart`・`--install-cli`・`--unregister` の 3 つです。前の 2 つはインストール時の選択肢で、トレイのメニューと同じ処理を 1 回行って終わります。`--unregister` はアンインストールの後始末です。このアプリが登録した Run の値と、このアプリが置いた CLI の写しだけを消します（Linux の AppImage では、この AppImage のアプリ一覧の登録も消します）。**データは消しません**。3 つともサーバを上げず、ロックもデータの置き場も作りません |
 | 失敗の知らせ | ダブルクリックでは端末が無いので、起動の失敗やコピーの結果は OS の小さな知らせで出します。macOS では `osascript` の display alert を使います（文は引数で渡し AppleScript に埋め込みません）。Linux では zenity → kdialog → notify-send を使います。Windows では MessageBoxW を使います。詳細はログに出ます |
-| self-update | desktop ビルドは `self-update` を拒否します（`--check` は可）。配布の looptrack は headless なので、置き換えるとトレイとダブルクリックの起動が無くなるためです（Windows では GUI の exe がコンソールの exe に替わります）。デスクトップ版はアプリごと置き換えます |
+| self-update | desktop ビルド（macOS・Linux では CLI もこれと同じファイル。Windows では GUI の `Looptrack.exe`）は `self-update` を拒否します（`--check` は可）。配布の looptrack は headless なので、置き換えるとトレイとダブルクリックの起動が無くなるためです（Windows では GUI の exe がコンソールの exe に替わります）。デスクトップ版はアプリごと置き換えます。**Windows の zip の CLI（`cli\looptrack.exe`）と、アプリが写した `%LOCALAPPDATA%\Programs\looptrack\looptrack.exe` は例外**です。desktop の印を付けずに作る headless のビルドなので（`deploy/release/desktop.sh` の「build windows（CLI・headless）」）拒否せず、GitHub のサーバ版の書庫の `looptrack.exe` に置き換わります。GUI の `Looptrack.exe` は別のファイルなので、置き換えても失うものはありません。置き換えた後の写しは、ハッシュが印のファイルと食い違って `CLIOther` になり、アプリの更新でも「CLI を使えるようにする」でも上書きしません。アンインストールでも消しません（下の「CLI を使えるようにする」）。CLI がアプリより新しくなる版のずれは、起こりうるものとして残します |
 
 #### 二重起動の防止
 
@@ -824,7 +963,7 @@ BLOCKED は 26 文字（ID 3 つ弱）を上限とし、超える値は 25 文�
 
 #### 新しい版の知らせ
 
-確認そのもの（取得・チャンネル・署名・控え）は §5-1「新しい版の確認」の `internal/updatecheck` です。デスクトップ版（`internal/client/desktop/update.go`）は結果を知らせ、確認を止める切り替えを受け持ちます。置き換えは下の「置き換え」です（macOS・Linux。Windows は知らせにとどめます）。
+確認そのもの（取得・チャンネル・署名・控え）は §5-1「新しい版の確認」の `internal/updatecheck` です。デスクトップ版（`internal/client/desktop/update.go`）は結果を知らせ、確認を止める切り替えを受け持ちます。置き換えは下の「置き換え」です（macOS・Linux・Windows）。
 
 | 項目 | 決定 |
 | -- | -- |
@@ -844,18 +983,20 @@ BLOCKED は 26 文字（ID 3 つ弱）を上限とし、超える値は 25 文�
 
 | 項目 | 決定 |
 | -- | -- |
-| 対象 | macOS の `.app`（実行ファイルが `<名前>.app/Contents/MacOS/` の中にあるとき）と Linux の AppImage（`$APPIMAGE` が絶対パスのふつうのファイル）だけです。Windows と、それ以外の形で動いているとき（`looptrack desktop` を直に起動したなど）は置き換えず、先頭の項目はリリースのページを開きます |
-| 使う結果 | 知らせの元になった確認の結果（今回か控えの `last_ok`）です。**署名を確かめた**（`Result.Signed`）結果で、資産（`updatecheck.DesktopAsset` の名前）の `https://` の URL と署名された `SHA256SUMS` の SHA-256 を持つものだけを使います。鍵の無いビルドで確認先を差し替えたときの署名なしの知らせでは置き換えません |
-| 取得 | 資産を取得しながら SHA-256 を計り、署名された値と比べます（一覧の大きさを上限にします。無ければ 1GiB）。Linux は AppImage と同じディレクトリの一時のファイル、macOS はデータの置き場の `updates` に取ります |
+| 対象 | macOS の `.app`（実行ファイルが `<名前>.app/Contents/MacOS/` の中にあるとき）・Linux の AppImage（`$APPIMAGE` が絶対パスのふつうのファイル）・Windows の `Looptrack.exe`（絶対パスのふつうのファイルで、隣に `cli\looptrack.exe` があるとき。zip もインストーラもこの配置で置きます）です。名前だけでは決めません。同梱の CLI（`cli\looptrack.exe`）や CLI の写し（`%LOCALAPPDATA%\Programs\looptrack\looptrack.exe`）から `desktop` を起動したときに、CLI のフォルダを置き換えないためです。Windows は実行ファイルの隣に `unins000.exe`（Inno Setup のアンインストーラ）があればインストーラで入れたもの、無ければ zip を展開したものとして扱います。それ以外の形で動いているとき（`looptrack desktop` を直に起動したなど）は置き換えず、先頭の項目はリリースのページを開きます |
+| 使う結果 | 知らせの元になった確認の結果（今回か控えの `last_ok`）です。**署名を確かめた**（`Result.Signed`）結果で、資産の `https://` の URL と署名された `SHA256SUMS` の SHA-256 を持つものだけを使います。資産の名前は `updatecheck.DesktopAsset` で、Windows のインストーラ版だけは `updatecheck.DesktopInstallerAsset`（`Looptrack_<版>_windows_<arch>_setup.exe`）です。setup.exe 専用の `.minisig` は無く、署名された `SHA256SUMS` の行で確かめます。Windows では資産の名前の末尾が入れ方と合わない結果（インストーラ版に `.zip`・zip 版に `_setup.exe`。入れ直す前の `last_ok` など）を使いません。鍵の無いビルドで確認先を差し替えたときの署名なしの知らせでは置き換えません |
+| 取得 | 資産を取得しながら SHA-256 を計り、署名された値と比べます（一覧の大きさを上限にします。無ければ 1GiB）。Linux は AppImage と同じディレクトリの一時のファイルに取ります。macOS と Windows のインストーラ版はデータの置き場の `updates`、Windows の zip 版は `Looptrack.exe` と同じフォルダの一時のディレクトリ（`.looptrack-update-…`）です |
 | 確認（macOS） | `spctl --assess --type open --context context:primary-signature`（dmg）→ `hdiutil attach -nobrowse -readonly -noautoopen`（データの置き場の下にマウント）→ 今の `.app` と同じディレクトリの一時のディレクトリへ `ditto` → `codesign --verify --deep --strict` → `spctl --assess --type execute` → `codesign -dv` の `Identifier` が `BundleID` と同じこと・今の `.app` に `TeamIdentifier` があれば同じこと。マウントは必ず外します |
 | 確認（Linux） | SHA-256 の後に ELF の頭（`\x7fELF`）を確かめ、実行の権限（0755）を付けます |
-| 置き換え | 今のものを `<元の名前>.prev`（`Looptrack.app.prev`・`<AppImage のファイル名>.prev`）に改名し、新しいものを元の名前に改名します。どちらも同じディレクトリの中の rename です。前の `.prev` は先に消します（前の版は 1 つだけ残します）。2 つ目の改名に失敗したら `.prev` を戻します。AppImage のファイル名は変えません（自動起動・CLI のリンク・アプリ一覧の登録がそのまま効きます） |
-| 起動し直し | macOS は `open -n <.app> --args desktop --after-update`、Linux は AppImage を `desktop --after-update` で別のセッションに起こし（`Setsid`）、今のインスタンスは `App.Quit` で終わります。`--after-update` は前のインスタンスがロックを放すのを最大 60 秒待ってから起動し、ブラウザを開きません。起こせなければ新しいものを消して `.prev` を元の名前に戻し、今の版のまま動き続けます |
-| 書けないとき | 一時のディレクトリ・改名が権限で失敗したら（`/Applications` に書けないなど）置き換えません。macOS は確かめた dmg を開いて利用者のドラッグに任せ、Linux はリリースのページを開きます（どちらも知らせを出します） |
+| 確認（Windows） | 署名（Authenticode）はありません。SHA-256 の後に、インストーラ版は setup.exe、zip 版は中の `Looptrack.exe` の頭が `MZ` であることを確かめます。zip から取り出すのは `Looptrack\` の下の 4 ファイル（`Looptrack.exe`・`cli\looptrack.exe`・`NOTICE`・`OFL-BIZUDGothic.txt`）だけで、規則は `self-update` の取り出しと同じです（`..` を含む項目があれば zip ごと拒む・ふつうのファイルだけ・同じ名前が 2 つあれば拒む・1 ファイル 512MiB まで・1 つでも欠ければ拒む） |
+| 置き換え | 今のものを `<元の名前>.prev`（`Looptrack.app.prev`・`<AppImage のファイル名>.prev`）に改名し、新しいものを元の名前に改名します。どちらも同じディレクトリの中の rename です。前の `.prev` は先に消します（前の版は 1 つだけ残します）。2 つ目の改名に失敗したら `.prev` を戻します。AppImage のファイル名は変えません（自動起動・CLI のリンク・アプリ一覧の登録がそのまま効きます）。Windows の zip 版は 4 ファイルを 1 つずつ同じように改名します（動いている `Looptrack.exe` も改名はできます）。途中で失敗したら、済んだ分を逆順に戻します。今のフォルダに無いファイル（利用者が消した `NOTICE` など）は `.prev` を作らずに置きます。Windows のインストーラ版はここでは何も改名せず、上書きは setup.exe に任せます（`.prev` は作りません） |
+| 起動し直し | macOS は `open -n <.app> --args desktop --after-update`、Linux は AppImage を `desktop --after-update` で別のセッションに起こし（`Setsid`）、今のインスタンスは `App.Quit` で終わります。Windows の zip 版は新しい `Looptrack.exe` を `desktop --after-update` で切り離して起こします（`DETACHED_PROCESS`・`CREATE_NEW_PROCESS_GROUP`）。`--after-update` は前のインスタンスがロックを放すのを最大 60 秒待ってから起動し、ブラウザを開きません。起こせなければ新しいものを消して `.prev` を元の名前に戻し、今の版のまま動き続けます |
+| 起動し直し（Windows のインストーラ版） | 取得した setup.exe を `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /RELAUNCH=1 /LOG=<updates>\setup.log` で切り離して起こし（`replace.go` の `installerArgs`）、今のインスタンスは `App.Quit` で終わります。`/TASKS` は付けません（Inno が前回の選択肢を引き継ぎます）。前のインスタンスは `Looptrack.iss` の `PrepareToInstall`（`desktop --quit`）と `CloseApplications` で止まります。`/VERYSILENT` では `[Run]` の起動が `skipifsilent` で飛ばされるので、`[Code]` の `DeinitializeSetup` が `{param:relaunch|0}` が `1` のときに `{app}\Looptrack.exe desktop --after-update` を待たずに起こします。上書きが成功しても、失敗して Inno が元に戻しても起こします（失敗の理由は `/LOG` に残ります）。setup.exe を起こせなかったときは何も変えていないので、今の版のまま動き続けます。取得した setup.exe は動いている間は消せないので残し、次の取得の前に消します |
+| 書けないとき | 一時のディレクトリ・改名が権限で失敗したら（`/Applications` に書けないなど）置き換えません。macOS は確かめた dmg を開いて利用者のドラッグに任せ、Linux と Windows の zip 版はリリースのページを開きます（どれも知らせを出します） |
 | 失敗したとき | 今の版と前の `.prev` に手を付けず、一時のもの（取得物・写したもの・マウント）を消して、理由を知らせます（`Options.Alert`） |
 | 自動の置き換え | トレイの「新しい版を自動で入れる」（チェック・**既定は外れている**）。控え（`update-check.json`）の `"auto": true` に残します（`updatecheck.Prefs.Auto`。確認の設定には効きません）。入れていると、知らせが出たときに同じ手順を行います（同じ版は 1 回のインスタンスで 1 回だけ試します）。自動のときは書けなくても dmg やページを開かず、知らせだけを出します |
 | DB | 置き換えでは触りません。新しい版の最初の起動が migrate の前に控えを取ります（「データ・ログの置き場」の `backups`） |
-| テスト | 外部のコマンド（`Options.UpdateRun`）と起動し直し（`Options.UpdateStart`）を差し替え、一時ディレクトリでファイルの置き換え・改名・`.prev`・失敗時の戻しを確かめます（`replace_test.go`）。実機の `codesign`・`spctl`・`hdiutil`・Gatekeeper と、実際の AppImage の起動し直しはテストしていません |
+| テスト | 外部のコマンド（`Options.UpdateRun`）と起動し直し（`Options.UpdateStart`）を差し替え、一時ディレクトリでファイルの置き換え・改名・`.prev`・失敗時の戻しを確かめます（`replace_test.go`。Windows の 2 つの経路も `GOOS` を windows にしてどの OS でも走らせます）。動いている exe を改名して戻せることは Windows だけのテスト（`replace_windows_test.go`）、無人の上書き・起動し直し・失敗したときの起動し直しは `release.yml` の desktop-windows-installer の smoke で確かめます。実機の `codesign`・`spctl`・`hdiutil`・Gatekeeper と、実際の AppImage の起動し直しはテストしていません。Windows のスマート アプリ コントロール・Defender・SmartScreen が署名の無い setup.exe と zip 版の新しい exe を止めるか、トレイと帯の「更新する」からの通し、フォルダごとの改名が拒まれるか、arm64 の実機は確かめていません。前の版の `cli\looptrack.exe.prev` を MCP のサーバなどがまだ動かしていると、次の更新で `.prev` を消せずに書けない置き場として扱い、リリースのページを開くとみられます（実機では未確認） |
 
 systray の OS ごとの仕組み:
 
@@ -873,6 +1014,7 @@ systray の OS ごとの仕組み:
 - 置いた CLI は**トークンの発行もログインもせずにそのまま使えます**。このアプリのサーバはローカルモードで、CLI もそれに合わせるためです（§3-3 の「CLI」の行）。
   URL は `looptrack desktop --status` が出すもの（末尾の `/` を除く）を `LOOPTRACK_API_URL` に渡します。
 - 既にある普通のファイル（setup・self-update で入れたもの）と利用者が自分で作ったリンクは触りません（「そのまま使える」と知らせます）。
+  アンインストールの `--unregister` も同じで、self-update で新しくした写しと印のファイルは消しません。
 - 起動のたびに、このアプリが作ったものが古ければ直します。古いと見なすのは次の 2 つです。
   - リンクの先が別の場所の .app / AppImage のとき（動かした場合や AppImage のファイル名に入る版が変わった場合）
   - Windows のコピーが同梱のものと違い、かつ置いたときの SHA-256 のままのとき（self-update で新しくしたものは戻しません）
@@ -880,7 +1022,7 @@ systray の OS ごとの仕組み:
 - **Windows で symlink にしない理由**: 開発者モードか管理者権限が要るためです。
 - **.cmd のシムにしない理由**: hook がシェルを通さずに起動すると動きません。Ctrl+C で「バッチ ジョブを終了しますか」も出ます。
 - **デスクトップ版の exe を CLI に使わない理由**: GUI の実行ファイル（`-H windowsgui`。ダブルクリックでコンソールの窓を出さないため）は標準出力が端末に出ません。
-  そのため Windows の zip にだけ CLI の exe を別に同梱します（大きさは 2 倍になります）。
+  だから Windows の zip にだけ CLI の exe を別に同梱します。大きさは 2 倍になります。
 
 #### ログイン時の自動起動（管理者権限不要）
 
@@ -890,11 +1032,11 @@ systray の OS ごとの仕組み:
 | Linux | `$XDG_CONFIG_HOME/autostart/looptrack.desktop`（既定 `~/.config/autostart`。Exec は Desktop Entry の引用規則で書きます。AppImage は `$APPIMAGE`） |
 | Windows | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` の値 `Looptrack` = `"<Looptrack.exe>" desktop --background` |
 
-メニューのチェックで登録と削除をします。起動のたびに登録を確かめ、中身が今のアプリの場所と違えば書き直します（.app や AppImage を動かしても続きます）。
+メニューのチェックで登録と削除をします。起動のたびに登録を確かめ、中身が今のアプリの場所と違えば書き直すので、.app や AppImage を動かしても続きます。
 
 #### アプリ一覧への登録（Linux の AppImage）
 
-AppImage には中の `looptrack.desktop` を外へ出す仕組みが無く、そのままではランチャーやアクティビティの検索から起動できません。そこでアプリが自分で登録します（`internal/client/desktop/appmenu.go`）。
+AppImage には中の `looptrack.desktop` を外へ出す仕組みが無く、そのままではランチャーやアクティビティの検索から起動できません。代わりにアプリが自分で登録します（`internal/client/desktop/appmenu.go`）。
 
 | 項目 | 決定 |
 | -- | -- |
@@ -909,9 +1051,9 @@ AppImage には中の `looptrack.desktop` を外へ出す仕組みが無く、�
 
 #### Bundle ID（仮）
 
-`net.howashoji.looptrack` です（配布元の識別子で、macOS の署名の識別子と合わせています）。置き場は `internal/client/desktop/app.go` の `BundleID` の 1 か所だけです。
+`net.howashoji.looptrack` です。配布元の識別子で、macOS の署名の識別子と合わせています。置き場は `internal/client/desktop/app.go` の `BundleID` の 1 か所だけです。
 `desktop.sh` はそこから読んで Info.plist の `CFBundleIdentifier` に入れ、LaunchAgent の Label にも使います。変えると既に登録した LaunchAgent は
-古い名前のまま残ります（変えるときは移し替えを足してください）。sign-macos.sh の `--id-prefix`（単体の実行ファイルの識別子）とは別物です。
+古い名前のまま残ります。変えるときは移し替えを足してください。sign-macos.sh の `--id-prefix`（単体の実行ファイルの識別子）とは別物です。
 
 #### 配布物
 
@@ -920,7 +1062,7 @@ AppImage には中の `looptrack.desktop` を外へ出す仕組みが無く、�
 | macOS | `Looptrack_<版>_macos_universal.dmg` | `Looptrack.app`（universal・`LSUIElement`＝Dock に出さない・最低 macOS 13＝Go の要件・アイコン `Looptrack.icns`・`NOTICE`・`OFL-BIZUDGothic.txt`）と `/Applications` へのリンクです。署名は .app → staple → dmg → dmg の署名・公証・staple の順です（sign-macos.sh） |
 | Linux | `Looptrack_<版>_linux_<x86_64|aarch64>.AppImage` | AppDir を squashfs にして type2-runtime の後ろにつなぎます。詳細は表の下の「AppImage の中身と起動の条件」です |
 | Windows | `Looptrack_<版>_windows_<amd64|arm64>_setup.exe` | **インストーラ**です（Inno Setup 7。下の「Windows のインストーラ」）。中身は同じ版の zip と同じ実行ファイルです |
-| Windows | `Looptrack_<版>_windows_<amd64|arm64>.zip` | 持ち運び用です（インストーラを使わない形も残します）。`Looptrack\Looptrack.exe`（desktop・GUI・アイコンは rsrc v0.10.2 で埋め込む）・`Looptrack\cli\looptrack.exe`（headless）・`NOTICE`・`OFL-BIZUDGothic.txt` |
+| Windows | `Looptrack_<版>_windows_<amd64|arm64>.zip` | 持ち運び用です（インストーラを使わない形も残します）。`Looptrack\Looptrack.exe`（desktop・GUI）・`Looptrack\cli\looptrack.exe`（headless）・`NOTICE`・`OFL-BIZUDGothic.txt`。2 つの exe にはアイコンと版の情報（ProductName `Looptrack`・ProductVersion＝ビルドの版）を go-winres v0.3.3 で埋め込みます（`internal/tools/winversion`） |
 
 AppImage の中身と起動の条件:
 
@@ -936,13 +1078,13 @@ AppImage の中身と起動の条件:
 - 入れられない環境では `APPIMAGE_EXTRACT_AND_RUN=1` を付けます。または `--appimage-extract` で展開して `squashfs-root/usr/bin/looptrack` を直に動かします。どちらも実測で動きます（利用者ガイドに書きます）。
 
 SHA256SUMS は従来どおり署名の後の最終ファイルから作ります。デスクトップ版の 7 つも入ります（release.yml の sums）。
-Windows の exe とインストーラは当面署名しません（SmartScreen の「詳細情報 → 実行」を利用者ガイドに書きます）。
+Windows の exe とインストーラは当面署名しません。SmartScreen の「詳細情報 → 実行」を利用者ガイドに書きます。
 
 #### Windows のインストーラ
 
 `deploy/release/windows/Looptrack.iss` です（**Inno Setup 7**・7.1.0 に固定）。組み立ては `desktop.sh windows-installer` で行います
-（zip の中身をそのまま入れる＝持ち運び用と同じ実行ファイル）。ISCC は Windows でしか動きません。そのため release.yml の
-`desktop-windows-installer` ジョブで作ります（amd64 は windows-2025・arm64 は windows-11-arm）。
+（zip の中身をそのまま入れる＝持ち運び用と同じ実行ファイル）。ISCC は Windows でしか動かないので、release.yml の
+`desktop-windows-installer` ジョブで作ります。amd64 は windows-2025、arm64 は windows-11-arm。
 
 | 項目 | 決定（利用者・2026-09-20） |
 | -- | -- |
@@ -976,12 +1118,12 @@ Windows の exe とインストーラは当面署名しません（SmartScreen �
 | github.com/godbus/dbus/v5 v5.1.0 | BSD-2-Clause | desktop（Linux） |
 | github.com/atotto/clipboard v0.1.4 | BSD-3-Clause | desktop・headless（`internal/client/desktop` は両方に入ります。headless では使いません） |
 | AppImage type2-runtime 20251108 | MIT | Linux の AppImage（実行ファイルの先頭。中に静的リンクされた部品は下の表） |
-| github.com/akavel/rsrc v0.10.2 | MIT | ビルドの道具だけ（成果物には入りません） |
+| github.com/tc-hib/go-winres v0.3.3・github.com/tc-hib/winres v0.2.1 | 0BSD | ビルドの道具だけ（成果物には入りません。作るのは資源のデータだけの .syso で、道具のコードはリンクされない。道具の依存の urfave/cli・blackfriday・go-md2man・smetrics・x/image・nfnt/resize も MIT・BSD・ISC） |
 
-第三者のライセンス文はリポジトリのルートの `NOTICE` にまとめて全ての配布物に添えます。`looptrack licenses` でも表示します（手順は RELEASE.md「2-2. NOTICE」）。
+第三者のライセンス文はリポジトリのルートの `NOTICE` にまとめて全ての配布物に添えます。`looptrack licenses` でも表示します。手順は RELEASE.md「2-2. NOTICE」。
 `NOTICE` は `go run ./internal/tools/notice` が作ります。材料はリリースの全ての形でリンクされるモジュールと、Go・BIZ UDGothic の OFL・AppImage の type2-runtime です。
 各節にはソースの入手先の URL（リポジトリと module proxy の zip）を書きます。MPL-2.0（`github.com/go-sql-driver/mysql`）の「実行ファイルで配るときに受け取った人へソースの入手先を知らせる」義務に応えるためです。
-AppImage の先頭の type2-runtime（MIT）は Go のモジュールではありません。そこでライセンス文の写しを `deploy/release/licenses/` に置き、NOTICE と AppImage の `usr/share/doc/looptrack/` の両方に入れます。
+AppImage の先頭の type2-runtime（MIT）は Go のモジュールではないので、ライセンス文の写しを `deploy/release/licenses/` に置き、NOTICE と AppImage の `usr/share/doc/looptrack/` の両方に入れます。
 
 #### AppImage の runtime に静的リンクされた部品（LGPL-2.1 への対応）
 
@@ -999,8 +1141,8 @@ Alpine Linux 3.21 + clang（`-static -static-pie`）で作り、次の 6 つを�
 | zlib | 1.3.1 | Zlib | ビルド環境の apk |
 | mimalloc | 2.1.7 | MIT | runtime の `Makefile` の `-lmimalloc` です。**上流の `LICENSE` の列挙には載っていない**ので、こちらで補っています |
 
-GPL-2.0 の `fusermount3` は同梱せず、利用者の OS に入っているものを実行します（GPL の義務は生じません）。
-Looptrack 自身（`usr/bin/looptrack`）はこれらの部品と一切リンクしません（MIT の Go の実行ファイルです）。
+GPL-2.0 の `fusermount3` は同梱せず、利用者の OS に入っているものを実行するので、GPL の義務は生じません。
+Looptrack 自身（`usr/bin/looptrack`）はこれらの部品と一切リンクしません。MIT の Go の実行ファイルです。
 
 libfuse が LGPL-2.1 なので、**LGPL-2.1 §6(a) + §6(d)** で対応します。
 
@@ -1060,7 +1202,7 @@ MCP 接続（OAuth・X-Looptrack-Project）── instructions: 最初に setup
   - `X-Looptrack-Session-Kind: host` が添えてあれば REST の `actor` と同じに読み、付与の対象から外します（§9-5「器のセッション ID」）。配る接続設定はセッション系のヘッダを送りません（理由は同じ節の表）。
 - **無ければ、合鍵（PreToolUse の hook が届けた、そのツール呼び出しの会話のセッション ID）を使います**。
   - core の hook `issue-session-bind` が、looptrack の MCP のツール（サーバ名は `LOOPTRACK_MCP_SERVER`・既定 `looptrack`。値は Go の正規表現（RE2）で、読めないときは合わないものとして扱い、MCP のツールの呼び出しのときだけ変数名と誤りを 1 行で知らせます）を呼ぶ直前に、`POST /projects/{slug}/session-binds` で `tool_use_id` と hook の入力の `session_id` を届けます。MCP の呼び出しより先に届く必要があるので、切り離さずに同期で送り、1.5 秒で打ち切ります。URL が無い・届かない・時間切れ・古いサーバ（404 `unknown_api`）・拒否のどれでも、何も出さずに呼び出しを通します（fail-open）。
-  - サーバは `tool_use_id` を `service.ToolUseHash` で検査・ハッシュにして、メモリの置き場（利用者 × ハッシュ → セッション ID と種類。期限 2 分・10,000 件まで。満ちたら期限切れを掃除し、それでも満ちていれば期限の近いものから捨てます）に置きます。**生の値は持ちません**。表にはしません（migration・grants は要りません。SQLite 版でも同じに動きます）。
+  - サーバは `tool_use_id` を `service.ToolUseHash` で検査・ハッシュにしたうえで、メモリの置き場に置きます。置き場には利用者 × ハッシュ → セッション ID と種類を、期限 2 分・10,000 件まで持ちます。満ちたら期限切れを掃除し、それでも満ちていれば期限の近いものから捨てます。**生の値は持ちません**。表にはしません。migration・grants は要らず、SQLite 版でも同じに動きます。
   - `mcpCallOf` は `_meta` の `claudecode/toolUseId` のハッシュで、**同じ利用者の**合鍵だけを引きます。印 `mcp-conn:` は付けません。会話のセッション ID なので、CLI が名乗る値とそのまま比べられます（同じ接続の 2 つの会話も見分けられます）。
   - 引けないとき（届いていない・別の利用者が届けたもの・期限切れ・`_meta` が無い・形が違う）は、下の接続 ID か空に戻ります。
   - hook は種類（`kind`）を送りません。器の窓でも hook の入力の `session_id` は会話のセッション ID で、器の印を付けると付与できている MCP の操作まで対象から外してしまうからです（§9-5「器のセッション ID」の「MCP 経路で印を送るか」）。入力に `session_id` が無ければ送りません（環境変数には倒しません）。口は `X-Looptrack-Session-Kind` と同じ読み方で `kind` を受けます（`host` だけを印にし、知らない値は読み捨てます）。
@@ -1070,7 +1212,7 @@ MCP 接続（OAuth・X-Looptrack-Project）── instructions: 最初に setup
   - これで MCP の接続設定にヘッダを書けない AI でも、同じ利用者の別の接続を区別できます。接続を張り直すと値が変わります。
 - **印を付けるのは、クライアントが名乗るセッション ID（環境変数由来）と種類が違うためです**。
   - 同じ AI が CLI と MCP を併用すると、同じセッションでも値が違います。
-  - そこで**種類の違う ID どうしは「同じか違うか」を比べません**（`service.ComparableSessions`）。比べると自分の着手を別のセッションの扱いにしてしまいます。
+  - このため**種類の違う ID どうしは「同じか違うか」を比べません**（`service.ComparableSessions`）。比べると自分の着手を別のセッションの扱いにしてしまいます。
 - **比べられないときも黙って自分のものとして扱わず、一覧と `next` に「別の経路（CLI / MCP）で着手されています。同じセッションかは判定できません」と出します**。
   - 使う名前は `cross_path_session` / `cross_path_sessions`・`server.api.issue.cross_path_note` です。
   - 判定できないことを伏せると見落としの側に倒れるからです。
@@ -1078,7 +1220,7 @@ MCP 接続（OAuth・X-Looptrack-Project）── instructions: 最初に setup
 
 MCP の操作を会話に結ぶ:
 
-- 接続 ID か空のセッション ID で着手した MCP の操作は、CLI から見ると「同じセッションか判定できない」になります。そこで、付与の hook（§9-5 の ②）が後から送るスナップショットの会話のセッション ID に、その操作を結びます。
+- 接続 ID か空のセッション ID で着手した MCP の操作は、CLI から見ると「同じセッションか判定できない」になります。付与の hook（§9-5 の ②）が後から送るスナップショットの会話のセッション ID に、その操作を結びます。
 - **突き合わせの鍵はツール呼び出しの ID です**。Claude Code は `tools/call` の `_meta` の `claudecode/toolUseId` に、同じ呼び出しの PostToolUse の hook の `tool_use_id` と同じ値を入れます。付与の hook はそれをスナップショットの `tool_use_id` として送ります。
   - サーバは呼び出しの時点で値を検査し（1〜128 字の英数字・`_`・`-`）、SHA-256 の 16 進の先頭 32 字を `issue_events.detail` の `tool_use` に残します（`service.ToolUseHash`。**生の値は残しません**）。外れた値・キーが無い・文字列でない値は黙って捨てます。
   - `claudecode/` は公開の仕様ではありません。無ければ従来どおり（接続 ID か空のセッション ID）に倒れます。
@@ -1118,7 +1260,7 @@ MCP の操作を会話に結ぶ:
 
 `{project, agent, workspace?, ask?, loop_answer?, client {name, version, agent, source}, install（下の導入状態）, steps [{who: ai|human, title, command?, command_windows?, text?}], files [{name, sha256, size, url}], dist_url, dist_url_expires_at, text}`
 
-`ask` と `loop_answer` は下の「loop の問いの 2 段」で使います。答えごとに 2 通りのコマンドを返すことはしません（AI が自分で答えを決めてしまうためです）。
+`ask` と `loop_answer` は下の「loop の問いの 2 段」で使います。答えごとに 2 通りのコマンドを返すことはしません。AI が自分で答えを決めてしまうため。
 
 | 導入状態 | 手順 |
 | -- | -- |
@@ -1143,7 +1285,7 @@ missing と stale の手順:
   1. [AI] 上の 1 と同じ取得 + init です。loop の答えがあれば、その旗を付けた 1 つにします（init は 1 回だけ。`self-update` と `--url` の無い init は返しません）。
   2. [AI] 確認（任意）: 置いた looptrack に `LOOPTRACK_API_URL`・`LOOPTRACK_PROJECT` を前置した `issue installed --agent <種類>` です（AI の作業環境の環境変数に頼りません）。
 
-**loop の問いの 2 段**（利用者の判断 2026-09-19）: 1 つの結果に問いと答えごとの 2 通りのコマンドを並べていた時期がありました。すると AI が問いを示さずにコマンドを実行することがありました（Copilot CLI 1.0.86 の実物で 3 回中 2 回。モデルによる差があります）。問いの段階を飛ばせない形にするため、setup を 2 段にしています。Claude Code・Codex・Copilot で同じ形です。
+**loop の問いの 2 段**（利用者の判断 2026-09-19）: 1 つの結果に問いと答えごとの 2 通りのコマンドを並べていた時期がありました。すると AI が問いを示さずにコマンドを実行することがありました。Copilot CLI 1.0.86 の実物で 3 回中 2 回。モデルによる差があります。問いの段階を飛ばせない形にするため、setup を 2 段にしています。Claude Code・Codex・Copilot で同じ形です。
 
 | 呼び出し | 返すもの |
 | -- | -- |
@@ -1173,13 +1315,13 @@ missing と stale の手順:
 - yes には hook の承認を添えます。no の手順の見出しには辞退の説明（作業ディレクトリごとに問う）を添えます。
 
 作業ディレクトリ単位の判定とも組み合わさります。導入済みの別の作業ディレクトリしか無ければ、その作業ディレクトリは missing・loop 未選択として扱います。1 回目は問いを返し、答え（と同じ `workspace`）を付けた 2 回目で手順を返します。
-AI が利用者に問わずに `loop` を付けて呼ぶことまでは防げません。そこで「利用者の答えを得てから loop を付けて呼ぶ」を次の 5 か所に書いています。setup の説明・引数 `loop` の説明・本文の先頭・接続時の instructions・prompt `setup` です。
+AI が利用者に問わずに `loop` を付けて呼ぶことまでは防げないので、「利用者の答えを得てから loop を付けて呼ぶ」を次の 5 か所に書いています。setup の説明・引数 `loop` の説明・本文の先頭・接続時の instructions・prompt `setup` です。
 既知の限界もあります（利用者の判断 2026-09-19 で制約として受け入れました）。
 2 段にした後も Copilot CLI 1.0.86 の auto で選ばれた mai-code-1.1-flash は、答えを渡さない 8 回すべてで問いを利用者に示しませんでした。自分で `loop` を決めて呼び直しています（7 回は yes）。
 答えを渡した回（gpt-5.6-luna）は、答えに合うコマンドを 1 つだけ実行しようとしました。サーバの結果の形では問いの段階を強制できません（モデル依存です）。loop が意図せず入ったときは `looptrack issue init --remove-loop` で外せます。
 **古い呼び方**: `loop` も `workspace` も付けずに呼ばれたとき、問いが要る状態なら問いだけを返します。本文の先頭に呼び直し方があり、ツールの一覧（`tools/list`）の setup にも引数 `loop` が出ます。問いを示した後に呼び直せば導入できます。`commands` を読んで実行する作りの AI は、コマンドが無いので何も実行しません（誤って導入することはありません）。
 
-**本文（text）の形と大きさ**: Copilot CLI は大きなツール結果を一時ファイルに逃がし、先頭のプレビュー（実物で 500 文字）だけを AI に渡します。MCP の instructions も既定では system prompt に入りません。そのため本文の**先頭**に見出しと AI への指示を置きます。見出しは `# イシュー管理の導入（<slug>・<AI>）: 未導入` のような状態の短い語です。問いだけの結果は、上の表のとおり指示と問いの全文を先頭 500 文字に収めます。手順の結果には「[AI] の手順は承認を得てから実行・[利用者] の手順は依頼」の 1 行を置きます（答えつきなら答えも）。
+**本文（text）の形と大きさ**: Copilot CLI は大きなツール結果を一時ファイルに逃がし、先頭のプレビュー（実物で 500 文字）だけを AI に渡します。MCP の instructions も既定では system prompt に入りません。だから本文の**先頭**に見出しと AI への指示を置きます。見出しは `# イシュー管理の導入（<slug>・<AI>）: 未導入` のような状態の短い語です。問いだけの結果は、上の表のとおり指示と問いの全文を先頭 500 文字に収めます。手順の結果には「[AI] の手順は承認を得てから実行・[利用者] の手順は依頼」の 1 行を置きます（答えつきなら答えも）。
 配布物の一覧は本文に出しません。出すのは取得コマンドが確かめる実行ファイルのハッシュの 1 行と、件数・一覧の URL だけです。全件の SHA-256 は構造化データの `files` / `binaries` と一覧 `/setup/<券>/` にあります。init は一覧の SHA-256 で確かめます。
 大きさは AI に渡る本文で測り、テストで固定しています（`TestSetupTextSize`）。
 
@@ -1190,20 +1332,20 @@ AI が利用者に問わずに `loop` を付けて呼ぶことまでは防げま
 - 構造化データ（`_meta`）は AI に渡らない前提なので測りません（変更前: 本文 10.6 KB・結果全体 37 KB → 変更後: 本文 6.6 KB）。
 
 **作業ディレクトリの単位の判定**: 導入済み通知は利用者 × プロジェクト × AI で 1 行（最後の通知）です。そのままでは同じプロジェクトの 2 つ目の作業ディレクトリ（別のリポジトリ・clone・端末）でも「導入済み」を返していました。手順も出ませんでした（Codex の実物で発生）。
-そこで setup の任意の引数 `workspace` の**最後の要素（ディレクトリ名）**を、通知の `workspace` と比べます。
+対策として、setup の任意の引数 `workspace` の**最後の要素（ディレクトリ名）**を、通知の `workspace` と比べます。
 
 - 引数は AI の作業ディレクトリの git のルートの絶対パスです。接続時の instructions・setup の説明・prompt `setup` で渡すよう案内しています。
 - 通知の `workspace` は CLI が送る導入先ディレクトリの名前です（パスは送りません）。
 - 比べるときは大文字小文字を区別せず、「/」「\」の区切りを受けます。引数は保存しません。
 
 違えばその作業ディレクトリは missing として手順を返します。loop の選択もその作業ディレクトリで問い、本文に最後の通知の作業ディレクトリ・ホスト・時刻を出します。`workspace` を渡さない呼び方と、通知に `workspace` が無いとき（送らない古い CLI）は従来どおりです。
-MCP のツール結果に付ける【導入が未完了】は従来の単位（利用者 × プロジェクト × AI）のままにします。要求に作業ディレクトリが無いためです。setup なら AI が引数で渡せますが、他のツールの呼び出しごとに渡させるのは重すぎます。
+MCP のツール結果に付ける【導入が未完了】は従来の単位（利用者 × プロジェクト × AI）のままにします。要求に作業ディレクトリが無いため。setup なら AI が引数で渡せますが、他のツールの呼び出しごとに渡させるのは重すぎます。
 
-**Copilot 向けの手順のコマンド**: Copilot（CLI・VS Code）は `.claude/settings.json` の env を CLI に渡しません。そのため agent が copilot のときは、サーバの URL とプロジェクトの環境変数を手順のすべてのコマンドの前に置きます（login の手順の文中の `config` の確認も含みます）。置くのは `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT` です。手順のコマンドは利用者の端末に貼られることがあるので、値を呼び出し元のシェルに残さない形にします（残ると、同じ端末で別のプロジェクトに移ったときに、そちらの looptrack が黙ってこのプロジェクトに向きます）。sh は、手順のコマンド（`&&` でつないだ取得 + init を含む）をサブシェルの `(export A=… B=… && <コマンド>)` で包みます。文中に示す単純コマンド（`config` の確認・辞退済みの案内の init）と確認の `installed` は `A=… B=… <コマンド>` です。PowerShell は `& { $__ltPrevApiUrl = $env:A; $__ltPrevProject = $env:B; $env:A = '…'; $env:B = '…'; try { <コマンド> } finally { $env:A = $__ltPrevApiUrl; $env:B = $__ltPrevProject } }` で、終わったら（失敗しても）前の値に戻します。退避の変数名は、包む中身（取得の手順の `$U`・`$S`・`$D`・`$B`・`$P`）と重ならない名前にします（PowerShell の変数名は大小を区別しないため）。sh の前置は環境変数の `LOOPTRACK_*` だけで、中身のシェル変数（`U`・`S`・`D`・`sum`）とは重なりません。Claude Code には付けません。ただし更新の後の確認（`installed`）と other の `installed` は、どの AI でも単純コマンドの形で付けます。
+**Copilot 向けの手順のコマンド**: Copilot（CLI・VS Code）は `.claude/settings.json` の env を CLI に渡さないので、agent が copilot のときは、サーバの URL とプロジェクトの環境変数を手順のすべてのコマンドの前に置きます。login の手順の文中の `config` の確認も含みます。置くのは `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT` です。手順のコマンドは利用者の端末に貼られることがあるので、値を呼び出し元のシェルに残さない形にします。残ると、同じ端末で別のプロジェクトに移ったときに、そちらの looptrack が黙ってこのプロジェクトに向きます。sh は手順のコマンド（`&&` でつないだ取得 + init を含む）をサブシェルの `(export A=… B=… && <コマンド>)` で包みます。文中に示す単純コマンド（`config` の確認・辞退済みの案内の init）と確認の `installed` は `A=… B=… <コマンド>` です。PowerShell は `& { $__ltPrevApiUrl = $env:A; $__ltPrevProject = $env:B; $env:A = '…'; $env:B = '…'; try { <コマンド> } finally { $env:A = $__ltPrevApiUrl; $env:B = $__ltPrevProject } }` で、終わったら（失敗しても）前の値に戻します。退避の変数名は、包む中身（取得の手順の `$U`・`$S`・`$D`・`$B`・`$P`）と重ならない名前にします。PowerShell の変数名は大小を区別しないため。sh の前置は環境変数の `LOOPTRACK_*` だけで、中身のシェル変数（`U`・`S`・`D`・`sum`）とは重なりません。Claude Code には付けません。例外は更新の後の確認（`installed`）と other の `installed` で、どの AI でも単純コマンドの形で付けます。
 CLI（Go 版）の「サーバの URL がありません」の案内では URL を固定値（本番）で出しません。代わりに `<サーバの URL>`（MCP の接続設定の URL から末尾の `/mcp` を除いたもの）と書きます。ローカルのサーバでは固定値が誤りになるからです。
 
 **期限つきの取得 URL（券）**: `/looptrack/setup/<券>/`（一覧。`GET /api/v1/dist` と同じ JSON）と `/looptrack/setup/<券>/<名前>`（本体・`X-Looptrack-SHA256`）の 2 つです。
-券は「用途 dist・利用者 ID・期限」を `LOOPTRACK_SECRET_KEY` の AES-GCM で封じたものです（DB に置かず、改ざんできません）。**有効期間は 1 時間で、配布物の取得だけ**に使えます。
+券は「用途 dist・利用者 ID・期限」を `LOOPTRACK_SECRET_KEY` の AES-GCM で封じたものです。DB に置かず、改ざんできません。**有効期間は 1 時間で、配布物の取得だけ**に使えます。
 無効化された利用者の券は通しません。無効・期限切れのときは 403 で「setup ツールを呼び直す」と返します。
 **理由**: MCP の接続（OAuth）はあっても CLI のトークンがまだ無い端末があります。そうした端末でも手作業なしで配布物を取れるようにするためです。`/api/v1/dist` は公開しません（従来の決定を保ちます）。券は AI の会話に載ります。ただ 1 時間で失効し、配布物の取得以外には使えません。
 
@@ -1215,7 +1357,7 @@ CLI（Go 版）の「サーバの URL がありません」の案内では URL �
 | 送る内容 | `{agent, trigger, source（link / copy / server。symlink なら link、実体なら .looptrack-kit.json（無ければ旧 .im-dist.json）の値）, files {配布ファイル名: SHA-256}（実体＝symlink ならリンク先の内容から計算）, host（ホスト名）, workspace（導入先ディレクトリの名前。パスは送らない）, self_repo（looptrack 自身のリポジトリからの通知のときだけ true）, core {bundle_sha256}, loop {installed, declined, bundle_sha256, version}}`。`core` / `loop` は `.claude/.looptrack-kit.json` の控えから作ります（§8。無ければ送りません） |
 | 保存 | 利用者 × プロジェクト × AI の種類で 1 行です（最後の通知で上書きします）。`hook_at` はフックからの通知でだけ進み、手動の通知では消えません。`bundle_sha256` は名前順の「名前 ハッシュ」行の SHA-256 です |
 | 判定 | missing → **no_hook** → **stale** → current の順に見ます。missing は行が無い状態です。no_hook は claude-code / codex で `hook_at` が無い状態で、フックが承認されて動いた証拠がありません。stale は `scripts.Names` のどれかが現在の配布物と違うか、kit の core / loop の一式のハッシュが違う状態です（§8）。other はフックが無いので手動の通知で current になります |
-| 自分自身 | `self_repo` が立っている導入では**kit（core / loop）を配布物と比べません**。looptrack 自身のリポジトリの kit は配布物より新しい元データなので、差が出るのが当たり前です。促された `issue init` の再実行はクライアントが「自身です」と拒否します。`--dir` で押し通すと古い配布物が元データを上書きしてしまいます。判定は配置（`kit/embed.go` と `cmd/looptrack`）を見るクライアントの `cli.IsSelfRepo` の 1 か所です。`init` の拒否も同じものを使います。比べなかったことは状態の文に出します（`server.mcp.setup.state.self_repo`）。実行ファイルの古さ（`self-update`）は抑えません。**loop も問いません**: 未選択でも `setup` は loop の問いを出さず、引数 `loop` を付けても `init` のコマンドを返しません（辞退の記録があっても `init --loop` を勧めません）。答えに合わせて返す `init` はクライアントが拒否するので、問いに答えても実行できないコマンドしか返らないからです。正本の `.claude/` は kit を指して手で配線します。loop が未選択か辞退の正本の導入を「正本として扱う」判定は `selfRepoLoop` の 1 か所で、setup の問い（`needLoopAsk`）・loop の状態の文（`loopPhrase`。`server.mcp.setup.loop.self_repo`）・辞退の勧め・guide の「次に読むもの」・prompt `loop` の選択（§8）がこれを使います。loop が installed の正本の導入は通常どおり扱います |
+| 自分自身 | `self_repo` が立っている導入では**kit（core / loop）を配布物と比べません**。looptrack 自身のリポジトリの kit は配布物より新しい元データなので、差が出るのが当たり前です。促された `issue init` を正本で実行しても、クライアントは何も書かずに終えます。書けば古い配布物が元データを上書きしてしまいます。判定は配置（`kit/embed.go` と `cmd/looptrack`）を見るクライアントの `cli.IsSelfRepo` の 1 か所です。`init` が何もしない判定も、要約と `doctor` が init に触れない正本用の直し方を出す判定も、同じものを使います。比べなかったことは状態の文に出します（`server.mcp.setup.state.self_repo`）。実行ファイルの古さ（`self-update`）は抑えません。ただし古いときに `setup` が返す取得の手順は、取得・置き換え・PATH の段だけで `init` を含みません（`fetchStep`。古いときの案内も `server.mcp.setup.update.refetch_self_repo` にして「取得と `init` をまとめた 1 つ」と書きません）。正本に `init` は要りません。以前のクライアントは正本での `init` を拒否したので、付けると looptrack は置き換わったのにコマンド全体が失敗で終わりました。置き換えた版は確認の手順（`issue installed`。正本からも `self_repo` と版を送る）か次のセッション開始時のフックが知らせます。この除外は loop の状態を問わず `self_repo` だけで決めます（loop が installed の正本でも `init` は何もしないため）。**loop も問いません**: 未選択でも `setup` は loop の問いを出さず、引数 `loop` を付けても `init` のコマンドを返しません（辞退の記録があっても `init --loop` を勧めません）。答えに合わせて返す `init` は正本では何もしないので、問いに答えても意味のないコマンドしか返らないからです。正本の `.claude/` は kit を指して手で配線します。loop が未選択か辞退の正本の導入を「正本として扱う」判定は `selfRepoLoop` の 1 か所で、setup の問い（`needLoopAsk`）・loop の状態の文（`loopPhrase`。`server.mcp.setup.loop.self_repo`）・辞退の勧め・guide の「次に読むもの」・prompt `loop` の選択（§8）がこれを使います。loop が installed の正本の導入は通常どおり扱います |
 | 権限 | プロジェクトの閲覧権限があれば送れます（viewer も CLI とフックを使うためです）。見えないプロジェクトは 404 です。入力の検査に外れると 400 です。検査するのは agent・trigger・source の値と、files が 1〜32 件・名前に `/` を含まない・ハッシュが 16 進 64 文字であることです |
 | 読む | `GET /projects/{slug}/install` → `{project, installs: [claude-code, codex, other の状態], latest_bundle_sha256}`（自分の分だけ） |
 
@@ -1270,7 +1412,7 @@ prompt review の手順:
 攻撃者のドメインを 127.0.0.1 に向けると、ブラウザは手元のサーバへ要求を送りますが、Host はそのドメインのまま届きます。
 go-sdk の既定の判定（ループバックのアドレスで受けた要求は、Host もループバックでなければ 403）は、
 **127.0.0.1 で待ち受け、リバースプロキシ（nginx / Caddy）が公開の Host を渡す配置**（`install.sh` の systemd 方式）では、MCP の要求をすべて 403 にします。
-そこで SDK の判定は切り（`DisableLocalhostProtection`）、`/mcp` の入口（認証より前）で次のように判定します（`mcpHostAllowed`）。
+このため SDK の判定は切り（`DisableLocalhostProtection`）、`/mcp` の入口（認証より前）で次のように判定します（`mcpHostAllowed`）。
 
 | 受けたローカルアドレス | Host（ポートを除く） | 結果 |
 | -- | -- | -- |
@@ -1288,7 +1430,7 @@ go-sdk の既定の判定（ループバックのアドレスで受けた要求�
 
 - 人の承認は最低 1 回要ります（コマンドの実行許可・フックの承認）。CLI のログインでは AI が `looptrack issue login --browser` を実行します。利用者はブラウザでログインと承認をします（§3-2。トークンは会話に出ません）。ブラウザの無い環境だけは、発行したトークンを `login --url` に貼る手作業が残ります。
 - 同じ利用者が複数の端末に導入した場合、状態は最後に通知した端末のものになります。setup の `workspace` も最後の通知とだけ比べます。
-  そのため 2 つの作業ディレクトリで同時にセッションを開くと、導入済みの側でも「未導入」になることがあります。後から通知した他方の名前と違う場合です。
+  この仕組みのため、2 つの作業ディレクトリで同時にセッションを開くと、導入済みの側でも「未導入」になることがあります。後から通知した他方の名前と違う場合です。
   手順の init を再実行しても「変更はありません」で終わるので、壊れはしません。名前だけを比べるので、別のホストの同名のディレクトリは区別できません。
 - 手で配線した既存のプロジェクト（`--agent` の無い SessionStart）は通知を送りません。`looptrack issue init` を再実行すると `--agent` が付きます。
 
@@ -1324,6 +1466,7 @@ go-sdk の既定の判定（ループバックのアドレスで受けた要求�
 - ボードの応答は `ETag`（弱い。`generated` を除いた内容のハッシュ）を持ちます。画面は `If-None-Match` を付けて見直します。
 - 変化が無ければ本文の無い **304** が返り、転送も描き直しもしません（`generated` の分単位の変化は変化に数えません）。
 - 304 でも「… 時点」を進められるよう、`generated` はヘッダ `X-Looptrack-Generated` でも返します。
+- 表示形式と絞り込みの条件は、ブラウザの localStorage にプロジェクトごと（キー `im.filters.<slug>`）で残し、次に開いたときに戻します（`static/board_prefs.js`）。サーバにもアカウントにも持ちません。対象は表示形式・検索語・型・優先度・「着手可能」「クローズ済みを隠す」「未応答の反応」・ラベル・担当です。読み戻しは 1 項目ずつ検め、知らない値は捨てて既定のままにします。ボードの JSON が届いた最初の 1 回だけ、今のデータに無いラベルと担当を外します。並び順は別のキー `im.sort` のままです。localStorage が使えない環境では、保存も読み戻しも諦めて既定で開きます。デスクトップ版が別のポートに逃げた回は origin が変わるので、条件は引き継がれません
 - 取得に失敗したら console と画面の帯（`#loadError`・文面は対訳表の `server.web.board.load_failed` など）に出します。次の周期で取り直し、成功すると帯を消します。
 
 ヘッダの組み立て:
@@ -1356,7 +1499,7 @@ go-sdk の既定の判定（ループバックのアドレスで受けた要求�
 - 失敗（403・400・ルールの 422）したら、サーバの `error.message` をフォームの下にそのまま出します。
 - 上書きできる違反（`error.overridable`。`usage` / `verify` のクローズ時の必須など）なら「上書きの理由」の欄を出し、再送できるようにします。
 - 4 秒ごとの見直しでは、ドロワーのフォームに書きかけがあれば詳細を開き直しません。
-- 画面の操作は人の操作です。そのため `usage.require_on_close`（AI の操作だけが対象）には掛かりません。
+- 画面の操作は人の操作なので、`usage.require_on_close` には掛かりません。この規則の対象は AI の操作だけです。
 
 ## 8. kit（導入セット core / loop と選択導入）
 
@@ -1374,7 +1517,7 @@ init（§5-2）と setup（§6）が各プロジェクトへ入れるものを 2
 - 配るのは `core/`・`loop/` の下だけです（`README.md`・`embed.go`・「.」「_」で始まるファイルは出しません）。`kit/loop` が無い版でもビルドは通ります。
 - 本体は `GET /api/v1/dist/{name...}`・`/looptrack/setup/<券>/{name...}` で取れます。`/` を含む名前はそのままのパスでも、`%2F` で 1 セグメントにしても取れます。一覧に無い名前は 404 です。
 - 導入状態の比較（§6 の stale）では、スクリプトをファイルごとに比べます（`distSums`）。kit は **core と loop を別々に一式のハッシュで**比べます（`latestDist`・下の「導入済み通知の core / loop」）。
-- `kit/loop/manifest.json` が配線を持ちます。形は `{version: 1, layer: "loop", entries: [{name, kind: hook|rules|skill|script|verify, event, matcher, timeout, order, runner: "bash", codex: {event, matcher, block?} | null, verify}]}` です。
+- `kit/loop/manifest.json` が配線を持ちます。形は `{version: 1, layer: "loop", entries: [{name, kind: hook|rules|skill|script|verify, event, matcher, timeout, order, runner: "looptrack", codex: {event, matcher, block?} | {agents_md} | null, copilot: codex と同じ形}]}` です。
   - `name` は `kit/loop/` からの相対パスで、kit/loop のファイルと 1 対 1 です。event〜order は hook だけが持ちます。
   - init はこれを読んで settings.json / hooks.json / AGENTS.md を書きます。CLI 側に配線を書き込まないので、増減は manifest だけで済みます。
   - 形式の詳細と hook の環境変数（`LOOPTRACK_LOOP_*`）は kit/README.ja.md「loop の置き方」にあります。
@@ -1417,7 +1560,7 @@ init（§5-2）と setup（§6）が各プロジェクトへ入れるものを 2
 | `--remove-loop` | loop の配線（settings.json / hooks.json のエントリ・AGENTS.md の loop 節）と symlink を外します。**利用者が手で変えたファイル（ハッシュ不一致）は消さず、名前を挙げて残します**。core と手で置いた hook は触りません。`.looptrack-kit.json` の `loop` は `installed: false` にします（`removed_at`・`declined_at` つき。以後は問いません）。`--project` は要りません |
 | 再実行 | 入っている loop は指定なしでも更新します。manifest とハッシュを突き合わせ、差分のあるファイルだけを書きます。**copy / server で手で変えたファイル（`files` のハッシュと違うもの）は上書きせず、名前を挙げます**。kit から無くなったファイルは、手で変えていなければ消します。変更が無ければ「変更はありません」と出します（既存と同じ） |
 
-マージ規則は §5-2 のとおりです（同じスクリプト名のコマンドがあれば足さない・matcher が同じグループへ足す・書式だけの差で書き直さない）。loop の hook は `manifest.json` の `order` の順に**既存の hook の後ろ**へ足します。各プロジェクトが手で置いた hook の順序を変えないためです。
+マージ規則は §5-2 のとおりです（同じスクリプト名のコマンドがあれば足さない・matcher が同じグループへ足す・書式だけの差で書き直さない）。loop の hook は `manifest.json` の `order` の順に**既存の hook の後ろ**へ足します。各プロジェクトが手で置いた hook の順序を変えないため。
 
 ### 導入済み通知の core / loop（§6 への追加・マイグレーション 0009）
 
@@ -1454,8 +1597,8 @@ init（§5-2）と setup（§6）が各プロジェクトへ入れるものを 2
 
 ### Codex
 
-`kit/loop/manifest.json` の `codex` に従い、hook は `.codex/hooks.json` へ同じイベントで配線します。**Stop でブロックできるかは実物で確かめていません**。確認できるまで Stop 系（引き継ぎ鮮度・runaway）は `codex.block: false` で「注入のみ」にします（manifest で切り替えます）。
-rules は `AGENTS.md` に `<!-- looptrack:loop:begin -->` 〜 `<!-- looptrack:loop:end -->` の節として追記します。skills は AGENTS.md の同じ節に短い手順として入れます（Codex に skill はありません）。
+`kit/loop/manifest.json` の `codex` に従い、hook は `.codex/hooks.json` へ同じイベントで配線します。**Stop でブロックできるかは実物で確かめていません**。確認できるまで Stop 系（引き継ぎ鮮度・runaway）は `codex.block: false` で「注入のみ」にします。manifest で切り替える設定です。
+rules は `AGENTS.md` に `<!-- looptrack:loop:begin -->` 〜 `<!-- looptrack:loop:end -->` の節として追記します。skills は AGENTS.md の同じ節に短い手順として入れます。Codex に skill はありません。
 何を入れるかは manifest の rules / skill の `codex.agents_md` に従います。
 
 - `sections`: Codex 向けの `looptrack:inject session` の節と、全文の置き場への 1 行
@@ -1507,7 +1650,7 @@ rules は `AGENTS.md` に `<!-- looptrack:loop:begin -->` 〜 `<!-- looptrack:lo
 | `done_requires_keyword` | 例 | Done には既存または同時コメントに指定の語（例「動作確認」）を含むこと |
 | `forbid_checkbox_pattern` | 例 | 受け入れ条件のチェックボックス行に反映・マージ依頼（ENV × ACTION × ASK − EXEMPT）を書かせない |
 | `usage` | 任意 | `{"require_on_close": true}` で、AI からの操作で Done / Canceled（`statuses` で変更可）にするとき、その会話のトークン情報がイシューに 1 件以上あることを求める（§9-5。理由付きで上書き可）。無い・`false` なら警告だけ（既定）。`case_pattern`（正規表現）はトークンレポートの案件別の規則（§9-5「案件ラベル別」）で、判定には使わない。例は `CASE-\d+`。`send_prompts: true`で指示文の作業名を送れるようにする（§9-5「指示文」。既定 false。Web のプロジェクト管理画面でも切り替えられる） |
-| `verify` | 任意（§9-3-4） | `{"require_on_close": true}` で、「## 検証コマンド」節を持つイシューを Done（`statuses` で変更可。既定は Done だけ）にするとき、**現在の本文**に対する直近の `verify` の記録が全件成功であることを求める（記録なし・本文が変わった・失敗の 3 通りの文言で `looptrack issue verify <ID>` を案内。理由付きで上書き可）。節の無いイシューには効かない。AI の操作に限らず全ての経路に効く |
+| `verify` | 任意（§9-3-4） | `{"require_on_close": true}` で、「## 検証コマンド」節を持つイシューを Done（`statuses` で変更可。既定は Done だけ）にするとき、**現在の本文**に対する直近の `verify` の記録が全件成功であることを求める（記録なし・本文が変わった・失敗の 3 通りの文言で `looptrack issue verify <ID>` を案内。理由付きで上書き可）。節の無いイシューには効かない。AI の操作に限らず全ての経路に効く。`require_evidence`（既定は入。ルールを何も設定していないプロジェクトにも効く）は `require_on_close` と独立に、検証コマンドを 1 つ以上持つイシューを Done にするとき、現在の本文に対する直近の記録に添付（エビデンス）があることを求める（§9-3-4「エビデンスの網」。理由付きで上書き可）。`false` にすると拒否の代わりに注意だけを返す |
 | `acceptance` | 任意 | `{"require_on_close": true}` で、「## 受け入れ条件」節を持つイシューを Done（`statuses` で変更可。既定は Done だけ。Canceled は既定で対象外）にするとき、節に**中身のある行が 1 行以上**あることを求める（起票の雛形のまま・空のチェックボックス・「（未記入）」だけなら拒否。`looptrack issue edit <ID>` を案内。理由付きで上書き可）。節の無いイシューには効かない。AI の操作に限らず全ての経路に効く。有効なプロジェクトでは、**着手（In Progress 以外から In Progress への遷移。`next` を含む）の時点で節が雛形のままなら、止めずに注意を応答に載せる**（`service` の `setStatus` で判定。REST の `messages` と `acceptance_notice`・`next` の `text` と `acceptance_notice`・MCP の本文・Web の状態の変更フォームの下。close の直前に初めて気づいて実装の後追いで条件を書くのを防ぐ。拒否しないのは、調査・記録のように条件を先に書きにくいイシューで上書きの常用を招かないため） |
 | 共通 | 全体 | 採番アトミック、列挙値、コメント append-only、クローズ済みの本文・項目は編集不可 |
 
@@ -1538,7 +1681,7 @@ CLI の `looptrack issue zero-bug-gate`）は、**2026-09-20 に製品から撤�
 イテレーション規律の「1 イテレーション = 1 実装イシュー」「発見 = 起票」は撤去後も残ります。サーバが強制しなくなっただけです。
 
 **`projects.rules` に残ったキーの扱い**: `domain.ParseRules` は未知のキーを拒否します（`DisallowUnknownFields`）。
-キーを解釈する側を消すだけでは、設定が残っているプロジェクトでイシューの読み書きが全経路で失敗します。そこで撤去では次の 2 つを両方行いました。
+キーを解釈する側を消すだけでは、設定が残っているプロジェクトでイシューの読み書きが全経路で失敗します。撤去では次の 2 つを両方行いました。
 
 | | 内容 |
 | -- | -- |
@@ -1589,7 +1732,7 @@ REST・MCP・画面は同じ `internal/service` を通り、判定は `service.a
 
 判定は 権限（403）→ 担当の指定の検査（400）→ クローズ済み（422）→ R2 / R3（422）→ プロジェクト別ルール（`checkStatus`）の順です。
 担当の検査は行ロックの中（`mutate`）で行うので、同時に 2 人が引き継いでも片方だけが通ります。
-`override_reason` はプロジェクト別ルールの上書き（§9-1）と共用します。1 つの理由で両方を通し、記録は規則ごとに残します。
+`override_reason` はプロジェクト別ルールの上書き（§9-1）と共用。1 つの理由で両方を通し、記録は規則ごとに残します。
 
 #### 記録（`issue_events`。kind に CHECK は無いのでマイグレーション不要・append-only のまま）
 
@@ -1600,10 +1743,10 @@ REST・MCP・画面は同じ `internal/service` を通り、判定は `service.a
 | `assignee_override` | R2 の本文 / 項目の更新を override で通したとき（`update` の後に残す。担当は替わらない） | `assignee`（その時の担当の login）・`reason`・`op`（`update`）。直した人はイベントの主体（`actor_user_id`・セッション） |
 
 状態変更と同時に担当が変わるときは `status` → `assign` →（`assignee_takeover`）の順に残します。鮮度ガード（`activity`）は最後のイベントを見るので、
-担当の変更でも `last_at` が進みます（要件 4）。トークン情報の突き合わせ（§9-5）が数える kind（`usage.Ops` = create / update / comment / status / verify / assign）には `assign` も入ります
-（MCP の `assign_issue` と、`assignee` を伴う `update_issue` が書くため。数えないと、その取りこぼしは未付与の一覧にすら現れません）。
+担当の変更でも `last_at` が進みます（要件 4）。トークン情報の突き合わせ（§9-5）が数える kind（`usage.Ops` = create / update / comment / status / verify / assign）には `assign` も入ります。
+MCP の `assign_issue` と、`assignee` を伴う `update_issue` が書くため。数えないと、その取りこぼしは未付与の一覧にすら現れません。
 単独の `assign` の応答には付与の指示（`usage_notice`）を載せませんが、MCP のフック（§9-5 の ②）は `assign_issue` を拾って付与し、
-CLI の `assign` も担当が変わったとき（応答の `changed` が真のとき）に付与します（§9-5 の ①。op は `assign`）。
+CLI の `assign` も担当が変わったとき（応答の `changed` が真のとき）に付与します。§9-5 の ① で、op は `assign`。
 
 #### API・CLI・MCP
 
@@ -1619,7 +1762,7 @@ CLI の `assign` も担当が変わったとき（応答の `changed` が真の�
 #### AI への案内（guide・MCP instructions）
 
 サーバが拒否するだけだと、AI は 422 を受けてから考えることになります。そこで規則を先に案内します。guide（`internal/guide/common.md`）では
-「起票・編集」の後に「担当者（重複作業の防止）」の節を置き、次の段落を載せます。一字一句の一致はテストで確かめます。
+「起票・編集」の後に「担当者（重複作業の防止）」の節を置き、次の段落を載せます。一字一句の一致はテストで確認。
 
 > **担当者**: 他の利用者が担当のイシューは In Progress にしない・本文や項目を直さない（サーバが 422 `assigned_to_other` で拒否する）。依頼や確認はコメントで伝える。引き継ぐとき・担当者に代わって直すときは、利用者に確認してから `--override "理由"`（MCP は `override_reason`）を付ける。In Progress にするときの override と `assign <ID> me --override "理由"`（MCP は `assign_issue`）は担当が自分に替わる（引き継ぎ）。本文の編集（`push` / `update_issue`）の override は担当を替えずに通り、誰が理由付きで直したかが記録に残る。`next` は自分が担当か未設定のイシューだけを取る。In Progress 以外への状態変更とコメントは担当に関係なくできる。
 
@@ -1627,10 +1770,33 @@ MCP の instructions では、本文の編集の行の次に下の 1 行を置�
 
 > 担当者: 他の利用者が担当のイシューは In Progress にしない・本文を直さない（サーバが 422 で拒否する。依頼や確認は add_comment）。引き継ぐとき・担当者に代わって本文を直すときは、利用者に確認してから override_reason を付ける（set_status の In Progress と assign_issue は担当が自分に替わる。update_issue は担当を替えずに通り、理由が記録に残る）。next は自分が担当か未設定のイシューだけを取る。
 
+エビデンス（検証の証跡）の規則も同じ 2 か所に置きます。規則の本文は guide の 1 か所だけです。
+guide では「作業の進め方（ループの 1 周）」の後に「エビデンス（検証の証跡を添付する）」の節を置き、次の本文を載せます。
+ほかの場所はこの節を短く指すだけにします。
+
+- MCP の instructions（下の 1 行）
+- verify の計画の文面。`verifyText` の末尾の 1 行で、CLI の `issue verify --list`・MCP の `verify_issue`・`GET /issues/{id}/verify` が出す（`next` の文面は別に組むのでこの行は通らない）
+- `next` の close の段の文面（`server.api.next.step_close`）。検証コマンドのあるイシューは `issue verify <ID> --attach-output` で記録に付けてから閉じる、と案内する（`issue attach` の添付は記録に付かない）
+- kit の rules（`iteration-discipline.md`）と skill（`iterate`・`issue`）
+
+> **検証したらエビデンスを取って Looptrack に添付します。** 「通った」と書いただけのコメントは後から誰も確かめられません。
+> - **何を添付するか**: いちばん大事なのはテストの出力の全文です（末尾だけや要約では足りない）。画面を変えたならその画面のスクリーンショットも撮ります。レポート・ビルドした成果物・書き出したファイルのような生成物があればそれも添付します。
+> - **CLI での送り方**: `looptrack issue attach <ID> <ファイル>...` で添付すると、添付の ID が出ます。verify の記録には `looptrack issue verify <ID> --attach <ファイル>` で付けられます。`--attach-output` を足すと切る前の出力の全文が付きます。
+> - **MCP での送り方**: MCP のツールはファイルを受け取りません。CLI の `looptrack issue attach` で送り、返った ID を `report_verify` の `attachments` に渡します。
+> - **添付が無いと Done にできない**: 本文に検証コマンドが 1 つ以上あるイシューでは、いまの本文に対する最新の verify の記録に添付が 1 つも無いと Done は拒否されます。記録そのものが無いときも拒否されます。既定で入っているプロジェクト別ルール `verify.require_evidence` の働きです。上書き（`--override "理由"`。MCP は `override_reason`）は利用者のはっきりした指示があるときだけ使います。このキーを切にしたプロジェクトでは拒否の代わりに注意だけが返ります。
+> - 秘密（トークン・パスワード・`.env` の値）が写ったファイルは添付しません。
+
+MCP の instructions では、ループの 1 周の行の次に下の 1 行を置きます。
+
+> エビデンス: 受け入れ条件を検証したら、テストの出力の全文・画面のスクリーンショット・生成物を CLI の looptrack issue attach <ID> <ファイル> で添付し、返った ID を report_verify の attachments に渡す（MCP のツールはファイルを受け取らない）。検証コマンドのあるイシューは、最新の verify の記録に添付が無いと Done を拒否される（プロジェクト別ルール verify.require_evidence。既定は入で、切ったプロジェクトでは注意だけ）。規則の全文は guide の共通規則の「エビデンス」にある。
+
+どちらも一字一句の一致をテストで確かめます。英語版（`internal/guide/en/common.md`・`mcpInstructionsEN`）は同じ位置に対訳を置き、
+コマンド・引数・キーの名前が入っていることを確かめます。
+
 #### マイグレーション 0008
 
 列・索引（`project_id, assignee_user_id`）・FK を足し、**現在 In Progress のイシューの担当を補います**。
-補う値は、最後に In Progress にした状態変更か起票のイベント（§5-2 の旧判定と同じ）の `actor_user_id` です。
+補う値は最後に In Progress にした状態変更か起票のイベント（§5-2 の旧判定と同じ）の `actor_user_id` です。
 補った分のイベントは残しません。マイグレーションは管理用の資格情報で動きます。
 `issue_events` の append-only はアプリ用ユーザーの権限で守っているので、そこは変えません。
 取り込んだだけで該当するイベントが無いものは未設定のままです。
@@ -1639,7 +1805,7 @@ MCP の instructions では、本文の編集の行の次に下の 1 行を置�
 
 参加を外したり役割を viewer に下げたりすると、その人はそのプロジェクトで担当にできなくなります。
 担当のまま残すと作業できない人の未クローズのイシューが残り、誰も引き継がないまま止まってしまいます。
-そこで変更の時点で代わりの担当者を決めてもらいます。
+これを防ぐため、変更の時点で代わりの担当者を決めてもらいます。
 
 | 項目 | 決定 |
 | -- | -- |
@@ -1666,7 +1832,7 @@ MCP の instructions では、本文の編集の行の次に下の 1 行を置�
 ### 9-3. 3 層のループ（検証コマンド・人の判断待ち・外からの反応）
 
 Andrew Ng の 3 層の入れ子ループ（① AI の作業ループ・② 人の判断のループ・③ 外からの反応のループ）をこのシステムで回します。
-① には「## 検証コマンド」節と `verify`（機械が判定する検証器）を使います。
+① で使うのは「## 検証コマンド」節と `verify`（機械が判定する検証器）。
 ② は AI へのプロンプト指示（prompt `review`）と `summary` の滞留が受け持ちます。
 ③ はコメント先頭の `フィードバック:` の規約と `summary` の「外からの反応」で扱います。
 **スキーマは変えません**。`verify` は `issue_events` の新しい kind で、フィードバックはコメントの先頭語なのでマイグレーションは要りません。
@@ -1758,6 +1924,7 @@ Andrew Ng の 3 層の入れ子ループ（① AI の作業ループ・② 人�
 AI の操作に限らず全ての経路に効きます。検証は誰が閉じても要るからです。起票で Done にする場合も同じ判定で、記録が無いので拒否します（上書きは可能）。
 
 判定の順は `forbid_status` → `done_requires_keyword` → `require_comment_before` → **`verify`** → `usage` です。DB を引く 2 つを後ろに置き、そのうち検証を先にします。
+エビデンスの網（下の「エビデンスの網」）はルールの有無に関わらず効くので、これらの後に別に見ます。
 
 判定の SQL です。`k_issue_events_issue_at` を使って 1 行だけ引きます。
 
@@ -1771,9 +1938,9 @@ SELECT JSON_UNQUOTE(JSON_EXTRACT(detail, '$.body_sha256')) AS body_sha256,
  LIMIT 1;
 ```
 
-通るのは、行がある **かつ** `body_sha256` が現在の本文の SHA-256 と一致する **かつ** `ok` のときです。**見るのは直近の 1 件だけです**。
+通るのは行がある **かつ** `body_sha256` が現在の本文の SHA-256 と一致する **かつ** `ok` のときです。**見るのは直近の 1 件だけです**。
 同じ本文で前に成功していても、その後に失敗していれば拒否します。今の状態を表すのは最後の実行だからです。
-経路は問いません（MCP の `report_verify` の自己申告も数えます）。
+経路は問わず、MCP の `report_verify` の自己申告も数えます。
 
 | 状態 | メッセージ（`{id}` `{command}` `{state}` を置換。`message` で上書き可） |
 | -- | -- |
@@ -1791,14 +1958,36 @@ SELECT JSON_UNQUOTE(JSON_EXTRACT(detail, '$.body_sha256')) AS body_sha256,
 5. `close` が通る
 
 verify 自身のコメントと `close --comment` は本文を変えないので、記録は有効なままです。
-設定は `looptrack project rules set <slug> deploy/rules/<slug>.json` で行います（§9-1 の運用。未知のキーや不正な `statuses` は拒否）。
+設定は `looptrack project rules set <slug> deploy/rules/<slug>.json` で行います。§9-1 の運用で、未知のキーや不正な `statuses` は拒否。
+
+##### エビデンスの網（`verify.require_evidence`）
+
+検証コマンドを 1 つ以上持つイシューを Done にするとき、現在の本文に対する直近の `verify` の記録に添付が 1 つも無ければ拒否します。
+**既定は入です。** ルールを何も設定していないプロジェクトにも効きます。
+記録そのものが無いときと、直近の記録の後に本文が変わったときも拒否します。見るのは `require_on_close` と同じ直近の 1 件で、添付の有無は `detail.attachments` が空でないかで読みます。
+verify の記録の後に添付を消去しても、その記録は「添付あり」のまま数えます。記録の `detail.attachments` だけを読むからです。消去は秘密を消すための操作で、この網の判定には戻りません。
+
+- 対象は Done だけです。Canceled は検証せずに終わらせる状態なので見ません。`statuses` はこの網には使いません。
+- 成否は見ません。失敗した記録でも添付があれば通ります。成否を求めるのは `require_on_close` の役目で、2 つは独立に効きます（`require_on_close` が切のプロジェクトでも、この網は既定で効きます）。
+- 本文に検証コマンドの無いイシューには効きません。「## 検証コマンド」節があってもコマンドが 0 件なら対象外です（判定は `domain.VerifyCheck.HasCommands` と同じ `domain.VerifyCommands`）。
+- 上書きは `--override "理由"`（MCP は `override_reason`）で、`rule_override` に `rule: verify_evidence_required` で残ります。`require_on_close` と両方に掛かる Done は、1 つの理由で両方を通し、記録は 2 行になります。
+- 起票で Done にする場合も同じ判定です。エビデンスの付いた記録はありえないので拒否します（上書きは可能）。
+
+判定は `internal/service` の `checkStatus` の最後（`checkEvidence`）と、起票（`Create`）の 2 か所です。Done への遷移はすべて `setStatus` を通るので、REST・MCP・CLI・Web のどこから閉じても同じ判定になります。
+応答は 422・`code: rule_violation`・`rule: verify_evidence_required`・`overridable: true` です。文面は記録なしと添付なしの 2 通りで、`looptrack issue verify {id} --attach-output` と MCP での送り方を案内します。`message` による上書きはありません。
+
+`"verify": {"require_evidence": false}` にしたプロジェクトでは、同じ条件で止めずに注意を返し、状態は Done になります。
+注意は着手の注意（`acceptance_notice`）と同じ経路に載ります。REST の `messages` と `evidence_notice`、MCP の本文と `evidence_notice`、Web の状態の変更フォームの下です。起票で Done にした場合は、起票の応答に載せる欄が無いので注意を出しません。
+
+旧版のクライアント（rc.5 まで）は添付を送れないので、この網の掛かるイシューは上書きでしか Done にできません。
+このキーを知らない旧版のサーバは、キーを含む rules を `project rules set` で拒否します。DB に残ったまま旧版へ戻すと、そのプロジェクトのルールが読めずに操作が失敗します。詳しくは DEPLOY.md の更新の節。
 
 ##### 節ごとのハッシュと「検証コマンドが起票時のまま」の警告
 
-`verify.require_on_close` が見るのは「記録があること」と「全件成功であること」だけです。そのため**起票時に書いた検証コマンドが、あとで更新された受け入れ条件を実証していなくても通ります**。
+`verify.require_on_close` が見るのは「記録があること」と「全件成功であること」だけです。**起票時に書いた検証コマンドが、あとで更新された受け入れ条件を実証していなくても通ります**。
 実際にこんなことがありました。受け入れ条件は「別の場所へ移す」に書き替わったのに、検証コマンドは起票時の `git ls-files <移す前の場所>` のままでした。
 移設の前後で出力の形が同じだったので 1/1 成功が記録され、その記録で close が通りました。
-そこで本文の**節ごとのハッシュ**を記録に残し、食い違いを警告します。成否は変えません。
+この穴を塞ぐため、本文の**節ごとのハッシュ**を記録に残し、食い違いを警告します。成否は変えません。
 
 | 項目 | 決定 |
 | -- | -- |
@@ -1847,7 +2036,7 @@ prompt **`review`** の全文です（`Title: 人の判断待ちと外からの�
 6. 扱った件数（Done・Todo へ戻した・残した・フィードバックへの応答）を報告して止まる。この prompt の中では next を呼ばない
 ```
 
-利用者がいないとき、`loop` は In Review とフィードバックを飛ばして `next` に進みます。In Review は `next` の候補にならないからです（§5-2 規則 2 のまま）。
+利用者がいないとき、`loop` は In Review とフィードバックを飛ばして `next` に進みます。In Review は `next` の候補にならないからです。§5-2 規則 2 のまま。
 `review` が利用者のいないときに呼ばれたら、一覧だけ報告して止まります。状態は変えません。
 CLI 側は `looptrack issue list --status "In Review"`・`summary`・`show` で足りるので、新しいサブコマンドは足しません。`skills/issue/SKILL.md`（kit/core）にも上の 2 段落を短く入れます。
 
@@ -1855,8 +2044,8 @@ CLI 側は `looptrack issue list --status "In Review"`・`summary`・`show` で�
 
 **スキーマ・権限・画面には手を入れません**。`comments` に列を足さず、画面にもフォームを足しません。`deploy/grants.sql` の「comments / issue_events は SELECT・INSERT のみ」もそのまま保ちます。
 
-**viewer はフィードバックを登録できません。** フィードバックは先頭に `フィードバック:` を付けた通常のコメントなので、**書けるのは editor 以上だけです**（`POST /issues/{id}/comments`・MCP `add_comment` の既存の権限。viewer は 403 のまま）。
-viewer 向けの入口（専用のコマンド・ツール・画面のフォーム・viewer に限ったコメント権限）は作りません（2026-09-18 の利用者の追加判断）。
+**viewer はフィードバックを登録できません。** フィードバックは先頭に `フィードバック:` を付けた通常のコメントなので、**書けるのは editor 以上だけです**。`POST /issues/{id}/comments`・MCP `add_comment` の既存の権限で、viewer は 403 のまま。
+viewer 向けの入口（専用のコマンド・ツール・画面のフォーム・viewer に限ったコメント権限）は作りません。2026-09-18 の利用者の追加判断です。
 参加者やテスターの反応は、editor 以上の人（AI を使う開発者）が聞いてイシューに残します。
 
 | 項目 | 決定 |
@@ -1991,7 +2180,7 @@ AI-GUIDE §2「ループ運用」には 5. の 2 段落（人の判断待ち・�
 
 ### 9-4. 下位がすべて完了した要件の検証と close
 
-**症状**: ループの 1 周で閉じるのは着手したイシューだけです。そのため下位（設計・実装）が全部 Done になっても、traces 先の要件は誰にも
+**症状**: ループの 1 周で閉じるのは着手したイシューだけなので、下位（設計・実装）が全部 Done になっても、traces 先の要件は誰にも
 促されずに開いたまま残っていました。下位が全部 Done なのに要件が Todo のままという例が複数ありました。
 
 **判定**は `domain.ClosableRequirements` / `ClosableFor` で行います。判定するのはサーバだけで、CLI と MCP は結果を表示するだけです。
@@ -2048,7 +2237,7 @@ AI-GUIDE §2「ループ運用」には 5. の 2 段落（人の判断待ち・�
 | Cline・Windsurf（Cascade）・opencode | それぞれ PostToolUse 相当あり（opencode はプラグインの `tool.execute.after`） | — | — | — | 未確認 |
 
 フックの入力の形は Claude Code・Codex・Gemini CLI でほぼ同じです（`session_id`・`transcript_path`・`tool_name`・`tool_input`・`tool_response`）。
-そのためトークン情報の hook は 1 本にして、項目名の違いだけを吸収します。
+トークン情報の hook は 1 本にして、項目名の違いだけを吸収します。
 
 アダプタが返せない項目は 0 / NULL にします（サブエージェントの別・読み書き量・関与の指標）。
 AI を足すときに要るのはアダプタ 1 つと、あればフックの配線だけです。
@@ -2109,19 +2298,19 @@ AI を足すときに要るのはアダプタ 1 つと、あればフックの�
 2. 隣り合う 2 件の差を「区間の消費」とします（会話の最初の 1 件は 0 からの差）。差が負になる行は巻き戻った枝なので 0 として捨て、件数を「不整合」として返します。
 3. **区間は、その区間を閉じたスナップショットのイシューに帰属させます**。起票の前の調査は起票したイシューへ、コメント・状態変更の前の作業はそのイシューへ入ります。
 4. `stop` / `session_end` で閉じた区間は、その会話で直前に操作したイシューが未クローズならそこへ入れます。そうでなければ **未帰属** です。
-5. 1 回の応答で複数のイシューを操作した場合（並列のツール呼び出し）は累計が同じなので、2 件目以降の差は 0 になります。つまり先に届いた 1 件に寄ります。
+5. 1 回の応答で複数のイシューを操作した場合（並列のツール呼び出し）は累計が同じなので、2 件目以降の差は 0 になり、先に届いた 1 件に寄ります。
 
 「作業中のイシューを In Progress で宣言させる」方式は採りません。宣言を忘れるとそのまま未帰属になります。しかも MCP の操作ではセッション ID が取れないので、宣言と区間を結べません。
 
 #### イベントとの突き合わせ（付与漏れの検知）
 
-`issue_events` は追記のみで、後から印を付けられません。そこで**結合で判定します**。
+`issue_events` は追記のみで、後から印を付けられないので、**結合で判定します**。
 同じイシュー・同じ利用者のスナップショットのうち、`COALESCE(attempted_at, received_at)` がイベントの `at` 以後 10 分以内のものがあれば「付与済み」です。
-再送のスナップショットは届いた時刻ではなく最初に送ろうとした時刻で見るので、送信に失敗して 10 分を過ぎてから再送が届いても元の操作に付きます
-（`trigger` は `issue_op` のままで、`manual` のように上限を外すことはしません。外すと、元の操作より後の同じイシューの別の操作まで付与済みに見えるためです）。
+再送のスナップショットは届いた時刻ではなく最初に送ろうとした時刻で見るので、送信に失敗して 10 分を過ぎてから再送が届いても元の操作に付きます。
+`trigger` は `issue_op` のままで、`manual` のように上限を外すことはしません。外すと、元の操作より後の同じイシューの別の操作まで付与済みに見えるためです。
 経過秒はクライアント自身の時計どうしの差なので、サーバとクライアントの時計のずれに左右されません。`resend_delay_sec` を付けない古いクライアントの再送は従来どおり届いた時刻で見ます。
 イベントの後に届いた `manual`（`usage attach` による回収）も、10 分を過ぎていても付与済みとします。回収すれば一覧と summary から消えます。
-対象は変更操作です（`kind` が `usage.Ops` = `create` / `update` / `comment` / `status` / `verify` / `assign`。サーバが受け付ける `op` と同じ一覧）。`rule_override` は同時の変更に付随するので数えません。
+対象は変更操作です。`kind` が `usage.Ops` = `create` / `update` / `comment` / `status` / `verify` / `assign` のもので、サーバが受け付ける `op` と同じ一覧。`rule_override` は同時の変更に付随するので数えません。
 突き合わせに使うので、`usage_snapshots.received_at` には DB の既定値ではなく**サーバの時計**の値を入れます（`issue_events.at` と同じ）。
 
 | イベント | 扱い |
@@ -2138,7 +2327,7 @@ claude.ai のコネクタのようにフックを置けないクライアント�
 Codex のシェルから打った CLI は `CODEX_THREAD_ID` を `X-Looptrack-Session` に載せるので、AI の操作として対象になります。以前はこれを読んでおらず、「人の操作」として対象外でした。
 
 既知の限界があります。同じ応答の中で同じイシューに同じ操作を 2 回すると（1 つの Bash で `comment` を 2 回など）、2 回目のスナップショットは累計が同じなので重複として捨てられます。
-そのため 2 回目の操作は未付与に数えられます。これは `usage attach` で回収できます。
+その結果、2 回目の操作は未付与に数えられます。これは `usage attach` で回収できます。
 
 | 出し先 | 内容 |
 | -- | -- |
@@ -2150,10 +2339,10 @@ Codex のシェルから打った CLI は `CODEX_THREAD_ID` を `X-Looptrack-Ses
 #### 器のセッション ID
 
 デスクトップ版の窓（器）によっては、Bash に `CLAUDE_CODE_SESSION_ID` が渡りません。渡るのは `CLAUDE_CODE_HOST_SESSION_ID`（その窓を通して一定の ID）だけです。
-実測では、上位のセッションのプロセスはすべて器の ID だけを持っていました。両方を持つのは子のエージェントの Bash だけです。
-ただし 2026-09-28 のデスクトップ版の器の窓（Claude Code 2.1.281）では、上位のセッションの Bash にも両方が渡っていました（名前と長さだけを確認）。渡るかどうかは版や窓で変わります。
-この ID は**並行するセッションを見分けるには足ります**（同じ利用者の別の窓は別の値になります）。
-ただし**会話記録（`~/.claude/projects/*/<セッション ID>.jsonl`）のファイル名とは一致しません**。実測では、器の ID は 42 文字で対応するファイルが無く、`CLAUDE_CODE_SESSION_ID` は 36 文字でファイルがありました。
+実測では上位のセッションのプロセスはすべて器の ID だけを持っていました。両方を持つのは子のエージェントの Bash だけです。
+一方、2026-09-28 のデスクトップ版の器の窓（Claude Code 2.1.281）では、上位のセッションの Bash にも両方が渡っていました。確かめたのは名前と長さだけです。渡るかどうかは版や窓で変わります。
+この ID は**並行するセッションを見分けるには足ります**。同じ利用者の別の窓は別の値になるからです。
+それでも**会話記録（`~/.claude/projects/*/<セッション ID>.jsonl`）のファイル名とは一致しません**。実測では器の ID は 42 文字で対応するファイルが無く、`CLAUDE_CODE_SESSION_ID` は 36 文字でファイルがありました。
 
 | 論点 | 決定 |
 | -- | -- |
@@ -2183,11 +2372,11 @@ Codex のシェルから打った CLI は `CODEX_THREAD_ID` を `X-Looptrack-Ses
 - `internal/setupwiz/mcpconfig_test.go` の `TestMCPConfigsOmitSessionHeaders`（**DB 無しで走ります**）: `setupwiz.MCPConfigs` の全設定に `X-Looptrack-Session` / `X-Looptrack-Session-Kind` が無いこと。
   対照として `X-Looptrack-Project` があることも同じテストで確かめます。
 
-**3 つの定数は `store` が `service` を参照できない都合で別々に定義されています**。そのため以前は値のずれが DB の要るテストでしか見つからず、DB 無しの検査はすべて緑のままでした。
+**3 つの定数は `store` が `service` を参照できない都合で別々に定義されています**。この都合で以前は値のずれが DB の要るテストでしか見つからず、DB 無しの検査はすべて緑のままでした。
 
 #### Codex のセッション ID
 
-CLI の操作を「AI の操作」と判定する根拠は `X-Looptrack-Session` です（上の表）。Codex では次の環境変数から得ます（2026-09-18 に確認）。
+CLI の操作を「AI の操作」と判定する根拠は `X-Looptrack-Session` です（上の表）。Codex では次の環境変数から得ます。2026-09-18 に確認。
 
 | 変数 | 中身 | 入った版 | 根拠 |
 | -- | -- | -- | -- |
@@ -2195,15 +2384,15 @@ CLI の操作を「AI の操作」と判定する根拠は `X-Looptrack-Session`
 | `CODEX_SESSION_ID` | 親の会話（root session）の ID。サブエージェントのスレッドも親と同じ値 | 2026-08（#37848） | 同上 `inject_session_env`。0.135 には無い |
 
 **判断**: CLI は `LOOPTRACK_SESSION_ID` → `CLAUDE_CODE_SESSION_ID` → `CLAUDE_SESSION_ID` → `CODEX_THREAD_ID` → `CODEX_SESSION_ID` の順に読みます。
-THREAD を先にするのは、会話記録とイベントの ID を揃えるためです（`usage_snapshot.detect` が同じ順でファイル名を引きます）。サブエージェントで SESSION を使うと親の記録を指してしまいます。
+THREAD を先にするのは、会話記録とイベントの ID を揃えるためです。`usage_snapshot.detect` が同じ順でファイル名を引きます。サブエージェントで SESSION を使うと親の記録を指してしまいます。
 Claude Code の変数を先にするのは、以前からの挙動を変えないためです。
 片方の中からもう片方を起動すると、両方の変数が子に残ります。内側がどちらかは環境変数からは分からないので、既存の順を保ちます。
 
 **会話記録からの推測（cwd が一致する直近の rollout の `session_meta.id`）は `X-Looptrack-Session` には使いません**。
 環境変数が 2026-02 から全経路で入るので要らないからです。
-推測すると、同じディレクトリで Codex を開いたまま人が端末から打った操作まで AI の操作になります（未付与の検知とクローズ時の必須判定の対象になります）。
+推測すると、同じディレクトリで Codex を開いたまま人が端末から打った操作まで AI の操作になり、未付与の検知とクローズ時の必須判定の対象になります。
 同じディレクトリで並行する別の Codex の会話に誤って帰属することもあります。
-トークン情報の送信（経路 ①）での cwd による推測は従来どおり残します。送るのは累計なので、誤っても重複排除と差分で害は小さく済みます。
+トークン情報の送信（経路 ①）での cwd による推測は従来どおり残します。送るのは累計。誤っても重複排除と差分で害は小さく済みます。
 
 既知の限界として、Codex の TUI で利用者が `!` で打ったコマンドにも ID が入るので、AI の操作に数えます。
 これは Claude Code の `!` と同じ扱いです。同じ会話の中の操作なので、トークン情報も付きます。
@@ -2213,7 +2402,7 @@ Codex のアプリサーバの単発のコマンド実行（スレッドに属�
 
 **経緯**: 最初の調査（2026-09-18 22:03）では「測れない」と判断し、Copilot の MCP の操作を未付与の判定から外しました。
 再調査（同日 22:23）で、CLI・VS Code とも OpenTelemetry（OTel）をファイルに書き出せると分かりました。そこには使用量とセッション ID が入ります。
-そこで利用者の判断（同日 22:27）により、扱いを広げました。OTel のファイル出力を有効にした利用者の Copilot は計測し、無いときは今の扱い（未付与に数えない）を残します。
+これを受けて、利用者の判断（同日 22:27）で扱いを広げました。OTel のファイル出力を有効にした利用者の Copilot は計測し、無いときは今の扱い（未付与に数えない）を残します。
 
 **確かめたこと（Copilot CLI 1.0.86 の実物・2026-09-19。VS Code は公式文書だけで実物は未確認）**
 
@@ -2255,8 +2444,8 @@ camelCase には event 名が無いので、配線で `--event postToolUse` な�
 VS Code は入力から Copilot と分からないので `--client copilot` を付けます。CLI の camelCase の入力と `~/.copilot/` の下の `transcript_path` は自動で Copilot と判定します。
 Copilot の MCP のツール名は、CLI 1.0.86 の hook の入力では `im-guide` の形でした。
 VS Code は未確認なので、Copilot のときだけ広く受けます。`mcp` の前置は任意で、サーバ名との区切りは `__` `_` `-` `/` `.` のどれでも構いません。
-OTel のスパンはまとめて書き出されます。そのため切り離した後に `LOOPTRACK_USAGE_COPILOT_WAIT_SEC`（既定 6 秒）待ってから読みます。
-**配線（`.github/hooks/*.json` に usage_hook を入れること）は init の担当です**。入るまでは、利用者が手で配線したときだけ動きます。
+OTel のスパンはまとめて書き出されるので、切り離した後に `LOOPTRACK_USAGE_COPILOT_WAIT_SEC`（既定 6 秒）待ってから読みます。
+**配線（`.github/hooks/*.json` に usage_hook を入れること）は init の担当です**。入るまでは利用者が手で配線したときだけ動きます。
 
 **サーバの判定**: `store.UsageOptInAgents`（今は `copilot`）の AI の MCP の操作を付与の対象（`service.UsageTarget`）にするのは、
 **その利用者のその AI のスナップショット（`client = copilot`）が同じプロジェクトに直近 7 日（`store.UsageOptInWindow`）以内に届いているときだけ**です。
@@ -2284,7 +2473,7 @@ OTel のスパンはまとめて書き出されます。そのため切り離し
 
 既知の限界:
 - 判定は利用者単位で、Copilot の製品（CLI・VS Code）を区別しません。`clientInfo` の名前で区別はできますが、`agent` は同じ `copilot` です。
-  そのため CLI だけ OTel を有効にした利用者の VS Code の操作は、7 日以内に CLI のスナップショットがあると対象になり、未付与に数えられます。VS Code も有効にするか、`override_reason` でクローズしてください。
+  CLI だけ OTel を有効にした利用者の VS Code の操作は、7 日以内に CLI のスナップショットがあると対象になり、未付与に数えられます。VS Code も有効にするか、`override_reason` でクローズしてください。
 - 計測している利用者がクローズ時の必須で拒否・警告されると、案内には `usage attach` が出ます。Copilot CLI では実行できますが、VS Code ではセッション ID が無いので付けられません。起票・コメントの hook の送信で付いていれば出ません。
 - 判定は `clientInfo` の名前で行います。VS Code から Copilot 以外の拡張が同じ名前で接続すると、Copilot として扱います。`agent` を持たない記録は `other` と同じく対象のままです。
 - 1 行の形・ツール名の形・書き出しの遅れは Copilot CLI 1.0.86 の実物で確かめました（2026-09-19）。VS Code の OTel の出力は実物では未確認です。Copilot の版の更新で形が変わったら、上の表と `internal/client/usagesnap/copilot_otel_test.go`（1.0.86 の形のテスト）を直してください。
@@ -2314,11 +2503,11 @@ Copilot CLI 1.0.86 の実物（2026-09-19）では、シェルと hook に `COPI
 | `TERM_PROGRAM=vscode` だけ（人が VS Code の端末で打った）・`COPILOT_CLI=1` だけ（ID を渡さない旧い版）・`COPILOT_AGENT_SESSION_ID` だけ | なし | なし | 人の操作 |
 
 - `COPILOT_AGENT_SESSION_ID` は `COPILOT_CLI=1` と組み合わせたときだけ読みます。別のツールが同名の変数を使っても取り違えません。
-- `X-Looptrack-Agent` は既定（Copilot でない）では送りません。反映前のサーバは知らないヘッダを読み捨てます。そのため VS Code の操作は人の操作として記録されるだけで、壊れはしません。
+- `X-Looptrack-Agent` は既定（Copilot でない）では送りません。反映前のサーバは知らないヘッダを読み捨てるので、VS Code の操作は人の操作として記録されるだけで、壊れはしません。
 - サーバは `X-Looptrack-Agent` を `Actor.Agent` に入れ、`issue_events.detail` の `agent` に残します（MCP の clientInfo の判定と同じ欄で、列は足しません）。Copilot は計測が任意の AI（`store.UsageOptInAgents`）です。計測を有効にしていない利用者の操作は、付与の指示・クローズ時の必須・未付与の検知の対象にしません。`humans`（人の操作）にも数えません（上の「イベントとの突き合わせ」）。
 - テスト: `TestCLISessionIDCopilot`（internal/server/cli_session_test.go）。
 
-Copilot でも**イシューの操作は MCP のツールが主です**（利用者の方針・2026-09-18）。MCP の操作は `clientInfo` から `copilot` と判定します（§6「接続してきた AI の判定」）。
+Copilot でも**イシューの操作は MCP のツールが主です**。2026-09-18 の利用者の方針。MCP の操作は `clientInfo` から `copilot` と判定します（§6「接続してきた AI の判定」）。
 
 既知の限界: Copilot CLI のトークン情報（経路 ①）は `usage_snapshot` の Copilot のアダプタ（OpenTelemetry のファイル出力）が扱います。VS Code の CLI の操作はセッション ID が無いので、会話と結べません。
 
@@ -2381,7 +2570,7 @@ Claude Code on the web・Codex cloud・GitHub Copilot cloud agent（旧称 codin
 | `GET /projects/{slug}/usage/requests[?all=1]` | レポートの作成依頼の一覧（新しい順。既定は未完了だけ。閲覧者も可）。各行に次に打つコマンド（`command`） |
 | `POST /projects/{slug}/usage/requests` | 依頼を登録（editor 以上。画面のフォームと同じ検証）。`{since_last | from, to?, target?, note?}` |
 
-MCP: スナップショットを**書く**ツールはありません（MCP のツールはトークンを知り得ないため）。MCP にあるのは次のツールです。
+MCP: スナップショットを**書く**ツールはありません。MCP のツールはトークンを知り得ないため。MCP にあるのは次のツールです。
 
 - 読む側: `issue_usage`（`GET /issues/{id}/usage` と同じ内容）
 - レポート: `usage_report`（集計。`request_id` で依頼の期間）・`list_usage_ledger`・`add_usage_ledger`（台帳の登録。トークンではなくレポートの記録なので MCP からも書けます）・
@@ -2413,7 +2602,7 @@ MCP: スナップショットを**書く**ツールはありません（MCP の�
 金額換算はしません（範囲外）。
 
 **案件ラベル別（`by_case`・`group=label`）**: イシューの `labels` に案件（ブランチ名 `CASE-nnn` の形）を入れて運用するプロジェクト向けです。
-イシューに帰属していない消費でも、ほとんどの区間にはブランチ名が付いています。そこでブランチ名を案件ラベルとみなし、同じ軸で集計できるようにします。
+イシューに帰属していない消費でも、ほとんどの区間にはブランチ名が付いています。このブランチ名を案件ラベルとみなし、同じ軸で集計できるようにします。
 
 | 項目 | 決定 |
 | -- | -- |
@@ -2479,10 +2668,10 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 #### 送信の経路
 
 **① CLI 内蔵（全 AI 共通・主経路）**: CLI は変更操作が成功した直後にスナップショットを集め、取れたら `POST …/usage` します。
-セッションはまず環境変数で特定します（Claude Code は `CLAUDE_CODE_SESSION_ID`、Codex は `CODEX_THREAD_ID` → `CODEX_SESSION_ID` でファイル名を引きます）。
+セッションはまず環境変数で特定します。Claude Code は `CLAUDE_CODE_SESSION_ID`、Codex は `CODEX_THREAD_ID` → `CODEX_SESSION_ID` でファイル名を引きます。
 無ければ、作業ディレクトリが一致する直近 10 分以内の会話記録（Codex の `session_meta.cwd`）を使います。
 どの AI の下でもない（人がターミナルから打った）ときは何も送りません。
-送信は 2 秒で打ち切ります（`LOOPTRACK_USAGE_TIMEOUT`）。失敗しても操作の結果と終了コードは変えません（`LOOPTRACK_USAGE_DEBUG=1` で理由を標準エラーに出します）。
+送信は 2 秒で打ち切ります（`LOOPTRACK_USAGE_TIMEOUT`）。失敗しても操作の結果と終了コードは変えません。`LOOPTRACK_USAGE_DEBUG=1` なら理由を標準エラーに出します。
 `LOOPTRACK_USAGE=0` で止められます。手動の付与は `looptrack issue usage attach <ID>`（trigger `manual` + issue）で、確認は `usage show <ID>` です。
 
 **② フック（`looptrack hook` が行う）**
@@ -2502,16 +2691,16 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 
 共通: **送信は子プロセスに切り離し、フック自体はすぐ 0 で終わります**。操作を遅らせず、失敗しても操作を妨げません。
 送れなかった分（届かない・5xx・ログインしていない）は looptrack の置き場（資格情報と同じ場所）に置き、次の起動でまとめて送ります。置き場は `~/.config/looptrack/usage-spool/<プロジェクトの鍵>/`、Windows は `%APPDATA%\looptrack\usage-spool\<プロジェクトの鍵>\` で、7 日で捨てます。
-鍵は API の URL と slug から作り（作業名を送るかの記録と同じ鍵）、再送は同じプロジェクトのセッションだけが行います（payload はプロジェクトを持たないので、置き場を分けないと別のプロジェクトへ送ってしまいます）。鍵の無い `usage-spool/*.json`（以前の版の置き場）は送り先が分からないので再送せず、7 日で捨てます。認証は CLI と同じ資格情報を使います。
-再送には退避してからの経過秒 `resend_delay_sec` を付けます（上の「イベントとの突き合わせ」）。この項目を知らない古いサーバが 400（`invalid_json`）で拒んだときは、項目を外して送り直します。4xx で拒まれた分は再送しても直らないので捨てます。
-**送信の失敗は同じ置き場の `usage-failure.json` に残します**（理由のキー・HTTP の状態・時刻・続けて失敗した回数。次に送れたら消します）。
+鍵は API の URL と slug から作り（作業名を送るかの記録と同じ鍵）、再送は同じプロジェクトのセッションだけが行います。payload はプロジェクトを持たないので、置き場を分けないと別のプロジェクトへ送ってしまうからです。鍵の無い `usage-spool/*.json`（以前の版の置き場）は送り先が分からないので再送せず、7 日で捨てます。認証は CLI と同じ資格情報を使います。
+再送には退避してからの経過秒 `resend_delay_sec` を付けます。照合の仕方は上の「イベントとの突き合わせ」。この項目を知らない古いサーバが 400（`invalid_json`）で拒んだときは、項目を外して送り直します。4xx で拒まれた分は再送しても直らないので捨てます。
+**送信の失敗は同じ置き場の `usage-failure.json` に残します**。残すのは理由のキー・HTTP の状態・時刻・続けて失敗した回数。次に送れたら消します。
 `looptrack issue summary`（SessionStart の要約）はこれと再送待ちの件数を読んで「この PC のフックがトークン情報を送れていません（…）」の 1 行を出します。フックは操作を妨げないよう失敗しても黙って終わるので、ここに出さないと誰も気づけません。
-`LOOPTRACK_API_URL` か `LOOPTRACK_PROJECT` が無いときは、送らず、退避も失敗の記録もしません（looptrack を使っていないリポジトリのセッションでも全体の設定の hook は起動するため。送り先が決まらないので退避しても再送先が分かりません）。
+`LOOPTRACK_API_URL` か `LOOPTRACK_PROJECT` が無いときは、送らず、退避も失敗の記録もしません。looptrack を使っていないリポジトリのセッションでも、全体の設定の hook は起動するため。送り先が決まらないので、退避しても再送先が分かりません。
 人間の発話に「本セッションは…レポート対象外」があれば `excluded: true` を付けて送ります。サーバは会話 ID 単位で集計から外します（行は残します）。
 
 **③ 応答での指示（全 AI 共通・回収）**: AI からの変更操作（上の対象）の応答に `usage_notice`
 `トークン情報が未付与です。次を実行してください: looptrack issue usage attach <ID>` を付けます。
-応答の時点では、その操作自体のスナップショットはまだありません（CLI は応答の後に ① で送り、MCP はフックが後から送ります）。そのためこの指示は「この後に付かなかったら」実行するものです。
+応答の時点では、その操作自体のスナップショットはまだありません。CLI は応答の後に ① で送り、MCP はフックが後から送ります。そのためこの指示は「この後に付かなかったら」実行するものです。
 
 | 経路 | 指示の扱い |
 | -- | -- |
@@ -2521,9 +2710,9 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 
 `usage attach` は ① と同じ収集を手動で 1 回だけするコマンドです（trigger `manual` + issue）。
 
-**クローズ時の必須化**はフックではなく、サーバのプロジェクト別ルール（`usage.require_on_close`）で行います（§9-1。どの経路でも同じ判定）。
-状態を Done / Canceled にする時点では、PostToolUse がまだ走っていません。そこで判定は「**その会話のスナップショットがそのイシューに 1 件以上ある**」とします。起票・着手・コメントのどれかで付いていれば通ります。
-無ければ 422（`rule: usage_required_on_close`・上書き可）を返します。メッセージには `looptrack issue usage attach <ID>`（手動で 1 件送るコマンド）と `--override "理由"` を出します。
+**クローズ時の必須化**はフックではなく、サーバのプロジェクト別ルール（`usage.require_on_close`）で行います。§9-1 のとおり、どの経路でも同じ判定。
+状態を Done / Canceled にする時点では、PostToolUse がまだ走っていないので、判定は「**その会話のスナップショットがそのイシューに 1 件以上ある**」とします。起票・着手・コメントのどれかで付いていれば通ります。
+無ければ 422（`rule: usage_required_on_close`・上書き可）を返します。メッセージに出すのは `looptrack issue usage attach <ID>`（手動で 1 件送るコマンド）と `--override "理由"`。
 
 | 項目 | 決定 | 理由 |
 | -- | -- | -- |
@@ -2537,7 +2726,7 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 
 英語で使う利用者のために、本システムが**意味を読み取る**日本語の決まった語には英語の別名を認めます。
 あわせて v1.0.0 から、**利用者が読むメッセージを日本語と英語の 2 言語で出します**。
-2 言語化の仕組みは「メッセージの 2 言語化」の項にまとめています。
+2 言語化の仕組みの詳細は「メッセージの 2 言語化」の項。
 
 #### 決めていること
 
@@ -2573,7 +2762,7 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 #### メッセージの 2 言語化
 
 利用者が読む文面は `internal/i18n` の対訳表から取り出します。**言語は要求ごとに決まります**。
-そのためグローバル変数には持たず、呼び出しの経路（CLI の環境・HTTP の要求）から `lang` を引き回します。
+グローバル変数には持たず、呼び出しの経路（CLI の環境・HTTP の要求）から `lang` を引き回します。
 
 **言語の決め方（優先順）**
 
@@ -2600,8 +2789,8 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
   要求あたりの追加の問い合わせはありません。**NULL は「設定なし」**で、`Accept-Language` の段へ進みます。
   空文字は保存しません。「設定なし」の表し方を NULL の 1 つに絞るためで、`store.SetUserLang` が空文字を NULL に直します。
 - **値の制限（`ja` / `en` / NULL）は `store.SetUserLang` が持ちます。** MySQL には `CHECK (lang IN ('ja','en'))` が
-  ありますが、**SQLite は `ALTER TABLE ADD COLUMN` に `CHECK` を付けられません**。そのため共通のドメイン操作の側が
-  最後の砦になります（書き込み経路が増えても効きます）。画面の `/account/lang` にも `i18n.Parse` があります。
+  ありますが、**SQLite は `ALTER TABLE ADD COLUMN` に `CHECK` を付けられません**。共通のドメイン操作の側が
+  最後の砦になります。書き込み経路が増えても効きます。画面の `/account/lang` にも `i18n.Parse` があります。
   ただしそちらは入力を正規形に直して 400 を返すためのもので、制限そのものではありません。
 - 画面は `/account` の「表示の言語」です（選択肢は **設定なし / 日本語 / English**）。設定なしにも戻せます。
 - **`LOOPTRACK_LANG` はこの設定より強く効きます。** CLI は `LOOPTRACK_LANG` が**実際に設定されているときだけ**
@@ -2616,7 +2805,7 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 **応答の `Content-Language`**
 
 サーバは `langFor` で決めた言語を、応答のヘッダ `Content-Language` で宣言します。
-**クライアントはこれを、自分の手元で組み立てる文面の言語に使います**。サーバが返した本文の言語と、CLI が付ける枠・案内の言語が割れないようにするためです。
+**クライアントはこれを、自分の手元で組み立てる文面の言語に使います**。サーバが返した本文の言語と、CLI が付ける枠・案内の言語が割れないようにするため。
 
 - **この宣言はクライアントが送った値の反響ではありません。** 優先順の 3 段目（`users.lang`）は**クライアントが知らない情報**です。
   `LOOPTRACK_LANG` を持たない利用者が `Accept-Language: en` を送っても、設定が `ja` なら `ja` が返ります。
@@ -2647,21 +2836,26 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 - 取り出しは `i18n.T(lang, "id", args)` です。文面を作る場所が相手の言語を知らないときは、`i18n.Errorf` / `i18n.Wrapf` で
   **ID を持つ error** を返します。出す側が `i18n.Text(lang, err)` で文面にします（`Error()` は ID を返すので、ログには ID が出ます）。
   もとの error を包む必要があるときは `Wrapf` を使ってください。`Errorf` は包まないので `errors.Is` が壊れます。
+- 英語は 1 件のときに単数になる文面（"1 issue"）を使います。件数を埋め込む文面は `<ID>_one` に単数の文面を足し、呼び出しは
+  `i18n.TN(lang, "id", n, ...)` にします。`n` が 1 で `<ID>_one` があるときだけ単数を使い、日本語は両方に同じ文面を置きます。
+  error には `ErrorfN` / `WrapfN`、別の文面へ埋める件数つきの語句には `MN`、テンプレートには `{{TN .Lang "id" n …}}` を使います。
+  1 つの文面に件数が 2 つ以上あるときは、件数ごとの語句を別の ID（それぞれに `_one`）にして `MN` で埋めます。
+  Web のスクリプトは同じ規則を `render.js` の `countText` に持ちます。単数の文面の抜けは `internal/i18n/lint_test.go` が見つけます。
 
-**抜けの検出**（`internal/i18n/lint_test.go` ほか）
+**抜けの検出**は `internal/i18n/lint_test.go` ほかで行います。
 
 - `ja.json` と `en.json` のキー集合が完全に一致することを確かめます（片方だけ足すと失敗します）。
 - コード中の `i18n.T` / `M` / `Errorf` / `Wrapf` の ID を `go/ast` で集め、対訳表に無い ID があれば失敗させます。
   **ID は必ず文字列リテラルで渡してください**。変数で渡すと検査が追えず、抜けを見逃します。
 - 対訳表にあってコードから参照されない ID も報告します（消し忘れの検出）。
-- **Web のテンプレートに書く ID は Go のソースに現れません**。そのため `go/ast` の走査だけでは拾えません。
+- **Web のテンプレートに書く ID は Go のソースに現れません**。`go/ast` の走査だけでは拾えません。
   これは `internal/i18n/lint_test.go` の `collectTemplateIDs` で**実装済み**です。**リポジトリ全体の `.html`** を歩きます
   （先頭が `.` のディレクトリ・`testdata`・`vendor`・`node_modules` の下は除きます）。`{{T .Lang "id"}}` の形から ID を集め
   （`{{template "head" (headData .Lang (T .Lang "id"))}}` のように括弧の中にあるものも含みます）、
   上の 2 つの検査（対訳表に無い ID・どこからも使われない ID）の対象に足します。
   **テンプレートでも ID は文字列リテラルで書いてください**（組み立てると拾えません）。
   集めた ID が 0 件だと、上の 2 つの検査は**何も見ないまま緑になります**。テンプレートが `{{T` を 1 つも使っていなかった
-  間は実際にその状態でした。そこで下限を `TestTemplateScanIsNotEmpty` で押さえています。
+  間は実際にその状態でした。下限は `TestTemplateScanIsNotEmpty` で押さえています。
   画面の JS が使う ID は **Go 側には現れません**。テンプレートが埋め込むデータブロック
   （`board.html`・`hub.html`・`first_run_done.html` の `<script type="application/json" id="i18n">`）の中に
   `{{T .Lang "id"}}` として書き、JS はそれを読むだけです。したがって拾うのは `go/ast` の走査ではなく、上の `.html` の走査
@@ -2677,7 +2871,7 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 | `TestJapaneseMarkdownDoesNotIncrease`（`internal/i18n/jamd_test.go`） | **`//go:embed` を実際にパースして展開した `.md`**（実行ファイルに入って配られるもの） | 日本語を含む**行数** | `jamd_allow_test.go` |
 
 `.md` の側は**対象を列挙しません**。「どの `.md` が利用者に届くか」は `//go:embed` が決めます。
-そこでリポジトリの `//go:embed` を読んで展開した結果を対象にします。列挙にすると、埋め込みのディレクトリに
+リポジトリの `//go:embed` を読んで展開した結果を対象にします。列挙にすると、埋め込みのディレクトリに
 `.md` を足した人が一覧も直さない限り、気づかれずに検査から漏れるからです。テストが失敗したときは、どの
 `//go:embed` から何が来たかを失敗の文面に添えます。単位（件数と行数）が違うので、一覧も合計も分けてあります。
 
@@ -2735,7 +2929,7 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 自分で読んで直せることを優先しました。対訳表（`ja.json` / `en.json`）ではなく**ファイルで持ちます**。
 
 **経緯**: 当初は「AI しか読まないので `kit/` の rules は日本語のまま（2 言語化の対象外）」としていました。
-これを **2026-09-20 に利用者の判断で撤回しました**（下の「採らなかった案」にも残しています）。kit を読んで直すのは英語圏の利用者も同じです。
+これを **2026-09-20 に利用者の判断で撤回しました**。下の「採らなかった案」にも残しています。kit を読んで直すのは英語圏の利用者も同じです。
 日本語のままでは、OSS として公開しても手を入れられません。**v1.0.0 の公開前に rules と skill を全部英語にします。**
 
 | 決めごと | 内容 |
@@ -2755,10 +2949,10 @@ PDF の保存先は既定で `~/Documents/トークンレポート/<slug>/`（`T
 | HTML テンプレート | `template.FuncMap` に `T` を足し、`{{T .Lang "server.web.login.title"}}` と書く。**テンプレートは 1 本のまま**（日英 2 本にすると文面が離れ、片方だけ更新されたときに気づけない） |
 | 画面の中の JS | 画面を返すときに、**その画面が使う文面だけ**を `<script type="application/json">` で埋め込み、JS がそれを引く。対訳表を API で丸ごと公開しない。埋め込むのはデータブロックなので、CSP のインラインスクリプト禁止（§10）には当たらない |
 
-**テストの注意**: 既定の言語は英語です。そのため**日本語の文面を検査するテストでは言語を固定してください**
-（HTTP は `Accept-Language: ja`、CLI と hook は `LOOPTRACK_LANG=ja`）。
-**子プロセスで `looptrack` を起動するテスト**では、子プロセスの環境にも `LOOPTRACK_LANG=ja` を渡します
-（渡さないと、実行する機械の `LANG` で結果が変わります）。
+**テストの注意**: 既定の言語は英語です。そのため**日本語の文面を検査するテストでは言語を固定してください**。
+HTTP は `Accept-Language: ja`、CLI と hook は `LOOPTRACK_LANG=ja`。
+**子プロセスで `looptrack` を起動するテスト**では、子プロセスの環境にも `LOOPTRACK_LANG=ja` を渡します。
+渡さないと、実行する機械の `LANG` で結果が変わります。
 
 #### 採らなかった案
 

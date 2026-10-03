@@ -53,6 +53,12 @@ type spec struct {
 	seeds   []Seed
 }
 
+// attachSeeds は添付するファイル（png は NUL を含むのでバイナリ、txt は秘密を含まないテキスト）。
+var attachSeeds = []Seed{
+	{Path: "ws/shot.png", Content: "\x89PNG\r\n\x1a\n\x00\x00\x00\x00"},
+	{Path: "ws/notes.txt", Content: "PASS\nok  pkg\n"},
+}
+
 var workSeeds = []Seed{
 	{Path: "ws/.claude/.looptrack-work/DEMO-0001.md", Content: markdown1 + "\n追記した行。\n"},
 	{Path: "ws/.claude/.looptrack-work/DEMO-0001.base.md", Content: markdown1},
@@ -73,6 +79,12 @@ func specs() []spec {
 			routes: []Route{r("POST", pIssues, created(createRes))}},
 		{name: "new-minimal", args: []string{"new", "最小の起票"}, routes: []Route{r("POST", pIssues, created(createRes))}},
 		{name: "comment", args: []string{"comment", "DEMO-0001", "原因が分かった。\n設定の読み込み順。"}, routes: []Route{r("POST", pIssue1+"/comments", created(commentRes))}},
+		{name: "comment-attach", args: []string{"comment", "DEMO-0001", "画面を付けた", "--attach", "shot.png", "--attach", "notes.txt"},
+			seeds: attachSeeds, routes: []Route{
+				r("POST", pIssue1+"/attachments", created(attachRes(11, "shot.png", "image/png", 12)), created(attachRes(12, "notes.txt", "text/plain; charset=utf-8", 12))),
+				r("POST", pIssue1+"/comments", created(commentRes))}},
+		{name: "attach", args: []string{"attach", "DEMO-0001", "shot.png", "notes.txt"}, json: true, seeds: attachSeeds, routes: []Route{
+			r("POST", pIssue1+"/attachments", created(attachRes(11, "shot.png", "image/png", 12)), created(attachRes(12, "notes.txt", "text/plain; charset=utf-8", 12)))}},
 		{name: "status", args: []string{"status", "DEMO-0002", "In Progress", "--comment", "着手", "--override", "急ぎ", "--assignee", "me"},
 			routes: []Route{r("POST", pIssue2+"/status", ok(statusRes))}},
 		{name: "close", args: []string{"close", "DEMO-0001", "--comment", "検証: go test が通った"}, routes: []Route{r("POST", pIssue1+"/status", ok(closeRes))}},

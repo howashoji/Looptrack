@@ -79,68 +79,23 @@ func normalizeHandoffCmd(cmd string) string {
 	return hookcmd.Normalize(hookcmd.JoinContinuations(cmd), hookcmd.HeadOnly)
 }
 
-// markHeredocs はヒアドキュメントの本文を外す（bash 版の post-work-complete-handoff-mark の strip_heredocs。
-// 1 行に最初の 1 つだけを見る・開きの引用符と閉じの引用符が同じときだけ当たる＝ `<<-?\s*(["']?)(名前)\1`）。
-func markHeredocs(cmd string) string {
-	lines := strings.Split(cmd, "\n")
-	var out []string
-	i := 0
-	for i < len(lines) {
-		line := lines[i]
-		out = append(out, line)
-		i++
-		if end, ok := heredocTag(line); ok {
-			for i < len(lines) && trimSpace(lines[i]) != end {
-				i++
-			}
-			i++
-		}
-	}
-	return strings.Join(out, "\n")
-}
-
-// heredocTag は行の中で最初に `<<-?\s*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1` に当たるものの名前。
-func heredocTag(line string) (string, bool) {
-	isStart := func(c byte) bool { return c == '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') }
-	isPart := func(c byte) bool { return isStart(c) || (c >= '0' && c <= '9') }
-	for i := 0; i+1 < len(line); i++ {
-		if line[i] != '<' || line[i+1] != '<' {
-			continue
-		}
-		j := i + 2
-		if j < len(line) && line[j] == '-' {
-			j++
-		}
-		for j < len(line) {
-			r := []rune(line[j:])[0]
-			if !isSpaceRune(r) {
-				break
-			}
-			j += len(string(r))
-		}
-		var q byte
-		if j < len(line) && (line[j] == '"' || line[j] == '\'') {
-			q = line[j]
-			j++
-		}
-		if j >= len(line) || !isStart(line[j]) {
-			continue
-		}
-		k := j + 1
-		for k < len(line) && isPart(line[k]) {
-			k++
-		}
-		if q != 0 && (k >= len(line) || line[k] != q) {
-			continue
-		}
-		return line[j:k], true
-	}
-	return "", false
-}
-
-// commandSegments はコマンドを区切り（; & | ( )）で分けた語の並び（引用符の中の区切りは分けない）。読めなければ nil。
+// commandSegments はコマンドを区切り（; & | ( ) 改行）で分けた語の並び（引用符の中の区切りは分けない）。読めなければ nil。
+//
+// ヒアドキュメントの本文は、ガードと同じ hookcmd の字句解析（StripHeredocsStrict）で落とす。行の中で最初の `<<名前` を
+// 開きと読む読み方では、引用符・コメント・算術（`$((1<<y))`）の中の `<<` でも次の行からを本文として落とし、
+// そこにある本物の close を見落とす。本文をシェルに渡す形（`cat <<EOF | sh`・`bash <<EOF`）の本文も、
+// 実行されるのに落としてしまう。どちらも引き継ぎが黙って求められない側の穴なので、シェルと同じ読み方にそろえる。
+// 行末の CRLF は先に LF にそろえる（字句解析は終端の名前を 1 語として読むので、`<<EOF` + CRLF の終端を `EOF\r` と読み、
+// 後ろの行を全部本文として落としてしまう）。
+//
+// コメントと $'…' は shlex が知らない書き方なので、先に hookcmd.ShlexFriendly で直す（コメントを落とし、$'…' を
+// ふつうの引用に替える）。直さないと `git add a.txt  # stage` + 改行 + close の close がコメントの続きとして消え、
+// `echo $'it\'s'` の後ろでは引用符が閉じないと読んで全体を分解できず、1 件も積まなくなる。
+// 改行は区切りとして残す（`"\n ; "`）。shlexSplit は語の中の `#`（`echo a#b`・`${x#y}`）からも行末までを捨てるので、
+// 改行を空白でつないで 1 行にすると、そこから文字列の終わりまでが全部消える。
 func commandSegments(cmd string) [][]string {
-	toks, err := shlexSplit(strings.ReplaceAll(markHeredocs(cmd), "\n", " ; "))
+	s := hookcmd.StripHeredocsStrict(strings.ReplaceAll(cmd, "\r\n", "\n"))
+	toks, err := shlexSplit(strings.ReplaceAll(hookcmd.ShlexFriendly(s), "\n", "\n ; "))
 	if err != nil {
 		return nil
 	}

@@ -46,34 +46,41 @@ func StripHeredocs(cmd string) string {
 func HeredocOpen(line string) (string, bool) {
 	rs := []rune(line)
 	for i := 0; i+1 < len(rs); i++ {
-		if rs[i] != '<' || rs[i+1] != '<' {
-			continue
+		if d, ok := heredocDelimAt(rs, i); ok {
+			return d, true
 		}
-		j := i + 2
-		if j < len(rs) && rs[j] == '-' {
-			j++
-		}
-		for j < len(rs) && IsSpace(rs[j]) {
-			j++
-		}
-		var q rune
-		if j < len(rs) && (rs[j] == '\'' || rs[j] == '"') {
-			q = rs[j]
-			j++
-		}
-		if j >= len(rs) || !isIdentStart(rs[j]) {
-			continue
-		}
-		k := j + 1
-		for k < len(rs) && isIdent(rs[k]) {
-			k++
-		}
-		if q != 0 && (k >= len(rs) || rs[k] != q) {
-			continue
-		}
-		return string(rs[j:k]), true
 	}
 	return "", false
+}
+
+// heredocDelimAt は rs[i:] が `<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1` で始まるときの終端の名前。
+func heredocDelimAt(rs []rune, i int) (string, bool) {
+	if i+1 >= len(rs) || rs[i] != '<' || rs[i+1] != '<' {
+		return "", false
+	}
+	j := i + 2
+	if j < len(rs) && rs[j] == '-' {
+		j++
+	}
+	for j < len(rs) && IsSpace(rs[j]) {
+		j++
+	}
+	var q rune
+	if j < len(rs) && (rs[j] == '\'' || rs[j] == '"') {
+		q = rs[j]
+		j++
+	}
+	if j >= len(rs) || !isIdentStart(rs[j]) {
+		return "", false
+	}
+	k := j + 1
+	for k < len(rs) && isIdent(rs[k]) {
+		k++
+	}
+	if q != 0 && (k >= len(rs) || rs[k] != q) {
+		return "", false
+	}
+	return string(rs[j:k]), true
 }
 
 func isIdentStart(r rune) bool { return r == '_' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' }

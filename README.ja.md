@@ -3,19 +3,19 @@
 *English: [README.md](README.md)*
 
 **Looptrack は、AI コーディングエージェントの外部記憶となり、ループエンジニアリングを実現するイシュー管理ツールです。**
-記録するのは、AI が分解した作業単位の課題。プロジェクト本来のイシューとは別に置きます。
+記録するのは AI が分解した作業単位の課題。プロジェクト本来のイシューとは別に置きます。
 AI の作業計画と意思決定が見えるようになり、各作業で使ったトークンも記録して分析レポートにできます。
 
 なぜこれが要るのか。理由は 4 つです。
 
 - **AI コーディングエージェントの外部記憶**: バイブコーディングで AI が覚えていられるのは、コンテキストウィンドウに収まる範囲の作業内容だけ。
   それより多くは覚えておけません。
-  だからセッションをまたぐと、同じ作業を繰り返したり、やるべき作業を飛ばしたりすることがある。
+  だからセッションをまたぐと、同じ作業を繰り返したり、やるべき作業を飛ばしたりすることがあります。
   記憶は AI の外に置くしかありません。Looptrack は、そのための AI 専用のタスクの記憶装置として生まれました。
   どのセッションもどの AI も同じイシューを読むので、前のセッションで決めたことはちゃんと次のセッションに残ります。
 - **ループエンジニアリングの実現**: ここでいうループエンジニアリングは、イシューを起点に「着手 → 作業 → 検証 → クローズ」を AI と人が同じ記録の上で回していくやり方のこと。
   いちばんの利点は？ 個人のバイブコーディングから一歩進んで、**チーム開発も見据えた**形でこれを回せることです。
-  人も同じイシューをブラウザで見て判断します。だからチームで 1 つのループを共有できるんですね。
+  人も同じイシューをブラウザで見て判断するので、チームで 1 つのループを共有できるんですね。
 - **プロジェクト本来のイシューとは別に、AI が分解した作業単位を記録**: 人が話し合う要望や不具合の報告は、プロジェクトがふだん使っている置き場に残します。
   Looptrack が持つのは別のもの。AI がその仕事を分解した作業単位（要件・設計・タスク・作業中に見つけた不具合・テスト）です。
   親子と traces でつなぎ、1 件ずつ着手して、根拠を添えて閉じられる大きさにそろえます。
@@ -28,7 +28,7 @@ AI の作業計画と意思決定が見えるようになり、各作業で使�
 複数のプロジェクトのイシューを 1 つのサーバで管理し、Claude Code・Codex・GitHub Copilot といったコーディング AI には、CLI・リモート MCP・hook を通してイシューを渡します。
 
 サーバは Go の単一バイナリ。データは MySQL か SQLite に入ります。
-イシューを管理対象のリポジトリにコミットすることはありません。だから成果物に管理番号は残りません。
+イシューを管理対象のリポジトリにはコミットしないので、成果物に管理番号は残りません。
 
 ## なぜ別のトラッカーなのか
 
@@ -54,7 +54,7 @@ Looptrack では、AI が「起票 → 着手（`next`）→ 作業 → 検証 �
 - Claude Code との連携
 - トークン計測
 
-core だけでも、セッションの冒頭に要約が入ります。中身は、いまの周回・人の判断待ち・外からの反応の 3 つ。
+core だけでも、セッションの冒頭に要約が入ります。中身はいまの周回・人の判断待ち・外からの反応の 3 つ。
 イシューへの着手は `next` で。見ていたイシューを更新しないまま終えようとすると、差し戻されます。トークン消費は段階ごとに貯まっていきます。
 
 loop を入れると、規律が加わります。「確認して」と頼んだときは編集を止め、ツール呼び出しの書式の誤りも差し戻す。
@@ -63,7 +63,7 @@ loop を入れると、規律が加わります。「確認して」と頼んだ
 
 とはいえ、ガードが捕まえるのはうっかりミスだけです。
 入れ子のシェルや `eval`、`sudo` などの前置は 1 段だけほどいて判定します。ところが、コマンド置換や一覧にないラッパで包んだコマンドは素通りすることがある。
-既知の限界は、一覧の表と [secrets-discipline.md](kit/loop/rules/secrets-discipline.md) にまとめました。
+既知の限界は一覧の表と [secrets-discipline.md](kit/loop/rules/secrets-discipline.md) にまとめました。
 
 Claude Code なら、プロジェクトの `.claude/settings.json` に 2 行足すだけ。それでサーバにつながります。Codex と Copilot の設定も、同じ manifest から作ります。
 トークンの消費はセッション・AI・段階・イシューごとに集計し、PDF のレポートにできます（[トークンレポート](#トークンレポート)）。
@@ -85,11 +85,11 @@ Claude Code なら、プロジェクトの `.claude/settings.json` に 2 行足�
 | Linux（x86_64 / aarch64） | `Looptrack_<版>_linux_x86_64.AppImage` |
 
 起動すると、既定のブラウザに初回設定の画面が開きます。ここで決めるのは管理者・二段階認証・最初のプロジェクト。
-サーバは 127.0.0.1 だけで待ち受け、データは SQLite のファイル 1 つに収まります。管理者権限は、どの OS でも要りません。
+サーバは 127.0.0.1 だけで待ち受け、データは SQLite のファイル 1 つに収まります。管理者権限はどの OS でも要りません。
 
 タスクトレイのアイコン（macOS ではメニューバーのアイコン）からは、画面を開く・MCP の接続設定をコピーする・CLI を使えるようにする・ログイン時に起動する、といった操作ができます。
 
-初回起動の OS ごとの違いは、[デスクトップ版](docs/guide/ja/desktop.md) にまとめてあります。
+初回起動の OS ごとの違いは、[デスクトップ版](docs/guide/ja/desktop/README.md) にまとめてあります。
 
 ### 2. Linux サーバに入れる — `install.sh`
 
@@ -182,7 +182,7 @@ looptrack setup
 ### 次に読むもの
 
 利用者ガイドには[日本語](docs/guide/ja/README.md)と[英語](docs/guide/README.md)があります。
-最初は [概念](docs/guide/ja/concepts.md) → [始め方](docs/guide/ja/getting-started.md) → [日々の使い方](docs/guide/ja/daily-use.md) の順がおすすめ。
+最初は [概念](docs/guide/ja/concepts.md) → [サーバ版の始め方](docs/guide/ja/server/getting-started.md)か[デスクトップ版の始め方](docs/guide/ja/desktop/getting-started.md) → [日々の使い方](docs/guide/ja/daily-use.md) の順がおすすめ。
 
 ### 表示の言語
 
@@ -213,6 +213,7 @@ skill はそうはいきません。実行時に選べないので、`looptrack 
 | `https://example.com/looptrack/p/<slug>/` | ボード / 一覧 / トレース + 詳細（起票・状態の変更・コメント・担当の変更の最小限のフォーム） |
 | `https://example.com/looptrack/account` | アカウント設定（アクセストークンの発行・失効、パスワード変更） |
 | `https://example.com/looptrack/admin/users` | 利用者管理（管理者） |
+| `https://example.com/looptrack/admin/attachments` | 添付の上限・使用量・消去（管理者） |
 | `https://example.com/looptrack/api/v1/` | REST API（Bearer トークン） |
 | `https://example.com/looptrack/mcp` | リモート MCP（OAuth 2.1 またはトークン） |
 
@@ -226,6 +227,7 @@ CLI と MCP が使うのは、利用者ごとのアクセストークンです�
 
 データの正本は DB。
 Markdown への定期的な書き出しはしないので、バックアップは DB のダンプで取ってください。とはいえ `looptrack export` を使えば、いつでも Markdown に書き出せます。データが閉じ込められる心配はありません。
+添付したファイル（テストの出力やスクリーンショット）だけは DB ではなくディスクに置くので、添付の置き場も DB の後に控えます。`looptrack export` は添付も書き出しますが、`looptrack import` は添付を運びません。手順は [DEPLOY.md](docs/server/DEPLOY.md) の「添付の置き場とバックアップ」へ。
 
 ### 画面の説明
 
@@ -234,15 +236,17 @@ Markdown への定期的な書き出しはしないので、バックアップ�
 プロジェクトを開くと、1 本のバーで同じイシューの見方を 3 つに切り替えられます。状態ごとの列に並べるボード、絞り込みと並べ替えができる一覧、イシュー同士のつながりをたどるトレース。
 イシューを選べば、横に詳細が開きます。本文、時系列のコメント、イベント、検証コマンドとその最後の結果まで見られます。
 
-ブラウザは、あくまで閲覧が中心。
-書き込めるのは担当者の変更と、起票・状態の変更・コメントの追記の最小限のフォームだけです。このフォームはターミナルを使わない人のための入口で、CLI・MCP・API と同じサーバの操作を通ります。だから、どこから変えても同じルールが効くわけです。
+![ボードの画面。状態ごとの列にイシューのカードが並ぶ](docs/guide/images/ja/board.png)
+
+ブラウザはあくまで閲覧が中心。
+書き込めるのは担当者の変更と、起票・状態の変更・コメントの追記の最小限のフォームだけです。このフォームはターミナルを使わない人のための入口で、CLI・MCP・API と同じサーバの操作を通るので、どこから変えても同じルールが効くわけです。
 本文の編集は画面にはありません。それを含むほかの変更は、CLI・MCP・API から。
 
 ## CLI
 
 各プロジェクトでは、`looptrack issue <サブコマンド>` の形で使います。
 導入は `looptrack issue init` を 1 回実行するだけ（詳しくは [ADD-PROJECT.md](docs/ADD-PROJECT.md)）。
-つなぐサーバとプロジェクトを決めるのは `LOOPTRACK_API_URL` と `LOOPTRACK_PROJECT` です。ふつうは、プロジェクトの `.claude/settings.json` の `env` に書いておきます。
+つなぐサーバとプロジェクトを決めるのは `LOOPTRACK_API_URL` と `LOOPTRACK_PROJECT` です。ふつうはプロジェクトの `.claude/settings.json` の `env` に書いておきます。
 
 `looptrack issue login --browser` でブラウザからログインしておけば、あとはトークンが自動で更新されます。
 保存先は `~/.config/looptrack/credentials.json`（権限 600）。Windows なら `%APPDATA%\looptrack\credentials.json` です。
@@ -251,7 +255,7 @@ CLI も hook も、同じ 1 つの実行ファイル。導入先にはそれ以�
 別の処理系も bash も要らないし、どの OS でも同じです。AI からの使い方は [AI-GUIDE.md](docs/AI-GUIDE.md) で説明しています。
 
 Windows では 1 つだけ注意が要ります。
-`looptrack issue verify` は検証コマンドを `bash -c` で実行し、`cmd.exe` や PowerShell では代わりに実行しません。だから Git Bash が必要です（`winget install --id Git.Git -e` で入ります）。見つかるかどうかは `looptrack doctor` で確かめられます。
+`looptrack issue verify` は検証コマンドを `bash -c` で実行し、`cmd.exe` や PowerShell では代わりに実行しません。Git Bash が要るのはこのためです（`winget install --id Git.Git -e` で入ります）。見つかるかどうかは `looptrack doctor` で確かめられます。
 
 ## イシュー鮮度ガード
 
@@ -321,17 +325,21 @@ looptrack/
 | リリース物を作る | [docs/server/RELEASE.md](docs/server/RELEASE.md) |
 | コードで貢献する | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 脆弱性を報告する | [SECURITY.md](SECURITY.md) |
-| 変更履歴を見る | [CHANGELOG.md](CHANGELOG.md) |
+| 変更履歴を見る | [CHANGELOG.md](CHANGELOG.md)（サーバ版と CLI）・[CHANGELOG-desktop.md](CHANGELOG-desktop.md)（デスクトップ版） |
 
 ## 配布物と署名
 
-- 公式の macOS 版は Developer ID で署名し、Apple の公証も通してあります。だから Gatekeeper の「開発元を確認できない」は出ません。
+- 公式の macOS 版は Developer ID で署名し、Apple の公証も通してあるので、Gatekeeper の「開発元を確認できない」は出ません。
   `codesign -dvv <ファイル>` で見れば、Authority は `Developer ID Application: HOWA SHOJI K.K.`。
 - **Windows 版はまだ署名していません。** 初回の起動では、SmartScreen の「Windows によって PC が保護されました」が出ることがあります。
   SHA-256 が `SHA256SUMS` と一致するのを確かめてから、「詳細情報」→「実行」で進めてください。
+  Windows 11 のスマート アプリ コントロールが「オン」の PC では、署名の無いアプリは止められ、「実行」の道もありません。会社の管理下の PC なら、管理者の方針で止まることもある。
+  どちらの場合も、打てる手は[サーバ版の始め方](docs/guide/ja/server/getting-started.md#署名と-os-の警告)の「署名と OS の警告」にまとめました。
+  デスクトップ版を入れた人は、[デスクトップ版のトラブルシュート](docs/guide/ja/desktop/troubleshooting.md)にも、ほかの症状と並べて同じ案内があります。
 - `SHA256SUMS` には minisign の署名 `SHA256SUMS.minisig` が付いています。公開鍵は
   [deploy/release/minisign.pub](deploy/release/minisign.pub)、鍵 ID は 29D707D7EBFF246B。
-  `looptrack self-update` は、この署名を確かめてから置き換えます。手で確かめたいなら
+  `looptrack self-update` は、この署名を確かめてから置き換えます。サーバの URL が無ければ GitHub のリリースから書庫を取り、
+  書庫と中の `looptrack` の両方をこの署名で確かめます。手で確かめたいなら
   `minisign -Vm SHA256SUMS -P RWRrJP/r1wfXKalGsxLnzFmmsExUd2azSJh4ccrYDJEBu8yE3N0ZlLJy` を実行してください。
 - 配布物には `NOTICE` を添えています。依存モジュール・Go・同梱フォントのライセンス文をまとめたもので、
   実行ファイル・.app・dmg・AppImage・Windows の zip・コンテナイメージの `/NOTICE` がそれ。`looptrack licenses` でも表示できます。

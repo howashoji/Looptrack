@@ -9,9 +9,12 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
 
 	"github.com/howashoji/looptrack/deploy"
 	"github.com/howashoji/looptrack/internal/i18n"
@@ -137,4 +140,109 @@ func Apply(ctx context.Context, a Admin, stmts []string) error {
 		}
 	}
 	return nil
+}
+
+// Requirement は grants.sql の GRANT の 1 行が求めるもの（表と、その表の権限）。
+type Requirement struct {
+	Table string
+	Privs []string // grants.sql に書いた順（SELECT・INSERT・UPDATE・DELETE のどれか）
+}
+
+// probes は Check が権限ごとに流す文の形（%[1]s は表の名前、%[2]s は列の名前）。
+// どれも行に触れない（WHERE 1 = 0）ので、権限の確かめだけが働く。INSERT と UPDATE は表の列を読まない形にする
+// （列を読むと SELECT の権限も要り、SELECT だけが欠けたときに INSERT・UPDATE まで欠けたと数えてしまう）。
+var probes = map[string]string{
+	"SELECT": "SELECT 1 FROM `%[1]s` WHERE 1 = 0",
+	"INSERT": "INSERT INTO `%[1]s` (`%[2]s`) SELECT NULL FROM DUAL WHERE 1 = 0",
+	"UPDATE": "UPDATE `%[1]s` SET `%[2]s` = NULL WHERE 1 = 0",
+	"DELETE": "DELETE FROM `%[1]s` WHERE 1 = 0",
+}
+
+// probeNeedsColumn は、確かめの文に列の名前が要る権限。
+var probeNeedsColumn = map[string]bool{"INSERT": true, "UPDATE": true}
+
+// Requirements は deploy/grants.sql の GRANT の行を、表と権限の並びにして返す（Statements と同じ行を読む）。
+// 確かめ方を知らない権限が grants.sql に入ったら、黙って飛ばさずに誤りを返す。
+func Requirements() ([]Requirement, error) {
+	stmts, err := Statements(sourceDB, "im_app")
+	if err != nil {
+		return nil, err
+	}
+	var out []Requirement
+	for _, s := range stmts {
+		on := strings.Index(s, " ON ")
+		rest := strings.TrimLeft(s[on+len(" ON "):], " ")
+		table := strings.TrimPrefix(rest[:strings.IndexByte(rest, ' ')], sourceDB+".")
+		r := Requirement{Table: table}
+		for _, p := range strings.Split(strings.TrimPrefix(s[:on], "GRANT"), ",") {
+			p = strings.TrimSpace(p)
+			if _, ok := probes[p]; !ok {
+				return nil, fmt.Errorf("deploy/grants.sql: no way to check privilege %q on %s", p, table)
+			}
+			r.Privs = append(r.Privs, p)
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+// Check は、アプリ用の利用者の接続 app（MySQL）で、grants.sql が挙げる全部の表にそこに書いた権限があるかを確かめ、
+// 足りないもの（表と、足りない権限）を返す。そろっていれば空。インストーラ（looptrack grants check）と
+// looptrack grants apply の最後の確かめが、どちらもこれを使う（確かめの規則を 1 か所に置くため）。
+//
+// 権限は SHOW GRANTS を読み解かずに、権限ごとに行に触れない文を実際に流して確かめる。DB 単位の広い権限・ロール経由の
+// 権限でも、サーバが実際に許すかどうかで判断できるため。文は取り消すトランザクションの中で流す（行は変わらない）。
+// 権限の拒否（1142・1143）だけを不足として数え、表が無い・繋がらないなどほかの誤りはそのまま返す。
+func Check(ctx context.Context, app *sql.DB) ([]Requirement, error) {
+	reqs, err := Requirements()
+	if err != nil {
+		return nil, err
+	}
+	tx, err := app.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() //nolint:errcheck // 確かめの文は行に触れないが、念のため必ず取り消す
+	var missing []Requirement
+	for _, r := range reqs {
+		m := Requirement{Table: r.Table}
+		for _, p := range r.Privs {
+			q := fmt.Sprintf(probes[p], r.Table)
+			if probeNeedsColumn[p] {
+				var col string
+				err := tx.QueryRowContext(ctx, "SELECT COLUMN_NAME FROM information_schema.COLUMNS "+
+					"WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION LIMIT 1", r.Table).Scan(&col)
+				if errors.Is(err, sql.ErrNoRows) {
+					// 列が 1 つも見えない = この表に何の権限も無い
+					m.Privs = append(m.Privs, p)
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				q = fmt.Sprintf(probes[p], r.Table, col)
+			}
+			if _, err := tx.ExecContext(ctx, q); err != nil {
+				var me *mysql.MySQLError
+				if errors.As(err, &me) && (me.Number == 1142 || me.Number == 1143) {
+					m.Privs = append(m.Privs, p)
+					continue
+				}
+				return nil, fmt.Errorf("%s: %w", r.Table, err)
+			}
+		}
+		if len(m.Privs) > 0 {
+			missing = append(missing, m)
+		}
+	}
+	return missing, nil
+}
+
+// FormatMissing は Check の結果を「表 (権限, 権限)」を ; で区切った 1 行にする（案内と誤りの文面に使う。言語に依らない形）。
+func FormatMissing(missing []Requirement) string {
+	parts := make([]string, 0, len(missing))
+	for _, m := range missing {
+		parts = append(parts, m.Table+" ("+strings.Join(m.Privs, ", ")+")")
+	}
+	return strings.Join(parts, "; ")
 }

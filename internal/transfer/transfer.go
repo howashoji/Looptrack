@@ -24,6 +24,11 @@ type SourceProject struct {
 	Project store.Project
 	Dir     string
 	Files   []SourceFile
+	// AttachmentManifest は添付の目録（export が書く attachments.json）があるか。import は添付を運ばないので、
+	// あれば呼び出し側が「運ばない」ことを知らせる（黙って捨てない）
+	AttachmentManifest bool
+	// AttachmentCount は目録の添付の件数（目録を読めなければ -1）
+	AttachmentCount int
 }
 
 // SourceFile は open/ または closed/ の 1 ファイル。
@@ -102,6 +107,7 @@ func ReadSource(root string, slugs []string) ([]SourceProject, error) {
 				p.Files = append(p.Files, SourceFile{Rel: sub + "/" + it.Name(), Name: it.Name(), Raw: b})
 			}
 		}
+		p.AttachmentCount, p.AttachmentManifest = readManifestCount(dir)
 		out = append(out, p)
 	}
 	if len(want) > 0 && len(out) != len(want) {
@@ -315,19 +321,31 @@ func diffAt(a, b []byte) int {
 	return i
 }
 
+// ExportResult は書き出しの結果。
+type ExportResult struct {
+	Files       int // 書いたイシューの Markdown の数
+	Attachments int // 目録に載せた添付の数（消去済み・書き出せなかったものを含む）
+	Bodies      int // 書いた添付の本体の数（同じ本体は 1 つ）
+	// Problems は添付を書き出せなかった理由（置き場が無い・本体が欠けている・SHA-256 と合わない）。
+	// あっても書き出しは最後まで続ける（呼び出し側は失敗として扱う）
+	Problems []i18n.Msg
+}
+
 // Export は DB のプロジェクトを out/<slug>/{open,closed}/ と counter に書き出す（移行時の確認・一時出力用）。
+// 添付があれば、本体を out/<slug>/attachments/<sha256> に、目録を out/<slug>/attachments.json に書く（attachments.go）。
+// attachDir は添付の本体の置き場（空なら置き場が無いものとして扱い、添付は目録に missing で載せる）。
 // アーカイブ済みのプロジェクトは既定で外す。includeArchived が true ならそれも書き出す
 // （slugs で名指ししても、includeArchived が false ならアーカイブ済みは出さない＝存在しないのと同じ扱い）。
-func Export(ctx context.Context, db *sql.DB, out string, slugs []string, includeArchived bool) (int, error) {
+func Export(ctx context.Context, db *sql.DB, out string, slugs []string, includeArchived bool, attachDir string) (ExportResult, error) {
+	var res ExportResult
 	projects, err := store.ListProjects(ctx, db)
 	if err != nil {
-		return 0, err
+		return res, err
 	}
 	want := map[string]bool{}
 	for _, s := range slugs {
 		want[s] = true
 	}
-	n := 0
 	for _, p := range projects {
 		if len(want) > 0 && !want[p.Slug] {
 			continue
@@ -337,22 +355,29 @@ func Export(ctx context.Context, db *sql.DB, out string, slugs []string, include
 		}
 		files, err := RenderProject(ctx, db, p)
 		if err != nil {
-			return n, err
+			return res, err
 		}
 		for _, sub := range []string{"open", "closed"} {
 			if err := os.MkdirAll(filepath.Join(out, p.Slug, sub), 0o755); err != nil {
-				return n, err
+				return res, err
 			}
 		}
 		for _, f := range files {
 			if err := os.WriteFile(filepath.Join(out, p.Slug, filepath.FromSlash(f.Rel)), f.Raw, 0o644); err != nil {
-				return n, err
+				return res, err
 			}
-			n++
+			res.Files++
 		}
 		if err := os.WriteFile(filepath.Join(out, p.Slug, "counter"), []byte(strconv.Itoa(p.Counter)+"\n"), 0o644); err != nil {
-			return n, err
+			return res, err
 		}
+		entries, bodies, problems, err := exportAttachments(ctx, db, out, p, attachDir)
+		if err != nil {
+			return res, i18n.Wrapf(err, "transfer.err.at", "at", p.Slug)
+		}
+		res.Attachments += entries
+		res.Bodies += bodies
+		res.Problems = append(res.Problems, problems...)
 	}
-	return n, nil
+	return res, nil
 }

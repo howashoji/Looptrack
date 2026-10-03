@@ -1,17 +1,20 @@
 package docscheck
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 // 利用者ガイド（docs/guide/ と docs/guide/ja/）の日英の構成がそろっているかを確かめる（以前の検査と同じ規則）。
-//  1. 英語版と日本語版で .md のファイル名がそろっている
+// 版ごとの節（server/・desktop/）のようなサブディレクトリにも降り、ファイルは guide からの相対パスで突き合わせる。
+//  1. 英語版と日本語版で .md の相対パスがそろっている
 //  2. 各ファイルの見出しの階層の並び（コードブロックの外）・コードブロックの数・表の数が同じ
 //  3. 相対リンクの先のファイルがある
 //  4. 社内固有の名前・内部の番号が無い（公開リポジトリ github.com/<組織>/looptrack と、そのインストーラを取る
@@ -61,20 +64,79 @@ func shapeOf(text string) shape {
 	return s
 }
 
-func mdNames(t *testing.T, dir string) []string {
+// mdNames は dir の下の .md を、dir からの相対パス（区切りは /）で返す。サブディレクトリにも降りる。
+// skip に挙げたディレクトリ（dir からの相対パス。英語版から見た ja）には降りない。
+func mdNames(t *testing.T, dir string, skip ...string) []string {
 	t.Helper()
-	ents, err := os.ReadDir(dir)
+	var out []string
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			if slices.Contains(skip, rel) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(d.Name(), ".md") {
+			out = append(out, rel)
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out []string
-	for _, e := range ents {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
-			out = append(out, e.Name())
-		}
-	}
 	sort.Strings(out)
 	return out
+}
+
+// guideTreeProblems は英語版 en（ja には降りない）と日本語版 ja の .md を相対パスで突き合わせ、
+// 片方にしか無いファイルと、構成（見出しの並び・コードブロックの数・表の数）の違いを返す。
+func guideTreeProblems(t *testing.T, en, ja string) []string {
+	t.Helper()
+	enNames, jaNames := mdNames(t, en, "ja"), mdNames(t, ja)
+	var out []string
+	for _, n := range enNames {
+		if !slices.Contains(jaNames, n) {
+			out = append(out, "ja/"+n+" がありません")
+		}
+	}
+	for _, n := range jaNames {
+		if !slices.Contains(enNames, n) {
+			out = append(out, n+"（英語版）がありません")
+		}
+	}
+	for _, n := range enNames {
+		if !slices.Contains(jaNames, n) {
+			continue
+		}
+		e := shapeOf(read(t, filepath.Join(en, filepath.FromSlash(n))))
+		j := shapeOf(read(t, filepath.Join(ja, filepath.FromSlash(n))))
+		if !slices.Equal(e.headings, j.headings) {
+			out = append(out, n+": 見出しの並びが違います（英 "+fmtInts(e.headings)+" / 日 "+fmtInts(j.headings)+"）")
+		}
+		if e.fences != j.fences {
+			out = append(out, n+": コードブロックの数が違います（英 "+strconv.Itoa(e.fences)+" / 日 "+strconv.Itoa(j.fences)+"）")
+		}
+		if e.tables != j.tables {
+			out = append(out, n+": 表の数が違います（英 "+strconv.Itoa(e.tables)+" / 日 "+strconv.Itoa(j.tables)+"）")
+		}
+	}
+	return out
+}
+
+func fmtInts(v []int) string {
+	s := make([]string, len(v))
+	for i, n := range v {
+		s[i] = strconv.Itoa(n)
+	}
+	return "[" + strings.Join(s, " ") + "]"
 }
 
 func read(t *testing.T, p string) string {
@@ -87,46 +149,50 @@ func read(t *testing.T, p string) string {
 }
 
 func TestGuideStructure(t *testing.T) {
-	ja := filepath.Join(guideDir, "ja")
-	en, jn := mdNames(t, guideDir), mdNames(t, ja)
+	en := mdNames(t, guideDir, "ja")
 	if len(en) == 0 {
 		t.Fatal("docs/guide に .md がありません")
 	}
-	for _, n := range en {
-		if !slices.Contains(jn, n) {
-			t.Errorf("ja/%s がありません", n)
+	// 検出できる側の対照 1: サブディレクトリ（版ごとの節）まで降りていること。降りなければ、版ごとの節は
+	// 日英のどちらかが欠けても何も言わずに通る。
+	for _, want := range []string{"server/README.md", "desktop/README.md"} {
+		if !slices.Contains(en, want) {
+			t.Errorf("%s を走査していません（mdNames がサブディレクトリに降りていません）", want)
 		}
 	}
-	for _, n := range jn {
-		if !slices.Contains(en, n) {
-			t.Errorf("%s（英語版）がありません", n)
+	for _, p := range guideTreeProblems(t, guideDir, filepath.Join(guideDir, "ja")) {
+		t.Error(p)
+	}
+
+	// 検出できる側の対照 2: 日本語版のサブディレクトリのファイルが 1 本欠けた写しでは、欠けを報告すること。
+	// 一時ディレクトリに組むので、実物は変えない。
+	tmp := t.TempDir()
+	for _, f := range []string{"README.md", "server/README.md", "ja/README.md"} {
+		p := filepath.Join(tmp, filepath.FromSlash(f))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("# x\n"), 0o644); err != nil {
+			t.Fatal(err)
 		}
 	}
-	for _, n := range en {
-		if !slices.Contains(jn, n) {
-			continue
-		}
-		e, j := shapeOf(read(t, filepath.Join(guideDir, n))), shapeOf(read(t, filepath.Join(ja, n)))
-		if !slices.Equal(e.headings, j.headings) {
-			t.Errorf("%s: 見出しの並びが違います（英 %v / 日 %v）", n, e.headings, j.headings)
-		}
-		if e.fences != j.fences {
-			t.Errorf("%s: コードブロックの数が違います（英 %d / 日 %d）", n, e.fences, j.fences)
-		}
-		if e.tables != j.tables {
-			t.Errorf("%s: 表の数が違います（英 %d / 日 %d）", n, e.tables, j.tables)
-		}
+	got := guideTreeProblems(t, tmp, filepath.Join(tmp, "ja"))
+	if !slices.Equal(got, []string{"ja/server/README.md がありません"}) {
+		t.Errorf("前提が崩れています: 日本語版の server/README.md を欠いた写しで、欠けの報告が 1 件だけ出ることを期待しましたが %q でした", got)
 	}
 }
 
 func TestGuideWordsAndLinks(t *testing.T) {
 	// 相対リンクを 1 本も見ずに緑になるのを塞ぐ（link の式か読み方が崩れると、リンク切れの検査は何も見ずに通る）。
-	checked := map[string]bool{} // 調べた相対リンク（"<相対パス> -> <リンク先>"）
+	checked := map[string]bool{} // 調べた相対リンク（"<guide からの相対パス> -> <リンク先>"）
 	files := 0
-	for _, dir := range []string{guideDir, filepath.Join(guideDir, "ja")} {
-		for _, n := range mdNames(t, dir) {
+	for _, side := range []struct {
+		dir  string
+		skip []string
+	}{{guideDir, []string{"ja"}}, {filepath.Join(guideDir, "ja"), nil}} {
+		for _, n := range mdNames(t, side.dir, side.skip...) {
 			files++
-			p := filepath.Join(dir, n)
+			p := filepath.Join(side.dir, filepath.FromSlash(n))
 			rel, _ := filepath.Rel(guideDir, p)
 			for i, line := range strings.Split(read(t, p), "\n") {
 				if forbidden.MatchString(strings.ReplaceAll(strings.ReplaceAll(line, allowRaw, ""), allowed, "")) {
@@ -138,7 +204,8 @@ func TestGuideWordsAndLinks(t *testing.T) {
 						continue
 					}
 					checked[filepath.ToSlash(rel)+" -> "+target] = true
-					if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(target))); err != nil {
+					// リンク先はそのファイルのあるディレクトリから辿る（server/・desktop/ の中の ../ を含む）。
+					if _, err := os.Stat(filepath.Join(filepath.Dir(p), filepath.FromSlash(target))); err != nil {
 						t.Errorf("%s:%d: リンク先がありません: %s", rel, i+1, target)
 					}
 				}
@@ -146,13 +213,16 @@ func TestGuideWordsAndLinks(t *testing.T) {
 		}
 	}
 	t.Logf("docs/guide の .md %d 本・相対リンク %d 本を調べました", files, len(checked))
-	// 下限は実物（2026-09 に 20 本・重複を除いた相対リンク 104 本）のおよそ半分。
-	if files < 10 || len(checked) < 60 {
+	// 下限は実物のおよそ半分。サブディレクトリに分ける前（85ddcc00）は .md 22 本・相対リンク 118 本、
+	// 分けた後は .md 40 本・相対リンク 212 本。
+	if files < 20 || len(checked) < 100 {
 		t.Fatalf("調べた .md が %d 本・相対リンクが %d 本しかありません（走査か link の式が空振りしています）", files, len(checked))
 	}
-	// 検出できる側の対照: 目次から各章へのリンクを実際に調べていること。
-	if want := "README.md -> concepts.md"; !checked[want] {
-		t.Errorf("%s を調べていません（link の式が目次のリンクに当たっていません）", want)
+	// 検出できる側の対照: 目次から各章へのリンクと、サブディレクトリのページのリンクを実際に調べていること。
+	for _, want := range []string{"README.md -> concepts.md", "server/README.md -> getting-started.md", "ja/desktop/README.md -> ../daily-use.md"} {
+		if !checked[want] {
+			t.Errorf("%s を調べていません（走査か link の式がこのリンクに当たっていません）", want)
+		}
 	}
 }
 

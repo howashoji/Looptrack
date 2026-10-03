@@ -36,6 +36,8 @@
 #       → <作業ディレクトリ>/Dockerfile と looptrack（<出力先> の linux/<arch> の実行ファイルを写す。サーバのイメージ）と NOTICE
 #
 # ビルドの形は deploy/build.sh と同じ（CGO_ENABLED=0・-trimpath・-s -w・-X main.version=<版>）。
+# windows の実行ファイルには版の情報（VERSIONINFO。ProductName・ProductVersion）を入れ、作った直後に読み戻して確かめる
+# （go run ./internal/tools/winversion。アイコンは入れない。linux・darwin のビルドは何も変えない）。
 # 対象のコマンドは RELEASE_CMDS（既定 "looptrack"。サーバは looptrack に統合した）、
 # 対象の OS/arch は RELEASE_TARGETS（既定は linux / darwin / windows × amd64 / arm64）。
 # macOS の desktop ビルド（cgo・トレイ）はここでは作らない（macOS の runner が要る。RELEASE.md「desktop ビルド」）。
@@ -59,9 +61,18 @@ GRANTS_SRC="deploy/grants.sql"
 GRANTS_NAME="grants.sql"
 TARGETS="${RELEASE_TARGETS:-linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64}"
 PUBKEY_VAR="github.com/howashoji/looptrack/internal/client/selfupdate.MinisignPublicKey"
+# windows の exe に入れる版の情報の .syso を作り、できた exe から読み戻す道具
+WINVERSION="./internal/tools/winversion"
+
+# build の間だけ置く .syso（失敗しても消す）
+SYSO=""
+cleanup_syso() {
+  [ -z "$SYSO" ] || rm -f "$SYSO"
+}
+trap cleanup_syso EXIT
 
 usage() {
-  sed -n '2,43p' "$0" >&2
+  sed -n '2,45p' "$0" >&2
   exit 2
 }
 
@@ -97,8 +108,17 @@ build() {
       [ "$os" = windows ] && ext=".exe"
       file="$out/${cmd}_${version}_${os}_${arch}${ext}"
       echo "build $file" >&2
+      if [ "$os" = windows ]; then
+        SYSO="cmd/$cmd/rsrc_windows_$arch.syso"
+        go run "$WINVERSION" syso -version "$version" -arch "$arch" -original "$cmd.exe" -out "$SYSO"
+      fi
       CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
         -ldflags "$ldflags" -o "$file" "./cmd/$cmd"
+      if [ "$os" = windows ]; then
+        rm -f "$SYSO"
+        SYSO=""
+        go run "$WINVERSION" check -version "$version" "$file" >&2
+      fi
     done
     if [ "$cmd" = looptrack ]; then
       cp "$OFL_SRC" "$out/$OFL_NAME"

@@ -31,7 +31,8 @@
 #   desktop-windows-installer: 上の zip を Windows の runner で受け取り、まず展開した場所からそのまま起動して確かめ
 #                    （deploy/release/desktop_smoke.ps1。zip はインストーラを通さない配り方なので、別に確かめる）、
 #                    同じ中身を Inno Setup 7 でインストーラにする。amd64 は windows-2025・arm64 は windows-11-arm。
-#                    インストーラは導入 → 起動中の上書き → アンインストールまで試す
+#                    インストーラは導入 → 起動中の上書き → 無人の上書きでの起動し直し（成功と失敗の経路）→
+#                    アンインストールまで試す
 #   署名するときは sign-macos が .app に署名・公証・staple → dmg を作り直して署名・公証し、署名なしの dmg を置き換える。
 #   どれも sums ジョブで合流し、SHA256SUMS は署名の後の最終ファイルから作る（今までの順を変えない）。
 # 秘密の扱い: set -x を使わない・秘密を echo しない・復号したファイルは $RUNNER_TEMP に置き、if: always() の片付けで消す。
@@ -377,7 +378,7 @@ jobs:
       - name: インストーラ（desktop.sh windows-installer）
         shell: bash
         run: bash deploy/release/desktop.sh windows-installer "$VERSION" "$ARCH" stage out
-      - name: smoke test（導入 → 起動中の上書き → アンインストール）
+      - name: smoke test（導入 → 起動中の上書き → 無人の上書きでの起動し直し → アンインストール）
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
@@ -429,6 +430,73 @@ jobs:
           if (-not (Test-Path (Join-Path $app 'Looptrack.exe'))) { throw '上書きの後に Looptrack.exe がありません' }
           if (-not (Test-Path (Join-Path $data 'smoke.txt'))) { throw '上書きでデータが消えました' }
 
+          # デスクトップ版の 1 クリックの置き換え（internal/client/desktop/replace.go）と同じ引数で、起動中に無人で上書きする。
+          # 並びは replace.go の installerArgs と同じ（TestInstallerScriptSettings が両方を同じ読み方で確かめる）。
+          # /TASKS は付けない（前回の選択肢を引き継ぐ）。/RELAUNCH=1 で Looptrack.iss の DeinitializeSetup が起動し直す
+          $updateArgs = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/RELAUNCH=1')
+          $statePath = Join-Path $data 'desktop.json'
+          # setup.exe の本体だけを待つ。Start-Process -Wait は子孫のプロセスの終了まで待つので、DeinitializeSetup が起こした
+          # Looptrack.exe が動き続けると止まる。Handle を先に取らないと、終わった後に ExitCode を読めないことがある
+          function Invoke-Setup([string[]]$SetupArgs) {
+            $sp = Start-Process -FilePath $setup -ArgumentList $SetupArgs -PassThru
+            $null = $sp.Handle
+            $sp.WaitForExit()
+            return $sp
+          }
+          function Wait-Status([int]$OldPid) {
+            for ($i = 0; $i -lt 60; $i++) {
+              & $cli desktop --status *> $null
+              if ($LASTEXITCODE -eq 0) {
+                $st = Get-Content $statePath -Raw | ConvertFrom-Json
+                if ($st.pid -and $st.pid -ne $OldPid) { return $st.pid }
+              }
+              Start-Sleep -Seconds 1
+            }
+            return 0
+          }
+
+          Write-Host '--- 無人の上書きで起動し直す（成功の経路）'
+          $proc = Start-Process -FilePath (Join-Path $app 'Looptrack.exe') `
+            -ArgumentList 'desktop','--background','--no-tray' -PassThru
+          if ((Wait-Status 0) -ne $proc.Id) { throw 'デスクトップ版が起動しません（無人の上書きの前）' }
+          $p = Invoke-Setup ($updateArgs + "/LOG=$env:RUNNER_TEMP\update.log")
+          if ($p.ExitCode -ne 0) { throw "無人の上書きが $($p.ExitCode) で終わりました" }
+          Wait-Process -Id $proc.Id -Timeout 60 -ErrorAction SilentlyContinue
+          $proc.Refresh()
+          if (-not $proc.HasExited) { throw '無人の上書きのときに起動中のインスタンスが止まっていません' }
+          $relaunched = Wait-Status $proc.Id
+          if (-not $relaunched) { throw '無人の上書きの後、60 秒以内に起動し直していません（desktop --status が 0 に戻らない）' }
+          Write-Host "起動し直した pid: $relaunched"
+          if (-not (Get-ItemProperty -Path $runKey -Name Looptrack -ErrorAction SilentlyContinue)) {
+            throw '無人の上書きでログイン時の起動（HKCU の Run の値）が消えました（/TASKS を付けずに前回の選択肢を引き継ぐはず）'
+          }
+          if (-not (Test-Path $cli)) { throw "無人の上書きで CLI の写しが消えました: $cli" }
+          if (-not (Test-Path (Join-Path $data 'smoke.txt'))) { throw '無人の上書きでデータが消えました' }
+
+          Write-Host '--- 無人の上書きが失敗しても起動し直す（NOTICE.txt を共有なしで開いたまま上書きさせる）'
+          # NOTICE.txt は CloseApplicationsFilter（*.exe,*.dll,*.chm）の外なので、Restart Manager はこの pwsh を閉じない。
+          # Inno はファイルを置き換えられずに中止して元に戻し、DeinitializeSetup が前の版を起動し直す
+          $notice = Join-Path $app 'NOTICE.txt'
+          $held = [System.IO.File]::Open($notice, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+          try {
+            $p = Invoke-Setup ($updateArgs + "/LOG=$env:RUNNER_TEMP\update-fail.log")
+          } finally {
+            $held.Close()
+          }
+          # 対照: 失敗の経路を通ったこと（0 でない終了コード）。0 なら共有なしで開いても上書きが通っており、失敗の経路を見ていない
+          if ($p.ExitCode -eq 0) {
+            throw '前提が崩れています: NOTICE.txt を共有なしで開いたままでも無人の上書きが 0 で終わりました（失敗の経路を通っていません）'
+          }
+          Write-Host "失敗した上書きの終了コード: $($p.ExitCode)"
+          Wait-Process -Id $relaunched -Timeout 60 -ErrorAction SilentlyContinue
+          if (Get-Process -Id $relaunched -ErrorAction SilentlyContinue) { throw '失敗した上書きのときに起動中のインスタンスが止まっていません' }
+          $again = Wait-Status $relaunched
+          if (-not $again) { throw '失敗した上書きの後、60 秒以内に前の版が起動し直していません' }
+          Write-Host "失敗の後に起動し直した pid: $again"
+          if (-not (Test-Path (Join-Path $app 'Looptrack.exe'))) { throw '失敗した上書きの後に Looptrack.exe がありません' }
+          & $cli desktop --quit
+          if ($LASTEXITCODE -ne 0) { throw "起動し直したインスタンスを止められません（$LASTEXITCODE）" }
+
           Write-Host '--- アンインストール（データは残り、Run の値と CLI の写しは消える）'
           $uninst = (Get-ItemProperty -Path $unKey).UninstallString.Trim('"')
           Start-Process -FilePath $uninst -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait | Out-Null
@@ -451,7 +519,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: installer-log-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
-          path: ${{ runner.temp }}/install.log
+          path: |
+            ${{ runner.temp }}/install.log
+            ${{ runner.temp }}/update.log
+            ${{ runner.temp }}/update-fail.log
           if-no-files-found: ignore
           retention-days: 7
       - uses: actions/upload-artifact@v7
@@ -867,6 +938,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('refs/tags/{0}', inputs.version) || github.ref }}
+      # Release の本文は、タグの時点の CHANGELOG.md（サーバ版）と CHANGELOG-desktop.md（デスクトップ版）の同じ版の節から作る
+      # （「Server」「Desktop app」の 2 節）。どちらにもその版の節が無ければここで止め、GHCR の latest を動かす前に気づけるようにする。
+      - name: Release の本文を 2 本の CHANGELOG から作る
+        run: |
+          bash deploy/release/release-notes.sh "$VERSION" > "$RUNNER_TEMP/release-notes.md"
+          head -5 "$RUNNER_TEMP/release-notes.md"
       - uses: actions/download-artifact@v8
         with:
           name: release-${{ needs.meta.outputs.version }}
@@ -906,7 +983,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          flags=(--draft --verify-tag --title "$VERSION" --generate-notes)
+          # 本文は CHANGELOG から作ったものだけにする。--generate-notes を併せて渡すと、gh は渡した本文の後ろにコミットと PR の
+          # 自動の一覧を付ける（gh release create --help の「--notes の本文は自動の一覧の前に置く」）。その一覧はサーバ版と
+          # デスクトップ版を分けないので付けない
+          flags=(--draft --verify-tag --title "$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md")
           # PRERELEASE=false のとき（正式版、または v1.0.0 の前の rc）は明示的に Latest にする
           # （既定の自動判定に任せず、利用者の決定どおりに固定する）
           if [ "$PRERELEASE" = true ]; then

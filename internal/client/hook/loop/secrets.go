@@ -466,16 +466,28 @@ var copyCmdHeadRe = regexp.MustCompile(cmdHeadPos + cmdPath + `(?i:cp|install|co
 // 雛形からの複写を通す判断（templateCopy）は、segments で分けた**単純コマンドごと**に行う。行の全体で判断すると、
 // `cp .env.example /tmp/t && cat ~/.ssh/id_rsa` のように、複写と無関係な秘密の読み出しまで一緒に通ってしまう。
 type quoteReading struct {
-	run      func(cmd string) string           // 実行される語だけ（ヒアドキュメントの本文と引用符の中を落とす）
+	heredocs func(cmd string) string           // ヒアドキュメントの本文を落とす（以前の読み方か狭い読み方）
 	strip    func(seg string) string           // 引用符の中を落とす
 	quoted   func(seg string) []string         // 引用符の組の中身
 	segments func(raw string) ([]string, bool) // 単純コマンドへの分割（閉じていない引用符があれば ok = false）
 }
 
+// ヒアドキュメントは以前の読み方（hookcmd.StripHeredocs）の 2 つを先に、狭い読み方（hookcmd.StripHeredocsNarrow）の
+// 2 つを後に見る。以前の読み方が `<<<EOF` や引用符の中の `<<EOF` を開きと読んで次の行を落としても、
+// 狭い読み方ではその行が残る。以前の読み方を先に見るので、確認は以前より減らない。
 var quoteReadings = []quoteReading{
-	{run: func(cmd string) string { return hookcmd.CommandText(cmd, true) },
+	{heredocs: hookcmd.StripHeredocs,
 		strip: hookcmd.StripQuotes, quoted: hookcmd.QuotedTexts, segments: hookcmd.SimpleSegments},
-	{run: hookcmd.CommandTextWin,
+	{heredocs: hookcmd.StripHeredocs,
+		strip: hookcmd.StripQuotesWin, quoted: hookcmd.QuotedTextsWin, segments: hookcmd.SimpleSegmentsWin},
+	{heredocs: hookcmd.StripHeredocsNarrow,
+		strip: hookcmd.StripQuotes, quoted: hookcmd.QuotedTexts, segments: hookcmd.SimpleSegments},
+	{heredocs: hookcmd.StripHeredocsNarrow,
+		strip: hookcmd.StripQuotesWin, quoted: hookcmd.QuotedTextsWin, segments: hookcmd.SimpleSegmentsWin},
+	// 3 つ目の読み方（算術・展開の中の `<<` を開きと読まず、シェルに渡す本文を残す）。追加なので止める側にだけ動く
+	{heredocs: func(s string) string { return strictHeredocs(s) },
+		strip: hookcmd.StripQuotes, quoted: hookcmd.QuotedTexts, segments: hookcmd.SimpleSegments},
+	{heredocs: func(s string) string { return strictHeredocs(s) },
 		strip: hookcmd.StripQuotesWin, quoted: hookcmd.QuotedTextsWin, segments: hookcmd.SimpleSegmentsWin},
 }
 
@@ -590,6 +602,7 @@ func PreToolSecretsGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 	// つながないと語が `.env\` になり、secretPath の basename の切り出し（LastIndexAny(b, "/\\")）が
 	// 末尾のバックスラッシュを区切りとして拾って basename が空になる（＝必ず「秘密ではない」と答える）。
 	cmd = hookcmd.JoinContinuations(cmd)
+	joined := cmd
 	// 判定に掛ける文字列は hookcmd の共通の段で作る（git ガードと同じものを呼ぶ）。
 	// 入れ子のシェルをほどき、前置の語（sudo・env・xargs …）を落とす。
 	// 位置を問わない（hookcmd.AnyPos）のは、`ask` は人がその場で通せるので、広く当てて
@@ -601,13 +614,23 @@ func PreToolSecretsGuard(ctx context.Context, ev hookio.Event) (hookio.Result, e
 			return r, nil
 		}
 	}
+	// 追加の読み方: 3 つ目の読み方で本文を落とし、$'…' とコメントを直してから入れ子のシェルをほどいたもの（本文や
+	// コメントの引用符がほどく段を狂わせて `bash -c '…'` の中身を見失う形と、`bash -c $'…'`）。ほどいた中身にも
+	// もう一度 3 つ目の読み方を掛ける（中身の本文と、閉じない引用符の行から後ろを落とす）。追加なので止める側にだけ動く。
+	first := strictHeredocs(hookcmd.NormalizeLines(hookcmd.ShlexFriendly(strictHeredocs(joined)), hookcmd.AnyPos))
+	for _, rd := range quoteReadings[len(quoteReadings)-2:] { // 最後の 2 つ＝3 つ目の読み方（posix・Windows）
+		if r, ok := secretsVerdict(first, rd, lang, note, e.env); ok {
+			return r, nil
+		}
+	}
 	return hookio.Result{}, nil
 }
 
 // secretsVerdict は 1 つの読み方で秘密のガードの判定をする（確認にするなら ok = true）。
 func secretsVerdict(cmd string, rd quoteReading, lang i18n.Lang, note string, env func(string) string) (hookio.Result, bool) {
 	// コマンド名は「実際に実行される語」だけを見る（引用符・ヒアドキュメントの中の同じ語では反応しない）。
-	run := rd.run(cmd)
+	text := rd.heredocs(cmd)
+	run := rd.strip(text)
 	if run == "" {
 		return hookio.Result{}, false
 	}
@@ -621,7 +644,7 @@ func secretsVerdict(cmd string, rd quoteReading, lang i18n.Lang, note string, en
 	// パスは引用符の中も見る（ヒアドキュメントの本文だけ落とす）。数えるのは中身がパスそのものの組だけ。
 	// 単純コマンドごとに数え、雛形からの複写であるコマンドだけを除く（ほかのコマンドは通常どおり判定する）。
 	allowed := func(p string) bool { return secretsAllowed(p, env) }
-	segs, split := rd.segments(hookcmd.CommandText(cmd, false))
+	segs, split := rd.segments(text)
 	var paths []string
 	redirect := false
 	seen := map[string]bool{}

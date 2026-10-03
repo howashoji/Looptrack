@@ -151,7 +151,10 @@ func (s *Service) verifyText(lang i18n.Lang, p *VerifyPlan) (message, text strin
 	if p.SectionDriftNote != "" {
 		b.WriteString(p.SectionDriftNote + "\n")
 	}
-	b.WriteString(message)
+	b.WriteString(message + "\n")
+	// 末尾はエビデンスの添付の案内（規則の本文は guide の共通規則「エビデンス」。CLI の --list・MCP の verify_issue・GET …/verify が同じ文面を出す。
+	// next の text は guide_api.go が別に組むのでこの行は通らない。next には close の段の文面（server.api.next.step_close）で同じ指示を出す）
+	b.WriteString(i18n.T(lang, "service.verify.evidence", "command", p.Command, "id", p.ID))
 	return message, b.String()
 }
 
@@ -177,6 +180,8 @@ type VerifyInput struct {
 	Results    []store.VerifyResult
 	Host       string
 	Workspace  string
+	// Attachments はエビデンスとして記録に付ける、そのイシューの添付の ID（detail.attachments。空なら付けない）
+	Attachments []int64
 }
 
 var verifyStatuses = []string{"ok", "fail", "timeout", "skipped"}
@@ -189,7 +194,8 @@ type VerifyRecord struct {
 
 // RecordVerify は CLI（または MCP の report_verify）が手元で実行した結果を、コメントと issue_events kind verify として 1 トランザクションで残す。
 // 検査: ① body_sha256 が現在の本文と違えば 409 body_changed ② コマンドが現在の節と同じ順で同じでなければ 400
-// ③ 出力はマスクして 4,096 バイトに切る ④ クローズ済みにも記録できる（コメントの追記と同じ）。拒否したときは何も記録しない。
+// ③ 出力はマスクして 4,096 バイトに切る ④ クローズ済みにも記録できる（コメントの追記と同じ）
+// ⑤ 添付の ID（エビデンス）はそのイシューの消去していない添付だけ（detail.attachments に残す）。拒否したときは何も記録しない。
 // lang は記録した利用者の言語（コメントの文面がこれで決まる。DB に残る文面は書いた利用者の言語・DESIGN §9-6。Create と同じく呼ぶ側が渡す）。
 func (s *Service) RecordVerify(ctx context.Context, a Actor, p store.Project, issueID int64, in VerifyInput, lang i18n.Lang) (*VerifyRecord, error) {
 	if strings.TrimSpace(in.BodySHA256) == "" {
@@ -212,7 +218,7 @@ func (s *Service) RecordVerify(ctx context.Context, a Actor, p store.Project, is
 		return nil, err
 	}
 	var detail store.VerifyDetail
-	it, err := s.mutate(ctx, a, p, issueID, 0, func(_ *sql.Tx, doc *mdformat.Document, cur domain.Issue, now string) (change, error) {
+	it, err := s.mutate(ctx, a, p, issueID, 0, func(tx *sql.Tx, doc *mdformat.Document, cur domain.Issue, now string) (change, error) {
 		sum := domain.BodySHA256(doc.BodyMain)
 		if in.BodySHA256 != sum {
 			return change{}, errm(Conflict, "body_changed", i18n.M("service.err.conflict.body_changed", "id", cur.ID, "command", domain.VerifyCommand(cur.ID)))
@@ -227,8 +233,13 @@ func (s *Service) RecordVerify(ctx context.Context, a Actor, p store.Project, is
 		if !sameCommands(cmds, in.Results) {
 			return change{}, errm(Invalid, "verify_commands_mismatch", i18n.M("service.err.verify_mismatch", "id", cur.ID, "n", len(cmds), "command", domain.VerifyCommand(cur.ID)))
 		}
+		refs, err := attachmentRefs(ctx, tx, issueID, in.Attachments)
+		if err != nil {
+			return change{}, err
+		}
 		detail = newVerifyDetail(sum, host, workspace, a.Via == "mcp", in.Results)
-		text := verifyComment(lang, detail)
+		detail.Attachments = refs
+		text := verifyComment(lang, detail) // 添付はコメントの本文に書かない（本文はこれまでと同じ）
 		if v := rules.CheckText(a.Lang, cur.ID, "", text); v != nil {
 			return change{}, ruleError(v)
 		}

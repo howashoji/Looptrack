@@ -116,7 +116,7 @@ settings for your agent, puts the CLI on `PATH`, and starts Looptrack at login.
 You don't need administrator rights on any OS.
 
 How each OS behaves on the first launch, and the rest of the details:
-[Desktop edition](docs/guide/desktop.md).
+[Desktop edition](docs/guide/desktop/README.md).
 
 ### 2. On a Linux server — `install.sh`
 
@@ -235,7 +235,8 @@ does are covered in [DEPLOY.md](docs/server/DEPLOY.md).
 The user guide comes in [English](docs/guide/README.md) and
 [Japanese](docs/guide/ja/README.md). Start here:
 [Concepts](docs/guide/concepts.md) →
-[Getting started](docs/guide/getting-started.md) →
+Getting started with the [server](docs/guide/server/getting-started.md)
+or the [desktop app](docs/guide/desktop/getting-started.md) →
 [Daily use](docs/guide/daily-use.md).
 
 ### Language
@@ -271,6 +272,7 @@ Skills are different. A skill can't be picked at run time, so
 | `https://example.com/looptrack/p/<slug>/` | Board / list / trace, with issue detail (minimal forms to file, change status, comment and reassign) |
 | `https://example.com/looptrack/account` | Account settings: issue and revoke access tokens, change password |
 | `https://example.com/looptrack/admin/users` | User administration (administrators) |
+| `https://example.com/looptrack/admin/attachments` | Attachment limits, usage and purging (administrators) |
 | `https://example.com/looptrack/api/v1/` | REST API (bearer token) |
 | `https://example.com/looptrack/mcp` | Remote MCP (OAuth 2.1 or a token) |
 
@@ -285,6 +287,11 @@ The public URL and the `/looptrack` prefix are both configurable.
 - The database is the source of truth. There's no periodic Markdown export, so
   back up with a database dump. Still, `looptrack export` writes Markdown on
   demand. Your data is never locked in.
+- Attached files (test output, screenshots) are kept on disk, not in the
+  database, so back up the attachment directory as well and take the database
+  first. `looptrack export` writes the attachments too, but `looptrack import`
+  doesn't carry them. See "添付の置き場とバックアップ" in
+  [DEPLOY.md](docs/server/DEPLOY.md).
 
 ### On the screen
 
@@ -296,6 +303,8 @@ board with a column per status, a list you can filter and sort, and a trace view
 that follows the links between issues. Select an issue and its detail opens
 beside them. You get the body, comments in order, events, and the verification
 commands with their last result.
+
+![The board: issue cards in a column per status](docs/guide/images/en/board.png)
 
 The browser is mainly for reading.
 The only writes it offers are changing the assignee, plus minimal forms to file
@@ -407,7 +416,7 @@ looptrack/
 | Build release artifacts | [docs/server/RELEASE.md](docs/server/RELEASE.md) |
 | Contribute code | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Report a vulnerability | [SECURITY.md](SECURITY.md) |
-| See what changed | [CHANGELOG.md](CHANGELOG.md) |
+| See what changed | [CHANGELOG.md](CHANGELOG.md) (server and CLI) · [CHANGELOG-desktop.md](CHANGELOG-desktop.md) (desktop app) |
 
 ## Release artifacts and signatures
 
@@ -418,10 +427,19 @@ looptrack/
 - **The Windows binaries aren't signed yet.** SmartScreen may show "Windows
   protected your PC" on the first run. Check the SHA-256 against `SHA256SUMS`
   first, then choose More info → Run anyway.
+  On Windows 11 with Smart App Control turned on, unsigned apps are blocked and
+  there is no Run anyway. A PC your organization manages may also block them by
+  policy. What you can do in either case is under "Signatures and OS warnings"
+  in [Getting started with the server](docs/guide/server/getting-started.md#signatures-and-os-warnings).
+  If you installed the desktop app, its
+  [troubleshooting page](docs/guide/desktop/troubleshooting.md) gives the same
+  advice next to its other symptoms.
 - `SHA256SUMS` is signed with minisign (`SHA256SUMS.minisig`). The public key is
   [deploy/release/minisign.pub](deploy/release/minisign.pub), key ID
   29D707D7EBFF246B. `looptrack self-update` verifies that signature before it
-  replaces anything. To check by hand:
+  replaces anything. With no server URL it fetches the server archive from
+  GitHub releases and checks both the archive and the `looptrack` inside it
+  against that signature. To check by hand:
   `minisign -Vm SHA256SUMS -P RWRrJP/r1wfXKalGsxLnzFmmsExUd2azSJh4ccrYDJEBu8yE3N0ZlLJy`.
 - Every artifact carries a `NOTICE` file with the license texts of every
   dependency, of Go itself, and of the embedded font. That means the binaries,

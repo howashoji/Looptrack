@@ -191,32 +191,32 @@ ws/AGENTS.md (0644)
     <!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
     ## 課題管理（イシュー管理サーバ）
 
-    **作業はイシュー登録から始める。会話だけで進めない。不具合は発覚と同時に起票する。**
+    **作業はイシュー登録から始めます。会話だけで進めないでください。不具合は発覚と同時に起票します。**
 
-    - **操作は MCP のツール（サーバ名 looptrack）で行う。** Codex のサンドボックスはシェルのコマンドの外部通信を止めるので、
-      CLI（`looptrack issue`）は実行のたびに権限の昇格（利用者の承認）が要る。MCP のツールの通信はサンドボックスに止められない
-    - **使い方とルールは最初に `guide` ツールで読む**（共通規則 + このプロジェクトのルール + 運用文書を 1 回で返す）
+    - **操作は MCP のツール（サーバ名 looptrack）で行います。** Codex のサンドボックスはシェルのコマンドの外部通信を止めます。
+      だから CLI（`looptrack issue`）は、実行のたびに権限の昇格（利用者の承認）が要ります。MCP のツールの通信はサンドボックスに止められません
+    - **使い方とルールは、最初に `guide` ツールで読みます**。共通規則 + このプロジェクトのルール + 運用文書を 1 回で返します
     - ループ運用の 1 周: `next`（着手）→ 作業 → `add_comment`（分かった時点で記録）→ 受け入れ条件を検証 → `set_status` で Done（`comment` に検証結果）→ 次の `next`。
-      起票は `create_issue`、本文の編集は `get_issue` で version と全文を取り `update_issue` に直した全文を渡す。拒否されたらメッセージの指示に従う
+      起票は `create_issue` です。本文の編集では `get_issue` で version と全文を取り、`update_issue` に直した全文を渡します。拒否されたらメッセージの指示に従ってください
     - 検証コマンド（本文の「## 検証コマンド」節）: `verify_issue` で一覧を取り、手元のシェルで順に全部実行して、結果を `report_verify` で送る
-    - トークン情報: MCP で起票・コメント・状態変更をすると、フック（`.codex/hooks.json` の `looptrack hook usage`）が数秒後にイシューへ付ける。
-      Done の前に `add_comment` で経過を残しておけば、規則 usage（AI の Done にトークン情報を求める）に拒否されない
-    - CLI は MCP に無い操作だけに使う。権限を上げて実行し、利用者の承認を得る（環境変数 `LOOPTRACK_API_URL=$API` / `LOOPTRACK_PROJECT=demo` は init が `.codex/config.toml` に書いた。
-      `looptrack issue config` がサーバの URL が無いというエラーで止まるなら、コマンドの前に `LOOPTRACK_API_URL=$API LOOPTRACK_PROJECT=demo` を付ける）:
-      - `looptrack issue usage attach <ID>`: ツールの結果にこのコマンドが示されたとき（目印は文面ではなくコマンド。サーバの文面は利用者の言語で変わる）。`set_status` が規則 usage で拒否されたときは、
-        数秒おいて 1 回やり直し（フックの送信が間に合っていないことがある）、それでも拒否されたら付けてからやり直す
-      - `looptrack issue login --browser --url $API`: 初回だけ（フックが使うトークン。開いたブラウザで利用者がログインと承認をする。トークンは会話に出ない）
+    - トークン情報: MCP で起票・コメント・状態変更をすると、フック（`.codex/hooks.json` の `looptrack hook usage`）が数秒後にイシューへ付けます。
+      Done の前に `add_comment` で経過を残しておけば、規則 usage（AI の Done にトークン情報を求める）に拒否されません
+    - CLI は MCP に無い操作だけに使います。権限を上げて実行し、利用者の承認を得てください。環境変数 `LOOPTRACK_API_URL=$API` / `LOOPTRACK_PROJECT=demo` は init が `.codex/config.toml` に書きました。
+      `looptrack issue config` がサーバの URL が無いというエラーで止まるなら、コマンドの前に `LOOPTRACK_API_URL=$API LOOPTRACK_PROJECT=demo` を付けます。CLI を使う場面は次のとおりです:
+      - `looptrack issue usage attach <ID>`: ツールの結果にこのコマンドが示されたとき。目印は文面ではなくコマンドです（サーバの文面は利用者の言語で変わります）。`set_status` が規則 usage で拒否されたときは、
+        数秒おいて 1 回やり直します。フックの送信が間に合っていないことがあるからです。それでも拒否されたら、付けてからやり直してください
+      - `looptrack issue login --browser --url $API`: 初回だけ。取るのはフックが使うトークンです。開いたブラウザで利用者がログインと承認をし、トークンは会話に出ません
       - 導入・更新（`init`・`installed`）: `setup` ツールが返す手順どおり
-    - MCP の looptrack が接続されていないときは、CLI の `next` / `comment` / `verify` / `close --comment` で同じ 1 周を回す（毎回承認が要る。
-      利用者に `~/.codex/config.toml` への `[mcp_servers.looptrack]` の追加を勧める）。本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡す
+    - MCP の looptrack が接続されていないときは、CLI の `next` / `comment` / `verify` / `close --comment` で同じ 1 周を回します。毎回承認が要るので、
+      利用者に `~/.codex/config.toml` への `[mcp_servers.looptrack]` の追加を勧めてください。本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡します
     - 閲覧: $API/p/demo/ （ログイン必須・閲覧専用）
 
     ### GitHub Copilot から使うとき
 
-    - 上と同じく MCP のツールが主（VS Code は `.vscode/mcp.json`、Copilot CLI はリポジトリの `.github/mcp.json` か `~/.copilot/mcp-config.json` の looptrack）。Copilot にサンドボックスは無いが、
-      CLI を打つときはコマンドの前に `LOOPTRACK_API_URL=$API LOOPTRACK_PROJECT=demo` を付ける（Copilot は `.codex/config.toml` を読まない）
-    - トークン情報: 利用者が Copilot の OpenTelemetry のファイル出力を有効にすると、フック（`.github/hooks/looptrack.json` の `looptrack hook usage`）が付ける
-      （手順は AI-GUIDE §7-3-1）。有効にしていなければ付かず、未付与にも数えない。
-      Copilot CLI のシェルでは `looptrack issue usage attach <ID>` で付けられる（`COPILOT_AGENT_SESSION_ID` から会話を特定する）。
-      **VS Code の Copilot では `looptrack issue usage attach` を実行しない**（シェルにセッション ID が渡らず、同じディレクトリの Codex の記録を付けてしまうことがある）
+    - 操作は上と同じく MCP のツールが主です（VS Code は `.vscode/mcp.json`、Copilot CLI はリポジトリの `.github/mcp.json` か `~/.copilot/mcp-config.json` の looptrack）。Copilot にサンドボックスはありません。
+      それでも CLI を打つときは、コマンドの前に `LOOPTRACK_API_URL=$API LOOPTRACK_PROJECT=demo` を付けてください。Copilot は `.codex/config.toml` を読まないからです
+    - トークン情報: 利用者が Copilot の OpenTelemetry のファイル出力を有効にすると、フック（`.github/hooks/looptrack.json` の `looptrack hook usage`）が付けます
+      （手順は AI-GUIDE §7-3-1）。有効にしていなければ付かず、未付与にも数えません。
+      Copilot CLI のシェルでは `looptrack issue usage attach <ID>` で付けられます。会話は `COPILOT_AGENT_SESSION_ID` から特定します。
+      **VS Code の Copilot では `looptrack issue usage attach` を実行しないでください**。シェルにセッション ID が渡らず、同じディレクトリの Codex の記録を付けてしまうことがあります
     <!-- looptrack:end -->

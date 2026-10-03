@@ -33,6 +33,8 @@ type reportVerifyIn struct {
 	Results    []reportVerifyResult `json:"results" jsonschema:"server.mcp.arg.report_verify.results"`
 	Host       string               `json:"host,omitempty" jsonschema:"server.mcp.arg.report_verify.host"`
 	Workspace  string               `json:"workspace,omitempty" jsonschema:"server.mcp.arg.report_verify.workspace"`
+	// Attachments は記録に付けるエビデンスの添付の ID（CLI の issue attach が返した ID）
+	Attachments []int64 `json:"attachments,omitempty" jsonschema:"server.mcp.arg.report_verify.attachments"`
 }
 
 // reportVerifyHint は verify_issue の本文の末尾に足す report_verify の使い方。
@@ -78,7 +80,7 @@ func (s *Server) addVerifyMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.Tool
 			for i, r := range in.Results {
 				res[i] = store.VerifyResult{Command: r.Command, Status: r.Status, ExitCode: r.ExitCode, DurationMS: r.DurationMS, OutputTail: r.OutputTail, Cached: r.Cached}
 			}
-			rec, err := s.svc.RecordVerify(ctx, c.actor, pr, row.ID, service.VerifyInput{BodySHA256: in.BodySHA256, Results: res, Host: in.Host, Workspace: in.Workspace}, c.lang)
+			rec, err := s.svc.RecordVerify(ctx, c.actor, pr, row.ID, service.VerifyInput{BodySHA256: in.BodySHA256, Results: res, Host: in.Host, Workspace: in.Workspace, Attachments: in.Attachments}, c.lang)
 			if err != nil {
 				return nil, nil, s.toolError(c.lang, "report_verify", err)
 			}
@@ -86,7 +88,11 @@ func (s *Server) addVerifyMCPTools(srv *mcp.Server, lang i18n.Lang, ro *mcp.Tool
 			comment := it.Row.Doc.Comments[len(it.Row.Doc.Comments)-1].Content
 			notice := s.usageNotice(ctx, c.lang, c.actor, pr, it, false)
 			text := i18n.T(c.lang, "server.mcp.verify.recorded", "label", i18n.M("service.verify.last.self_reported"), "id", it.Item.ID, "comment", comment)
-			return result(withNotice(text, notice), map[string]any{"issue": toIssueJSON(it), "seq": d.CommentSeq, "ok": d.OK, "passed": d.Passed,
-				"failed": d.Failed, "body_sha256": d.BodySHA256, "self_reported": d.SelfReported, "comment": comment, "usage_notice": notice}), nil, nil
+			data := map[string]any{"issue": toIssueJSON(it), "seq": d.CommentSeq, "ok": d.OK, "passed": d.Passed,
+				"failed": d.Failed, "body_sha256": d.BodySHA256, "self_reported": d.SelfReported, "comment": comment, "usage_notice": notice}
+			if len(d.Attachments) > 0 { // REST の応答と同じく、添付を付けた記録だけ
+				data["attachments"] = d.Attachments
+			}
+			return result(withNotice(text, notice), data), nil, nil
 		})
 }

@@ -1,0 +1,170 @@
+# LOOPTRACK_LANG=en init --project demo --agent claude-code
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws (project demo, http://127.0.0.1:9/im, AI claude-code)
+kit source: the kit embedded in the executable (looptrack dev)
+Wiring: looptrack hook <name> --agent <AI>
+Install set: core only. loop is not installed (--loop installs it).
+  create     .claude/settings.json
+  create     CLAUDE.md
+  create     .claude/skills/issue/SKILL.md
+  create     .claude/skills/token-report/SKILL.md
+  create     .gitignore
+  create     .claude/.looptrack-kit.json
+verify: checked 8 wiring(s), looptrack dev（headless・test）
+Next:
+  1. Restart Claude Code (to pick up env and the hooks). If it asks you to confirm hooks or settings, read them and approve (the desktop app loads them without asking).
+  2. No token yet: run looptrack issue login --browser --url http://127.0.0.1:9/im and log in and approve in the browser it opens (the AI may run this; it waits up to 5 minutes, so set the command timeout longer than 5 minutes. Without a browser, issue a token at http://127.0.0.1:9/im/account and paste it into login --url http://127.0.0.1:9/im).
+  3. Check: looptrack issue config -> guide -> next --dry-run
+
+#### stderr
+
+#### files
+.claude/.looptrack-kit.json (0644)
+    {
+      "version": 1,
+      "url": "http://127.0.0.1:9/im",
+      "project": "demo",
+      "agent": [
+        "claude-code"
+      ],
+      "source": "copy",
+      "core": {
+        "bundle_sha256": "$SHA256",
+        "files": {
+          "kit/core/skills/issue/SKILL.md": "$SHA256",
+          "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+        }
+      },
+      "loop": {
+        "installed": false
+      }
+    }
+.claude/settings.json (0644)
+    {
+      "env": {
+        "LOOPTRACK_API_URL": "http://127.0.0.1:9/im",
+        "LOOPTRACK_PROJECT": "demo"
+      },
+      "hooks": {
+        "SessionStart": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook summary --agent claude-code",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-freshness-mark --agent claude-code",
+                "timeout": 5
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Bash|Read|Edit|Write|NotebookEdit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-freshness-mark --agent claude-code",
+                "timeout": 5
+              }
+            ]
+          },
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-freshness-check --agent claude-code",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "SessionEnd": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "PreToolUse": [
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "looptrack hook issue-session-bind --agent claude-code",
+                "timeout": 5
+              }
+            ]
+          }
+        ]
+      },
+      "permissions": {
+        "allow": [
+          "Bash(looptrack issue:*)"
+        ]
+      }
+    }
+.claude/skills/issue/SKILL.md (0644) = kit kit/core/skills/issue/en/SKILL.md
+.claude/skills/token-report/SKILL.md (0644) = kit kit/core/skills/token-report/en/SKILL.md
+.gitignore (0644)
+    .claude/.looptrack-freshness/
+CLAUDE.md (0644)
+    <!-- looptrack:begin (managed by looptrack issue init; to change it, run looptrack issue init again) -->
+    ## Issue tracking (issue server)
+
+    **Start every piece of work by filing an issue, not in conversation alone. File a bug as soon as you find one.**
+
+    This section is for Claude Code. GitHub Copilot and Codex follow the "Issue tracking" section in AGENTS.md instead; if AGENTS.md has none, they start from the `setup` tool of the looptrack MCP server.
+    The note is here because GitHub Copilot's CLI and VS Code read CLAUDE.md too.
+
+    - Operation: `looptrack issue` (API mode, with `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT=demo` in the `env` of `.claude/settings.json`). The skill is `/issue`
+    - **Read how to use it and the rules with `looptrack issue guide`**. It returns the common rules, this project's rules and the operating documents in one go. Over MCP, use the `guide` tool
+    - One round of the loop: `looptrack issue next` (start) → work → `looptrack issue comment <ID> "…"` (record what you learn as you learn it) → verify the acceptance criteria → `looptrack issue close <ID> --comment "verification results"` → the next `next`
+    - Browse: http://127.0.0.1:9/im/p/demo/ (login required, read-only)
+
+    The authoritative copy of each issue lives on the server (in its database), and there are no local files. Handle them as follows.
+
+    - **The first time only**, run `looptrack issue login --browser --url http://127.0.0.1:9/im`. The user logs in and approves in the browser that opens; the token never shows up in the conversation and refreshes itself from then on. Without a browser, issue a token at http://127.0.0.1:9/im/account and paste it into `login --url http://127.0.0.1:9/im`
+    - Editing a body: `looptrack issue edit <ID>` → Read / Edit `.claude/.looptrack-work/<ID>.md` → `looptrack issue push <ID>`
+    - Issues need no git pull / commit / push
+    - The server enforces numbering, the immutability of closed issues and the per-project rules. When it rejects something, follow the instructions in the message
+    - `--traces` is for issue IDs only, and `--refs` for document IDs (`FR-`/`NFR-`/`UC-`/`ISS-`/`DEC-`) only
+    - To pass a body or a comment through the shell, wrap it in a quoted heredoc (`<<'EOF'`)
+    <!-- looptrack:end -->

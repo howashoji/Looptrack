@@ -76,6 +76,7 @@ type handoffOpts struct {
 	dropMarks bool
 	lockTTL   time.Duration
 	hasTTL    bool
+	help      bool     // -h / --help（使い方を出して、何も書かずに終わる）
 	args      []string // 位置引数（本文。無いか "-" なら標準入力）
 }
 
@@ -91,6 +92,10 @@ func Handoff(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		return handoffExitUsage
 	}
 	sub := args[0]
+	if sub == "-h" || sub == "--help" {
+		fmt.Fprint(stdout, i18n.T(lang, "loop.handoff.cli.usage"))
+		return handoffExitOK
+	}
 	if sub != "append" && sub != "compact" {
 		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.unknown_subcommand", "name", sub))
 		fmt.Fprint(stderr, i18n.T(lang, "loop.handoff.cli.usage"))
@@ -101,6 +106,10 @@ func Handoff(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.bad_flag", "name", bad))
 		fmt.Fprint(stderr, i18n.T(lang, "loop.handoff.cli.usage"))
 		return handoffExitUsage
+	}
+	if opt.help {
+		fmt.Fprint(stdout, i18n.T(lang, "loop.handoff.cli.usage"))
+		return handoffExitOK
 	}
 	body, code := handoffReadBody(opt, stdin, stderr, lang)
 	if code != handoffExitOK {
@@ -117,7 +126,26 @@ func handoffErr(w io.Writer, lang i18n.Lang, msg string) {
 	fmt.Fprintln(w, i18n.T(lang, "cmd.prefix.error", "msg", msg))
 }
 
+// handoffMistypedFlag は、選択肢の打ち間違いに見える語か（空白を含まず、- 1 つと英字だけ。例 -x・-help）。
+//
+// 本文として通すと、使い方を見るつもりの -h のような語が引き継ぎに書き込まれて成功で終わる。
+// 本文として通すのは、ちょうど -（標準入力）・"- 項目" のような箇条・ふつうの文・-- の後ろの語だけ。
+func handoffMistypedFlag(a string) bool {
+	if len(a) < 2 || a[0] != '-' {
+		return false
+	}
+	for _, r := range a[1:] {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
 // handoffParse は引数を解く（--name=値 と --name 値 の両方を受ける）。戻り値の bad は誤った選択肢の名前。
+//
+// -h / --help は help を立てて、そこで解くのをやめる（使い方を見るだけなので、後ろの語は見ない）。
+// 本文として「-」で始まる語を書くときは、-- の後ろに置く。
 func handoffParse(args []string) (handoffOpts, string) {
 	var o handoffOpts
 	take := func(i *int, inline string, ok bool) (string, bool) {
@@ -136,13 +164,26 @@ func handoffParse(args []string) (handoffOpts, string) {
 			o.args = append(o.args, args[i+1:]...)
 			break
 		}
+		if a == "-h" {
+			o.help = true
+			return o, ""
+		}
 		if !strings.HasPrefix(a, "--") {
+			if handoffMistypedFlag(a) {
+				return o, a
+			}
 			o.args = append(o.args, a)
 			continue
 		}
 		name, inline, hasInline := strings.Cut(a, "=")
 		var ok bool
 		switch name {
+		case "--help":
+			if hasInline {
+				return o, name
+			}
+			o.help = true
+			return o, ""
 		case "--file":
 			o.file, ok = take(&i, inline, hasInline)
 		case "--title":

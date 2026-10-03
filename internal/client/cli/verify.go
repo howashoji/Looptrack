@@ -35,6 +35,16 @@ func cmdVerify(c *Ctx, v *Values) error {
 		return &Exit{2}
 	}
 	issueID := v.Str("id")
+	// --list・--last は実行も記録もしないので、添付を受け取っても付ける先が無い。黙って捨てずに止める
+	if (v.Bool("list") || v.Bool("last")) && (len(v.List("attach")) > 0 || v.Bool("attach_output")) {
+		return i18n.Errorf("cli.err.verify_attach_with_read")
+	}
+	// 添付は要求を送る前に全部読んで秘密の検査を通す（止まるなら、サーバに何も送らず、長い実行の前に止める）
+	files, err := readAttachments(v.List("attach"))
+	if err != nil {
+		return err
+	}
+	attachOutput := v.Bool("attach_output")
 	path, err := c.verifyPath(issueID)
 	if err != nil {
 		return err
@@ -92,6 +102,16 @@ func cmdVerify(c *Ctx, v *Values) error {
 		Dir: dir, Env: verify.Env(os.Environ(), issueID),
 		Timeout: seconds(timeout), TotalTimeout: seconds(total),
 	}
+	// --attach-output: 切る前の出力の全文を一時ファイルに控える（記録の output_tail は今までどおり末尾だけ）
+	var full *os.File
+	if attachOutput {
+		if full, err = os.CreateTemp("", "looptrack-verify-*.log"); err != nil {
+			return err
+		}
+		defer os.Remove(full.Name())
+		defer full.Close()
+		opts.Full = full
+	}
 	if !asJSON {
 		opts.Before = func(i, n int, command string) { c.Printf("[%d/%d] $ %s\n", i, n, command) }
 		opts.After = func(i, n int, r verify.Result) {
@@ -124,11 +144,33 @@ func cmdVerify(c *Ctx, v *Values) error {
 	var sendErr string
 	sent := false
 	cachedDropped := false
+	if full != nil {
+		f, err := c.outputAttachment(full, issueID)
+		if err != nil {
+			return err
+		}
+		files = append([]attachFile{f}, files...)
+	}
+	// 添付を先に送り、その ID を記録に付ける。添付を送れなければ記録もしない（エビデンスの無い記録を黙って残さない）
+	var attachIDs []any
 	body := verify.Body(sha, results, dir)
-	r, err := verify.Send(cl, path, body)
+	err = nil
+	if len(files) > 0 {
+		ids, _, aerr := c.uploadAttachments(cl, issueID, files, asJSON)
+		attachIDs = ids
+		if aerr != nil {
+			err = aerr
+		} else {
+			body.Set("attachments", ids)
+		}
+	}
+	var r any
+	if err == nil {
+		r, err = verify.Send(cl, path, body)
+	}
 	// cached の欄を知らない版のサーバは本文を丸ごと拒む。注記だけを捨てて、検証の記録そのものは残す
 	// （記録が残らない方が害が大きい。注記が落ちたことは下で手元に出す）。
-	if err != nil && unknownFieldRejected(err) && verify.StripCached(body) {
+	if err != nil && len(attachIDs) == len(files) && unknownFieldRejected(err) && verify.StripCached(body) {
 		if r2, err2 := verify.Send(cl, path, body); err2 == nil {
 			r, err, cachedDropped = r2, nil, true
 		}
@@ -145,7 +187,11 @@ func cmdVerify(c *Ctx, v *Values) error {
 		case errors.As(err, &ce):
 			sendErr = i18n.Text(c.Lang, ce)
 		default:
-			return err
+			var ie *i18n.Error
+			if !errors.As(err, &ie) {
+				return err
+			}
+			sendErr = i18n.Text(c.Lang, err) // 添付を送れない理由（古いサーバ・読めない応答）
 		}
 	} else {
 		res, sent = r, true
@@ -166,9 +212,13 @@ func cmdVerify(c *Ctx, v *Values) error {
 		if !sent {
 			errv = sendErr
 		}
-		c.PrintJSON(jsonorder.NewObject().Set("id", issueID).Set("body_sha256", sha).Set("ok", failed == 0).
+		out := jsonorder.NewObject().Set("id", issueID).Set("body_sha256", sha).Set("ok", failed == 0).
 			Set("passed", passed).Set("failed", failed).Set("results", verify.ResultsJSON(results)).
-			Set("recorded", sent).Set("cached_not_recorded", cachedDropped).Set("response", res).Set("error", errv))
+			Set("recorded", sent).Set("cached_not_recorded", cachedDropped).Set("response", res).Set("error", errv)
+		if len(files) > 0 { // 添付を付けた実行だけ（付けない実行の出力はこれまでと同じ）
+			out.Set("attachments", attachIDs)
+		}
+		c.PrintJSON(out)
 	} else {
 		var ms int64
 		for _, r := range results {
@@ -197,6 +247,21 @@ func cmdVerify(c *Ctx, v *Values) error {
 		return &Exit{1}
 	}
 	return nil
+}
+
+// outputAttachment は控えた出力の全文を添付の形にする（文字コードを揃えてマスクする。切りはしない）。
+// マスクした後なので秘密の検査には当たらないはずだが、ほかの添付と同じ関所を通す。
+func (c *Ctx) outputAttachment(full *os.File, issueID string) (attachFile, error) {
+	raw, err := os.ReadFile(full.Name())
+	if err != nil {
+		return attachFile{}, err
+	}
+	data := []byte(verify.FullText(raw))
+	name := "verify-output-" + issueID + ".txt"
+	if err := checkAttachText(name, data); err != nil {
+		return attachFile{}, err
+	}
+	return attachFile{Path: name, Name: name, MediaType: "text/plain; charset=utf-8", Data: data}, nil
 }
 
 // recordCachedDropped は、結果キャッシュの注記を外して記録したことをイシューのコメントに 1 行残す。
