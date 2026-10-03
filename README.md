@@ -1,3 +1,5 @@
+<p align="center"><img src="internal/client/desktop/icon/app_256.png" alt="Looptrack" width="128" height="128"></p>
+
 # Looptrack
 
 *日本語版: [README.ja.md](README.ja.md)*
