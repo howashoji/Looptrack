@@ -97,14 +97,15 @@ func (s *Server) wantsJSON(r *http.Request) bool {
 		strings.HasPrefix(p, b+"/oauth/") || strings.HasPrefix(p, b+"/setup/")
 }
 
-// setupGated はセットアップ未完了の検査の対象か（静的ファイル・healthz・OAuth のメタデータは除く）。
+// setupGated はセットアップ未完了の検査の対象か（静的ファイル・favicon・healthz・OAuth のメタデータは除く）。
+// favicon を除くのは、初回設定の画面のタブにもアイコンを出すため（ブラウザは認証もリダイレクトも無しで取りに来る）。
 func (s *Server) setupGated(r *http.Request) bool {
 	b := s.cfg.BasePath
 	p := r.URL.Path
 	if p != b && !strings.HasPrefix(p, b+"/") {
 		return false
 	}
-	return !strings.HasPrefix(p, b+"/static/") && p != b+"/healthz" && !strings.HasPrefix(p, b+"/.well-known/")
+	return !strings.HasPrefix(p, b+"/static/") && p != b+"/favicon.ico" && p != b+"/healthz" && !strings.HasPrefix(p, b+"/.well-known/")
 }
 
 // errNoAdmin は有効な管理者が 1 人もいないこと。

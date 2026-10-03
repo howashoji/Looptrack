@@ -36,6 +36,7 @@ setup の結果がループエンジニアリング一式（loop）を入れる�
 次に **guide ツールを 1 回呼び**、共通規則・このプロジェクトのルール・運用文書を読んでから作業する。
 ツール結果に、導入が未完了（導入済み通知が届いていない）か配布物が古いことを知らせる注記（ツールの結果とは別の行で付き、setup ツールか更新のコマンドを示す。文面は利用者の言語で変わる）が付いている間は、作業の区切りで利用者にその対応（setup の手順）を提案する。
 作業はイシューから始める。ループ運用の 1 周は next（着手: 自分が着手中のもの、無ければ着手可能な最上位を In Progress にして本文・受け入れ条件・関連を返す）→ 作業 → 原因・判断が分かった時点で add_comment → 受け入れ条件を検証 → set_status で Done（comment に検証結果）→ 次の next。set_status の結果の末尾に、要件の検証と close を促す行（looptrack issue show <要件ID> と close のコマンドを含む。文面ではなくこのコマンドで判断する）が付いたら、次の next の前にその要件の受け入れ条件を検証して Done にする。定型は prompt「loop」（導入は prompt「setup」）。
+エビデンス: 受け入れ条件を検証したら、テストの出力の全文・画面のスクリーンショット・生成物を CLI の looptrack issue attach <ID> <ファイル> で添付し、返った ID を report_verify の attachments に渡す（MCP のツールはファイルを受け取らない）。検証コマンドのあるイシューは、最新の verify の記録に添付が無いと Done を拒否される（プロジェクト別ルール verify.require_evidence。既定は入で、切ったプロジェクトでは注意だけ）。規則の全文は guide の共通規則の「エビデンス」にある。
 In Review（人の判断待ち）や未応答のフィードバック（コメント先頭が「フィードバック:」）があれば、次の next の前に利用者に示し、返答を先頭「判断:」「差し戻し:」のコメントに残して Done か Todo へ動かす（prompt「review」）。利用者から聞いた参加者・テスターの反応は先頭「フィードバック:」でコメントに残す。
 コメントは追記のみ（書き換え・削除はできない）。クローズ済み（Done / Canceled）の本文・項目は編集できない（蒸し返しは新規起票して参照）。
 状態は set_status で変える（プロジェクト別ルールで拒否されたらメッセージの指示に従う）。本文の編集は get_issue で version と全文を取り、update_issue に version と直した全文を渡す。
@@ -50,6 +51,7 @@ When the result of setup is nothing but the question of whether to install the l
 Then **call the guide tool once** and read the common rules, this project's rules and its operating document before you work.
 While a tool result carries a note that the installation is incomplete (the installed-notification has not arrived) or that the files are out of date (it comes on a line of its own, separate from the tool's result, and names the setup tool or an update command; the wording changes with the user's language), offer the user the steps to deal with it (the setup procedure) at a break in the work.
 Work starts from an issue. One round of the loop is: next (start: the issue you already have in progress, or else the highest-ranked issue that is ready to start, moved to In Progress and returned with its body, acceptance criteria and related issues) → work → add_comment as soon as you know the cause or the decision → verify the acceptance criteria → set_status to Done (with the verification result in comment) → the next next. When the result of set_status ends with a line urging you to verify and close a requirement (it holds looptrack issue show <requirement-ID> and the close command; decide from that command, not from the wording), verify that requirement's acceptance criteria and set it to Done before the next next. The prompt "loop" carries the routine (the prompt "setup" carries the installation).
+Evidence: once you have verified the acceptance criteria, attach the full test output, screenshots of the screens and the generated files with the CLI (looptrack issue attach <ID> <file>) and pass the IDs that come back in attachments of report_verify (the MCP tools do not take files). On an issue with verify commands, Done is rejected when the latest verify record carries no attachment (the per-project rule verify.require_evidence, on by default; a project that turns it off only gets a note). The full rule is under "Evidence" in the common rules of guide.
 When there are issues In Review (waiting on a human decision) or unanswered feedback (a comment starting with "Feedback:"), put them to the user before the next next, record the answer as a comment starting with "Decision:" or "Changes requested:", and move the issue to Done or Todo (the prompt "review"). Reactions you hear from participants or testers go into a comment starting with "Feedback:".
 Comments are append-only (they cannot be rewritten or deleted). The body and the fields of a closed issue (Done / Canceled) cannot be edited (to reopen the subject, file a new issue and refer to it).
 Change the status with set_status (when a per-project rule rejects it, do what the message tells you). To edit a body, take the version and the full text with get_issue and send the version and the corrected full text to update_issue.
@@ -440,7 +442,7 @@ func rowsText(lang i18n.Lang, items []issueJSON, empty string) string {
 		}
 		b.WriteString(it.Title + "\n")
 	}
-	b.WriteString("\n" + i18n.T(lang, "server.mcp.list.count", "count", len(items)))
+	b.WriteString("\n" + i18n.TN(lang, "server.mcp.list.count", len(items), "count", len(items)))
 	if inactive {
 		b.WriteString("\n" + i18n.T(lang, "server.mcp.list.inactive_note"))
 	}
@@ -504,7 +506,8 @@ type (
 	}
 	commentIn struct {
 		issueIDArg
-		Text string `json:"text" jsonschema:"server.mcp.arg.add_comment.text"`
+		Text        string  `json:"text" jsonschema:"server.mcp.arg.add_comment.text"`
+		Attachments []int64 `json:"attachments,omitempty" jsonschema:"server.mcp.arg.add_comment.attachments"`
 	}
 	statusIn struct {
 		issueIDArg
@@ -594,7 +597,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				sum := summaryOf(pr, roles[pr.ID])
 				sum.Counts = counts(set)
 				out = append(out, sum)
-				b.WriteString(i18n.T(c.lang, "server.mcp.list_projects.row", "slug", pr.Slug, "name", pr.Name, "prefix", pr.Prefix,
+				b.WriteString(i18n.TN(c.lang, "server.mcp.list_projects.row", int(sum.Counts.OpenBugs), "slug", pr.Slug, "name", pr.Name, "prefix", pr.Prefix,
 					"role", roles[pr.ID], "open", sum.Counts.Open, "in_progress", sum.Counts.InProgress,
 					"ready", sum.Counts.Ready, "bugs", sum.Counts.OpenBugs) + "\n")
 			}
@@ -653,7 +656,17 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			if err != nil {
 				return nil, nil, s.toolError(c.lang, "get_issue", err)
 			}
-			return result(fmt.Sprintf("version: %d\n\n%s", it.Row.Version, it.Markdown), toDetailJSON(it)), nil, nil
+			atts, err := s.svc.Attachments(ctx, c.actor, it.Item.ID, pr.Slug)
+			if err != nil {
+				return nil, nil, s.toolError(c.lang, "get_issue", err)
+			}
+			// 添付の一覧は version の行と Markdown の間に置く（理由は mcp_attach.go）
+			text := fmt.Sprintf("version: %d\n\n", it.Row.Version)
+			if list := mcpAttachmentsText(c.lang, atts); list != "" {
+				text += list + "\n\n"
+			}
+			text += it.Markdown
+			return result(text, mcpIssueDetail{issueDetailJSON: toDetailJSON(it), Attachments: toMCPAttachments(atts)}), nil, nil
 		})
 
 	addTool(srv, lang, &mcp.Tool{Name: "create_issue", Description: i18n.T(lang, "server.mcp.tool.create_issue"), Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive}},
@@ -689,7 +702,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			if err != nil {
 				return nil, nil, err
 			}
-			it, err := s.svc.Comment(ctx, c.actor, pr, row.ID, in.Text)
+			it, err := s.svc.CommentAttach(ctx, c.actor, pr, row.ID, in.Text, in.Attachments)
 			if err != nil {
 				return nil, nil, s.toolError(c.lang, "add_comment", err)
 			}
@@ -712,8 +725,11 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			if res.AcceptanceNotice != "" {
 				data["acceptance_notice"] = res.AcceptanceNotice
 			}
+			if res.EvidenceNotice != "" {
+				data["evidence_notice"] = res.EvidenceNotice
+			}
 			// 下位の最後の 1 件を閉じたら要件の検証と close を促す（REST の messages と同じ行）
-			text := strings.Join(withClosable(c.lang, statusMessages(c.lang, res, in.Comment), data, s.closedRequirements(ctx, pr, res)), "\n")
+			text := strings.Join(withClosable(c.lang, statusMessages(c.lang, res), data, s.closedRequirements(ctx, pr, res)), "\n")
 			notice := s.usageNotice(ctx, c.lang, c.actor, pr, res.Issue, res.Issue.Closed() && res.From != res.Issue.Item.Status)
 			data["usage_notice"] = notice
 			return result(withNotice(text, notice), data), nil, nil
@@ -845,7 +861,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				layerWorkHeading(c.lang), i18n.T(c.lang, "server.mcp.summary.in_progress_heading"), ipText,
 				i18n.T(c.lang, "server.mcp.summary.ready_heading", "shown", len(top), "total", len(ready)), rowsText(c.lang, top, none), reqs,
 				reviewLayerText(c.lang, inReview), feedbackLayerText(c.lang, fb, s.svc.Loc),
-				i18n.T(c.lang, "server.mcp.summary.open_counts", "open", cnt.Open, "bugs", cnt.OpenBugs))
+				i18n.TN(c.lang, "server.mcp.summary.open_counts", int(cnt.OpenBugs), "open", cnt.Open, "bugs", cnt.OpenBugs))
 			if m := usageMissingText(c.lang, missing); m != "" {
 				text += "\n" + m
 			}
@@ -975,7 +991,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			}
 			sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 			for _, a := range out {
-				b.WriteString(i18n.T(c.lang, "server.mcp.activity.row", "id", a.ID, "at", a.LastAt, "kind", a.LastKind,
+				b.WriteString(i18n.TN(c.lang, "server.mcp.activity.row", int(a.EventsSince), "id", a.ID, "at", a.LastAt, "kind", a.LastKind,
 					"via", a.LastVia, "count", a.EventsSince) + "\n")
 			}
 			if len(out) == 0 {

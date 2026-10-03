@@ -40,6 +40,8 @@ type Arg struct {
 	Required bool
 	Metavar  string
 	Help     string
+	// Append は同じオプションを繰り返すたびに値を足す（[]string。既定は nil）。ほかのオプションは後の指定が勝つ
+	Append bool
 }
 
 func (a *Arg) positional() bool { return !strings.HasPrefix(a.Name, "-") }
@@ -217,6 +219,11 @@ func parseInto(cmd *Command, prog string, args []string, v *Values) (*Command, [
 		conv, err := convert(a, value)
 		if err != nil {
 			return nil, nil, fail("argument %s: %s", optionNames(a), err.Error())
+		}
+		if a.Append {
+			list, _ := v.m[a.dest()].([]string)
+			v.m[a.dest()] = append(list, value)
+			continue
 		}
 		v.m[a.dest()] = conv
 	}

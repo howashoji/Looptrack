@@ -96,7 +96,7 @@
 {{define "replacement"}}{{with .Pending}}
 <section class="panel" id="replacement">
   <h2>{{T $.Lang "server.web.replacement.h2"}}</h2>
-  <p>{{T $.Lang "server.web.replacement.intro" "login" .Login "slug" .Slug}}<strong>{{T $.Lang "server.web.replacement.count" "n" (len .Issues) "slug" .Slug}}</strong>{{T $.Lang "server.web.replacement.ids_open"}}{{range $i, $id := .Issues}}{{if $i}}, {{end}}{{$id}}{{end}}{{T $.Lang "server.web.replacement.ids_close"}}{{T $.Lang "server.web.replacement.after" "what" .What "login" .Login}}</p>
+  <p>{{T $.Lang "server.web.replacement.intro" "login" .Login "slug" .Slug}}<strong>{{TN $.Lang "server.web.replacement.count" (len .Issues) "n" (len .Issues) "slug" .Slug}}</strong>{{T $.Lang "server.web.replacement.ids_open"}}{{range $i, $id := .Issues}}{{if $i}}, {{end}}{{$id}}{{end}}{{T $.Lang "server.web.replacement.ids_close"}}{{T $.Lang "server.web.replacement.after" "what" .What "login" .Login}}</p>
   <form method="post" action="{{.Action}}" class="row">
     <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="{{.HiddenName}}" value="{{.HiddenID}}"><input type="hidden" name="role" value="{{.Role}}">
     <label>{{T $.Lang "server.web.replacement.select"}}<select name="replacement" required>

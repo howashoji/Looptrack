@@ -172,3 +172,24 @@ aside.on{transform:none}
 .docid{font-size:11.5px; border:1px solid var(--line); border-radius:4px; padding:0 4px; color:var(--fg-2); white-space:nowrap}
 a.ilink{text-decoration:none; border-bottom:1px solid currentColor}
 .path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11.5px; color:var(--fg-3); word-break:break-all}
+
+/* ---------- 添付（ドロワーの一覧とコメントのフォーム） ---------- */
+.atts{margin:16px 0 0; border-top:1px solid var(--line); padding-top:10px}
+.atts h3{font-size:13px; margin:0 0 6px}
+.att-none{font-size:12px; color:var(--fg-3); margin:0}
+.att-list, .att-pending{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px}
+.att-item{font-size:12.5px; display:flex; flex-wrap:wrap; align-items:center; gap:6px}
+.att-item.image{flex-direction:column; align-items:flex-start}
+.att-item.purged .att-name{color:var(--fg-3); text-decoration:line-through}
+.att-img{display:block; max-width:100%; max-height:320px; border:1px solid var(--line); border-radius:6px; background:var(--panel-2)}
+.att-meta{font-size:11px; color:var(--fg-3)}
+.att-name{word-break:break-all}
+.att-drop{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 10px; border:1px dashed var(--line); border-radius:6px; font-size:12px; color:var(--fg-2)}
+.att-drop.over{border-color:var(--accent); background:var(--accent-soft)}
+form.issue-form .att-pick{flex-direction:row; align-items:center; cursor:pointer; color:var(--accent)}
+form.issue-form .att-pick input[type="file"]{font-size:12px; padding:0; border:0; max-width:220px}
+.att-hint{color:var(--fg-3)}
+.att-item.sent .att-name{color:var(--fg-2)}
+.att-remove{font:inherit; font-size:12px; line-height:1; padding:1px 6px; border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--fg-2); cursor:pointer}
+.att-status{font-size:12px; color:var(--fg-2); margin:0}
+.att-status[hidden]{display:none}

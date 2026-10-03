@@ -302,7 +302,7 @@ const (
 	CmdHeadPos = cmdHeadStart + cmdHeadRun
 )
 
-// nestedShellPrefixRe は、その直後の引用符の中身がそのまま「実行されるコマンド」になる前置
+// nestedShellPrefixHead は、その直後の引用符の中身がそのまま「実行されるコマンド」になる前置
 // （bash / sh / zsh / dash の -c と eval）。引用符の直前までの文字列に当てる。
 //
 // **当てるのはコマンドの位置だけ**（CmdHeadPos）。空白の直後まで当てると、`echo bash -c '…'` のように
@@ -317,10 +317,18 @@ const (
 //
 // `-c` は**短い選択肢をまとめた形の最後**にも現れる（bash -lc・bash -ec・bash -xc）ので、`-[A-Za-z]*c` で見る。
 // その前には、値を取らない選択肢（-x）と値を 1 語で取る選択肢（-o pipefail）の並びを許す。
-var nestedShellPrefixHeadRe = regexp.MustCompile(CmdHeadPos + nestedShellBody)
+const nestedShellPrefixHead = CmdHeadPos + nestedShellBody
 
-// nestedShellPrefixAnyRe は位置を問わない版（秘密のガード）。CmdAnyPos は空白の直後にも当たる。
-var nestedShellPrefixAnyRe = regexp.MustCompile(CmdAnyPos + nestedShellBody)
+// nestedShellPrefixAny は位置を問わない版（秘密のガード）。CmdAnyPos は空白の直後にも当たる。
+const nestedShellPrefixAny = CmdAnyPos + nestedShellBody
+
+// nestedShellPrefixHeadRev / nestedShellPrefixAnyRev は上の 2 つを逆向きにした正規表現。unwrapNestedShell は
+// 引用符ごとに「その手前の文字列の末尾が当たるか」を調べるので、前向きの式を手前の全体に掛けると
+// 引用符の数 × 長さで 2 次になる。逆向きの式で末尾から読めば、数語で止まる（revmatch.go）。
+var (
+	nestedShellPrefixHeadRev = mustCompileReversed(nestedShellPrefixHead)
+	nestedShellPrefixAnyRev  = mustCompileReversed(nestedShellPrefixAny)
+)
 
 const nestedShellBody = CmdPath +
 	`(?:(?i:(?:bash|sh|zsh|dash)(?:\.exe)?)` +
@@ -338,10 +346,19 @@ const nestedShellBody = CmdPath +
 //
 // 外すのは 1 段だけ（入れ子の入れ子は対象外）。閉じていない引用符に出会ったらそこで止める
 // （区切りが信用できない）。
-func UnwrapNestedShell(cmd string, pos UnwrapPos) string {
-	re := nestedShellPrefixHeadRe
+func UnwrapNestedShell(cmd string, pos UnwrapPos) string { return unwrapNestedShell(cmd, pos, ';') }
+
+// NormalizeLines は Normalize と同じだが、ほどいた引用符を ; ではなく改行に替える（追加の読み方だけが使う）。
+// 中身が行に並ぶので、中身のヒアドキュメントの終端の行が `EOF;` にならず、シェルと同じく終端と読める。
+func NormalizeLines(cmd string, pos UnwrapPos) string {
+	return StripCommandPrefixes(unwrapNestedShell(cmd, pos, '\n'))
+}
+
+// unwrapNestedShell は UnwrapNestedShell の本体。ほどいた引用符を sep に替える。
+func unwrapNestedShell(cmd string, pos UnwrapPos, sep byte) string {
+	rev := nestedShellPrefixHeadRev
 	if pos == AnyPos {
-		re = nestedShellPrefixAnyRe
+		rev = nestedShellPrefixAnyRev
 	}
 	b := []byte(cmd)
 	for i := 0; i < len(b); i++ {
@@ -357,8 +374,8 @@ func UnwrapNestedShell(cmd string, pos UnwrapPos) string {
 		if end < 0 {
 			break
 		}
-		if re.Match(b[:i]) {
-			b[i], b[end] = ';', ';'
+		if endsWithMatch(rev, b, i) { // 前向きの式を b[:i] に掛けたのと同じ
+			b[i], b[end] = sep, sep
 		}
 		i = end
 	}

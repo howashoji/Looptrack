@@ -24,11 +24,15 @@ import (
 	"github.com/howashoji/looptrack/internal/updatecheck"
 )
 
+// static/icon.png と static/favicon.ico は、デスクトップ版のアイコン（internal/client/desktop/icon の app_256.png と app.ico）の複製。
+// サーバはクライアント側のパッケージに依存しない（TestServerNeverExecutes）ので、import で共有できない。
+// 同じ絵であることは favicon_test.go が実ファイルで突き合わせる。
+//
 // 埋め込むのは実際に配信するものだけに絞る。static/* （中身を丸ごと）だと、node --test で回す
 // static/render_test.mjs まで実行ファイルに入り、下の GET <base>/static/ から認証なしで配信されていた。
 // テストコードの置き場は動かしていない（絞ったのはこのパターンだけ）。embed_assets_test.go が実測する。
 //
-//go:embed templates/*.html static/*.css static/*.js
+//go:embed templates/*.html static/*.css static/*.js static/icon.png static/favicon.ico
 var assets embed.FS
 
 // Config はサーバの設定。
@@ -68,6 +72,9 @@ type Config struct {
 	// UpdateApplier は帯の「更新する」ボタン（POST {base}/update/apply）が呼ぶ置き換え。デスクトップ版だけが渡す
 	// （localserve.Options.UpdateApplier）。nil ならボタンを出さず、POST {base}/update/apply は 404
 	UpdateApplier UpdateApplier
+	// AttachDir は添付の本体の置き場（service.Service.AttachDir。looptrack serve は service.AttachDirFromEnv、デスクトップ版は
+	// DataDir/attachments）。空なら添付の操作だけが「置き場が設定されていない」で失敗し、サーバはそのまま動く
+	AttachDir string
 }
 
 // UpdateApplier は新しい版への置き換えを画面の帯から始める部品（デスクトップ版の App が満たす。手順はトレイの
@@ -141,6 +148,8 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 		// T は画面の文面を対訳表から出す（{{T .Lang "server.web.…"}}）。
 		// 実体は i18n.TFunc。まだ .Lang を詰めていない画面では nil が渡り、対訳表の正本（日本語）で出る。
 		"T": i18n.TFunc,
+		// TN は件数で単数と複数を分ける文面を出す（{{TN .Lang "server.web.…" (len .Items) "slug" .Slug}}）。実体は i18n.TNFunc。
+		"TN": i18n.TNFunc,
 		// headData は共通の <head>（layout.html の "head"）へ渡す組。テンプレートは引数を 1 つしか
 		// 取れないので、表示の言語と題名をここで束ねる。言語を渡さないと <html lang> と製品名だけが
 		// 既定の言語に固定される（画面の本文は .Lang で正しく出るので、見落としやすい）。
@@ -203,6 +212,7 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 	}
 	s := &Server{cfg: cfg, db: db, tmpl: tmpl, mux: http.NewServeMux(), svc: service.New(db, cfg.Now), hashSlot: make(chan struct{}, 2),
 		binds: newSessionBinds(cfg.Now)}
+	s.svc.AttachDir = cfg.AttachDir
 	srv = s
 	s.routes()
 	return s, nil
@@ -212,6 +222,9 @@ func (s *Server) routes() {
 	b := s.cfg.BasePath
 	static, _ := fs.Sub(assets, "static")
 	s.mux.Handle("GET "+b+"/static/", http.StripPrefix(b+"/static/", http.FileServerFS(static)))
+	// favicon。head の link（/static/icon.png）と、ブラウザが直接取りに来る /favicon.ico。どちらも認証は要らない。
+	s.mux.HandleFunc("GET "+b+"/static/icon.png", serveIcon("image/png", "static/icon.png"))
+	s.mux.HandleFunc("GET "+b+"/favicon.ico", serveIcon("image/x-icon", "static/favicon.ico"))
 	s.mux.HandleFunc("GET "+b+"/healthz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
@@ -267,6 +280,11 @@ func (s *Server) routes() {
 	api.HandleFunc("GET "+b+"/api/v1/issues/{id}/verify", s.apiGetVerify)   // 検証コマンドと直近の記録
 	api.HandleFunc("POST "+b+"/api/v1/issues/{id}/verify", s.apiPostVerify) // CLI が手元で実行した結果の記録
 	api.HandleFunc("POST "+b+"/api/v1/issues/{id}/assign", s.apiAssign)     // 担当者の変更
+	// 添付（エビデンスのファイル。attachments_api.go）。この経路だけ本文の上限と締切が違う
+	api.HandleFunc("POST "+b+"/api/v1/issues/{id}/attachments", s.apiPostAttachment)
+	api.HandleFunc("GET "+b+"/api/v1/issues/{id}/attachments", s.apiListAttachments)
+	api.HandleFunc("GET "+b+"/api/v1/attachments/{id}", s.apiGetAttachment)
+	api.HandleFunc("POST "+b+"/api/v1/attachments/{id}/purge", s.apiPurgeAttachment) // 本体の消去（管理者だけ）
 	// MCP の呼び出しを会話に結ぶ合鍵（PreToolUse の hook が送る・session_binds.go）
 	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/session-binds", s.apiPostSessionBind)
 	api.HandleFunc("GET "+b+"/api/v1/activity", s.apiActivity)
@@ -314,6 +332,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST "+b+"/admin/users/{login}/{action}", s.admin(s.adminUserAction))
 	s.mux.HandleFunc("GET "+b+"/admin/security", s.adminForbidden(s.adminSecurityPage)) // 二段階認証の必須 / 任意
 	s.mux.HandleFunc("POST "+b+"/admin/security", s.adminForbidden(s.adminSecuritySubmit))
+	s.mux.HandleFunc("GET "+b+"/admin/attachments", s.adminForbidden(s.adminAttachmentsPage)) // 添付の上限・使用量・消去（管理者以外は 403）
+	s.mux.HandleFunc("POST "+b+"/admin/attachments/limits", s.adminForbidden(s.adminAttachmentLimits))
+	s.mux.HandleFunc("POST "+b+"/admin/attachments/{id}/purge", s.adminForbidden(s.adminAttachmentPurge))
 	s.mux.HandleFunc("GET "+b+"/admin/projects", s.admin(s.adminProjectsPage))   // プロジェクト管理
 	s.mux.HandleFunc("POST "+b+"/admin/projects", s.admin(s.adminCreateProject)) // プロジェクトの作成
 	s.mux.HandleFunc("POST "+b+"/admin/projects/{slug}/member", s.admin(s.adminProjectMember))
@@ -344,8 +365,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.CookieSecure && !s.cfg.LocalMode {
 		h.Set("Strict-Transport-Security", "max-age=31536000")
 	}
-	if !strings.HasPrefix(r.URL.Path, s.cfg.BasePath+"/static/") {
+	if !strings.HasPrefix(r.URL.Path, s.cfg.BasePath+"/static/") && r.URL.Path != s.cfg.BasePath+"/favicon.ico" {
 		h.Set("Cache-Control", "no-store")
+	}
+	if s.attachmentPath(r.URL.Path) { // 認証の誤り（401）を含め、添付の経路のどの応答にも付ける（attachments_api.go）
+		h.Set("Content-Security-Policy", attachCSP)
 	}
 	// ローカルモードの Host・Origin の検査と、管理者 0 人のときの「セットアップ未完了」
 	r, ok := s.gate(w, r)

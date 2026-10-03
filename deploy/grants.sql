@@ -5,7 +5,7 @@
 --
 -- 方針:
 --   - DB 単位ではなくテーブル単位で付与する（MySQL は DB 単位の付与からテーブル単位で取り消せないため）。
---   - comments / issue_events / usage_snapshots / usage_reports / usage_report_requests / setting_changes / issue_event_sessions は SELECT・INSERT のみ（追記専用。書き換え・削除させない）。
+--   - comments / issue_events / usage_snapshots / usage_reports / usage_report_requests / setting_changes / issue_event_sessions / attachments / attachment_purges は SELECT・INSERT のみ（追記専用。書き換え・削除させない）。
 --   - projects / issues は DELETE を与えない（削除の経路を持たない）。
 --   - スキーマ変更（migrate）と取り込み（import）は管理用の資格情報で行う。
 -- テーブルを追加したら、このファイルにも追記する。
@@ -34,3 +34,5 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON im.mcp_connections   TO 'im_app'@'%';
 GRANT SELECT, INSERT, UPDATE         ON im.agent_installs    TO 'im_app'@'%';
 GRANT SELECT, INSERT, UPDATE         ON im.system_settings   TO 'im_app'@'%';
 GRANT SELECT, INSERT                 ON im.setting_changes   TO 'im_app'@'%';
+GRANT SELECT, INSERT                 ON im.attachments       TO 'im_app'@'%';
+GRANT SELECT, INSERT                 ON im.attachment_purges TO 'im_app'@'%';

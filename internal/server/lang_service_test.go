@@ -58,7 +58,7 @@ func TestRuleTextFollowsRequestLang(t *testing.T) {
 	}
 	mustDiffer(t, "require_comment_before", viol[i18n.JA], viol[i18n.EN])
 	for _, lang := range []i18n.Lang{i18n.JA, i18n.EN} {
-		wantMsg := i18n.T(lang, "service.next.all_skipped", "message", viol[lang], "count", 1, "ids", id,
+		wantMsg := i18n.TN(lang, "service.next.all_skipped", 1, "message", viol[lang], "count", 1, "ids", id,
 			"hint_comment", i18n.M("service.next.all_skipped.hint_comment"), "hint_override", "")
 		e := v.ed.fail(422, "POST", "/projects/lr/next", map[string]any{}, langHeaderOf(lang)...)
 		if e.Error.Rule != "require_comment_before" || e.Error.Message != wantMsg {
@@ -106,7 +106,8 @@ func TestVerifyTextFollowsRequestLang(t *testing.T) {
 		p := plan(id, lang)
 		run := i18n.T(lang, "service.verify.run", "command", domain.VerifyCommand(id))
 		head := i18n.T(lang, "service.verify.heading", "id", id, "count", 2, "sha", p.BodySHA256[:8])
-		wantText := head + "\n1. go test ./...\n2. make lint\n" + lastNone[lang] + "\n" + run
+		evidence := i18n.T(lang, "service.verify.evidence", "command", domain.VerifyCommand(id), "id", id)
+		wantText := head + "\n1. go test ./...\n2. make lint\n" + lastNone[lang] + "\n" + run + "\n" + evidence
 		if p.Message != run || p.Text != wantText {
 			t.Errorf("%s: GET verify\nmessage %q\ntext:\n%s\nwant:\n%s", lang, p.Message, p.Text, wantText)
 		}

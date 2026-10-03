@@ -1,14 +1,15 @@
 # CI とリリースの手順
 
-GitHub Actions の CI（`.github/workflows/ci.yml`）とリリース物の作成（`.github/workflows/release.yml`）、版の付け方と公開の手順をまとめます。
-実行ファイルの作り方は `deploy/release/dist.sh` 1 つに寄せてあり、CI・リリース・手元で同じものを使います。
+この文書で扱うのは GitHub Actions の CI（`.github/workflows/ci.yml`）とリリース物の作成（`.github/workflows/release.yml`）、版の付け方と公開の手順。
+実行ファイルの作り方は `deploy/release/dist.sh` 1 つに寄せてあり、CI・リリース・手元で使うのも同じものです。
 
 サーバの配置（`looptrack setup`・`deploy/install.sh`）は [DEPLOY.md](DEPLOY.md) にあります。この文書の手順とは独立しています。
 
 ## 1. CI（`ci.yml`）
 
-**CI は手動（`workflow_dispatch`）と週次（月曜の朝の `schedule`）でだけ走ります。** push や pull request では走りません（`on:` に `push` / `pull_request` を置いていません）。
-手動で実行するのは次の 2 つの機会です。
+**CI は pull request と `main` への push で走ります。** ジョブが回るのは公開のリポジトリ（`github.com/howashoji/looptrack`）だけで、フォークでは全部飛ばします。
+重いジョブはここでは回しません。週次（月曜の朝の `schedule`）と手動（`workflow_dispatch`）の `full` に回してあります。
+手動で実行する機会は次の 2 つ。
 
 - **本番の配置・配布物の更新・リリースのタグの直前**
 - **Windows に関わる変更をまとめた区切り**（1 日 0〜2 回）
@@ -32,7 +33,7 @@ GitHub Actions の CI（`.github/workflows/ci.yml`）とリリース物の作成
 Go には `LOOPTRACK_TEST_DSN` だけを渡し、各テストジョブの最初に「`LOOPTRACK_TEST_DSN` 以外の `IM_*` が無いこと」を確かめます。
 CI には運用中のサーバの URL や秘密を置きません。
 
-Go の版: ci.yml・release.yml の `GO_VERSION` で決めます。今は `1.27.x` で、手元と同じ系列の最新パッチです。go.mod の `go` 行は下限です。
+Go の版: ci.yml・release.yml の `GO_VERSION` で決めます。今は `1.27.x` で、手元と同じ系列の最新パッチ。go.mod の `go` 行は下限です。
 上げるときは 2 つの workflow の `GO_VERSION` を同時に変えてください。Dependabot は Go 本体の版を上げません。
 
 
@@ -51,7 +52,7 @@ Go の版: ci.yml・release.yml の `GO_VERSION` で決めます。今は `1.27.
 Releases に上げないもの: 素の実行ファイル・`install.sh`・`grants.sql`（`publish` の前に `dist.sh check-release` が名前で確かめる）。
 `install.sh`・`grants.sql` は `dist.sh build` の出力先に写すだけです（下の「2-3」）。
 
-起動と公開の条件は次のとおりです。
+起動と公開の条件は次のとおり。
 
 | 起動 | 作るもの | 公開（GHCR への push・Releases の下書き） |
 | -- | -- | -- |
@@ -62,16 +63,16 @@ Releases に上げないもの: 素の実行ファイル・`install.sh`・`grant
 **artifact の保持日数**（private リポジトリの Actions の保存容量は artifact の積み上げで数えられ、無料枠が小さい。公開側は対象外）:
 同じ run の後のジョブが読むだけのもの（`build-<版>`・`unsigned-macos-app-<版>`・`signed-macos-<版>`・`desktop-*-<版>`・`binaries-<版>`）は **1 日**、
 人が手元で確かめに取りに行くもの（`release-<版>`・`sums-signature-<版>`・公開しないときの `image-<版>-<arch>`。下の「4. リリースの手順」の 4）は **3 日**、
-失敗のときだけ読む `installer-log-*` は 7 日、CI の `go-test-log*` は 7 日です。
+失敗のときだけ読む `installer-log-*` は 7 日、CI の `go-test-log*` は 7 日。
 `publish` は同じ run の `release-<版>` と `sums-signature-<版>` を読みます（手動で `publish` にチェックして起動し直すと run が新しくなり、作り直した artifact を読みます）。
 失敗したジョブを 1 日より後に再実行すると、1 日の artifact が無く落ちるので、その場合は新しく run を起こします。
 
-公開する版は `vX.Y.Z` / `vX.Y.Z-<pre>` の形に限ります。それ以外は meta ジョブで止まります。
+公開する版の形は `vX.Y.Z` / `vX.Y.Z-<pre>` だけ。それ以外は meta ジョブで止まります。
 
 **利用者の決定（2026-09-28）**: rc（`-` を含む版）も、同じリポジトリに正式版のタグ（`vX.Y.Z`、`-` を含まない）が
 まだ無い間は Latest として扱います（Releases は Pre-release にせず、GHCR にも `latest` タグを付けます）。
 正式版のタグが一度でも付けば、以後に出す rc は Pre-release に戻します（`latest` は付けず、Releases の
-Latest は正式版のままです）。meta ジョブがタグの一覧（`gh api repos/<owner>/<repo>/tags`）を見て機械的に判定します。
+Latest は正式版のままです）。タグの一覧（`gh api repos/<owner>/<repo>/tags`）を見て機械的に判定するのは meta ジョブです。
 Releases は**下書き**で作ります。中身を確かめてから人が公開します。
 
 ### 署名
@@ -93,6 +94,7 @@ Releases は**下書き**で作ります。中身を確かめてから人が公�
 - リポジトリ変数 `RELEASE_SIGN` が `true` でないと、`sign-macos`・`sign-sums` は飛ばされます。SHA256SUMS は署名なしで作られます（private の間の試しのビルド）。
   **公開（publish）には署名が必須です。** `RELEASE_SIGN` が `true` でないと meta ジョブで止まります。looptrack の self-update が署名の無い配布からは更新しないためです。
   `sign-sums` の trusted comment（`looptrack <版> SHA256SUMS`）と実行ファイルの名前（`looptrack_<版>_<os>_<arch>`）の形は変えないでください。self-update はこの 2 つから署名された版を読み、配布の一覧の version と同じでなければ置き換えません（一覧は署名されていないので、version の偽装で古い版へ戻されないため）。
+  書庫の名前と中の並び（`looptrack_<版>_<os>_<arch>_server/looptrack[.exe]`）と、`SHA256SUMS` の書庫の中の実行ファイルの行も変えないでください。URL の無い self-update は GitHub のリリースから書庫を取り、書庫の行で照合してからこの名前だけを取り出し、実行ファイルの行で照合し直します。
 - darwin の単体の実行ファイルと zip には staple できません。初回の起動時に Gatekeeper がオンラインで公証を確かめます。
   デスクトップ版の `.app` / dmg は、sign-macos ジョブが同じ `sign-macos.sh` に渡します。署名・公証の後に `stapler staple` まで行います（.app → dmg の順に 2 回呼ぶ。下の「デスクトップ版」）。
 - 秘密の扱い: `set -x` は使わず、秘密を echo しません。復号したファイルは `$RUNNER_TEMP` に置いて最後に消します。
@@ -106,11 +108,11 @@ Releases は**下書き**で作ります。中身を確かめてから人が公�
 
 | 場所 | 使い方 |
 | -- | -- |
-| `internal/client/selfupdate.MinisignPublicKey` | `looptrack self-update` が SHA256SUMS と `.minisig` を取り、署名と、SHA256SUMS の中のハッシュが一覧と同じことを確かめる。署名が無い・合わなければ置き換えない |
+| `internal/client/selfupdate.MinisignPublicKey` | `looptrack self-update` が SHA256SUMS と `.minisig` を取り、署名と、SHA256SUMS の中のハッシュが一覧と同じことを確かめる。署名が無い・合わなければ置き換えない。GitHub のリリースから取るときは、書庫と取り出した実行ファイルの両方をこの署名で確かめる |
 | `deploy/install.sh`（`MINISIGN_PUBKEY_DEFAULT`） | `minisign` コマンドがあれば確かめる（無ければ注意して進む。`--require-signature` で必須）。DEPLOY.md「install.sh」 |
 | `deploy/release/dist.sh verify` | 手元・CI で SHA256SUMS の照合と署名の確認 |
 
-鍵を持たないビルド: `dist.sh build` に `RELEASE_MINISIGN_PUBKEY=`（空）を渡すと、`-X` で公開鍵を空にします。この場合 self-update は署名を確かめず、ハッシュだけを見ます。
+鍵を持たないビルド: `dist.sh build` に `RELEASE_MINISIGN_PUBKEY=`（空）を渡すと、`-X` で公開鍵を空にします。この場合 self-update はサーバの配布から取るときに署名を確かめず、ハッシュだけを見ます。GitHub のリリースからは取りません（問い合わせもしない）。
 これを使うのは**署名しない配布（自分のサーバの配布ディレクトリに置く配布・§2-1）だけ**です。普通の `go build` とリリースは鍵を持ちます。
 秘密鍵（`looptrack-minisign.key`・パスワード付き）は、利用者の手元の可搬媒体 2 部に保管しています。
 鍵を替えるときは 3 か所と `minisign.pub` を同時に直してください。古い looptrack が新しい署名を拒む期間があるので、その案内も出します。
@@ -132,7 +134,7 @@ Releases は**下書き**で作ります。中身を確かめてから人が公�
 | 変数（Environment） | `APPLE_TEAM_ID`・`MACOS_SIGN_IDENTITY`（CI の一時キーチェーンには証明書が 1 つだけなので名前でよい） |
 | 変数（リポジトリ） | `RELEASE_SIGN=true`（meta ジョブが読む） |
 
-確かめるには次の 2 つを使います。
+確かめる道具は次の 2 つ。
 
 - `codesign -dvvv <ファイル>`: Authority が `Developer ID Application: …` → `Developer ID Certification Authority` → `Apple Root CA` と並び、`flags=0x10000(runtime)`・`Timestamp=…`・`TeamIdentifier=…` が出ること
 - `spctl -a -vvv -t install <ファイル>`: `accepted` と `source=Notarized Developer ID` が出ること
@@ -151,7 +153,7 @@ desktop ビルド（`-tags desktop`・トレイつき）は `dist.sh` では作�
 | -- | -- | -- |
 | `desktop-macos` | macos-15 | `Looptrack.app`（arm64 と amd64 を `CGO_ENABLED=1` でビルドして `lipo`。Bundle ID は `internal/client/desktop/app.go` の `BundleID`＝仮）→ 起動の確認（`desktop_smoke.sh`）→ 署名なしの `Looptrack_<版>_macos_universal.dmg`。.app は zip にして sign-macos へ渡す |
 | `desktop-linux` | ubuntu（amd64・arm64 の matrix） | `Looptrack_<版>_linux_<x86_64|aarch64>.AppImage`（cgo なし。squashfs-tools と、版と SHA-256 で固定した type2-runtime）。x86_64 は展開して `desktop_smoke.sh` |
-| `desktop-windows` | ubuntu（amd64・arm64 の matrix） | `Looptrack_<版>_windows_<arch>.zip`（`Looptrack.exe`＝GUI・アイコンつき、`cli/looptrack.exe`＝CLI） |
+| `desktop-windows` | ubuntu（amd64・arm64 の matrix） | `Looptrack_<版>_windows_<arch>.zip`（`Looptrack.exe`＝GUI・アイコンつき、`cli/looptrack.exe`＝CLI）。2 つの exe には版の情報（VERSIONINFO の ProductName `Looptrack` と ProductVersion＝ビルドの版）も入れ、作った直後に `go run ./internal/tools/winversion check` で読み戻す。`dist.sh build` の Windows の `looptrack.exe` も同じ（アイコンは入れない） |
 | `desktop-windows-installer` | windows-2025（amd64）・windows-11-arm（arm64） | 上の zip を展開し、**まずその場から `Looptrack.exe` を起動して確かめる**（`desktop_smoke.ps1`。zip はインストーラを通さない配り方なので別に確かめる）。そのあと同じ中身を Inno Setup 7 でインストーラにする（`Looptrack_<版>_windows_<arch>_setup.exe`。下の「Windows のインストーラ」） |
 | `sign-macos`（署名するとき） | macos-15 | 上の .app に署名・公証・staple → dmg を作り直して署名・公証・staple（`sign-macos.sh` を 2 回）。署名済みの dmg は `signed-macos-<版>` に入り、sums で署名なしの dmg を置き換える |
 | `sums` | ubuntu | 実行ファイル・デスクトップ版（`desktop-*-<版>` の artifact）・署名済みのものを合わせ、デスクトップ版の 7 つがそろっていることを確かめてから SHA256SUMS を作る（署名の後に作る順は変えない） |
@@ -170,8 +172,8 @@ bash deploy/release/desktop.sh macos-dmg v0.0.0-test out/Looptrack.app out
 
 #### Windows のインストーラ
 
-`deploy/release/windows/Looptrack.iss`（Inno Setup 7）で作ります。決定と中身は DESIGN.md §5-4「Windows のインストーラ」にあります。
-ISCC は Windows でしか動かないので、手元（macOS・Linux）では組み立てられません。**CI で確かめます。**
+`deploy/release/windows/Looptrack.iss`（Inno Setup 7）で作ります。決定と中身の置き場は DESIGN.md §5-4「Windows のインストーラ」。
+ISCC は Windows でしか動かないので、手元（macOS・Linux）では組み立てられません。**確かめるのは CI。**
 
 ```
 # Windows で（Inno Setup 7 を入れてから。PATH に無ければ ISCC=<ISCC.exe のパス>）
@@ -185,7 +187,9 @@ CI の smoke test は次の順に確かめます。
 1. サイレント導入（`/TASKS=startup,cli`）
 2. ファイル・HKCU の Uninstall キー・スタートメニューの `.lnk`・`looptrack.exe version`・Run の値
 3. 起動中の上書き
-4. アンインストール（データが残り、Run の値と CLI の写しが消える）
+4. 無人の上書き（1 クリックの置き換えと同じ `/RELAUNCH=1` の引数・`/TASKS` なし）で、古いプロセスが終わり 60 秒以内に起動し直す。Run の値と CLI の写しも残る
+5. `NOTICE.txt` を共有なしで開いたままの無人の上書き。0 でない終了コードを対照に確かめてから、前の版が起動し直すことを見る
+6. アンインストール（データが残り、Run の値と CLI の写しが消える）
 
 #### Windows の zip
 
@@ -198,7 +202,7 @@ zip はインストーラを通さず、**展開した場所からそのまま�
 pwsh -File deploy/release/desktop_smoke.ps1 -Exe <展開先>\Looptrack\Looptrack.exe
 ```
 
-確かめることは macOS・Linux の `desktop_smoke.sh` と同じです。
+確かめることは macOS・Linux の `desktop_smoke.sh` と同じ。
 
 1. `desktop --no-tray --background` で起動する
 2. `--status` で URL が分かる
@@ -216,7 +220,7 @@ pwsh -File deploy/release/desktop_smoke.ps1 -Exe <展開先>\Looptrack\Looptrack
 | アイコン | `internal/client/desktop/icon/`（同じ名前・形式のファイルを置く。今のものは仮で `go run ./internal/client/desktop/icon/gen` が作る） |
 | Bundle ID・表示名 | `internal/client/desktop/app.go` の `BundleID`・`paths.go` の `AppName`（公開の準備で確定する） |
 | AppImage の runtime | `desktop.sh` の `APPIMAGE_RUNTIME_TAG` と SHA-256（type2-runtime の Releases のファイルの SHA-256 を確かめて直す）。**部品の一覧（`deploy/release/licenses/runtime-components.json`）も一緒に取り直す**。手順は下の「2-2. NOTICE」→「AppImage の runtime の版を上げるとき」 |
-| Windows のアイコンの埋め込みの道具 | `desktop.sh` の `RSRC`（`go run` で版を固定） |
+| Windows の exe に入れる資源（アイコン・版の情報）の道具 | `internal/tools/winversion` の `goWinres`（go-winres を `go run` で版を固定）。入れる値もこの道具が決める |
 | Inno Setup の版 | `release.yml` の `desktop-windows-installer` の `INNO_URL`・`INNO_SHA256`（GitHub Releases のファイルの SHA-256 を確かめて直す） |
 | インストーラの `AppId` | **変えない**（`Looptrack.iss` と `release.yml` の `APP_ID`。変えると更新が上書きにならず、アンインストールの登録が二重になる） |
 
@@ -229,7 +233,7 @@ looptrack を利用者に配るのはサーバの配布ディレクトリです�
 | 物 | 中身 |
 | -- | -- |
 | install.sh で入れたサーバ | 配布ディレクトリは install.sh が置く（systemd は `/usr/local/share/looptrack/dist`、compose は `<dir>/dist`）。`.env` の `LOOPTRACK_DIST_DIR` が別の置き場を指していれば、install.sh はそこに触らない（管理者が自分で置く）。自分でビルドした版をそこへ置いても、次の `--upgrade` でリリースの版に置き換わる |
-| 置き方 | `dist.sh build`（署名しないなら `RELEASE_MINISIGN_PUBKEY=` を付け、self-update はハッシュだけを確かめる）と `dist.sh sums` の出力を、サーバの配布ディレクトリに置く（実行ファイル → SHA256SUMS の順に置き、前の版を消す）。出力に入る `install.sh`・`grants.sql` は置いても置かなくてもよい（配布口が配るのは実行ファイルと SHA256SUMS・NOTICE・OFL-BIZUDGothic.txt だけで、ほかの名前は配らない）。**配布ディレクトリは素の実行ファイルの形のまま**で、GitHub Releases の書庫は置かない（置いても一覧に出ず、`/api/v1/dist/bin/<書庫の名前>` は 404）。公式のリリースから置くときは、書庫から `looptrack` を取り出して従来の名前で置き、リリースの `SHA256SUMS`・`SHA256SUMS.minisig` をそのまま置く（SHA256SUMS に従来の名前の行があるので、公式のビルドの self-update が署名で確かめられる。手順は利用者ガイドの updating.md） |
+| 置き方 | `dist.sh build`（署名しないなら `RELEASE_MINISIGN_PUBKEY=` を付け、self-update はハッシュだけを確かめる）と `dist.sh sums` の出力を、サーバの配布ディレクトリに置く（実行ファイル → SHA256SUMS の順に置き、前の版を消す）。出力に入る `install.sh`・`grants.sql` は置いても置かなくてもよい（配布口が配るのは実行ファイルと SHA256SUMS・NOTICE・OFL-BIZUDGothic.txt だけで、ほかの名前は配らない）。**配布ディレクトリは素の実行ファイルの形のまま**で、GitHub Releases の書庫は置かない（置いても一覧に出ず、`/api/v1/dist/bin/<書庫の名前>` は 404）。公式のリリースから置くときは、書庫から `looptrack` を取り出して従来の名前で置き、リリースの `SHA256SUMS`・`SHA256SUMS.minisig` をそのまま置く（SHA256SUMS に従来の名前の行があるので、公式のビルドの self-update が署名で確かめられる。手順は利用者ガイドの server/updating.md） |
 | 版 | 公開の版（`vX.Y.Z`）か、`v0.0.0-<UTC の年月日時分秒>-<コミット ID>`（Go の擬似版の形。semver のプレリリースとして時刻の順に並ぶ） |
 | サーバ（looptrack serve） | `LOOPTRACK_DIST_DIR=<配布ディレクトリ>`（コンテナなら読み取り専用で入れる）。`GET /api/v1/dist`（と setup の券の一覧）の `binaries: [{name, os, arch, version, sha256, size, url}]` に (os, arch) ごとの最新を出し、`/api/v1/dist/bin/<名前>` で本体を返す。SHA256SUMS に載っていない・ハッシュが違うファイルは配らない。配布ディレクトリが無い・空なら `binaries` は空の一覧。配布物がサーバの版にそろっていない（置き場が無い・6 対象のどれかが無い・古い）ときは、起動時のログと admin の画面の帯で知らせる |
 | 最低の対応版 | `.env` に `LOOPTRACK_CLIENT_MIN_VERSION=v…` を書くと、それより古い looptrack の導入に【配布スクリプトの更新】が出る（空なら判定しない） |
@@ -281,7 +285,7 @@ go run ./internal/tools/notice -check   # 書き換えずに、今の依存と�
 ### AppImage の runtime の版を上げるとき
 
 `deploy/release/desktop.sh` の `APPIMAGE_RUNTIME_TAG` を上げるときは、**部品の一覧も一緒に取り直します**。
-取り直しを忘れても、NOTICE の生成が失敗するので気づけます。手順は次のとおりです。
+取り直しを忘れても、NOTICE の生成が失敗するので気づけます。手順は次のとおり。
 
 1. `APPIMAGE_RUNTIME_TAG` と `APPIMAGE_RUNTIME_SHA256_x86_64`・`APPIMAGE_RUNTIME_SHA256_aarch64` を、
    その tag の Releases のファイルの SHA-256 で直します。
@@ -343,7 +347,7 @@ bash deploy/release/dist.sh sums /tmp/dist
 sudo sh /tmp/dist/install.sh --from /tmp/dist
 ```
 
-この経路は `deploy/install_test.sh` が Docker で確かめています。
+この経路を Docker で確かめているのは `deploy/install_test.sh`。
 素の形の取得元（`dist.sh build` の出力）と、Releases と同じ並びの取得元（書庫。`LOOPTRACK_INSTALL_REPO` で `--from` なしの既定の取得元を差し替える）の両方で見ています。
 
 ## 3. 版の付け方
@@ -352,8 +356,14 @@ sudo sh /tmp/dist/install.sh --from /tmp/dist
   候補版は `v1.0.0-rc.1` のように `-rc.N` を付けます（semver の比較で rc.10 が rc.9 より後になります）。
 - 互換を壊す変更は MAJOR を上げます。CLI の出力・終了コード・REST / MCP の形・環境変数・マイグレーションで戻れない変更がこれに当たります。
   機能の追加は MINOR、修正だけなら PATCH です。
-- タグを打つ前に、CHANGELOG.md に版ごとの「追加・変更・修正・移行の注意」を書きます。
+- タグを打つ前に、2 本の CHANGELOG に版ごとの「追加・変更・修正・移行の注意」を書きます。
+  サーバを動かす人・管理する人・CLI でサーバにつなぐ人に効く変更は `CHANGELOG.md`、デスクトップ版の利用者に効く変更は `CHANGELOG-desktop.md` です。
+  両方に効く変更は両方に書きます。デスクトップ版の zip にも CLI が入っているので、CLI の変更もデスクトップ版に効くかを実物で確かめて振り分けます。
+  各項目の太字の 1 文目には、その版の利用者から見て何が変わるかを書き、実装の中身は後ろに回します。
   各版は英語の後に `---` を挟んで日本語を書きます（日英併記。日本語に見出しは付けません）。
+- GitHub の Release の本文は、release の公開の段が `deploy/release/release-notes.sh <版>` で 2 本の同じ版の節から作ります。
+  本文は「Server」「Desktop app」の 2 節で、片方にその版の節が無ければ、その節に「この版の変更はありません」が日英で出ます。
+  どちらにも節が無い版では、公開の段が GHCR の multi-arch のタグ（`latest` を含む）と Releases の下書きを作る前に止まります。
 
 ## 4. リリースの手順
 
@@ -362,7 +372,8 @@ README・利用者ガイド・`install.sh`・`setup` のどれかを変えたと
 
 1. CI（`ci`）を手動で実行し、緑であることを確かめます（`gh workflow run ci.yml`）。
    push では走らないので、main に入れただけでは実行されていません。実行する SHA は、手元の全検査が緑のものにします。
-2. CHANGELOG.md を更新して main にコミットします。
+2. CHANGELOG.md と CHANGELOG-desktop.md を更新して main にコミットします。
+   手元でも `bash deploy/release/release-notes.sh <版>` を実行し、Release の本文が「Server」「Desktop app」の 2 節そろって出るかを見ておきます。
 3. 注釈付きタグを打って push します。push は CI・release を動かすので、利用者の承認を得てから行ってください。
    ```
    git tag -a v1.0.0-rc.1 -m "v1.0.0-rc.1"
@@ -409,13 +420,16 @@ workflow を直したら、actionlint（`go run github.com/rhysd/actionlint/cmd/
 
 ## 6. 用意するもの（リポジトリの設定）
 
+列「今」は、公開のリポジトリの設定です。秘密の値そのものは書きません。
+Environment `release` はタグ `v*` だけをデプロイの対象にしています（承認者は置いていません）。
+
 | 種類 | 名前 | 用途 | 今 |
 | -- | -- | -- | -- |
 | 自動 | `GITHUB_TOKEN` | GHCR への push（`packages: write`）・Releases の下書き（`contents: write`）。権限はジョブごとに与えるので、Settings の既定（read）のままでよい | 追加の設定なし |
-| 変数 | `RELEASE_PUBLISH` | `true` でタグの push から公開まで進める | 未設定（作るだけ） |
-| 変数 | `RELEASE_SIGN` | `true` で macOS の署名・公証と SHA256SUMS の署名を行う（公開には必須）。meta が読むのでリポジトリ変数 | 未設定（private の間は手元で署名） |
-| 変数（Environment `release`） | `APPLE_TEAM_ID`・`MACOS_SIGN_IDENTITY` | 署名の身元と TeamIdentifier の確認 | 公開用リポジトリを作るときに登録 |
-| 秘密（Environment `release`） | `MACOS_CERT_P12_BASE64`・`MACOS_CERT_P12_PASSWORD`・`APPLE_API_KEY_P8_BASE64`・`APPLE_API_KEY_ID`・`APPLE_API_ISSUER_ID`・`MINISIGN_SECRET_KEY`・`MINISIGN_PASSWORD` | macOS の署名と公証・SHA256SUMS の署名。登録の手順は「署名」 | 可搬媒体に保管。公開用リポジトリを作るときに登録 |
+| 変数 | `RELEASE_PUBLISH` | `true` でタグの push から公開まで進める | `true` に設定済み |
+| 変数 | `RELEASE_SIGN` | `true` で macOS の署名・公証と SHA256SUMS の署名を行う（公開には必須）。meta が読むのでリポジトリ変数 | `true` に設定済み |
+| 変数（Environment `release`） | `APPLE_TEAM_ID`・`MACOS_SIGN_IDENTITY` | 署名の身元と TeamIdentifier の確認 | 登録済み |
+| 秘密（Environment `release`） | `MACOS_CERT_P12_BASE64`・`MACOS_CERT_P12_PASSWORD`・`APPLE_API_KEY_P8_BASE64`・`APPLE_API_KEY_ID`・`APPLE_API_ISSUER_ID`・`MINISIGN_SECRET_KEY`・`MINISIGN_PASSWORD` | macOS の署名と公証・SHA256SUMS の署名。登録の手順は「署名」 | 7 つとも登録済み。原本は可搬媒体に保管 |
 
 Dependabot（`.github/dependabot.yml`）が、Go のモジュールと Actions の版の更新 PR を週 1 回まとめて出します。
 **その PR では CI は走りません**（上の「1. CI」）。取り込む前に、手元の全検査（CONTRIBUTING.md の「Running the tests」）を通してください。

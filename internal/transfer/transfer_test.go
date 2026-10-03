@@ -93,9 +93,9 @@ func TestImportVerifyFixtures(t *testing.T) {
 
 	// export したファイルが元とバイト一致（ファイル名のバイト列を含む）
 	out := t.TempDir()
-	n, err := Export(ctx, db, out, nil, false)
-	if err != nil || n != files {
-		t.Fatalf("export: n=%d err=%v", n, err)
+	res, err := Export(ctx, db, out, nil, false, "")
+	if err != nil || res.Files != files || res.Attachments != 0 || len(res.Problems) != 0 {
+		t.Fatalf("export: %+v err=%v", res, err)
 	}
 	for _, sp := range src {
 		for _, f := range sp.Files {
@@ -145,20 +145,20 @@ func TestExportExcludesArchivedProject(t *testing.T) {
 	}
 
 	out := t.TempDir()
-	n, err := Export(ctx, db, out, nil, false)
+	res, err := Export(ctx, db, out, nil, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 0 {
+	if n := res.Files; n != 0 {
 		t.Errorf("既定でアーカイブ済みを外さなかった: n=%d", n)
 	}
 	if _, err := os.Stat(filepath.Join(out, src[0].Project.Slug)); !os.IsNotExist(err) {
 		t.Errorf("アーカイブ済みのディレクトリが出た（stat の結果: %v）", err)
 	}
 
-	n, err = Export(ctx, db, out, nil, true)
-	if err != nil || n == 0 {
-		t.Fatalf("includeArchived=true で書き出されなかった: n=%d err=%v", n, err)
+	res, err = Export(ctx, db, out, nil, true, "")
+	if err != nil || res.Files == 0 {
+		t.Fatalf("includeArchived=true で書き出されなかった: n=%d err=%v", res.Files, err)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/howashoji/looptrack/internal/mdformat"
 	"github.com/howashoji/looptrack/internal/store"
 )
 
@@ -189,6 +190,57 @@ func TestBoardFormHeadingFollowsLang(t *testing.T) {
 	}
 }
 
+// TestBoardCommentsHeadingFollowsLang は、ボードが詳細のコメント節の見出しを画面の言語で渡すことを確かめる。
+// 保存した本文の見出しは言語に関わらず mdformat.CommentSection（構造の目印）のままで、画面の JS
+// （render.js の localizeCommentHeading）が描くときだけこの文面に替える。日本語の画面は対照。
+func TestBoardCommentsHeadingFollowsLang(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	pr := e.project("req")
+	for _, tc := range []struct {
+		lang, login, want, other string
+		client                   *http.Client
+	}{
+		{"en", "enreader", "Comments", "コメント", enClient()},
+		{"ja", "jareader", "コメント", "Comments", e.client()},
+	} {
+		u := e.user(tc.login, tc.login+"-password-1", "member")
+		store.SetMember(ctx, e.db, pr.ID, u.ID, "editor")
+		e.enroll(tc.client, tc.login, tc.login+"-password-1")
+		res, page := e.get(tc.client, "/im/p/req/")
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("%s: ボード %d", tc.lang, res.StatusCode)
+		}
+		m := boardTextsRe.FindStringSubmatch(page)
+		if m == nil {
+			t.Fatalf("%s: ボードに文面の JSON が無い", tc.lang)
+		}
+		var texts map[string]string
+		if err := json.Unmarshal([]byte(m[1]), &texts); err != nil {
+			t.Fatalf("%s: 文面の JSON が読めない: %v", tc.lang, err)
+		}
+		if texts["comments_heading"] != tc.want {
+			t.Errorf("%s: コメント節の見出し = %q, want %q（反対の言語は %q）", tc.lang, texts["comments_heading"], tc.want, tc.other)
+		}
+		if tc.lang != "en" {
+			continue
+		}
+		// 英語の利用者が起票してコメントしても、保存した本文の見出しは構造の目印のまま（訳すのは描くときだけ）
+		csrf := boardCSRFRe.FindStringSubmatch(page)[1]
+		if code, v := e.formPost(tc.client, csrf, "/api/v1/projects/req/issues", map[string]any{"title": "heading", "body": "x"}); code != http.StatusCreated {
+			t.Fatalf("起票 %d %v", code, v)
+		}
+		if code, v := e.formPost(tc.client, csrf, "/api/v1/issues/REQ-0001/comments", map[string]any{"text": "hello"}); code != http.StatusCreated {
+			t.Fatalf("コメント %d %v", code, v)
+		}
+		var d issueDetailJSON
+		e.apiAs(u).json(200, "GET", "/issues/REQ-0001", nil, &d)
+		if !strings.Contains(d.Markdown, "\n"+mdformat.CommentSection+"\n") || strings.Contains(d.Markdown, "## Comments") {
+			t.Errorf("英語の利用者の本文のコメント節の見出しが %q でない:\n%s", mdformat.CommentSection, d.Markdown)
+		}
+	}
+}
+
 // TestBoardFormsRuleRejection は、プロジェクト別ルールで拒否された画面からの変更が、画面に出す文言（error.message）と
 // 上書きの可否（error.overridable）を返し、上書きできる違反は理由付きなら通ることを確かめる。
 // 画面の操作は人の操作なので、usage.require_on_close（AI の操作だけが対象）には掛からない。
@@ -223,5 +275,37 @@ func TestBoardFormsRuleRejection(t *testing.T) {
 	if code, v := e.formPost(c, csrf, "/api/v1/issues/REQ-0001/status", map[string]any{"status": "Done",
 		"override_reason": "画面から理由付きでクローズ"}); code != http.StatusOK {
 		t.Errorf("理由付きのクローズ: %d %v", code, v)
+	}
+}
+
+// TestHubSubtitleSingularText は、プロジェクト選択の画面が件数の行の単数の文面（sub_one）を渡すことを確かめる。
+// hub.js（render.js の countText）が、プロジェクトが 1 件のときだけこれを使う。英語は単数と複数で文面が違い、
+// 日本語は同じ文面（対照）。
+func TestHubSubtitleSingularText(t *testing.T) {
+	e := newEnv(t)
+	for _, tc := range []struct {
+		lang, login, sub, one string
+		client                *http.Client
+	}{
+		{"en", "enhub", "{n} projects / {open} open / as of {at}", "{n} project / {open} open / as of {at}", enClient()},
+		{"ja", "jahub", "{n} プロジェクト　／　{open} 件が未クローズ　／　{at} 時点", "{n} プロジェクト　／　{open} 件が未クローズ　／　{at} 時点", e.client()},
+	} {
+		e.user(tc.login, tc.login+"-password-1", "member")
+		e.enroll(tc.client, tc.login, tc.login+"-password-1")
+		res, page := e.get(tc.client, "/im/")
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("%s: プロジェクト選択 %d", tc.lang, res.StatusCode)
+		}
+		m := boardTextsRe.FindStringSubmatch(page)
+		if m == nil {
+			t.Fatalf("%s: プロジェクト選択に文面の JSON が無い", tc.lang)
+		}
+		var texts map[string]string
+		if err := json.Unmarshal([]byte(m[1]), &texts); err != nil {
+			t.Fatalf("%s: 文面の JSON が読めない: %v", tc.lang, err)
+		}
+		if texts["sub"] != tc.sub || texts["sub_one"] != tc.one {
+			t.Errorf("%s: sub = %q / sub_one = %q, want %q / %q", tc.lang, texts["sub"], texts["sub_one"], tc.sub, tc.one)
+		}
 	}
 }

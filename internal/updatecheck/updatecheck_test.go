@@ -537,6 +537,28 @@ func TestDesktopAsset(t *testing.T) {
 	}
 }
 
+// TestDesktopInstallerAsset は Windows のインストーラの名前が、desktop.sh の windows-installer
+// （<出力先>/Looptrack_<版>_windows_<arch>_setup.exe）と同じことを確かめる。配っていない arch は空。
+func TestDesktopInstallerAsset(t *testing.T) {
+	for _, c := range []struct{ arch, want string }{
+		{"amd64", "Looptrack_v1.0.0-rc.5_windows_amd64_setup.exe"},
+		{"arm64", "Looptrack_v1.0.0-rc.5_windows_arm64_setup.exe"},
+		{"386", ""},
+		{"", ""},
+	} {
+		if got := DesktopInstallerAsset(c.arch)("v1.0.0-rc.5"); got != c.want {
+			t.Errorf("DesktopInstallerAsset(%s) = %q, want %q", c.arch, got, c.want)
+		}
+	}
+	b, err := os.ReadFile("../../deploy/release/desktop.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `base="${APP_NAME}_${version}_windows_${goarch}_setup"`) {
+		t.Error("desktop.sh の windows-installer の出力名が DesktopInstallerAsset と同じ形か確かめられません（前提が崩れています）")
+	}
+}
+
 // TestArchiveAsset は書庫の名前が、リリースの組み立て（deploy/release/dist.sh の server_base・archive_ext と
 // release.yml の 6 対象。Releases に上げるのは書庫だけで、素の実行ファイルは無い）と同じことを確かめる。
 // 配っていない組み合わせは空。

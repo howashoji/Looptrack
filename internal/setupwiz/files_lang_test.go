@@ -27,8 +27,15 @@ func TestComposeAndDockerfileInEnglish(t *testing.T) {
 			t.Errorf("英語の compose.yaml（%s）:\n%s", store, en)
 		}
 		// 対照: 日本語を選べば日本語の注釈になる（上の検査が何も見ていないのではないことを確かめる）
-		if ja := renderCompose(p, now, i18n.JA); !hasJA(ja) {
+		ja := renderCompose(p, now, i18n.JA)
+		if !hasJA(ja) {
 			t.Fatalf("日本語の compose.yaml に日本語が無い（検査の前提が崩れています）:\n%s", ja)
+		}
+		// 書き出す注釈は、リポジトリに無いファイルを元だと名乗らない（雛形の文面は renderCompose が持つ）
+		for _, got := range []string{en, ja} {
+			if strings.Contains(got, "deploy/compose.yaml") {
+				t.Errorf("compose.yaml の注釈が無いファイルを指している（%s）:\n%s", store, got)
+			}
 		}
 	}
 	if en := renderDockerfile(now, i18n.EN); hasJA(en) || !strings.Contains(en, "FROM scratch") || !strings.Contains(en, `CMD ["serve"]`) {

@@ -327,7 +327,7 @@ func cmdUsageMissing(c *Ctx, v *Values) error {
 	if truthy(res, "mine") {
 		who = i18n.T(c.Lang, "cli.usage.missing.who.mine")
 	}
-	c.Println(i18n.T(c.Lang, "cli.usage.missing.rate", "rate", rate, "days", intOf(get(res, "days", nil)), "who", who,
+	c.Println(i18n.TN(c.Lang, "cli.usage.missing.rate", int(intOf(get(res, "days", nil))), "rate", rate, "days", intOf(get(res, "days", nil)), "who", who,
 		"target", intOf(get(res, "target", nil)), "attached", intOf(get(res, "attached", nil)),
 		"missing", intOf(get(res, "missing_count", nil)), "humans", intOf(get(res, "humans", nil))))
 	missing := objects(get(res, "missing", nil))

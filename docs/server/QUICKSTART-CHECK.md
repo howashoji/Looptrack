@@ -1,7 +1,7 @@
 # 公開候補を、まっさらな環境で通す（quickstart の再現）
 
 公開したあと第三者が最初にやることを、ひととおり通す手順です。開発者の手元の設定・タグ・環境変数が無い環境で行います。
-**目的は、README と `docs/guide`・`docs/server/DEPLOY.md` だけで最後まで行けるかを確かめることです。**
+**目的は README と `docs/guide`・`docs/server/DEPLOY.md` だけで最後まで行けるかを確かめることです。**
 通らなかった箇所やそれ以外の知識が要った箇所を見つけたら、直しは別のイシューで行います。
 
 リリースの前（版を切る前）と、README・ガイド・`install.sh`・`setup` のどれかを変えたときに実行します。
@@ -30,7 +30,7 @@ mkdir "$S/src" && tar xf "$S/looptrack-src.tar" -C "$S/src"
 - `.claude/`・`CLAUDE.md` が入っていない（`bash deploy/public-scan.sh --only aiconf` と同じ判定）
 - 展開した `"$S/src/looptrack"` に `README.md`・`LICENSE`・`deploy/`・`docs/` がある
 
-**以降は、展開したこの木の中だけを使います。** 作業ツリーや手元の設定は参照しません。
+**以降は展開したこの木の中だけを使います。** 作業ツリーや手元の設定は参照しません。
 
 ## 1. 取得元（GitHub Releases の代わり）を作る 【CI 可】
 
@@ -108,7 +108,7 @@ docker exec ltcheck-a grep PRETTY_NAME /etc/os-release
 
 ## 3. ローカル + SQLite（ウィザード） 【CI 可】
 
-利用者ガイドの「1. Download the binaries」→「2. Set up the server」→「3. Start the server」をなぞります。
+利用者ガイドのサーバ版の始め方（`docs/guide/server/getting-started.md`）の「1. Download the binaries」→「2. Set up the server」→「3. Start the server」をなぞります。
 `curl` の取得先だけを `/release` に読み替えてください。
 
 ```sh
@@ -142,6 +142,11 @@ EOF
 ```sh
 docker exec -d ltcheck-a sudo -u dev bash -c \
   'export PATH="$HOME/.local/bin:$PATH"; cd ~/looptrack-server && exec looptrack serve --env-file ./.env >~/serve.log 2>&1'
+# 待ち受けを始めるまで待つ（最大 30 秒）
+for i in $(seq 1 30); do
+  docker exec ltcheck-a curl -fs -o /dev/null http://127.0.0.1:8090/looptrack/healthz && break
+  sleep 1
+done
 docker exec ltcheck-a curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8090/looptrack/healthz
 docker exec ltcheck-a curl -s http://127.0.0.1:8090/looptrack/api/v1/projects
 ```
@@ -172,7 +177,8 @@ EOF
 
 - `--dry-run` は差分だけを出して何も書かない
 - 本番は `.claude/settings.json`・`CLAUDE.md`・`.claude/skills/issue/`・`.claude/skills/token-report/`・
-  `.mcp.json`・`.gitignore`・`.claude/.looptrack-kit.json` の 7 つを作り、`verify: 配線 7 件` で終わる
+  `.mcp.json`・`.gitignore`・`.claude/.looptrack-kit.json` の 7 つを作り、`verify: checked <n> wiring(s)` で終わる。
+  `<n>` は `grep -c 'looptrack hook' .claude/settings.json` の数と同じで、`doctor` の配線の件数とも一致する
 - `doctor` は「問題はありません」（`LOOPTRACK_API_URL` が無い注意は、素のシェルでは出てよい）
 - `issue new` が `DEMO-0001` を採番し、`next` が `Todo → In Progress` にして受け入れ条件と検証コマンドを出す
 - `summary` が 3 層（いまの周／人の判断待ち／外からの反応）で出る
@@ -187,10 +193,16 @@ EOF
 ```sh
 docker run -d --name ltcheck-mysql --network ltcheck-net \
   -e MYSQL_ROOT_PASSWORD=qscheckroot mysql:8.4
-docker run -d --name ltcheck-b --network ltcheck-net \
+docker run -d --name ltcheck-b --network ltcheck-net -p 127.0.0.1:18391:80 \
   --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
   -v "$S/src/looptrack/deploy/install.sh:/raw/install.sh:ro" -v "$S/release:/gh/releases/latest/download:ro" \
   ltcheck-systemd:v1
+# -p は 7 章で使う口（前段の nginx の 80 番）。デスクトップ版の既定の 18090 とはぶつからない番号にする
+# MySQL がネットワーク越しに受け付けるまで待つ（最大 2 分。起動の途中は一時的なサーバが動いている）
+for i in $(seq 1 60); do
+  docker exec ltcheck-b mysql -h ltcheck-mysql -uroot -pqscheckroot -e 'SELECT 1' >/dev/null 2>&1 && break
+  sleep 2
+done
 # 1. 人が先に用意するのは、表を作る利用者だけ（DB im とアプリ用の利用者 im_app はインストーラが作る。
 #    GRANT ALL ON im.* は DB を作る前に流せる）
 docker exec -i ltcheck-mysql mysql -uroot -pqscheckroot <<'SQL'
@@ -229,7 +241,7 @@ DB im がありません。作りますか (y/n) [y]: y
   表がまだありません。管理用の資格情報で作ります（migrate）
 適用: 0001_init.sql
 …
-  権限を与えました（GRANT 23 件。deploy/grants.sql と同じ）
+  権限を与えました（GRANT <n> 件。deploy/grants.sql と同じ）
   アプリ用の利用者 im_app で読めました
 スキーマを最新にしています（マイグレーション）…
   最新です
@@ -244,6 +256,7 @@ DB im がありません。作りますか (y/n) [y]: y
 
 - `systemctl is-active looptrack` が `active`・`is-enabled` が `enabled`
 - `/etc/looptrack/.env` が 600、`/looptrack/healthz` が 200
+- `GRANT <n> 件` の `<n>` が、展開した木で数えた `grep -c '^GRANT' deploy/grants.sql` と同じ
 - `docker exec ltcheck-mysql mysql -uroot -pqscheckroot -e "SHOW GRANTS FOR 'im_app'@'%'"` に `deploy/grants.sql` と同じ表ごとの権限が出る
 - `grep -rF qscheckroot /etc/looptrack /var/lib/looptrack` が何も出さない（管理用のパスワードを残さない）
 - **2 回目**を実行すると「設定済みです（/etc/looptrack/install.conf）。何も変えていません。」
@@ -261,10 +274,19 @@ DB im がありません。作りますか (y/n) [y]: y
 
 ```sh
 docker exec ltcheck-b bash -c '
+  set -e
+  mkdir -p /etc/ssl/ltcheck
   openssl req -x509 -newkey rsa:2048 -nodes -days 30 -keyout /etc/ssl/ltcheck/key.pem \
     -out /etc/ssl/ltcheck/cert.pem -subj "/CN=im.example.test" -addext "subjectAltName=DNS:im.example.test"
   # proxy-examples.txt の nginx の節を sites-available/looptrack へ写し、ssl_certificate の 2 行を上に向ける
-  nginx -t && systemctl restart nginx'
+  sed -n "/^# ---- nginx/,/^# ---- Caddy/p" /etc/looptrack/proxy-examples.txt | sed "\$d" \
+    | sed -E -e "s|^ *# ssl_certificate +.*|    ssl_certificate     /etc/ssl/ltcheck/cert.pem;|" \
+             -e "s|^ *# ssl_certificate_key .*|    ssl_certificate_key /etc/ssl/ltcheck/key.pem;|" \
+    > /etc/nginx/sites-available/looptrack
+  ln -sf /etc/nginx/sites-available/looptrack /etc/nginx/sites-enabled/looptrack
+  nginx -t && systemctl restart nginx
+  # 公開 URL の名前（im.example.test）を、この箱の中でだけ引けるようにする
+  echo "127.0.0.1 im.example.test" >> /etc/hosts'
 docker exec ltcheck-b curl -sk -o /dev/null -w '%{http_code}\n' https://im.example.test/looptrack/healthz
 ```
 
@@ -324,22 +346,37 @@ POST /looptrack/admin/projects  csrf=… slug=shop prefix=SHOP name=Shop
 > **この節を人や AI に頼むときは、この禁止を指示にそのまま書いてください。** 「`claude` がどこに
 > 認証情報を置くか」を調べる過程でその中身を出力に残す事故が、過去に 2 回起きています。
 
-コンテナの中のサーバは `127.0.0.1` だけで待ち受けます。
-ホストから届かせるには**文書どおり前段にリバースプロキシを置き、その口だけを公開します**（`-p 127.0.0.1:18090:80`）。
+コンテナの中のサーバが待ち受けるのは `127.0.0.1` だけ。
+ホストから届かせるには**文書どおり前段にリバースプロキシを置き、その口だけを公開します**。
+5 章の `docker run` で付けた `-p 127.0.0.1:18391:80` がその口です。
+デスクトップ版は既定で `127.0.0.1:18090` を使うので、同じ番号にするとデスクトップ版が動いている端末では始められません。
+設定例の nginx が待ち受けるのは 443 番だけ。80 番の口を足し、80 番を先に取っている default の site を外します。
+
+```sh
+docker exec ltcheck-b bash -c '
+  sed -i "s/^    listen 443 ssl;/&\n    listen 80;/" /etc/nginx/sites-available/looptrack
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t && systemctl restart nginx'
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18391/looptrack/healthz
+```
 
 アクセストークンは `/account` の「アクセストークン」で発行します（`name` と `days` の 2 つが要ります）。
 
 ```sh
 cat > "$S/mcp.json" <<JSON
 { "mcpServers": { "looptrack": { "type": "http",
-    "url": "http://127.0.0.1:18090/looptrack/mcp",
+    "url": "http://127.0.0.1:18391/looptrack/mcp",
     "headers": { "X-Looptrack-Project": "demo", "Authorization": "Bearer $(cat "$S/token.txt")" } } } }
 JSON
 chmod 600 "$S/mcp.json"
-cd "$S/mcp-work" && claude -p --mcp-config "$S/mcp.json" --strict-mcp-config \
+mkdir -p "$S/mcp-work" && cd "$S/mcp-work" && claude -p "setup を workspace=$S/mcp-work で 1 回呼び、guide、next を呼んで、要点だけをまとめてください。next で着手できるイシューが無ければ、create_issue で 1 件起票してから next をもう一度呼んでください" \
+  --mcp-config "$S/mcp.json" --strict-mcp-config \
   --allowedTools "mcp__looptrack__setup,mcp__looptrack__guide,mcp__looptrack__next,mcp__looptrack__create_issue" \
-  "setup を workspace=<この作業ディレクトリ> で 1 回呼び、guide、next を呼んで、要点だけをまとめてください"
+  </dev/null
 ```
+
+プロンプトは `-p` の直後に置きます。`--mcp-config` と `--allowedTools` は値をいくつでも取るので、後ろに置くとプロンプトまで値として読まれます。
+そのときの出力は `Error: Input must be provided either through stdin or as a prompt argument when using --print` の 1 行だけ。
 
 期待する結果:
 
@@ -354,20 +391,23 @@ cd "$S/mcp-work" && claude -p --mcp-config "$S/mcp.json" --strict-mcp-config \
 ## 8. サーバ + compose（README の入口 3） 【CI 可】
 
 README の入口 3「Docker があるところで — compose」を、**そのイメージが 1 つも無い状態から**なぞります。
-`looptrack setup` が書く `compose.yaml` は隣の `Dockerfile` からイメージを作るので、レジストリからは何も取りません。
-他人が同じ名前のイメージを公開していても引きません。
+`looptrack setup` が書く `compose.yaml` は `pull_policy: build` を持ち、隣の `Dockerfile` からイメージを作ります。
+レジストリには取りに行きません。他人が同じ名前のイメージを公開していても引きません。
 
 ここだけは**まっさらなコンテナの中ではなくホストで**行います。中で docker を動かす必要があるからです。
 手元の `looptrack:latest` を上書きしないよう、`LOOPTRACK_IMAGE` と `-p` で名前を分けます。
+ウィザードは展開した木から作った候補の `looptrack` で動かします。手元に入っている別の版の `looptrack` を使うと、確かめたい `compose.yaml` になりません。
 
 ```sh
+cd "$S/src/looptrack" && go build -o "$S/bin/looptrack" ./cmd/looptrack
 D=$(mktemp -d); PW=$(mktemp); printf 'correcthorsebattery123\n' >"$PW"
 # 1. ウィザード（チームのサーバ・SQLite・compose）
-looptrack setup --dir "$D" --yes --mode team --store sqlite --port 18390 \
+"$S/bin/looptrack" setup --dir "$D" --yes --mode team --store sqlite --port 18390 \
   --base-path /looptrack --public-url http://127.0.0.1:18390 \
   --admin-login admin --admin-name Admin --admin-password-file "$PW" \
   --two-factor optional --project demo
 ls "$D"        # .env  Dockerfile  NOTICE  compose.yaml （linux なら looptrack も）
+grep -n 'pull_policy' "$D/compose.yaml"
 
 # 2. linux 以外で setup した場合は、配布物と同じ形の linux/amd64 を自分で置く
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o "$D/looptrack" ./cmd/looptrack
@@ -375,11 +415,19 @@ chmod +x "$D/looptrack"; chmod 777 "$D/data"
 
 # 3. 起動（イメージはここで作られる）
 cd "$D" && LOOPTRACK_IMAGE=ltcheck-compose:latest docker compose -p ltcheck-compose up -d
+# 待ち受けを始めるまで待つ（最大 30 秒）。健全性は最初の確かめが終わるまで starting のまま（最大 2 分）
+for i in $(seq 1 30); do curl -fs -o /dev/null http://127.0.0.1:18390/looptrack/healthz && break; sleep 1; done
 curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18390/looptrack/healthz
+for i in $(seq 1 60); do [ "$(docker inspect looptrack --format '{{.State.Health.Status}}')" != starting ] && break; sleep 2; done
 docker inspect looptrack --format '{{.State.Health.Status}} restarts={{.RestartCount}}'
 ```
 
-期待する結果: 3 で `Built` と出てイメージが手元で作られる（`Pull` ではない）、`healthz` が 200。
+期待する結果:
+
+- `compose.yaml` の `build:` の直後に `pull_policy: build` がある
+- 3 で `Building` → `Built` と出てイメージが手元で作られ、`Pulling` の行が 1 つも出ない
+- `healthz` が 200
+- `pull_policy: build` なので、`up -d` は `--build` を付けなくても毎回ビルドを走らせる。変わっていない層は使い回す
 
 `docker inspect` の健全性は **`healthy` になるのが正しい状態です**。`unhealthy` のまま `restarts` が増えるときは、
 `compose.yaml` の `mem_limit` が足りていません（サーバと healthcheck の 2 プロセスが 1 つの枠に入らない）。
@@ -404,7 +452,7 @@ docker inspect looptrack --format '{{.State.Health.Status}} restarts={{.RestartC
 ## 10. 片付け
 
 ```sh
-docker rm -f ltcheck-a ltcheck-b ltcheck-mysql
+docker rm -f -v ltcheck-a ltcheck-b ltcheck-mysql   # -v: MySQL の名前の無いボリュームも消す
 docker rmi ltcheck-base:v1 ltcheck-systemd:v1
 docker network rm ltcheck-net
 rm -rf "$S"          # tarball・配布物・トークンの控え

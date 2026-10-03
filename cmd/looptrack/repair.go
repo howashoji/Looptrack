@@ -91,13 +91,13 @@ func repairLists(ctx context.Context, db *sql.DB, lang i18n.Lang, w io.Writer, s
 			}
 		}
 		if err != nil {
-			return i18n.Wrapf(err, "cmd.repair.partial", "slug", p.Slug, "count", len(list))
+			return i18n.WrapfN(err, "cmd.repair.partial", len(list), "slug", p.Slug, "count", len(list))
 		}
 		fmt.Fprintln(w, i18n.T(lang, "cmd.repair.count", "slug", p.Slug, "count", len(list)))
 		total += len(list)
 	}
 	if apply {
-		fmt.Fprintln(w, i18n.T(lang, "cmd.repair.total_applied", "count", total, "kind", service.RepairKind))
+		fmt.Fprintln(w, i18n.TN(lang, "cmd.repair.total_applied", total, "count", total, "kind", service.RepairKind))
 	} else {
 		fmt.Fprintln(w, i18n.T(lang, "cmd.repair.total_dry_run", "count", total))
 	}

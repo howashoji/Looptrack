@@ -175,7 +175,8 @@ func truthyKey(o *jsonorder.Object, k string) bool {
 }
 
 // IsSelfRepo は dir が looptrack 自身のリポジトリ（kit の正本）かを返す。判定はここだけに置く:
-//   - init は自分自身への導入を拒む（internal/client/kitinit）
+//   - init は自分自身には導入せず、何も書かずに成功で終える（internal/client/kitinit）
+//   - 要約と doctor は、PATH の直し方・更新の仕方で init に触れない正本用の文を出す
 //   - 導入済み通知は self_repo として送り、サーバは kit を配布物と比べない
 //
 // 見るのは配置（kit/embed.go と cmd/looptrack）で、リポジトリの名前や remote は見ない

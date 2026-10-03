@@ -8,6 +8,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/howashoji/looptrack/internal/i18n"
+	"github.com/howashoji/looptrack/internal/service"
 )
 
 // MCP のツール定義（ツールの説明と入力項目の説明）を、接続の言語で出す。
@@ -28,6 +29,9 @@ import (
 //
 // スキーマは言語ごとに作り直す（jsonschema.For は呼ぶたびに新しい値を返す）。同じ値を 2 つのサーバで
 // 共有すると、片方の言語で書き換えたものがもう片方に出る。
+
+// mcpArgParams は入力項目の説明に埋め込める値。説明の {max_refs} は、値を変えても説明が古くならないようここで埋める。
+var mcpArgParams = []any{"max_refs", service.MaxAttachmentRefs}
 
 // mcpArgKeyPrefix は入力項目の説明に使う対訳表のキーの接頭辞。
 const mcpArgKeyPrefix = "server.mcp.arg."
@@ -54,7 +58,7 @@ func localizeSchema(lang i18n.Lang, s *jsonschema.Schema) {
 	if strings.HasPrefix(s.Description, mcpArgKeyPrefix) {
 		// i18n.T は ID を文字列リテラルで受ける決まり（lint_test.go）。ここの ID はタグから来るので Msg で引く
 		// （タグの ID は lint_test.go がタグから集めて、表との過不足を見る）。
-		s.Description = i18n.Msg{ID: s.Description}.In(lang)
+		s.Description = i18n.Msg{ID: s.Description, KV: mcpArgParams}.In(lang)
 	}
 	for _, p := range s.Properties {
 		localizeSchema(lang, p)

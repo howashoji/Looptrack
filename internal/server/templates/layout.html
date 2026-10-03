@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>{{.Title}} — {{T .Lang "server.web.common.brand"}}</title>
+<link rel="icon" type="image/png" href="{{base}}/static/icon.png">
 <link rel="stylesheet" href="{{base}}/static/app.css">
 <link rel="stylesheet" href="{{base}}/static/appbar.css">
 </head>
@@ -89,7 +90,8 @@
     <div class="usermenu-who"><strong>{{who .}}</strong><span>{{T $.Lang "server.web.common.login_role" "login" .Login "role" .Role}}</span></div>
     <a class="usermenu-item" href="{{base}}/account">{{T $.Lang "server.web.common.account_settings"}}</a>
     {{if eq .Role "admin"}}<a class="usermenu-item" href="{{base}}/admin/users">{{T $.Lang "server.web.common.admin_users"}}</a>
-    <a class="usermenu-item" href="{{base}}/admin/projects">{{T $.Lang "server.web.common.admin_projects"}}</a>{{end}}
+    <a class="usermenu-item" href="{{base}}/admin/projects">{{T $.Lang "server.web.common.admin_projects"}}</a>
+    <a class="usermenu-item" href="{{base}}/admin/attachments">{{T $.Lang "server.web.common.admin_attachments"}}</a>{{end}}
     {{if not localMode}}{{with $.CSRF}}<div class="usermenu-sep"></div>
     <form method="post" action="{{base}}/logout"><input type="hidden" name="csrf" value="{{.}}"><button type="submit" class="usermenu-item danger">{{T $.Lang "server.web.common.logout"}}</button></form>{{end}}{{end}}
   </div>

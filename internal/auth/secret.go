@@ -23,7 +23,7 @@ func NewBox(keyB64 string) (*Box, error) {
 		return nil, i18n.Wrapf(err, "auth.err.secret_key_base64")
 	}
 	if len(key) != 32 {
-		return nil, i18n.Errorf("auth.err.secret_key_length", "bytes", len(key))
+		return nil, i18n.ErrorfN("auth.err.secret_key_length", len(key), "bytes", len(key))
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {

@@ -37,7 +37,17 @@ const JA = {
   comment_label: "コメントを追記（追記のみ。後から書き換えられない）",
   comment_submit: "コメントを追記",
   body_empty: "（未記入）",
-  body_acceptance: "## 受け入れ条件"
+  body_acceptance: "## 受け入れ条件",
+  comments_heading: "コメント",
+  att_none: "添付はまだ無い。",
+  att_purged: "消去済み",
+  att_pick: "ファイルを選ぶ",
+  att_hint: "ここへドラッグ&ドロップしても、本文の欄に画像を貼り付けても添付できます",
+  att_remove: "{name} を外す",
+  att_sent: "送信済み（次の送信でコメントに付く）",
+  att_sending: "{name} を送信中（{n}/{total}）",
+  att_upload_failed: "{name} を添付できなかった。{reason}",
+  att_empty: "本文か添付のどちらかを入れてください。何も送っていない。"
 };
 
 test("esc は引用符も落とす（属性値を閉じられない）", () => {
@@ -266,7 +276,9 @@ test("en の文面で描くと、画面に日本語が残らない", () => {
     feedbackTag(it, EN),
     newIssueForm({ canEdit: true, types: ["task"], priorities: ["P2"], t: EN }),
     statusForm({ canEdit: true, it, statuses: ["Todo", "Done"], t: EN }),
-    commentForm({ canEdit: true, it, t: EN }),
+    commentForm({ canEdit: true, it, t: EN, pending: [{ name: "a.png", size: 10 }, { name: "b.log", size: 2048, sent: true }] }),
+    attachmentList([], EN),
+    attachmentList([{ id: 1, filename: "x.png", purged: true }, { id: 2, filename: "y.txt", media_type: "text/plain", size: 3, url: "/im/api/v1/attachments/2" }], EN),
     apiErrorMessage(403, null, EN),
     apiErrorMessage(502, null, EN),
     buildIssueBody("", "works", EN)
@@ -274,4 +286,220 @@ test("en の文面で描くと、画面に日本語が残らない", () => {
   assert.doesNotMatch(html, HAS_JA, "英語の辞書で描いた出力に日本語が残っています:\n" + html);
   // 辞書を引けているか（空の辞書でも「日本語が無い」は成立してしまうため）
   assert.match(html, /Unassign|Reassign|assignee|Body|Comment|Status/i);
+});
+
+/* ---------------- 添付（コメントのフォームとドロワーの一覧） ---------------- */
+import { attachmentList, showInline, pendingList, uploadRequest, pastedName, formatSize, sendComment } from "./render.js";
+
+const att = (over) => Object.assign({ id: 1, filename: "f", media_type: "application/octet-stream", size: 10, purged: false,
+  url: "/im/api/v1/attachments/1", inline: false }, over);
+
+test("ドロワーの添付: サーバが inline にした png は img、SVG はどの経路でも img にしない", () => {
+  // 対照: 中身も png（サーバの inline が true）なら、その場で表示する
+  const png = attachmentList([att({ id: 7, filename: "shot.png", media_type: "image/png", inline: true, url: "/im/api/v1/attachments/7" })], JA);
+  assert.match(png, /<img class="att-img" src="\/im\/api\/v1\/attachments\/7" alt="shot.png"/);
+  // SVG: サーバが attachment で返す（inline: false）ので img にしない。ダウンロードのリンクになる
+  const svg = attachmentList([att({ id: 8, filename: "evil.svg", media_type: "image/svg+xml", url: "/im/api/v1/attachments/8" })], JA);
+  assert.doesNotMatch(svg, /<img/);
+  assert.match(svg, /<a href="\/im\/api\/v1\/attachments\/8" download="evil.svg">evil.svg<\/a>/);
+  // サーバが誤って inline と言っても、SVG だけは img にしない（大文字・引数つきの申告も）
+  for (const mt of ["image/svg+xml", "IMAGE/SVG+XML", " image/svg+xml; charset=utf-8"]) {
+    assert.equal(showInline(att({ media_type: mt, inline: true })), false, mt);
+    assert.doesNotMatch(attachmentList([att({ media_type: mt, inline: true })], JA), /<img/, mt);
+  }
+  // 判定はサーバの inline に従い、形式で作り直さない: png を名乗っても inline でなければ img にしない
+  assert.equal(showInline(att({ media_type: "image/png", inline: false })), false);
+  assert.equal(showInline(att({ media_type: "image/png", inline: "true" })), false);   // 真偽値の true だけ
+  assert.equal(showInline(att({ media_type: "image/png", inline: true })), true);
+});
+
+test("ドロワーの添付: 消去済みは名前と「消去済み」だけ、空なら空と出す", () => {
+  const html = attachmentList([att({ id: 3, filename: "secret.png", media_type: "image/png", inline: true, purged: true })], JA);
+  assert.match(html, /<span class="att-name">secret.png<\/span> <span class="tag">消去済み<\/span>/);
+  assert.doesNotMatch(html, /<img|<a |href=/);
+  assert.match(attachmentList([], JA), /添付はまだ無い。/);
+  assert.match(attachmentList(null, JA), /添付はまだ無い。/);
+});
+
+test("ドロワーの添付の値はエスケープし、危険なリンク先は通さない", () => {
+  const html = attachmentList([att({ filename: '"><script>x</script>', media_type: "<b>", url: "javascript:alert(1)" }),
+    att({ id: 2, filename: '"><img onerror=x>', inline: true, media_type: "image/png", url: "/im/x" })], JA);
+  assert.doesNotMatch(html, /<script>|<b>|javascript:|<img onerror/);
+  assert.match(html, /href="#"/);
+});
+
+test("viewer にはフォームの添付の操作が出ない（editor には出る）", () => {
+  const it = { id: "IM-0001", status: "Todo" };
+  assert.equal(commentForm({ canEdit: false, it, t: JA, pending: [{ name: "a.png", size: 1 }] }), "");
+  // 対照: editor には選択の部品・ドロップの場所・送る前の一覧が出る
+  const html = commentForm({ canEdit: true, it, t: JA, pending: [{ name: "a.png", size: 1 }] });
+  assert.match(html, /<input type="file" multiple data-attach-input>/);
+  assert.match(html, /data-attach-drop/);
+  assert.match(html, /<ul class="att-pending" data-attach-pending><li class="att-item"><span class="att-name">a.png<\/span>/);
+  assert.doesNotMatch(html, /<textarea name="text" rows="3" required>/);   // 本文が空でも添付だけを送れる
+});
+
+test("送る前の一覧: 送信済みは外せず、名前はエスケープする", () => {
+  const html = pendingList([{ name: '"><b>', size: 1536 }, { name: "done.log", size: 1, sent: true }], JA);
+  assert.doesNotMatch(html, /<b>/);
+  assert.match(html, /1.5 KiB/);
+  assert.match(html, /data-attach-remove="0"/);
+  assert.doesNotMatch(html, /data-attach-remove="1"/);
+  assert.match(html, /送信済み（次の送信でコメントに付く）/);
+  assert.equal(pendingList(undefined, JA), "");
+});
+
+test("添付の要求: 本文はファイル、名前は符号化して X-Looptrack-Filename、画面の CSRF を付ける", () => {
+  const file = { name: "画面 1.png", type: "image/png" };
+  const req = uploadRequest("/im", "IM-0001", "my proj", file, "tok");
+  assert.equal(req.url, "/im/api/v1/issues/IM-0001/attachments?project=my%20proj");
+  assert.equal(req.init.method, "POST");
+  assert.equal(req.init.credentials, "same-origin");
+  assert.equal(req.init.body, file);
+  assert.deepEqual(req.init.headers, { "Content-Type": "image/png", "X-Looptrack-Filename": "%E7%94%BB%E9%9D%A2%201.png", "X-CSRF-Token": "tok" });
+  // 形式が分からないファイルは octet-stream で送る（形式の判定はサーバがする）
+  assert.equal(uploadRequest("/im", "IM-0001", "p", { name: "x" }, "").init.headers["Content-Type"], "application/octet-stream");
+  // コメントには返った ID を付ける。付けないときは本文だけ（これまでと同じ形）
+  assert.deepEqual(formRequest("comment", "IM-0001", "im", { text: "記録", attachments: [3, 4] }),
+    { path: "/api/v1/issues/IM-0001/comments", body: { text: "記録", attachments: [3, 4] } });
+  assert.deepEqual(formRequest("comment", "IM-0001", "im", { text: "記録", attachments: [] }),
+    { path: "/api/v1/issues/IM-0001/comments", body: { text: "記録" } });
+});
+
+test("貼り付けた画像の名前: 汎用の名前だけを日時の名前に替える", () => {
+  const at = new Date(2026, 9, 2, 13, 5, 9);
+  assert.equal(pastedName("image.png", "image/png", at), "paste-20261002-130509.png");
+  assert.equal(pastedName("", "image/jpeg", at), "paste-20261002-130509.jpg");
+  assert.equal(pastedName("design.png", "image/png", at), "design.png");
+  assert.equal(formatSize(20 << 20), "20 MiB");
+  assert.equal(formatSize(512), "512 B");
+});
+
+// fakeFetch は送った要求を数え、添付には ID を、コメントには 201 を返す。
+function fakeFetch() {
+  const calls = [];
+  let next = 40;
+  const f = async (url, init) => {
+    calls.push({ url, init });
+    const body = /\/attachments\?/.test(url) ? { attachment: { id: next++ } } : { ok: true };
+    return { ok: true, status: 201, json: async () => body };
+  };
+  return { f, calls };
+}
+const sendOpt = (f, text, files) => ({ fetch: f, base: "/im", slug: "im", id: "IM-0001", csrf: "tok", text, t: JA,
+  pending: { files: files || [], uploaded: [] } });
+
+test("コメントの送信: 本文も添付も無ければ要求 0 件でエラーを出す（本文だけ・添付だけなら送る）", async () => {
+  for (const text of ["", "  \n\t "]) {
+    const { f, calls } = fakeFetch();
+    const res = await sendComment(sendOpt(f, text));
+    assert.equal(calls.length, 0, JSON.stringify(text) + " で要求を送った");
+    assert.deepEqual(res, { ok: false, error: "本文か添付のどちらかを入れてください。何も送っていない。" });
+  }
+  // 対照 1: 本文だけ → コメントの要求 1 件（添付の ID は付けない）
+  {
+    const { f, calls } = fakeFetch();
+    assert.deepEqual(await sendComment(sendOpt(f, " 記録 ")), { ok: true });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "/im/api/v1/issues/IM-0001/comments");
+    assert.deepEqual(JSON.parse(calls[0].init.body), { text: "記録" });
+    assert.equal(calls[0].init.headers["X-CSRF-Token"], "tok");
+  }
+  // 対照 2: 添付だけ → 添付の要求 1 件で、空のコメントは送らない
+  {
+    const { f, calls } = fakeFetch();
+    const opt = sendOpt(f, "", [{ name: "a.png", type: "image/png", size: 3 }]);
+    assert.deepEqual(await sendComment(opt), { ok: true });
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /^\/im\/api\/v1\/issues\/IM-0001\/attachments\?project=im$/);
+    assert.deepEqual(opt.pending, { files: [], uploaded: [{ id: 40, name: "a.png", size: 3 }] });
+  }
+  // 本文と添付 → 添付を送ってから、返った ID をコメントに付ける
+  {
+    const { f, calls } = fakeFetch();
+    await sendComment(sendOpt(f, "記録", [{ name: "a.png", type: "image/png", size: 3 }, { name: "b.log", type: "text/plain", size: 1 }]));
+    assert.equal(calls.length, 3);
+    assert.deepEqual(JSON.parse(calls[2].init.body), { text: "記録", attachments: [40, 41] });
+  }
+});
+
+test("コメントの送信: 添付が拒まれたらそこで止め、コメントは送らない", async () => {
+  const calls = [];
+  const f = async (url, init) => {
+    calls.push(url);
+    return { ok: false, status: 413, json: async () => ({ error: { message: "1 ファイルの上限を超えています" } }) };
+  };
+  const opt = sendOpt(f, "記録", [{ name: "big.bin", size: 9 }, { name: "next.bin", size: 1 }]);
+  const res = await sendComment(opt);
+  assert.deepEqual(res, { ok: false, error: "big.bin を添付できなかった。1 ファイルの上限を超えています" });
+  assert.equal(calls.length, 1);
+  assert.equal(opt.pending.files.length, 2);   // 送れなかったものは送る前の一覧に残る
+});
+
+import { localizeCommentHeading, COMMENT_SECTION } from "./render.js";
+
+// 保存した本文のコメント節の見出しは構造の目印なので「## コメント」のまま。描くときだけ画面の言語の見出しに替える。
+const STORED = "## Details\n\nWrite the README.\n\n" + COMMENT_SECTION + "\n\n### 2026-10-01 10:00\n\nDone.";
+
+test("英語の画面では、詳細のコメント節の見出しが英語で出る", () => {
+  assert.equal(EN.comments_heading, "Comments");   // 対訳表（en.json）の文面
+  const src = localizeCommentHeading(STORED, EN);
+  assert.equal(src, STORED.replace(COMMENT_SECTION, "## Comments"));
+  const html = r.md(src);
+  assert.match(html, /<h2>Comments<\/h2>/);
+  assert.doesNotMatch(html, HAS_JA);   // 英語の本文に日本語の見出しが混ざらない
+});
+
+test("日本語の画面では、コメント節の見出しは「コメント」のまま出る（英語の対照）", () => {
+  assert.equal(localizeCommentHeading(STORED, JA), STORED);
+  assert.match(r.md(localizeCommentHeading(STORED, JA)), /<h2>コメント<\/h2>/);
+});
+
+test("置き換えるのはコードブロックの外の最初の見出しだけで、文面が無ければ本文をそのまま返す", () => {
+  const body = "```\n" + COMMENT_SECTION + "\n```\n\n" + COMMENT_SECTION + "\n\nquoted:\n\n" + COMMENT_SECTION;
+  assert.equal(localizeCommentHeading(body, EN), "```\n" + COMMENT_SECTION + "\n```\n\n## Comments\n\nquoted:\n\n" + COMMENT_SECTION);
+  assert.equal(localizeCommentHeading(STORED, {}), STORED);
+  assert.equal(localizeCommentHeading("## Details\n\nno comments", EN), "## Details\n\nno comments");
+});
+
+import { countText } from "./render.js";
+
+// プロジェクト選択の画面の見出しの下の行（hub.html が server.web.hub.sub と sub_one を渡す）。
+const hubTexts = lang => ({ sub: catalog(lang)["server.web.hub.sub"], sub_one: catalog(lang)["server.web.hub.sub_one"] });
+
+test("英語のプロジェクト選択の画面は、1 件なら project・2 件なら projects と出る", () => {
+  const en = hubTexts("en");
+  assert.equal(countText(en, "sub", 1, { open: 6, at: "2026-10-02 21:13" }), "1 project / 6 open / as of 2026-10-02 21:13");
+  assert.equal(countText(en, "sub", 2, { open: 1, at: "x" }), "2 projects / 1 open / as of x");
+  assert.equal(countText(en, "sub", 0, { open: 0, at: "x" }), "0 projects / 0 open / as of x");
+});
+
+test("日本語のプロジェクト選択の画面は、件数に関わらず同じ文面（英語の対照）", () => {
+  const ja = hubTexts("ja");
+  assert.equal(countText(ja, "sub", 1, { open: 6, at: "t" }), "1 プロジェクト　／　6 件が未クローズ　／　t 時点");
+  assert.equal(countText(ja, "sub", 2, { open: 6, at: "t" }), "2 プロジェクト　／　6 件が未クローズ　／　t 時点");
+});
+
+test("単数の文面が無ければ、1 件でも基の文面を使う", () => {
+  assert.equal(countText({ sub: "{n} items" }, "sub", 1), "1 items");
+  assert.equal(countText({}, "sub", 1), "");
+});
+
+// Go の i18n.TN（<ID>_one を件数 1 のときだけ選ぶ）と同じ規則を、同じ対訳表で確かめる。
+// 対訳表の <ID>_one を持つ基の文面は、n=1 で単数・n=0 と n=2 で基の文面になり、日本語は件数に関わらず同じ。
+test("countText は Go の i18n.TN と同じく、_one を持つ文面を n=1 のときだけ単数にする", () => {
+  const en = catalog("en"), ja = catalog("ja");
+  const bases = Object.keys(en).filter(k => k.endsWith("_one") && en[k.slice(0, -4)] !== undefined).map(k => k.slice(0, -4));
+  assert.ok(bases.length >= 20, "単数の文面を持つ文面が " + bases.length + " 件しかない（対訳表の読み違い）");
+  // countText は {n} を件数で埋める。ほかの {名前} は埋めずに文面そのものの選ばれ方を見る
+  const raw = (c, key) => ({ [key]: c[key], [key + "_one"]: c[key + "_one"] });
+  const withN = (text, n) => text.split("{n}").join(String(n));
+  for (const key of bases) {
+    const e = raw(en, key), j = raw(ja, key);
+    assert.equal(countText(e, key, 1, {}), withN(e[key + "_one"], 1), key + " の n=1（英語）");
+    assert.equal(countText(e, key, 0, {}), withN(e[key], 0), key + " の n=0（英語）");
+    assert.equal(countText(e, key, 2, {}), withN(e[key], 2), key + " の n=2（英語）");
+    assert.equal(countText(j, key, 1, {}), withN(j[key], 1), key + " の n=1（日本語は件数に関わらず同じ文面）");
+    assert.equal(countText(j, key, 2, {}), withN(j[key], 2), key + " の n=2（日本語は件数に関わらず同じ文面）");
+  }
 });

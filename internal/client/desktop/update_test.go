@@ -260,7 +260,7 @@ func TestUpdateCheckEnvOff(t *testing.T) {
 	} {
 		o := &Options{Env: env.FromMap(c.vars), Version: "v1.0.0", GOOS: runtime.GOOS, Alert: (&recorder{}).alert}
 		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-		a := &App{opts: o, logger: logger, updates: o.newUpdates(Paths{DataDir: dir}, logger)}
+		a := &App{opts: o, logger: logger, updates: o.newUpdates(Paths{DataDir: dir}, logger, "")}
 		if a.UpdateCheckEnvOff() != c.envOff {
 			t.Errorf("%v: UpdateCheckEnvOff = %v", c.vars, a.UpdateCheckEnvOff())
 		}
@@ -273,11 +273,11 @@ func TestUpdateCheckEnvOff(t *testing.T) {
 	}
 	// 公開鍵を渡さない（テスト・鍵の無いビルド）と、既定の確認先（GitHub）へは通信しない。渡せば確認に使う
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	noKey := (&Options{Env: env.FromMap(nil), Version: "v1.0.0", GOOS: runtime.GOOS}).newUpdates(Paths{DataDir: dir}, logger)
+	noKey := (&Options{Env: env.FromMap(nil), Version: "v1.0.0", GOOS: runtime.GOOS}).newUpdates(Paths{DataDir: dir}, logger, "")
 	if res := noKey.runner.Checker.Check(context.Background(), updatecheck.Prefs{}); res.Status != updatecheck.StatusNoKey {
 		t.Errorf("鍵なし・既定の確認先の結果 = %s, want no_key", res.Status)
 	}
-	withKey := (&Options{Env: env.FromMap(nil), Version: "v1.0.0", GOOS: runtime.GOOS, UpdatePublicKey: "RWQkey"}).newUpdates(Paths{DataDir: dir}, logger)
+	withKey := (&Options{Env: env.FromMap(nil), Version: "v1.0.0", GOOS: runtime.GOOS, UpdatePublicKey: "RWQkey"}).newUpdates(Paths{DataDir: dir}, logger, "")
 	if withKey.runner.Checker.PublicKey != "RWQkey" || withKey.store.Path != (Paths{DataDir: dir}).UpdateCheck() {
 		t.Errorf("鍵・控えの置き場が渡っていない: %q %q", withKey.runner.Checker.PublicKey, withKey.store.Path)
 	}

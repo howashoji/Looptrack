@@ -208,6 +208,9 @@ type Result struct {
 	Asset *Asset `json:"asset,omitempty"`
 	// Signed は署名を確かめたか（公開鍵を持たないビルドで確認先を差し替えたときだけ false の available がある）
 	Signed bool `json:"signed,omitempty"`
+	// SignedSums は署名を確かめた SHA256SUMS の本文（Signed の available のときだけ）。書庫の中の実行ファイルを
+	// 置き換える側（self-update）が、Asset 以外の行（relsig.BinaryName）も同じ署名で照合するために使う。控えには残さない
+	SignedSums []byte `json:"-"`
 	// Transient は通信の失敗（取得できない・HTTP の失敗・大きすぎる・一覧を読めない）による error か。
 	// 設定の誤り・署名や版の確認の失敗・資産が無いときは false（前の回の結果で知らせ続けない。NoticeFor）
 	Transient bool `json:"transient,omitempty"`
@@ -295,6 +298,20 @@ func DesktopAsset(goos, arch string) func(string) string {
 	}
 }
 
+// DesktopInstallerAsset は Windows のデスクトップ版のインストーラ（Looptrack_<版>_windows_<arch>_setup.exe。名前は
+// deploy/release/desktop.sh の windows-installer と同じ）の名前を作る Checker.Asset。インストーラで入れたアプリ
+// （実行ファイルの隣に unins000.exe があるもの）の置き換えが使う。zip を展開して使っている人は DesktopAsset の zip を使う。
+// amd64・arm64 のほかは空（名前では確かめない）。
+func DesktopInstallerAsset(arch string) func(string) string {
+	return func(v string) string {
+		switch arch {
+		case "amd64", "arm64":
+			return "Looptrack_" + v + "_windows_" + arch + "_setup.exe"
+		}
+		return ""
+	}
+}
+
 // ArchiveAsset は Releases に上げる書庫（looptrack_<版>_<os>_<arch>_server.tar.gz。windows は .zip。
 // 名前は relsig.ServerArchiveName で、deploy/release/dist.sh の server_base・archive_ext と .github/workflows/release.yml の
 // 書庫と同じ）の名前を作る Checker.Asset（サーバ版の知らせが使う）。素の実行ファイルは Releases には無い
@@ -316,7 +333,7 @@ func ArchiveAsset(goos, arch string) func(string) string {
 	}
 }
 
-// ServerUpgradeCommand は install.sh で入れたサーバを新しい版に置き換える 1 行（利用者ガイド updating.md「サーバ」・
+// ServerUpgradeCommand は install.sh で入れたサーバを新しい版に置き換える 1 行（利用者ガイド server/updating.md「サーバ」・
 // DEPLOY.md「更新（--upgrade）」と同じ）。サーバ版の知らせ（管理画面の帯・doctor・起動時のログ）が案内する。
 const ServerUpgradeCommand = "curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade"
 
@@ -355,11 +372,11 @@ func (c *Checker) Check(ctx context.Context, p Prefs) Result {
 		res.Status, res.Latest = StatusUpToDate, r.brief()
 		return res
 	}
-	a, err := c.verify(ctx, r)
+	a, sums, err := c.verify(ctx, r)
 	if err != nil {
 		return res.fail(StatusError, err)
 	}
-	res.Status, res.Latest, res.Asset, res.Signed = StatusAvailable, r.brief(), a, c.PublicKey != ""
+	res.Status, res.Latest, res.Asset, res.Signed, res.SignedSums = StatusAvailable, r.brief(), a, c.PublicKey != "", sums
 	return res
 }
 
@@ -383,7 +400,8 @@ func (r Result) fail(st Status, err error) Result {
 
 // verify は r の SHA256SUMS の署名を確かめ、署名で守られた版がタグと同じことを確かめる（公開鍵が無ければ署名は見ない）。
 // Asset を渡されていれば、その名前の資産（URL と署名された SHA256SUMS のハッシュ）を返す。
-func (c *Checker) verify(ctx context.Context, r *Release) (*Asset, error) {
+// 署名を確かめたときは、その SHA256SUMS の本文も返す（公開鍵が無ければ nil）。
+func (c *Checker) verify(ctx context.Context, r *Release) (*Asset, []byte, error) {
 	var name string
 	if c.Asset != nil {
 		name = c.Asset(r.Tag)
@@ -392,45 +410,45 @@ func (c *Checker) verify(ctx context.Context, r *Release) (*Asset, error) {
 	if name != "" {
 		a := r.asset(name)
 		if a == nil {
-			return nil, i18n.Errorf("updatecheck.err.asset_missing", "tag", r.Tag, "name", name)
+			return nil, nil, i18n.Errorf("updatecheck.err.asset_missing", "tag", r.Tag, "name", name)
 		}
 		cp := *a
 		out = &cp
 	}
 	if c.PublicKey == "" {
-		return out, nil
+		return out, nil, nil
 	}
 	sumsA, sigA := r.asset("SHA256SUMS"), r.asset("SHA256SUMS.minisig")
 	if sumsA == nil || sigA == nil {
-		return nil, i18n.Errorf("updatecheck.err.no_signature", "tag", r.Tag)
+		return nil, nil, i18n.Errorf("updatecheck.err.no_signature", "tag", r.Tag)
 	}
 	sums, err := c.get(ctx, sumsA.URL, maxSumsBytes, "")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sig, err := c.get(ctx, sigA.URL, maxSumsBytes, "")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	trusted, err := relsig.Verify(c.PublicKey, sums, sig)
 	if err != nil {
-		return nil, i18n.Wrapf(err, "updatecheck.err.signature", "tag", r.Tag)
+		return nil, nil, i18n.Wrapf(err, "updatecheck.err.signature", "tag", r.Tag)
 	}
 	v, versioned := relsig.TrustedVersion(trusted)
 	if versioned && v != r.Tag {
-		return nil, i18n.Errorf("updatecheck.err.trusted_version", "tag", r.Tag, "signed", v)
+		return nil, nil, i18n.Errorf("updatecheck.err.trusted_version", "tag", r.Tag, "signed", v)
 	}
 	if out != nil {
 		h, ok := relsig.Lookup(sums, name)
 		if !ok {
-			return nil, i18n.Errorf("updatecheck.err.asset_missing", "tag", r.Tag, "name", name)
+			return nil, nil, i18n.Errorf("updatecheck.err.asset_missing", "tag", r.Tag, "name", name)
 		}
 		out.SHA256 = strings.ToLower(h)
 	} else if !versioned {
 		// 版を持たない trusted comment で、名前でも確かめられない → タグの版を署名で確かめられない
-		return nil, i18n.Errorf("updatecheck.err.version_unsigned", "tag", r.Tag)
+		return nil, nil, i18n.Errorf("updatecheck.err.version_unsigned", "tag", r.Tag)
 	}
-	return out, nil
+	return out, sums, nil
 }
 
 // fetchList はリリースの一覧を取る。

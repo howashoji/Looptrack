@@ -1,0 +1,37 @@
+# attach/ok
+$ issue attach DEMO-0001 shot.png notes.txt
+
+#### exit 0
+
+#### stdout
+DEMO-0001 に添付した（添付 ID 11・shot.png・12 バイト）
+DEMO-0001 に添付した（添付 ID 12・notes.txt・12 バイト）
+
+#### stderr
+
+#### requests (2)
+POST /im/api/v1/issues/DEMO-0001/attachments?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: image/png
+  X-Looptrack-Client: cli
+  X-Looptrack-Filename: shot.png
+  X-Looptrack-Lang: ja
+  body:
+    (バイナリ 12 バイト sha256=1b56b50ac4e976f488f128cabdcdffb2fc9331d6974bb9968131a415d14ade24)
+POST /im/api/v1/issues/DEMO-0001/attachments?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: text/plain; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Filename: notes.txt
+  X-Looptrack-Lang: ja
+  body:
+    PASS
+    ok  pkg
+
+
+#### files (2)
+ws/notes.txt (0644)
+    PASS
+    ok  pkg
+ws/shot.png (0644)
+    (バイナリ 12 バイト sha256=1b56b50ac4e976f488f128cabdcdffb2fc9331d6974bb9968131a415d14ade24)

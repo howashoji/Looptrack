@@ -101,7 +101,7 @@ func Build(rep Report) ([]byte, error) {
 		style       int
 	}{
 		{"A1", title, st.title},
-		{"A2", i18n.T(lang, "report.xlsx.sub", "generated", rep.Generated, "filter", filter, "count", len(rep.Rows)), st.sub},
+		{"A2", i18n.TN(lang, "report.xlsx.sub", len(rep.Rows), "generated", rep.Generated, "filter", filter, "count", len(rep.Rows)), st.sub},
 	}
 	for _, h := range head {
 		if err := f.SetCellStr(sheet, h.cell, h.value); err != nil {

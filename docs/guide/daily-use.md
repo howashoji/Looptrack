@@ -1,9 +1,59 @@
 # Daily use
 
-[Guide contents](README.md) · Previous: [Getting started](getting-started.md) · Next: [Agent-specific notes](ai-agents.md)
+[Guide contents](README.md) · Previous: [Getting started with the server](server/getting-started.md) · [Getting started with the desktop app](desktop/getting-started.md) · Next: [Agent-specific notes](ai-agents.md)
 
 This page uses CLI commands.
 But the MCP tools do the same things (`create_issue`, `next`, `add_comment`, `set_status`, and so on), and the server applies the same checks either way.
+
+## Your first loop
+
+Once your agent is connected ([server](server/getting-started.md), [desktop app](desktop/getting-started.md)), both editions take the same path. Run one loop from start to finish.
+The commands below run in a terminal where `LOOPTRACK_API_URL` and `LOOPTRACK_PROJECT` point at your server and project. Step 9 of [Getting started with the server](server/getting-started.md) sets them; for the desktop app, see [Use the CLI](desktop/using.md#use-the-cli). The examples use the project `demo`, whose ID prefix is `DEMO`.
+Rather not use a terminal? Ask your agent to file the issue as well.
+
+File your first issue and walk through one turn by hand.
+
+```bash
+looptrack issue new "Write an overview in README" --type task --body "$(cat <<'EOF'
+Write a three-line overview of this repository in README.md.
+
+## 受け入れ条件
+
+- [ ] README.md exists
+- [ ] It has three lines of overview
+
+## 検証コマンド
+
+- `test -f README.md`
+- `test "$(grep -c . README.md)" -ge 3`
+EOF
+)"
+looptrack issue next
+```
+
+`next` moves `DEMO-0001` to In Progress and shows its body and acceptance criteria.
+`## 受け入れ条件` (acceptance criteria) and `## 検証コマンド` (verify commands) are the section headings the server looks for. You can write them in English instead: `## Acceptance criteria` and `## Verify commands` (case does not matter).
+From here on, it's the agent's turn.
+Open Claude Code and ask:
+
+> Take the next issue and do one full loop. Verify the acceptance criteria before you close it.
+
+The agent does the work, runs the verify commands with `verify`, records the results, and closes the issue.
+Last, check the result yourself:
+
+```bash
+looptrack issue show DEMO-0001
+looptrack issue verify DEMO-0001 --last
+looptrack issue summary
+```
+
+If `show` lists the comments and the status is Done, your first loop is complete.
+The same issue is in the browser too, on the project's page (`<server URL>/p/demo/`).
+Select its card and the detail opens, with the comments, the verify result and the attachments in order.
+
+![The detail of DEMO-0001, Done: the plan comment, the verify result, the closing comment and the attached full output](images/en/issue-done.png)
+
+PowerShell has no here-documents. Write the body to a file and pass it with `--body (Get-Content -Raw body.md)`.
 
 ## A typical day
 
@@ -12,6 +62,10 @@ But the MCP tools do the same things (`create_issue`, `next`, `add_comment`, `se
 3. The agent picks up work with `next` and repeats work → verify → close
 4. Anything that needs a decision collects In Review. Answer them in one batch, whenever it suits you
 5. When you hear how people are using the product, tell the agent so it records the reaction on the issue
+
+The board in the browser puts issues in a column per status. The In Review column holds what is waiting for you.
+
+![The board: columns from Backlog to Canceled, with cards marked ready, feedback or waiting](images/en/board.png)
 
 Want to check things yourself? These commands help:
 
@@ -96,6 +150,33 @@ In a project with `verify.require_on_close`, you have to run `verify` again afte
 
 The server finds the sections by their headings. Write them as `## Verify commands` and `## Acceptance criteria` (case doesn't matter), or in Japanese as `## 検証コマンド` and `## 受け入れ条件`.
 
+## Attachments (evidence)
+
+You can attach the evidence of a check to an issue as files.
+That means the full test output, screenshots of the screens, generated reports and the like. The file itself stays on the server along with who attached it and when, so there's no need to settle for a path written in a comment.
+
+```bash
+looptrack issue attach DEMO-0004 screenshot.png report.html   # attach and print the attachment IDs
+looptrack issue comment DEMO-0004 "Fixed the screen" --attach after.png
+looptrack issue verify DEMO-0004 --attach-output              # put the full, untruncated output on the verify record
+looptrack issue verify DEMO-0004 --attach coverage.html       # put other files on the record too (repeatable)
+```
+
+- An agent can't send a file through the MCP tools. It sends it with the CLI's `issue attach` and passes the IDs that come back in `attachments` of `report_verify` or `add_comment`. The guide and the MCP instructions tell the agent to do exactly that.
+- In the browser, the comment box takes a file three ways: pick it, drag and drop it, or paste a screenshot. The drawer lists the attachments, and images show right there.
+- If a text file holds something that looks like a secret (the shape of a token or a password), the CLI stops without sending any of the files. The server can't mask what's inside.
+- Attachments can't be deleted. If you attached a secret by mistake, ask an administrator to purge the file ([Administration](server/admin.md#attachment-limits-and-purging)).
+- By default the limits are 20MiB per file and 1GiB per project.
+
+Here an agent has attached a screenshot of the screen it built and is asking for a decision In Review.
+
+![The detail of an issue In Review: a "Needs your decision:" comment, and the attached image shown in place](images/en/in-review.png)
+
+**Marking an issue Done needs evidence by default.**
+On an issue whose body has verify commands, the server rejects Done unless the latest verify record for the current body carries an attachment. It rejects a missing record too.
+Run `verify` with `--attach-output` or `--attach` and it goes through. An attachment added with `issue attach` alone isn't on the verify record, so it doesn't count.
+To turn this off for a project, set the project rule `verify.require_evidence` to `false` ([Administration](server/admin.md#setting-project-rules)).
+
 ## Comment types
 
 Comments are append-only. Nobody can edit or delete them.
@@ -160,6 +241,10 @@ looptrack issue new "End-to-end test for the login page" --type test --traces DE
 looptrack issue matrix
 ```
 
+The trace view in the browser shows the same table.
+
+![The trace view: from requirement DEMO-0002 to its design, implementation and test issues, each with its status](images/en/trace.png)
+
 When every issue tracing a requirement is closed, the close response says so ("Every child of requirement <ID> is finished").
 That's your cue. Check the requirement's acceptance criteria, and if they're met, close the requirement too.
 
@@ -222,3 +307,30 @@ Don't want the notice? Set `LOOPTRACK_LOOP_WORKTREE_NOTICE=0`.
 - Getting around a rule rejection by another path (MCP or edit)
 - Writing access tokens into chat, commits, issues, or logs
 - Pasting production data into issues (mask it or write only IDs)
+
+## Language (English / Japanese)
+
+Everything you read comes out in English or Japanese. Set it explicitly with
+`LOOPTRACK_LANG`, or just leave it to your terminal and browser:
+
+```bash
+LOOPTRACK_LANG=en looptrack issue list   # this command only
+export LOOPTRACK_LANG=ja                 # this shell
+```
+
+| Order | Command line | Web pages and MCP |
+| -- | -- | -- |
+| 1 | `LOOPTRACK_LANG` | `?lang=ja` / `?lang=en`, for that one request |
+| 2 | `LC_ALL`, then `LC_MESSAGES`, then `LANG` | `LOOPTRACK_LANG`, which the CLI sends as an explicit choice |
+| 3 | English | The display language you pick on `/account` (it can be left unset) |
+| 4 | — | `Accept-Language` |
+| 5 | — | English |
+
+Pick a display language on `/account`, and even a connection that can't send headers (MCP) comes back in it.
+Set it back to unset and it follows your browser and terminal again, exactly as before.
+
+The same goes for what an AI agent reads. The MCP `instructions`, the `guide` bodies and the tool
+descriptions come back in the same language, picked for each connection. The rules installed into
+your project ship in both languages, and the hooks pick one at run time by the
+same order. Skills are the exception. `looptrack issue init` installs only the one in the language
+of the installation, so run it again after changing the language.

@@ -419,7 +419,7 @@ func (s *Server) evalInstall(lang i18n.Lang, pr store.Project, agent string, ins
 		// フックの有無・kit の控えに依らず、looptrack の取得 + init（hook の配線を looptrack に置き換える）を求める
 		st.State = "stale"
 		st.StaleFiles = append(st.StaleFiles, goClientName)
-		st.UpdateCommand = i18n.T(lang, "server.mcp.setup.update.refetch")
+		st.UpdateCommand = refetchCommand(lang, st.SelfRepo)
 		st.Message = i18n.T(lang, "server.mcp.setup.state.legacy_cli", "agent", label, "at", st.ReportedAt,
 			"source", orDash(inst.Source), "command", st.UpdateCommand)
 		return st
@@ -479,7 +479,7 @@ func (s *Server) evalInstall(lang i18n.Lang, pr store.Project, agent string, ins
 // PATH の looptrack も LOOPTRACK_API_URL も無いことがあり、self-update や --url の無い init は CLI の既定
 // （手元のローカルモード）に向く。取得 + init には期限つきの券の URL が要るので、券を発行する setup の手順で返す。
 func goStaleMessage(lang i18n.Lang, label string, st installStateJSON, why []string) (string, string) {
-	cmd := i18n.T(lang, "server.mcp.setup.update.refetch")
+	cmd := refetchCommand(lang, st.SelfRepo)
 	for _, l := range st.StaleKit {
 		why = append(why, i18n.T(lang, "server.mcp.setup.stale.kit", "layer", l))
 	}
@@ -487,6 +487,15 @@ func goStaleMessage(lang i18n.Lang, label string, st installStateJSON, why []str
 		"os", st.ClientOS, "arch", orDash(st.ClientArch), "why", strings.Join(why, i18n.T(lang, "server.mcp.setup.sep.reason")),
 		"at", st.ReportedAt, "command", cmd)
 	return cmd, msg
+}
+
+// refetchCommand は古いときの案内（setup ツールの手順で直す）。looptrack 自身のリポジトリ（kit の正本）からの通知では、
+// setup の手順は取得と置き換えだけで init を含まない（fetchStep）ので、案内も「取得と init をまとめた 1 つ」と書かない。
+func refetchCommand(lang i18n.Lang, selfRepo bool) string {
+	if selfRepo {
+		return i18n.T(lang, "server.mcp.setup.update.refetch_self_repo")
+	}
+	return i18n.T(lang, "server.mcp.setup.update.refetch")
 }
 
 func orDash(s string) string {
@@ -950,7 +959,7 @@ func setupStepsOf(lang i18n.Lang, agent, slug, base, dist string, st installStat
 	case st.State != "current":
 		// missing・stale: 取得と init の手順（steps[0]）を、答えの旗を付けた取得 + init の 1 つに置き換える
 		// （loop の手順を別に挟むと init が 2 回続く）
-		steps[0] = g.fetchStep(lang, agent, slug, base, dist, loopFlag(answer), loopAnswerPhrase(lang, answer))
+		steps[0] = g.fetchStep(lang, agent, slug, base, dist, loopFlag(answer), loopAnswerPhrase(lang, answer), st.SelfRepo)
 		return steps
 	}
 	return append(steps[:at], append([]setupStepJSON{*ls}, steps[at:]...)...)
@@ -1088,8 +1097,14 @@ func (s *Server) composeSetupFor(ctx context.Context, lang i18n.Lang, base strin
 		fmt.Fprintf(&b, "\n%s\n", i18n.T(lang, "server.mcp.setup.text.loop_declined", "command", cmd))
 	}
 	fmt.Fprintf(&b, "\n## %s\n\n", i18n.T(lang, "server.mcp.setup.text.dist_heading", "expires", out.ExpiresAt))
-	fmt.Fprintf(&b, "- %s\n", i18n.T(lang, "server.mcp.setup.text.dist_note",
-		"files", len(out.Files), "binaries", len(out.Binaries), "url", dist))
+	// kit の正本では取得の手順に init を付けない（fetchStep）ので、「init が kit を確かめる」とも書かない
+	kitFiles := i18n.MN("server.mcp.setup.text.dist_files", len(out.Files), "n", len(out.Files))
+	executables := i18n.MN("server.mcp.setup.text.dist_binaries", len(out.Binaries), "n", len(out.Binaries))
+	note := i18n.T(lang, "server.mcp.setup.text.dist_note", "files", kitFiles, "binaries", executables, "url", dist)
+	if st.SelfRepo {
+		note = i18n.T(lang, "server.mcp.setup.text.dist_note_self_repo", "files", kitFiles, "binaries", executables, "url", dist)
+	}
+	fmt.Fprintf(&b, "- %s\n", note)
 	out.Text = strings.TrimRight(b.String(), "\n")
 	return out, nil
 }

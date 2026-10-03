@@ -209,6 +209,7 @@ type Request struct {
 	Method  string
 	Path    string            // /api/v1 の後ろ（クエリを含めてよい）
 	Body    any               // JSON で送る本文（nil なら送らない）
+	RawBody []byte            // そのまま送る本文（添付のファイル。Body が nil のときだけ使う。Content-Type は Headers で渡す）
 	Headers map[string]string // 追加・上書きのヘッダ
 	Token   string            // 明示のトークン（空なら環境変数か資格情報）
 	URL     string            // 明示の URL（空なら BaseURL）
@@ -338,6 +339,8 @@ func (c *Client) once(r Request, base, token string) (*Response, error) {
 	var body io.Reader
 	if r.Body != nil {
 		body = bytes.NewReader(jsonorder.Marshal(r.Body))
+	} else if r.RawBody != nil {
+		body = bytes.NewReader(r.RawBody) // 401 の取り直しで 2 回目を送るときも、毎回先頭から読む
 	}
 	headers := map[string]string{
 		"X-Looptrack-Client": "cli",

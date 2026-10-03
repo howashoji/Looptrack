@@ -96,7 +96,7 @@ func (v *verifyEnv) verifyEvents(id string) int {
 }
 
 func TestVerifyAPI(t *testing.T) {
-	v := newVerifyEnv(t, "vf", "")
+	v := newVerifyEnv(t, "vf", `{"verify": {"require_evidence": false}}`) // 記録の形を見る。エビデンスの網は evidence_api_test.go で見る
 	id := v.create("検証あり", verifyBody)
 	none := v.create("検証なし", "説明だけ")
 
@@ -198,7 +198,7 @@ func TestVerifyAPI(t *testing.T) {
 }
 
 func TestVerifyRequireOnClose(t *testing.T) {
-	v := newVerifyEnv(t, "vr", `{"verify": {"require_on_close": true}}`)
+	v := newVerifyEnv(t, "vr", `{"verify": {"require_on_close": true, "require_evidence": false}}`) // エビデンスの網は evidence_api_test.go で見る
 	id := v.create("検証あり", verifyBody)
 	cmd := domain.VerifyCommand(id)
 
@@ -264,7 +264,7 @@ JOIN issues i ON i.id = e.issue_id WHERE i.display_id = ? AND e.kind = 'rule_ove
 }
 
 func TestVerifyNextAndMCP(t *testing.T) {
-	v := newVerifyEnv(t, "vn", "")
+	v := newVerifyEnv(t, "vn", `{"verify": {"require_evidence": false}}`) // エビデンスの網は evidence_api_test.go で見る
 	id := v.create("検証あり", verifyBody)
 
 	// next: verify に一覧、text に節
@@ -379,7 +379,7 @@ func TestServerNeverExecutes(t *testing.T) {
 // MCP の report_verify。POST /verify と同じ検査・拒否、自己申告の印（detail・コメント・next・verify_issue・summary・CLI）、
 // verify.require_on_close は自己申告も数える。
 func TestReportVerifyMCP(t *testing.T) {
-	v := newVerifyEnv(t, "vm", `{"verify": {"require_on_close": true}}`)
+	v := newVerifyEnv(t, "vm", `{"verify": {"require_on_close": true, "require_evidence": false}}`) // エビデンスの網は evidence_api_test.go で見る
 	id := v.create("検証あり", verifyBody)
 	none := v.create("検証なし", "説明だけ")
 	p := v.plan(id)

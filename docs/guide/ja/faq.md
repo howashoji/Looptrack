@@ -1,6 +1,6 @@
 # FAQ / トラブルシュート
 
-[ガイドの目次](README.md) · 前: [管理者の手引き](admin.md)
+[ガイドの目次](README.md) · 前: [AI ごとの手引き](ai-agents.md) · 次: [トークンレポート](token-report.md)
 
 ## 【導入が未完了】と出る
 
@@ -31,8 +31,9 @@ looptrack issue init --project <slug> --url <サーバの URL> --agent <AI>   # 
 
 `self-update` は、サーバが配っている `looptrack` を取ってきて今の実行ファイルと入れ替えます。
 プロジェクトの中で実行するなら、`--url` は環境変数 `LOOPTRACK_API_URL` から取れます。
-ところが、配布のディレクトリを設定していないサーバは、そもそも `looptrack` を配っていません。そのときは[始め方](getting-started.md)の手順 1 で新しい版を取り直してください。
-案内が出る仕組みや、デスクトップ版・サーバの更新は[更新](updating.md)にまとめました。
+ところが、配布のディレクトリを設定していないサーバは、そもそも `looptrack` を配っていません。
+そのときは `looptrack self-update --from github` で GitHub のリリースから置き換えます。署名を確かめ、新しい版があるときだけ置き換えるやり方です。[始め方](server/getting-started.md)の手順 1 で取り直してもかまいません。
+案内が出る仕組みと更新の手順は、[サーバと CLI の更新](server/updating.md)と[デスクトップ版の更新](desktop/updating.md)にまとめました。
 
 ## トークン情報が未付与と出る
 
@@ -131,9 +132,10 @@ MCP や edit のような別の経路で回避しないこと。
 | -- | -- |
 | `looptrack` が見つからない | PATH の変更は新しく開いたターミナルとアプリにしか効きません。PowerShell と AI を起動し直してください |
 | AI の hook だけが `looptrack` を見つけられない | スタートメニューなどから起動した AI は PATH が違うことがあります。`init` は PATH に無いと絶対パスで配線し、`.claude/settings.local.json` に書きます。`looptrack doctor` で確かめてください |
-| 実行ファイルに警告が出る（「Windows によって PC が保護されました」） | Windows 版はまだ署名していないので、初回の起動で SmartScreen が警告を出すことがあります。SHA-256 が `SHA256SUMS` と一致するのを確かめてから、「詳細情報」→「実行」で進めてください（[始め方](getting-started.md)の「署名と OS の警告」）。macOS 版は署名・公証済みです |
+| 実行ファイルに警告が出る（「Windows によって PC が保護されました」） | Windows 版はまだ署名していないので、初回の起動で SmartScreen が警告を出すことがあります。SHA-256 が `SHA256SUMS` と一致するのと、その `SHA256SUMS` 自体が `SHA256SUMS.minisig` で確かめられるのを見てから、「詳細情報」→「実行」で進めてください。どちらの手順も[始め方](server/getting-started.md)の「署名と OS の警告」にあります。macOS 版は署名・公証済みです |
+| 実行ファイルが止められて「実行」が出ない | Windows 11 のスマート アプリ コントロールが「オン」だと、署名の無いアプリは止められます。会社の管理下の PC なら、管理者の方針で止まることもある。どちらも利用者の側で Looptrack だけを通す手段はありません。打てる手は[始め方](server/getting-started.md)の「署名と OS の警告」へ |
 | ヒアドキュメント（`<<'EOF'`）が使えない | PowerShell にはありません。本文をファイルに書き、`--body (Get-Content -Raw body.md)` で渡します。Git Bash なら使えます |
-| `. ./.env` が使えない | PowerShell では[始め方](getting-started.md)の手順 4 にある 1 行で読み込みます |
+| `. ./.env` が使えない | PowerShell では[始め方](server/getting-started.md)の手順 4 にある 1 行で読み込みます |
 | ゲート（`looptrack gates`）の make が失敗する | Windows の make は、日本語などを含むディレクトリで動かないことがあります。英数字だけのパスで作業してください |
 | Codex の hook が動かない | ターミナルの `codex` をプロジェクトで起動し、`/hooks` で信頼します。デスクトップ版のチャット欄に `/hooks` と打ってもコマンドになりません |
 | ポート 8090 が使われている | `looptrack setup --force` でポートを変えます。変えたら、init や MCP など URL を使う設定も直してください |

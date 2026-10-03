@@ -1,6 +1,6 @@
 // プロジェクト選択画面。データは /im/api/v1/projects（参加しているプロジェクトだけ。管理者も同じ）から取り、4 秒ごとに見直す。
 // 値は必ず esc / attr を通して埋める（現行ビューアにあった属性値の引用符の扱いを直した）。
-import { esc, attr, paint, loadTexts, fill } from "./render.js";
+import { esc, attr, paint, loadTexts, fill, countText } from "./render.js";
 
 const BASE = document.body.dataset.base;
 // この画面の文面（サーバが <script type="application/json" id="i18n"> で返す。JS には文面を持たない）。
@@ -43,8 +43,7 @@ function card(p) {
 function render(d) {
   const g = document.getElementById("grid");
   const projects = d.projects || [];
-  document.getElementById("sub").textContent = t("sub", {
-    n: projects.length,
+  document.getElementById("sub").textContent = countText(TEXT, "sub", projects.length, {
     open: projects.reduce((a, p) => a + p.counts.open, 0),
     at: d.generated || ""
   });

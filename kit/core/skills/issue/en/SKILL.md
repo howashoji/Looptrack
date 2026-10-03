@@ -41,12 +41,15 @@ looptrack issue comment <ID> "$(cat <<'EOF'
 The cause, the judgement, the plan — as soon as you know them
 EOF
 )"
+looptrack issue verify <ID> --attach-output   # if there are verify commands, run and record them, attaching the full output
+looptrack issue attach <ID> <file>...         # attach the evidence: screenshots, generated files and the like
 looptrack issue close <ID> --comment "How you verified the acceptance criteria"
 looptrack issue next              # the next turn
 ```
 
 - **Comment as soon as you know the cause or the judgement** (do not save the conclusion up for later). Comments are append-only
 - **Leave the result of verifying the acceptance criteria in a comment before you close.** Never close what you have not verified
+- **Attach the evidence before you close** (the full output of the tests, screenshots of the screens, generated files). On an issue with verify commands, Done can be rejected when the latest verify record has no attachment. The rule is under "Evidence" in guide
 - To change only the status, use `status <ID> "<status>" --comment "…"`
 
 ### Waiting for a human decision

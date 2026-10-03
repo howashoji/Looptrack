@@ -169,6 +169,30 @@ func TestVerifyLinesFollowLang(t *testing.T) {
 	}
 }
 
+// Text の末尾はエビデンスの添付の案内（CLI の --list・MCP の verify_issue・GET …/verify が同じ文面を出す）。
+// 対照: 検証コマンドの節が無いときの案内には出さない（添付する記録が無い）。
+func TestVerifyTextEndsWithEvidence(t *testing.T) {
+	s := &Service{Loc: time.UTC}
+	for _, lang := range []i18n.Lang{i18n.JA, i18n.EN} {
+		p := &VerifyPlan{ID: "EX-0103", Commands: []string{"go test ./..."}, BodySHA256: "abcdef0123456789",
+			Command: domain.VerifyCommand("EX-0103")}
+		p.LastLine = s.lastLine(lang, p)
+		_, text := s.verifyText(lang, p)
+		want := i18n.T(lang, "service.verify.evidence", "command", p.Command, "id", p.ID)
+		if !strings.HasSuffix(text, "\n"+want) {
+			t.Errorf("%s: text の末尾がエビデンスの案内でない:\n%s", lang, text)
+		}
+		for _, w := range []string{"looptrack issue verify EX-0103 --attach-output", "--attach <", "looptrack issue attach EX-0103 <", "report_verify", "attachments"} {
+			if !strings.Contains(want, w) {
+				t.Errorf("%s: エビデンスの案内に %q が無い: %s", lang, w, want)
+			}
+		}
+		if m, text := s.verifyText(lang, &VerifyPlan{ID: "EX-0104"}); strings.Contains(text, "attach") || m != text {
+			t.Errorf("%s: 節なしの案内にエビデンスの行が出ている: %q", lang, text)
+		}
+	}
+}
+
 // 記録のコメントは記録した利用者の言語で書く（DB に残る文面は書いた利用者の言語・DESIGN §9-6）。
 // 同じ記録を日本語と英語で組み立て、全文が各言語の形になり、英語の側に日本語が 1 文字も残らないことを見る。
 func TestVerifyCommentFollowsWriterLang(t *testing.T) {

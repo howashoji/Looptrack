@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -20,20 +21,24 @@ import (
 	"github.com/howashoji/looptrack/internal/updatecheck"
 )
 
-// 新しい版への置き換え（DESIGN.md §5-4「置き換え」）。macOS の .app と Linux の AppImage だけを置き換える
-// （Windows はコード署名が入るまで知らせにとどめる）。どちらも次の順で進め、途中で失敗したら今の版に手を付けない。
+// 新しい版への置き換え（DESIGN.md §5-4「置き換え」）。macOS の .app・Linux の AppImage・Windows の Looptrack.exe を置き換える。
+// どれも次の順で進め、途中で失敗したら今の版に手を付けない（手を付けた分は戻す）。
 //
 //  1. 取得: 確認の結果（updatecheck.Result）の資産を取り、**署名された SHA256SUMS の SHA-256** と比べる
 //     （署名を確かめていない結果・資産やハッシュの無い結果は置き換えない。リリースのページを開く）
 //  2. 確認: macOS は dmg を spctl（open）→ 中の .app を今の .app と同じディレクトリに写して codesign --verify・
-//     spctl（execute）・Bundle ID・TeamIdentifier（今の .app に Team があれば同じこと）。Linux は ELF の頭
+//     spctl（execute）・Bundle ID・TeamIdentifier（今の .app に Team があれば同じこと）。Linux は ELF の頭。
+//     Windows は MZ の頭（zip は中の Looptrack.exe）
 //  3. 置き換え: 今のもの（<名前>.app・AppImage）を <名前>.prev に改名し、新しいものを元の名前に改名する
-//     （同じディレクトリの中の rename。前の .prev は消す＝前の版は 1 つだけ残す）。2 つ目の改名に失敗したら .prev を戻す
+//     （同じディレクトリの中の rename。前の .prev は消す＝前の版は 1 つだけ残す）。2 つ目の改名に失敗したら .prev を戻す。
+//     Windows の zip 版は中の 4 ファイルを 1 つずつ同じように改名し、途中で失敗したら済んだ分を逆順に戻す。
+//     Windows のインストーラ版はここでは何も改名しない（setup.exe が上書きする）
 //  4. 起動し直し: 新しいものを desktop --after-update で起こし（前のインスタンスが止まるのを待ってから起動する）、今のものは終わる。
-//     起こせなければ .prev を戻して今の版のまま動き続ける
+//     起こせなければ .prev を戻して今の版のまま動き続ける。Windows のインストーラ版は setup.exe を無人で起こし、
+//     起動し直しは Looptrack.iss の DeinitializeSetup が受け持つ（上書きに失敗して Inno が戻したときも前の版を起こす）
 //
 // 置き場に書けない（/Applications に書く権限が無いなど）ときは置き換えず、macOS は確かめた dmg を開き（利用者がドラッグで入れる）、
-// Linux はリリースのページを開く。外部のコマンド（codesign・spctl・hdiutil・ditto・open）と起動し直しは差し替えられる（テスト）。
+// Linux と Windows の zip 版はリリースのページを開く。外部のコマンド（codesign・spctl・hdiutil・ditto・open）と起動し直しは差し替えられる（テスト）。
 
 // maxDownload は取得物の上限（リリースの一覧に大きさが無いとき）。dmg・AppImage はどちらもこれより十分小さい。
 const maxDownload = 1 << 30
@@ -51,13 +56,59 @@ type startFunc func(name string, args ...string) error
 // replacer は置き換えの部品（App.replacer が組む。テストは直に組む）。
 type replacer struct {
 	GOOS     string
-	Launcher string // Launcher() の値（macOS は .app の中の実行ファイル）
+	Launcher string // Launcher() の値（macOS は .app の中の実行ファイル。Windows は Looptrack.exe）
 	AppImage string // $APPIMAGE（Linux）
-	WorkDir  string // 取得物（dmg）とマウント先の置き場（データの置き場の updates）
+	WorkDir  string // 取得物（dmg・setup.exe）とマウント先の置き場（データの置き場の updates）
 	BundleID string
 	Client   *http.Client
 	Run      runFunc
 	Start    startFunc
+	// Swap は Windows の zip 版で 1 ファイルずつ改名する（nil は swap。テストが途中の失敗を起こすために差し替える）
+	Swap func(cur, next, prev string) error
+}
+
+// windowsAppExe は Windows のアプリの実行ファイルの名前（zip の Looptrack\Looptrack.exe・インストーラの {app}\Looptrack.exe）。
+const windowsAppExe = AppName + ".exe"
+
+// uninstallerName は Inno Setup がインストール先に置くアンインストーラ。これが実行ファイルの隣にあれば、インストーラで入れたものとみなす。
+const uninstallerName = "unins000.exe"
+
+// installerArgs は無人の上書きで setup.exe に渡す引数（/LOG は別に足す）。/TASKS は付けない（付けなければ Inno は前回の選択肢を
+// 引き継ぐ。付けると「ログイン時に起動する」「CLI を使えるようにする」を外した人にも入れてしまう）。/RELAUNCH=1 は
+// Looptrack.iss の DeinitializeSetup が読み、上書きが成功しても失敗しても（Inno が戻したときも）アプリを起動し直す。
+// release.yml の smoke も同じ並びで上書きする（TestInstallerScriptSettings が両方を同じ読み方で確かめる）。
+var installerArgs = [...]string{"/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/RELAUNCH=1"}
+
+// installerLog は setup.exe の /LOG の置き場（データの置き場の updates の中）。上書きに失敗した理由はここに残る。
+const installerLog = "setup.log"
+
+// zipTop は Windows の zip の中の最上位のフォルダ（deploy/release/desktop.sh の windows-zip）。
+const zipTop = AppName
+
+// zipFiles は Windows の zip から取り出して置き換えるファイル（zipTop からの相対。置き換える順）。
+// 1 つ目は今の実行ファイルそのもの。
+var zipFiles = [...]string{windowsAppExe, "cli/looptrack.exe", "NOTICE", "OFL-BIZUDGothic.txt"}
+
+// maxZipEntry は zip から取り出す 1 ファイルの大きさの上限（selfupdate の maxBinaryBytes と同じ値。テストが小さくする）。
+var maxZipEntry int64 = 512 << 20
+
+// installedByInstaller は launcher（Looptrack.exe）の隣に unins000.exe（ふつうのファイル）があるか。
+// あればインストーラで入れたもの（setup.exe で上書きする）、無ければ zip を展開したもの（zip の中身で置き換える）。
+func installedByInstaller(launcher string) bool {
+	if launcher == "" {
+		return false
+	}
+	fi, err := os.Stat(filepath.Join(filepath.Dir(launcher), uninstallerName))
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// desktopAssetFor は確認で照らす資産の名前（Checker.Asset）。Windows でインストーラで入れたものは setup.exe、
+// それ以外（zip を展開したものを含む）は updatecheck.DesktopAsset。
+func desktopAssetFor(goos, arch, launcher string) func(string) string {
+	if goos == "windows" && installedByInstaller(launcher) {
+		return updatecheck.DesktopInstallerAsset(arch)
+	}
+	return updatecheck.DesktopAsset(goos, arch)
 }
 
 // notWritableError は置き場に書けない（置き換えずに、dmg かリリースのページを開く）。
@@ -95,8 +146,56 @@ func (r *replacer) target() (string, error) {
 			return "", i18n.Errorf("desktop.update.err.not_appimage")
 		}
 		return p, nil
+	case "windows":
+		exe := r.Launcher
+		if exe == "" || !filepath.IsAbs(exe) || !strings.EqualFold(filepath.Base(exe), windowsAppExe) {
+			return "", i18n.Errorf("desktop.update.err.not_windows_app", "path", exe)
+		}
+		if fi, err := os.Stat(exe); err != nil || !fi.Mode().IsRegular() {
+			return "", i18n.Errorf("desktop.update.err.not_windows_app", "path", exe)
+		}
+		// 名前だけでは決めない。同梱の CLI（<アプリ>\cli\looptrack.exe）とその写し（%LOCALAPPDATA%\Programs\looptrack\looptrack.exe）も
+		// 大小を無視すれば同じ名前で、そこから desktop を起動したときに CLI のフォルダを zip の中身で置き換えてしまう。
+		// zip もインストーラ（Looptrack.iss の [Files]）も、アプリの隣に cli\looptrack.exe を置くので、その配置で確かめる
+		if fi, err := os.Stat(filepath.Join(filepath.Dir(exe), "cli", "looptrack.exe")); err != nil || !fi.Mode().IsRegular() {
+			return "", i18n.Errorf("desktop.update.err.not_windows_app", "path", exe)
+		}
+		return exe, nil
 	}
 	return "", i18n.Errorf("desktop.update.err.unsupported_os", "os", r.GOOS)
+}
+
+// fits は資産の名前が今の入れ方に合うか（Windows だけ。インストーラで入れたものは _setup.exe、zip を展開したものは .zip）。
+// 控えの last_ok が前の入れ方（入れ直す前・この版より前の確認）の資産を持っているときに、取り違えて置き換えないため。
+func (r *replacer) fits(cur string, a *updatecheck.Asset) error {
+	if r.GOOS != "windows" || a == nil {
+		return nil
+	}
+	if installedByInstaller(cur) {
+		if !strings.HasSuffix(a.Name, "_setup.exe") {
+			return i18n.Errorf("desktop.update.err.asset_not_installer", "name", a.Name)
+		}
+		return nil
+	}
+	if !strings.HasSuffix(a.Name, ".zip") {
+		return i18n.Errorf("desktop.update.err.asset_not_zip", "name", a.Name)
+	}
+	return nil
+}
+
+// ready は src でこの環境のものを置き換えられるか（check・target・fits）。置き換えるもののパスを返す。
+func (r *replacer) ready(src *updatecheck.Result) (string, error) {
+	if err := check(src); err != nil {
+		return "", err
+	}
+	cur, err := r.target()
+	if err != nil {
+		return "", err
+	}
+	if err := r.fits(cur, src.Asset); err != nil {
+		return "", err
+	}
+	return cur, nil
 }
 
 var sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -116,40 +215,67 @@ func check(src *updatecheck.Result) error {
 	return nil
 }
 
+// move は改名で置き換えた 1 つ（prev が空なら、元の名前には何も無かった。戻すときは新しいものを消すだけ）。
+// madeDir は置くために作ったディレクトリ（戻すときに空なら消す。作っていなければ空）。
+type move struct{ cur, prev, madeDir string }
+
 // applied は置き換え済み（起動し直す前）の状態。
 type applied struct {
-	cur, prev string
+	cur, prev string // 主なもの（ログと知らせに出す。Windows のインストーラ版は prev が空）
+	moves     []move // 改名で置き換えたもの（置き換えた順。Windows のインストーラ版は空＝戻すものが無い）
 	relaunch  func() error
 	cleanup   func() // 起動し直した後に消すもの（macOS の dmg）
 }
 
-// undo は起動し直せなかったときに前の版を戻す（新しい版は消す）。
+// undo は起動し直せなかったときに前の版を戻す（新しい版は消す）。置き換えた順の逆に戻し、
+// 1 つ戻せなくても残りは戻す（誤りはまとめて返す）。
 func (ap *applied) undo() error {
-	failed := ap.cur + ".failed"
+	var errs []error
+	for i := len(ap.moves) - 1; i >= 0; i-- {
+		if err := ap.moves[i].undo(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (m move) undo() error {
+	failed := m.cur + ".failed"
 	if err := os.RemoveAll(failed); err != nil {
 		return err
 	}
-	if err := os.Rename(ap.cur, failed); err != nil {
+	if err := os.Rename(m.cur, failed); err != nil {
 		return err
 	}
-	if err := os.Rename(ap.prev, ap.cur); err != nil {
-		os.Rename(failed, ap.cur)
+	if m.prev != "" {
+		if err := os.Rename(m.prev, m.cur); err != nil {
+			os.Rename(failed, m.cur)
+			return err
+		}
+	}
+	if err := os.RemoveAll(failed); err != nil {
 		return err
 	}
-	return os.RemoveAll(failed)
+	if m.madeDir != "" {
+		os.Remove(m.madeDir) // 空のときだけ消える（ほかのものが置かれていれば残す）
+	}
+	return nil
 }
 
 // apply は取得・確認・置き換えまでを行う（起動し直すのは呼ぶ側が applied.relaunch で）。
 func (r *replacer) apply(ctx context.Context, src *updatecheck.Result) (*applied, error) {
-	if err := check(src); err != nil {
-		return nil, err
-	}
-	cur, err := r.target()
+	cur, err := r.ready(src)
 	if err != nil {
 		return nil, err
 	}
-	if r.GOOS == "darwin" {
+	switch r.GOOS {
+	case "darwin":
 		return r.applyMac(ctx, src.Asset, cur)
+	case "windows":
+		if installedByInstaller(cur) {
+			return r.applyInstaller(ctx, src.Asset, cur)
+		}
+		return r.applyZip(ctx, src.Asset, cur)
 	}
 	return r.applyAppImage(ctx, src.Asset, cur)
 }
@@ -209,7 +335,7 @@ func (r *replacer) applyAppImage(ctx context.Context, a *updatecheck.Asset, cur 
 		return nil, i18n.Wrapf(err, "desktop.update.err.replace", "path", cur)
 	}
 	ok = true
-	return &applied{cur: cur, prev: prev, cleanup: func() {},
+	return &applied{cur: cur, prev: prev, moves: []move{{cur: cur, prev: prev}}, cleanup: func() {},
 		relaunch: func() error { return r.Start(cur, "desktop", "--after-update") }}, nil
 }
 
@@ -225,6 +351,231 @@ func isELF(p string) error {
 		return i18n.Errorf("desktop.update.err.not_elf")
 	}
 	return nil
+}
+
+// isPE は Windows の実行ファイルの形か（頭が MZ。SHA-256 は既に合っている。取り違えた資産や中身に備える）。
+func isPE(p string) error {
+	f, err := os.Open(p)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	head := make([]byte, 2)
+	if _, err := io.ReadFull(f, head); err != nil || !bytes.Equal(head, []byte("MZ")) {
+		return i18n.Errorf("desktop.update.err.not_pe", "path", p)
+	}
+	return nil
+}
+
+// applyInstaller は Windows のインストーラ版: setup.exe をデータの置き場の updates に取得して確かめる。何も改名しない
+// （上書きは setup.exe が行う）ので、undo と cleanup は何もしない。起動し直し（relaunch）は setup.exe を無人で起こすことで、
+// 前のインスタンスを止めるのは Looptrack.iss の PrepareToInstall（desktop --quit）と CloseApplications、
+// 新しい版を起こすのは DeinitializeSetup（/RELAUNCH=1）。取得した setup.exe は動いている間は消せないので残し、次の取得の前に消す。
+func (r *replacer) applyInstaller(ctx context.Context, a *updatecheck.Asset, cur string) (*applied, error) {
+	if err := os.MkdirAll(r.WorkDir, 0o700); err != nil {
+		return nil, err
+	}
+	if old, _ := filepath.Glob(filepath.Join(r.WorkDir, "*_setup.exe")); len(old) > 0 {
+		for _, p := range old {
+			os.Remove(p) // 前の置き換えで取得したもの（消せなければ残す。今回の名前なら下で上書きする）
+		}
+	}
+	setup := filepath.Join(r.WorkDir, a.Name)
+	f, err := os.CreateTemp(r.WorkDir, a.Name+".part-")
+	if err != nil {
+		return nil, err
+	}
+	err = r.download(ctx, a, f)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), setup)
+	}
+	if err != nil {
+		os.Remove(f.Name())
+		return nil, err
+	}
+	if err := isPE(setup); err != nil {
+		os.Remove(setup)
+		return nil, err
+	}
+	args := append(installerArgs[:], "/LOG="+filepath.Join(r.WorkDir, installerLog))
+	return &applied{cur: cur, cleanup: func() {},
+		relaunch: func() error { return r.Start(setup, args...) }}, nil
+}
+
+// applyZip は Windows の zip 版: 今の Looptrack.exe と同じフォルダの一時のディレクトリに zip を取得し、中の 4 ファイルを取り出して
+// 確かめてから、1 ファイルずつ <名前>.prev に退けて置き換える。途中で失敗したら済んだ分を逆順に戻す。
+func (r *replacer) applyZip(ctx context.Context, a *updatecheck.Asset, cur string) (*applied, error) {
+	dir := filepath.Dir(cur)
+	stage, err := os.MkdirTemp(dir, ".looptrack-update-")
+	if err != nil {
+		if errors.Is(err, fs.ErrPermission) {
+			return nil, notWritable(dir, "", err)
+		}
+		return nil, err
+	}
+	defer os.RemoveAll(stage)
+	zipPath := filepath.Join(stage, a.Name)
+	f, err := os.Create(zipPath)
+	if err != nil {
+		return nil, err
+	}
+	err = r.download(ctx, a, f)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return nil, err
+	}
+	files := filepath.Join(stage, "files")
+	if err := extractAppZip(zipPath, a.Name, files); err != nil {
+		return nil, err
+	}
+	if err := isPE(filepath.Join(files, windowsAppExe)); err != nil {
+		return nil, err
+	}
+	sw := r.Swap
+	if sw == nil {
+		sw = swap
+	}
+	var moves []move
+	for _, name := range zipFiles {
+		dst := filepath.Join(dir, filepath.FromSlash(name))
+		if name == windowsAppExe {
+			dst = cur // 名前の大小は今のものに合わせる
+		}
+		m, err := place(sw, dst, filepath.Join(files, filepath.FromSlash(name)))
+		if err != nil {
+			if uerr := (&applied{moves: moves}).undo(); uerr != nil {
+				return nil, i18n.Wrapf(errors.Join(err, uerr), "desktop.update.err.replace", "path", dst)
+			}
+			if errors.Is(err, fs.ErrPermission) {
+				return nil, notWritable(dir, "", err)
+			}
+			return nil, i18n.Wrapf(err, "desktop.update.err.replace", "path", dst)
+		}
+		moves = append(moves, m)
+	}
+	return &applied{cur: cur, prev: cur + ".prev", moves: moves, cleanup: func() {},
+		relaunch: func() error { return r.Start(cur, "desktop", "--after-update") }}, nil
+}
+
+// place は next を dst に置く。dst があれば sw で dst.prev に退けてから置き、無ければ（利用者が消した NOTICE など）そのまま置く。
+func place(sw func(cur, next, prev string) error, dst, next string) (move, error) {
+	if _, err := os.Lstat(dst); errors.Is(err, fs.ErrNotExist) {
+		made := ""
+		if _, err := os.Lstat(filepath.Dir(dst)); errors.Is(err, fs.ErrNotExist) {
+			if err := os.Mkdir(filepath.Dir(dst), 0o755); err != nil {
+				return move{}, err
+			}
+			made = filepath.Dir(dst)
+		}
+		if err := os.Rename(next, dst); err != nil {
+			if made != "" {
+				os.Remove(made)
+			}
+			return move{}, err
+		}
+		return move{cur: dst, madeDir: made}, nil
+	}
+	prev := dst + ".prev"
+	if err := sw(dst, next, prev); err != nil {
+		return move{}, err
+	}
+	return move{cur: dst, prev: prev}, nil
+}
+
+// extractAppZip は Windows の zip（name は知らせに出す名前）から zipFiles を dst の下に取り出す。規則は selfupdate の extract と同じ:
+//   - 名前に .. の区切りを含む項目があれば、zip ごと拒む（取り出す名前とは別でも。正しい zip には無い）
+//   - 取り出すのは zipTop/<zipFiles の名前> と文字どおり同じ名前の、ふつうのファイルだけ（シンボリックリンクや 2 つ目は拒む。
+//     ほかの名前は読まない）
+//   - 大きさは maxZipEntry まで（項目に書かれた大きさと、実際に読んだ大きさの両方で確かめる）
+//
+// 1 つでも欠けていれば誤り。desktop は selfupdate を import しない（selfupdate も desktop を import しない）ので、ここに別に持つ。
+func extractAppZip(zipPath, name, dst string) error {
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return i18n.Wrapf(err, "selfupdate.err.archive_read", "name", name)
+	}
+	defer zr.Close()
+	want := map[string]string{} // zip の中の名前 → zipFiles の名前
+	for _, f := range zipFiles {
+		want[zipTop+"/"+f] = f
+	}
+	found := map[string]bool{}
+	for _, zf := range zr.File {
+		if hasDotDot(zf.Name) {
+			return i18n.Errorf("selfupdate.err.archive_entry", "name", name, "entry", zf.Name)
+		}
+		rel, ok := want[zf.Name]
+		if !ok {
+			continue
+		}
+		if found[rel] {
+			return i18n.Errorf("selfupdate.err.archive_dup", "name", name, "entry", zf.Name)
+		}
+		if !zf.Mode().IsRegular() {
+			return i18n.Errorf("selfupdate.err.archive_not_regular", "name", name, "entry", zf.Name)
+		}
+		if zf.UncompressedSize64 > uint64(maxZipEntry) {
+			return i18n.Errorf("selfupdate.err.binary_too_large", "name", name, "entry", zf.Name, "limit", maxZipEntry)
+		}
+		if err := extractZipFile(zf, filepath.Join(dst, filepath.FromSlash(rel)), name); err != nil {
+			return err
+		}
+		found[rel] = true
+	}
+	for _, f := range zipFiles {
+		if !found[f] {
+			return i18n.Errorf("selfupdate.err.archive_no_binary", "name", name, "entry", zipTop+"/"+f)
+		}
+	}
+	return nil
+}
+
+// extractZipFile は zip の 1 項目を out に書く（maxZipEntry を超えたら誤り）。
+func extractZipFile(zf *zip.File, out, name string) error {
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return err
+	}
+	rc, err := zf.Open()
+	if err != nil {
+		return i18n.Wrapf(err, "selfupdate.err.archive_read", "name", name)
+	}
+	defer rc.Close()
+	w, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o755)
+	if err != nil {
+		return err
+	}
+	err = copyLimited(w, rc, name, zf.Name)
+	if cerr := w.Close(); err == nil {
+		err = cerr
+	}
+	return err
+}
+
+// copyLimited は r を w に写し、maxZipEntry を超えたら誤りにする（項目に書かれた大きさの検査とは別に、実際に読んだ大きさで止める）。
+func copyLimited(w io.Writer, r io.Reader, name, entry string) error {
+	n, err := io.Copy(w, io.LimitReader(r, maxZipEntry+1))
+	if err != nil {
+		return i18n.Wrapf(err, "selfupdate.err.archive_read", "name", name)
+	}
+	if n > maxZipEntry {
+		return i18n.Errorf("selfupdate.err.binary_too_large", "name", name, "entry", entry, "limit", maxZipEntry)
+	}
+	return nil
+}
+
+// hasDotDot は名前の区切り（/ と \）で分けた中に .. があるか（selfupdate と同じ）。
+func hasDotDot(name string) bool {
+	for _, s := range strings.FieldsFunc(name, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if s == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // applyMac は macOS: dmg を取得して確かめ、中の .app を今の .app と同じディレクトリに写して確かめてから改名で置き換える。
@@ -309,7 +660,7 @@ func (r *replacer) applyMac(ctx context.Context, a *updatecheck.Asset, cur strin
 		return nil, i18n.Wrapf(err, "desktop.update.err.replace", "path", cur)
 	}
 	keepDMG = true // 消すのは起動し直しを試した後（applied.cleanup）
-	return &applied{cur: cur, prev: prev, cleanup: func() { os.Remove(dmg) },
+	return &applied{cur: cur, prev: prev, moves: []move{{cur: cur, prev: prev}}, cleanup: func() { os.Remove(dmg) },
 		relaunch: func() error {
 			rctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()

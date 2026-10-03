@@ -7,6 +7,7 @@ import (
 
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/i18n"
+	"github.com/howashoji/looptrack/internal/service"
 	"github.com/howashoji/looptrack/internal/updatecheck"
 )
 
@@ -21,6 +22,9 @@ type Paths struct {
 
 // DB は SQLite のファイル。鍵は localserve が隣に <db>.secret-key で作る。
 func (p Paths) DB() string { return filepath.Join(p.DataDir, "looptrack.db") }
+
+// Attachments は添付の本体の置き場（DB の隣。更新しても消さない）。
+func (p Paths) Attachments() string { return filepath.Join(p.DataDir, service.AttachDirName) }
 
 // Lock は二重起動の防止に使うロックのファイル（中身は使わない。OS のファイルロックだけを見る）。
 func (p Paths) Lock() string { return filepath.Join(p.DataDir, "desktop.lock") }

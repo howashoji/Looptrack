@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -41,9 +42,13 @@ var (
 	heredocTagRe = compatRe(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
 	quotedRe     = regexp.MustCompile(`"(\\\\.|[^"\\\\])*"|'[^']*'`)
 	segSplitRe   = regexp.MustCompile(`&&|\|\||;|\n`)
-	cdRe         = compatRe(`^(?:builtin\s+)?cd\s+(\S+)\s*$`)
-	gitCRe       = compatRe(`(?:^|\s)git\s+-C\s+(\S+)`)
-	writeRes     = []*regexp.Regexp{
+	// segSplitWideRe は segSplitRe に、パイプ・背景の & ・かっこ・バッククォートを足した区切り（追加の読み方）。
+	// segSplitRe だけでは、空白を挟まずに続く `echo a|git -C <別> add x` や `(git -C <別> add x)` の git が
+	// 区切りの直後に見えず（書き込みの語は空白か行頭の直後で当てる）、素通りしていた。
+	segSplitWideRe = regexp.MustCompile("&&|\\|\\||;|\n|\\|&?|&|[()`]")
+	cdRe           = compatRe(`^(?:builtin\s+)?cd\s+(\S+)\s*$`)
+	gitCRe         = compatRe(`(?:^|\s)git\s+-C\s+(\S+)`)
+	writeRes       = []*regexp.Regexp{
 		compatRe(`(^|\s)git(\s+-C\s+\S+|\s+-c\s+\S+)*\s+(commit|add|rm|mv|push|merge|reset|checkout|switch|stash|apply|am|cherry-pick|rebase|revert|tag|restore|worktree\s+(add|remove))\b`),
 		compatRe(`(^|\s)sed\s+(-[A-Za-z]*i|--in-place)`),
 		compatRe(`(^|[\s|])(cp|mv|rm|rmdir|touch|mkdir|tee|ln|patch|truncate|chmod|install)\s`),
@@ -108,6 +113,41 @@ func stripHeredocs(s string) string {
 		i++
 		for _, t := range tags {
 			for i < len(lines) && trimSpace(lines[i]) != t[1] {
+				i++
+			}
+			i++
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// strictHeredocs は追加の読み方（3 つ目のヒアドキュメントの読み方。hookcmd.StripHeredocsStrict）の入口。
+// 4 つのガードはこれを通して呼ぶ。以前の読み方で止まる形では呼ばれないこと（遅い追加の読み方で打ち切りの時間を
+// 越えない）を、テストが呼ばれた回数で確かめるため。
+var strictHeredocs = hookcmd.StripHeredocsStrict
+
+// stripHeredocsNarrow は stripHeredocs の狭い読み方。開きと読むのは、シェルが演算子として読む `<<` から始まる
+// ものだけ（hookcmd.HeredocLexer。`<<<` の一部・引用符の中・コメントの中の `<<` は開きと読まない）。
+// 呼ぶ側は stripHeredocs の後に追加の読み方として使い、どちらかで当たれば当たりとする
+// （以前の読み方を先に見るので、判定は以前より通す側に動かない。理由は hookcmd.StripHeredocsNarrow の注釈）。
+func stripHeredocsNarrow(s string) string {
+	lines := strings.Split(s, "\n")
+	var out []string
+	var lx hookcmd.HeredocLexer
+	i := 0
+	for i < len(lines) {
+		line := lines[i]
+		out = append(out, line)
+		ops := lx.Ops(line)
+		var tags []string
+		for _, m := range heredocTagRe.FindAllStringSubmatchIndex(line, -1) {
+			if slices.Contains(ops, m[0]) {
+				tags = append(tags, line[m[2]:m[3]])
+			}
+		}
+		i++
+		for _, t := range tags {
+			for i < len(lines) && trimSpace(lines[i]) != t {
 				i++
 			}
 			i++
@@ -227,40 +267,74 @@ func PreToolScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, err
 	// 前置の語を落とす段（hookcmd.Normalize の後半）は呼ばない。この判定は前置の語に左右されない形
 	// （`(^|\s)` で当てる書き込みの語・区切りの直後の cd）で見ていて、落とすと `env LOOPTRACK_PROJECT=<別> …` の
 	// 指定そのものが空白に替わり、別プロジェクトの判定が消える。
-	body := hookcmd.UnwrapNestedShell(stripHeredocs(cmd), hookcmd.AnyPos)
-	bare := quotedRe.ReplaceAllString(body, `""`) // 引用符の中を空にしたもの（リダイレクト・区切りの判定用）
+	//
+	// ヒアドキュメントは以前の読み方（stripHeredocs）で判定し、当たらなければ狭い読み方（stripHeredocsNarrow）でも
+	// 判定する。以前の読み方を先に見るので、確認は以前より減らない。
+	verdict := func(text string, splitRe *regexp.Regexp, post func(string) string) (hookio.Result, bool) {
+		body := hookcmd.UnwrapNestedShell(text, hookcmd.AnyPos)
+		if post != nil {
+			body = post(body)
+		}
+		bare := quotedRe.ReplaceAllString(body, `""`) // 引用符の中を空にしたもの（リダイレクト・区切りの判定用）
 
-	// 別プロジェクトの LOOPTRACK_PROJECT でのイシューの変更
-	if slug != "" && issueWriteRe.MatchString(bare) && !helpFlagRe.MatchString(bare) {
-		for _, m := range imProjectRe.FindAllStringSubmatch(body, -1) {
-			v := strings.Trim(m[1], `"'`)
-			if v != "" && v != slug {
-				return ask("other_project_cli", i18n.T(lang, "loop.pretool.other_project_cli", "slug", slug, "other", v))
+		// 別プロジェクトの LOOPTRACK_PROJECT でのイシューの変更
+		if slug != "" && issueWriteRe.MatchString(bare) && !helpFlagRe.MatchString(bare) {
+			for _, m := range imProjectRe.FindAllStringSubmatch(body, -1) {
+				v := strings.Trim(m[1], `"'`)
+				if v != "" && v != slug {
+					res, _ := ask("other_project_cli", i18n.T(lang, "loop.pretool.other_project_cli", "slug", slug, "other", v))
+					return res, true
+				}
 			}
 		}
-	}
 
-	// 別リポジトリでの変更
-	cwd := cwd0
-	raws, segs := segSplitRe.Split(body, -1), segSplitRe.Split(bare, -1)
-	if len(raws) != len(segs) { // 引用符の中に区切りがある: 区切りは引用符を空にした側でそろえる
-		raws = segs
+		// 別リポジトリでの変更
+		cwd := cwd0
+		raws, segs := splitRe.Split(body, -1), splitRe.Split(bare, -1)
+		if len(raws) != len(segs) { // 引用符の中に区切りがある: 区切りは引用符を空にした側でそろえる
+			raws = segs
+		}
+		for i := range segs {
+			segRaw, s := raws[i], trimSpace(segs[i])
+			if m := cdRe.FindStringSubmatch(trimSpace(segRaw)); m != nil {
+				cwd = resolve(m[1], cwd)
+				continue
+			}
+			target := cwd
+			if m := gitCRe.FindStringSubmatch(segRaw); m != nil {
+				target = resolve(m[1], cwd)
+			}
+			if !isWriteSeg(s) || helpFlagRe.MatchString(s) {
+				continue
+			}
+			if top := otherRepo(target); top != "" {
+				res, _ := ask("other_repo_cmd", i18n.T(lang, "loop.pretool.other_repo_cmd", "root", r, "repo", top, "cmd", headStr(s, 80)))
+				return res, true
+			}
+		}
+		return hookio.Result{}, false
 	}
-	for i := range segs {
-		segRaw, s := raws[i], trimSpace(segs[i])
-		if m := cdRe.FindStringSubmatch(trimSpace(segRaw)); m != nil {
-			cwd = resolve(m[1], cwd)
-			continue
-		}
-		target := cwd
-		if m := gitCRe.FindStringSubmatch(segRaw); m != nil {
-			target = resolve(m[1], cwd)
-		}
-		if !isWriteSeg(s) || helpFlagRe.MatchString(s) {
-			continue
-		}
-		if top := otherRepo(target); top != "" {
-			return ask("other_repo_cmd", i18n.T(lang, "loop.pretool.other_repo_cmd", "root", r, "repo", top, "cmd", headStr(s, 80)))
+	// その後に追加の読み方（止める側にだけ動く）でも判定する: 3 つ目のヒアドキュメントの読み方
+	// （hookcmd.StripHeredocsStrict。算術・展開の中の `<<` を開きと読まず、シェルに渡す本文を残す）と、
+	// それに $'…' とコメントの直し（hookcmd.ShlexFriendly）を重ねたものと、広い区切り（segSplitWideRe）。
+	// 3 つ目の読み方では、ほどいた中身にももう一度 3 つ目の読み方を掛ける（中身のヒアドキュメントの本文と、閉じない
+	// 引用符の行から後ろを落とす。シェルはどちらも実行しない）。
+	type reading struct {
+		strip func(string) string
+		split *regexp.Regexp
+		post  func(string) string
+	}
+	strict := func(s string) string { return strictHeredocs(s) }
+	strictFriendly := func(s string) string { return hookcmd.ShlexFriendly(strictHeredocs(s)) }
+	done := strict // ほどいた中身にもう一度掛ける（中身のヒアドキュメントの本文と、閉じない引用符の行から後ろを落とす）
+	for _, rd := range []reading{
+		{stripHeredocs, segSplitRe, nil}, {stripHeredocsNarrow, segSplitRe, nil},
+		{strict, segSplitRe, done},
+		{stripHeredocs, segSplitWideRe, nil}, {stripHeredocsNarrow, segSplitWideRe, nil}, {strict, segSplitWideRe, done},
+		{strictFriendly, segSplitRe, done}, {strictFriendly, segSplitWideRe, done},
+	} {
+		if res, ok := verdict(rd.strip(cmd), rd.split, rd.post); ok {
+			return res, nil
 		}
 	}
 	return hookio.Result{}, nil

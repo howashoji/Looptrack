@@ -3,8 +3,10 @@
 // ボードの JSON は本文を持たない。本文は詳細を開いたときに 1 件だけ取り、本文の検索はサーバに任せる（board_data.js）。
 // 値は必ず esc / attr を通して埋める（現行ビューアにあった属性値の引用符・javascript: リンクの穴を塞いだ）。
 import { esc, attr, paint, makeRenderer, assigneeLabel, matchAssignee, assignForm, feedbackTag, matchFeedback,
-  newIssueForm, statusForm, commentForm, formRequest, apiErrorMessage, loadTexts, fill } from "./render.js";
+  newIssueForm, statusForm, commentForm, formRequest, apiErrorMessage, loadTexts, fill,
+  attachmentList, pendingList, pastedName, sendComment, localizeCommentHeading } from "./render.js";
 import { makePoller, fetchBoard, fetchBody, fetchSearch, makeBodyCache } from "./board_data.js";
+import { TYPES, PRIORITIES, browserStorage, loadPrefs, savePrefs, applyPrefs, dropStale } from "./board_prefs.js";
 
 const BASE = document.body.dataset.base;
 const SLUG = document.body.dataset.slug;
@@ -37,6 +39,16 @@ try {
   const saved = JSON.parse(localStorage.getItem(SORT_STORE) || "null");
   if (saved && SORTS[saved.sort]) { state.sort = saved.sort; state.desc = !!saved.desc; }
 } catch (err) { /* 使えない環境では既定のまま */ }
+// 表示形式と絞り込みの条件は、プロジェクトごとのキーで残して次に開いたときに戻す（board_prefs.js。使えない環境では既定のまま）。
+// state の項目を変えたら persist() を呼ぶ（呼び忘れは board_prefs_test.mjs が見つける）。
+applyPrefs(state, loadPrefs(browserStorage(), SLUG));
+function persist() { savePrefs(browserStorage(), SLUG, state); }
+// 戻した検索語と表示形式を部品に出す（ボードの JSON が届く前から見た目を合わせる）
+document.getElementById("q").value = state.q;
+function syncTabs() {
+  for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.view === state.view ? "true" : "false");
+}
+syncTabs();
 
 let DATA = { issues: [], statuses: [], closed_statuses: [], types: [], priorities: [], generated: "", project: "", prefix: "" };
 let issues = [];
@@ -200,10 +212,18 @@ function viewMatrix() {
   return html;
 }
 
-function renderFilters() {
+function labelsOf() {
   const labels = [];
   issues.forEach(i => (i.labels || []).forEach(l => { if (labels.indexOf(l) < 0) labels.push(l); }));
-  labels.sort();
+  return labels.sort();
+}
+function peopleOf() {
+  const people = [];
+  issues.forEach(i => { if (i.assignee && people.indexOf(i.assignee) < 0) people.push(i.assignee); });
+  return people.sort();
+}
+function renderFilters() {
+  const labels = labelsOf();
   const chip = (txt, on, attrs) => '<button class="chip" aria-pressed="' + (on ? "true" : "false") + '" ' + attrs + ">" + esc(txt) + "</button>";
   let h = "";
   h += chip(t("filter_ready"), state.readyOnly, 'data-toggle="ready"');
@@ -214,9 +234,7 @@ function renderFilters() {
   h += '<span class="sep"></span>';
   h += DATA.priorities.map(p => chip(p, state.priorities.has(p), 'data-pri="' + attr(p) + '"')).join("");
   // 担当の絞り込み: すべて / 自分 / 未設定 / 各担当者
-  const people = [];
-  issues.forEach(i => { if (i.assignee && people.indexOf(i.assignee) < 0) people.push(i.assignee); });
-  people.sort();
+  const people = peopleOf();
   const aopt = (v, txt) => '<option value="' + attr(v) + '"' + (state.assignee === v ? " selected" : "") + ">" + esc(txt) + "</option>";
   h += '<span class="sep"></span><select class="chip" id="asg" title="' + attr(t("assignee_title")) + '">'
     + aopt("", t("assignee_all")) + aopt("me", t("assignee_me")) + aopt("-", t("assignee_none"))
@@ -241,8 +259,7 @@ function render() {
     state.view === "board" ? viewBoard(list) :
       state.view === "list" ? viewList(list) : viewMatrix();
   paint(document.getElementById("main"));
-  const tabs = document.querySelectorAll(".tabs button");
-  for (const b of tabs) b.setAttribute("aria-selected", b.dataset.view === state.view ? "true" : "false");
+  syncTabs();
   const shown = state.view === "matrix" ? issues.length : list.length;
   document.getElementById("proj").textContent =
     t("count", { shown, total: issues.length, at: DATA.generated });
@@ -256,7 +273,8 @@ function stripTitle(id, body) {
 // 本文は詳細を開いたときに 1 件だけ取る（ボードの JSON には無い）。同じ版なら取り直さない。
 const bodies = makeBodyCache();
 let openId = "";
-function bodyHTML(id, body) { return render0.md(stripTitle(id, body)); }
+// コメント節の見出しは保存した本文では「## コメント」のまま（構造の目印）なので、画面の言語の見出しに替えて描く
+function bodyHTML(id, body) { return render0.md(localizeCommentHeading(stripTitle(id, body), TEXT)); }
 function loadBody(it) {
   fetchBody(fetch, BASE, it.id, SLUG)
     .then(got => {
@@ -315,11 +333,94 @@ function openIssue(id) {
     + "</dl>"
     + '<div class="dbody"><div id="dbodyText">' + (cached !== undefined ? bodyHTML(it.id, cached)
       : '<p class="loading">' + esc(t("body_loading")) + "</p>") + "</div>"
-    + commentForm({ canEdit: DATA.can_edit, it, t: TEXT }) + "</div>";   // コメントの追記
+    // 添付の一覧（開くたびに取り直す。取得までは前に取った一覧を出しておく）
+    + '<section class="atts"><h3>' + esc(t("att_h3")) + '</h3><div id="attList">'
+    + (attachCache.has(it.id) ? attachmentList(attachCache.get(it.id), TEXT) : '<p class="loading">' + esc(t("att_loading")) + "</p>")
+    + "</div></section>"
+    + commentForm({ canEdit: DATA.can_edit, it, t: TEXT, pending: pendingItems(it.id) }) + "</div>";   // コメントの追記と添付
   openId = id;
   showDrawer(d);
   setHash("#" + id);
   if (cached === undefined) loadBody(it);
+  loadAttachments(it.id);
+}
+
+/* ---------------- 添付 ---------------- */
+// 一覧は GET …/attachments の応答をそのまま描く。画像として埋め込むかはサーバの inline に従う（render.js の showInline）。
+// 送る前の添付はイシューごとに持つ（4 秒ごとの見直しでドロワーを描き直しても消えないように）。sent は送り終えてコメント待ちのもの。
+const attachCache = new Map();
+const pendingAttach = new Map();
+function pendingOf(id) {
+  if (!pendingAttach.has(id)) pendingAttach.set(id, { files: [], uploaded: [] });
+  return pendingAttach.get(id);
+}
+function pendingItems(id) {
+  const p = pendingAttach.get(id);
+  if (!p) return [];
+  return p.uploaded.map(u => ({ name: u.name, size: u.size, sent: true })).concat(p.files.map(f => ({ name: f.name, size: f.size })));
+}
+function hasPending(id) {
+  const p = pendingAttach.get(id);
+  return !!p && (p.files.length > 0 || p.uploaded.length > 0);
+}
+function refreshPending(form) {
+  const ul = form && form.querySelector("[data-attach-pending]");
+  if (ul) ul.innerHTML = pendingList(pendingItems(form.dataset.id), TEXT);
+}
+function addFiles(form, files, pasted) {
+  if (!form || !files || !files.length) return;
+  const p = pendingOf(form.dataset.id);
+  for (const f of files) {
+    if (!pasted) { p.files.push(f); continue; }
+    const name = pastedName(f.name, f.type);
+    p.files.push(name === f.name ? f : new File([f], name, { type: f.type }));
+  }
+  refreshPending(form);
+}
+function loadAttachments(id) {
+  fetch(BASE + "/api/v1/issues/" + encodeURIComponent(id) + "/attachments?project=" + encodeURIComponent(SLUG),
+    { credentials: "same-origin", cache: "no-store" })
+    .then(r => r.json().catch(() => null).then(data => ({ r, data })))
+    .then(({ r, data }) => {
+      if (r.status === 401) { location.href = BASE + "/login"; return; }
+      if (!r.ok) throw new Error(apiErrorMessage(r.status, data, TEXT));
+      const list = (data && data.attachments) || [];
+      attachCache.set(id, list);
+      const el = document.getElementById("attList");
+      if (openId === id && el) el.innerHTML = attachmentList(list, TEXT);
+    })
+    .catch(e => {
+      console.error("looptrack: " + id + ": " + t("att_list_failed", { reason: e.message }), e);
+      const el = document.getElementById("attList");
+      if (openId === id && el) el.innerHTML = '<p class="load-error">' + esc(t("att_list_failed", { reason: e.message })) + "</p>";
+    });
+}
+// submitComment はコメントのフォームの送信。送る順と空の送信の歯止めは render.js の sendComment にあり、ここは画面の表示だけを持つ。
+async function submitComment(form) {
+  const id = form.dataset.id;
+  const err = form.querySelector(".form-error");
+  const btn = form.querySelector('button[type="submit"]');
+  const status = form.querySelector(".att-status");
+  err.hidden = true;
+  btn.disabled = true;
+  const fail = msg => { err.textContent = msg; err.hidden = false; };
+  try {
+    const res = await sendComment({ fetch, base: BASE, slug: SLUG, id, csrf: document.body.dataset.csrf || "",
+      text: form.elements.text.value, pending: pendingOf(id), t: TEXT,
+      onProgress: msg => { status.textContent = msg; status.hidden = false; },
+      onUploaded: () => refreshPending(form) });
+    if (res.login) { location.href = BASE + "/login"; return; }
+    if (!res.ok) { fail(res.error); return; }
+    pendingAttach.delete(id);
+    form.reset();
+    setHash("#" + id);
+    await poller.poll(true);   // 取り直して詳細を開き直す（添付の一覧も取り直す）
+  } catch (e) {
+    fail(t("send_failed", { reason: e.message }));
+  } finally {
+    btn.disabled = false;
+    status.hidden = true;
+  }
 }
 // openNew は起票フォームをドロワーに出す（editor 以上だけ）。
 function openNew() {
@@ -354,10 +455,11 @@ function closeIssue() {
 /* ---------------- 起票・状態の変更・コメントの送信 ---------------- */
 // 既存の REST API を、画面のセッション（Cookie）と X-CSRF-Token で呼ぶ（サーバ側に新しい書き込みの経路は作らない）。
 // 失敗（権限の 403・ルールの 422 など）はサーバの文言をフォームの下に出す。上書きできる違反なら理由の欄を出す。
-// 成功しても応答が注意（acceptance_notice。受け入れ条件が雛形のままの着手）を載せたら、そのイシューの状態の変更フォームの
+// 成功しても応答が注意（acceptance_notice。受け入れ条件が雛形のままの着手。evidence_notice。エビデンスの無い Done）を載せたら、そのイシューの状態の変更フォームの
 // 下に出し続ける（ドロワーは見直しのたびに描き直すので、フォームの中ではなくここに持つ）。閉じるか次の変更で消す。
 let statusNotice = null;
 function submitForm(form) {
+  if (form.dataset.action === "comment") { submitComment(form); return; }
   const values = {};
   for (const el of form.elements) if (el.name) values[el.name] = el.value;
   const req = formRequest(form.dataset.action, form.dataset.id, SLUG, values, TEXT);
@@ -383,7 +485,7 @@ function submitForm(form) {
       }
       form.reset();
       if (form.dataset.action === "status") {
-        const text = data && typeof data.acceptance_notice === "string" ? data.acceptance_notice : "";
+        const text = data ? ["acceptance_notice", "evidence_notice"].map(k => typeof data[k] === "string" ? data[k] : "").filter(Boolean).join(" ") : "";
         statusNotice = text ? { id: form.dataset.id, text } : null;
       }
       const id = form.dataset.action === "create" ? data && data.issue && data.issue.id : form.dataset.id;
@@ -398,6 +500,7 @@ function drawerBusy() {
   const d = document.getElementById("drawer");
   if (!d.classList.contains("on")) return false;
   if (d.querySelector("#newIssueForm")) return true;
+  if (openId && hasPending(openId)) return true;   // 送る前の添付がある
   for (const el of d.querySelectorAll("form.issue-form input, form.issue-form textarea")) if (el.value.trim()) return true;
   return d.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
 }
@@ -447,7 +550,7 @@ document.addEventListener("click", e => {
   const link = e.target.closest("[data-issue]");
   if (link) { e.preventDefault(); openIssue(link.dataset.issue); return; }
   const tab = e.target.closest(".tabs button");
-  if (tab) { state.view = tab.dataset.view; render(); return; }
+  if (tab) { state.view = tab.dataset.view; persist(); render(); return; }
   const th = e.target.closest("th[data-sort]");
   if (th) {
     const k = th.dataset.sort;
@@ -456,6 +559,14 @@ document.addEventListener("click", e => {
   }
   if (e.target.closest("#dir")) { setSort(state.sort, !state.desc); renderFilters(); render(); return; }
   if (e.target.closest("#export")) { exportXlsx(); return; }
+  const rm = e.target.closest("[data-attach-remove]");
+  if (rm) {
+    const form = rm.closest("form.issue-form");
+    const p = pendingOf(form.dataset.id);
+    p.files.splice(Number(rm.dataset.attachRemove) - p.uploaded.length, 1);
+    refreshPending(form);
+    return;
+  }
   const chip = e.target.closest(".chip[aria-pressed]");
   if (chip) {
     const d = chip.dataset;
@@ -464,7 +575,7 @@ document.addEventListener("click", e => {
     else if (d.toggle === "feedback") state.feedbackOnly = !state.feedbackOnly;
     else if (d.type) state.types.has(d.type) ? state.types.delete(d.type) : state.types.add(d.type);
     else if (d.pri) state.priorities.has(d.pri) ? state.priorities.delete(d.pri) : state.priorities.add(d.pri);
-    renderFilters(); render();
+    persist(); renderFilters(); render();
   }
 });
 document.addEventListener("submit", e => {
@@ -474,12 +585,47 @@ document.addEventListener("submit", e => {
 const newBtn = document.getElementById("newIssue");   // 起票ボタン（editor 以上にだけサーバが出す）
 if (newBtn) newBtn.onclick = openNew;
 document.addEventListener("change", e => {
-  if (e.target.id === "lbl") { state.label = e.target.value; render(); }
-  if (e.target.id === "asg") { state.assignee = e.target.value; render(); }
+  if (e.target.matches && e.target.matches("[data-attach-input]")) {
+    addFiles(e.target.closest("form.issue-form"), e.target.files, false);
+    e.target.value = "";   // 同じファイルをもう一度選べるように
+    return;
+  }
+  if (e.target.id === "lbl") { state.label = e.target.value; persist(); render(); }
+  if (e.target.id === "asg") { state.assignee = e.target.value; persist(); render(); }
   if (e.target.id === "sort") { setSort(e.target.value); renderFilters(); render(); }
 });
+// 添付: コメントのフォームへのドラッグ&ドロップと、クリップボードの画像の貼り付け（フォームがあるのは editor 以上だけ）
+function commentFormOf(target) {
+  const form = target && target.closest ? target.closest('form.issue-form[data-action="comment"]') : null;
+  return form && document.getElementById("drawer").contains(form) ? form : null;
+}
+document.addEventListener("dragover", e => {
+  const form = commentFormOf(e.target);
+  if (!form || !e.dataTransfer || ![...e.dataTransfer.types].includes("Files")) return;
+  e.preventDefault();
+  form.querySelector("[data-attach-drop]").classList.add("over");
+});
+document.addEventListener("dragleave", e => {
+  const zone = e.target.closest && e.target.closest("[data-attach-drop]");
+  if (zone) zone.classList.remove("over");
+});
+document.addEventListener("drop", e => {
+  const form = commentFormOf(e.target);
+  if (!form || !e.dataTransfer || !e.dataTransfer.files.length) return;
+  e.preventDefault();
+  form.querySelector("[data-attach-drop]").classList.remove("over");
+  addFiles(form, e.dataTransfer.files, false);
+});
+document.addEventListener("paste", e => {
+  const form = commentFormOf(e.target);
+  const files = e.clipboardData ? [...e.clipboardData.files] : [];
+  // 文字の貼り付けはそのまま。表計算の範囲のように文字と画像を一緒に持つものも、文字として貼る
+  if (!form || !files.length || [...e.clipboardData.types].includes("text/plain")) return;
+  e.preventDefault();
+  addFiles(form, files, true);
+});
 document.getElementById("scrim").onclick = closeIssue;
-document.getElementById("q").addEventListener("input", e => { state.q = e.target.value; searchBodies(250); render(); });
+document.getElementById("q").addEventListener("input", e => { state.q = e.target.value; persist(); searchBodies(250); render(); });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") closeIssue();
   // 入力欄（担当変更フォームの理由など）では / をそのまま入力させる
@@ -490,6 +636,7 @@ document.addEventListener("keydown", e => {
 /* ---------------- データの取得（4 秒ごとに見直す） ---------------- */
 // 前の取得が終わってから次を予約し（makePoller）、If-None-Match で変化の無い周期は 304 で済ませる（転送も描き直しもしない）。
 // 失敗は console と画面の帯に出し、次の周期で取り直す。成功したら帯を消す。
+let restoredChecked = false;
 function apply(d) {
   DATA = d;
   issues = d.issues || [];
@@ -497,6 +644,11 @@ function apply(d) {
   document.getElementById("projname").textContent = d.project || d.slug;
   document.title = (d.project || d.slug) + " — " + t("title_suffix");
   reindex();
+  // 戻した条件に、今のデータに無いラベル・担当者があれば最初の 1 回だけ外す（外れた分は保存し直す）
+  if (!restoredChecked) {
+    restoredChecked = true;
+    if (dropStale(state, { types: d.types || TYPES, priorities: d.priorities || PRIORITIES, labels: labelsOf(), people: peopleOf() })) persist();
+  }
   renderFilters();
   render();
 }

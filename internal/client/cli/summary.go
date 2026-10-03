@@ -274,7 +274,7 @@ func feedbackLayer(lang i18n.Lang, fb *jsonorder.Object, loc *time.Location) str
 				"count", intOf(get(it, "pending", int64(0))), "excerpt", getStr(it, "excerpt", "")))
 	}
 	if rest := issueCount - int64(len(shown)); rest > 0 {
-		lines = append(lines, i18n.T(lang, "cli.summary.feedback.more", "rest", rest))
+		lines = append(lines, i18n.TN(lang, "cli.summary.feedback.more", int(rest), "rest", rest))
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
@@ -367,7 +367,7 @@ func usageFailureText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) s
 	spooled := intOf(get(o, "spooled", int64(0)))
 	reason := getStr(o, "reason", "")
 	if reason == "" {
-		return i18n.T(lang, "cli.summary.usage_spooled", "count", spooled)
+		return i18n.TN(lang, "cli.summary.usage_spooled", int(spooled), "count", spooled)
 	}
 	var why string
 	switch reason {
@@ -384,7 +384,7 @@ func usageFailureText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) s
 	default:
 		why = reason // 新しい版が書いた知らないキーはそのまま出す
 	}
-	return i18n.T(lang, "cli.summary.usage_send_failed", "at", localTimeIn(getStr(o, "at", ""), loc), "reason", why,
+	return i18n.TN(lang, "cli.summary.usage_send_failed", int(spooled), "at", localTimeIn(getStr(o, "at", ""), loc), "reason", why,
 		"count", intOf(get(o, "count", int64(0))), "spooled", spooled)
 }
 
@@ -415,6 +415,10 @@ func pathMissingNote(lang i18n.Lang, root string) string {
 		} else {
 			doctor = `"` + exe + `" doctor`
 		}
+	}
+	// 正本（looptrack 自身のリポジトリ）では init をしないので、取得と PATH だけを案内する
+	if IsSelfRepo(root) {
+		return i18n.T(lang, "cli.summary.path_missing.self_repo", "doctor", doctor)
 	}
 	return i18n.T(lang, "cli.summary.path_missing", "doctor", doctor)
 }

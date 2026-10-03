@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/howashoji/looptrack/internal/client/hook/hookcmd"
 )
 
 func TestRegexPorts(t *testing.T) {
@@ -43,7 +45,7 @@ func TestRegexPorts(t *testing.T) {
 		if hasRedirect(w.S) != w.Redirect {
 			t.Errorf("リダイレクト %q: Go %v / 旧 %v", w.S, hasRedirect(w.S), w.Redirect)
 		}
-		tag, ok := heredocTag(w.S)
+		tag, ok := hookcmd.HeredocOpen(w.S)
 		if ok != (w.Heredoc != nil) || (ok && tag != *w.Heredoc) {
 			t.Errorf("ヒアドキュメント %q: Go %q %v / 旧 %v", w.S, tag, ok, w.Heredoc)
 		}

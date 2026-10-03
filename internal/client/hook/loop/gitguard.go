@@ -43,6 +43,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/howashoji/looptrack/internal/client/hook/hookcmd"
 	"github.com/howashoji/looptrack/internal/hookio"
@@ -464,8 +465,37 @@ func PreToolGitGuard(ctx context.Context, ev hookio.Event) (hookio.Result, error
 	// エスケープとして扱わないので、引用符で囲まない `C:\tools\git.exe` が区切りを失わず 1 語のまま読める）
 	// の両方に掛け、どちらかが当たれば発火する（利用者・監督の決定「案 1」）。posix 側の結果は
 	// 1 ビットも変わらないので Git Bash はこれまでどおり無傷。どちらも分解できなければ通す（fail-open）。
-	for _, split := range []func(string) ([][]string, bool){hookcmd.CommandWords, hookcmd.CommandWordsWin} {
-		cmds, ok := split(normalized)
+	// ヒアドキュメントは以前の読み方の後に狭い読み方（hookcmd.StripHeredocsNarrow）でも読む。以前の読み方が
+	// `<<<EOF` や引用符の中の `<<EOF` を開きと読んで次の行を落としても、狭い読み方ではその行が残る。
+	// 以前の読み方を先に見るので、判定は以前より通す側に動かない。
+	// 以前の読み方（上の 4 つ）で止まらなかったときだけ、追加の読み方でも見る。追加の読み方は以前の読み方より遅いので、
+	// 以前の読み方が止める形では計算しない（計算すると打ち切りの時間を越えて、以前は止めていた形が通る）。
+	//   - 3 つ目の読み方（strictHeredocs。算術・展開の中の `<<` を開きと読まず、シェルに渡す本文を残す）
+	//   - それで本文を落とした後に $'…' とコメントを直してから分ける読み方（hookcmd.CommandWordsFriendly）
+	//   - 本文を落とし、$'…' とコメントを直してから入れ子のシェルをほどいたもの（friendlyFirst）。本文やコメントの
+	//     引用符がほどく段を狂わせて `bash -c '…'` の中身を見失う形と、`bash -c $'…'`。
+	// $'…' とコメントの直しは、3 つ目の読み方で本文を落とした後にだけ掛ける。以前の読み方は `<<\EOF` を開きと読まないので、
+	// その後にコメントを落とすと、本文（データ）を語に分けて新しく deny にしてしまう。
+	strict := func(s string) string { return strictHeredocs(s) }
+	strictWords := func(s string) ([][]string, bool) { return hookcmd.CommandWordsWith(s, strict) }
+	strictWordsWin := func(s string) ([][]string, bool) { return hookcmd.CommandWordsWinWith(s, strict) }
+	friendlyWords := func(s string) ([][]string, bool) { return hookcmd.CommandWordsFriendly(s, strict) }
+	norm := func() string { return normalized }
+	friendlyFirst := sync.OnceValue(func() string {
+		return hookcmd.NormalizeLines(hookcmd.ShlexFriendly(strict(cmd)), hookcmd.HeadOnly)
+	})
+	type reading struct {
+		text  func() string
+		split func(string) ([][]string, bool)
+	}
+	readings := []reading{
+		{norm, hookcmd.CommandWords}, {norm, hookcmd.CommandWordsWin},
+		{norm, hookcmd.CommandWordsNarrow}, {norm, hookcmd.CommandWordsWinNarrow},
+		{norm, strictWords}, {norm, strictWordsWin}, {norm, friendlyWords},
+		{friendlyFirst, strictWords}, {friendlyFirst, friendlyWords},
+	}
+	for _, rd := range readings {
+		cmds, ok := rd.split(rd.text())
 		if !ok {
 			continue
 		}

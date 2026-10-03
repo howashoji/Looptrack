@@ -8,7 +8,7 @@ description: 実装イテレーションを自動で進める手順です（着�
 
 > 規律の元の定義は rules の `iteration-discipline.md` にあります。この文書には操作の手順だけを書きます。
 > プロジェクト側の rules に固有の実装規律（ワークフロー・テスト階層・コミット規約）があれば、それに従ってください。
-> イシューの操作全般は skill `/issue` を見てください。
+> イシューの操作全般は skill `/issue` を参照。
 
 ## 0. 前提の確認（毎イテレーションの冒頭）
 
@@ -30,7 +30,7 @@ looptrack issue next                # 自分が着手中のもの、無ければ
 
 ## 2. 実装 → ゲート
 
-実装し、テストは**受け入れ条件から**書きます（受け入れ条件の項目をテスト名やアサーションにする）。そのあと次を実行します:
+実装し、テストは**受け入れ条件から**書きます。受け入れ条件の項目をテスト名やアサーションにしてください。そのあと次を実行します:
 
 ```bash
 looptrack gates               # 段は LOOPTRACK_LOOP_GATES_STAGES（既定 build lint test）。fail-fast
@@ -59,14 +59,16 @@ looptrack gates               # 段は LOOPTRACK_LOOP_GATES_STAGES（既定 buil
 次をすべて満たしてから close します:
 
 - `gates.sh` が全段グリーン（「═══ gates 結果 ═══」のブロックをそのままコメントに引用）
+- エビデンスを添付済み（ゲートのログ・テストの出力の全文・画面のスクリーンショット・生成物）。検証コマンドのあるイシューは `looptrack issue verify <ID> --attach-output` で記録に付けておく
 - この周で見つけた問題がすべて起票済みで、直したものは close 済み
 - 受け入れ条件ごとの合否（自動テストにできなかったものは「何を・どう確かめたか」）
 
 ```bash
+looptrack issue attach <ID> <ファイル>...   # エビデンスを添付（何を送るかは guide の「エビデンス」）
 looptrack issue close <ID> --comment "<gates 結果の引用 + 受け入れ条件ごとの合否>"
 ```
 
-- そのあとコミットし（イシュー単位。触ったパスだけを stage）、引き継ぎを更新します（skill `session-handoff`）。
+- そのあとイシュー単位でコミットし、触ったパスだけを stage します。引き継ぎも更新します（skill `session-handoff`）。
 
 ## 5. 次へ（自動進行）
 

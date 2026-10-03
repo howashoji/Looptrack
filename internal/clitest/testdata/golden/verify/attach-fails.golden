@@ -1,0 +1,34 @@
+# verify/attach-fails
+$ issue verify DEMO-0001 --attach-output
+
+#### exit 1
+
+#### stdout
+DEMO-0001 の検証コマンド 1 件を実行します（場所: $TMP/ws・本文 01234567）
+[1/1] $ echo ok
+[1/1] ok      echo ok（$SEC 秒）
+結果: 1/1 成功（$SEC 秒）
+
+#### stderr
+エラー: verify の記録を送れませんでした: ファイルが 1 ファイルの上限（10 バイト）を超えています
+
+#### requests (2)
+GET /im/api/v1/issues/DEMO-0001/verify?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+POST /im/api/v1/issues/DEMO-0001/attachments?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: text/plain; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Filename: verify-output-DEMO-0001.txt
+  X-Looptrack-Lang: ja
+  body:
+    $ echo ok
+    ok
+
+    [ok exit=0]
+
+
+
+#### files (0)

@@ -34,6 +34,8 @@ type verifyLastDetailJSON struct {
 	Host       string               `json:"host"`
 	Workspace  string               `json:"workspace"`
 	Results    []store.VerifyResult `json:"results"`
+	// Attachments は記録に付けたエビデンスの添付の ID（無ければ省く）
+	Attachments []int64 `json:"attachments,omitempty"`
 }
 
 // nextVerifyJSON は next の応答の verify（節が無ければ null）。
@@ -85,7 +87,8 @@ func verifyPlanView(p *service.VerifyPlan, loc *time.Location) verifyPlanJSON {
 		if res == nil {
 			res = []store.VerifyResult{}
 		}
-		out.Last = &verifyLastDetailJSON{verifyLastJSON: *l, Via: p.Last.Via, BodySHA256: p.Last.BodySHA256, Host: p.Last.Host, Workspace: p.Last.Workspace, Results: res}
+		out.Last = &verifyLastDetailJSON{verifyLastJSON: *l, Via: p.Last.Via, BodySHA256: p.Last.BodySHA256, Host: p.Last.Host, Workspace: p.Last.Workspace, Results: res,
+			Attachments: p.Last.Attachments}
 	}
 	return out
 }
@@ -123,6 +126,8 @@ type verifyRequest struct {
 	Results    []store.VerifyResult `json:"results"`
 	Host       string               `json:"host"`
 	Workspace  string               `json:"workspace"`
+	// Attachments はエビデンスとして記録に付ける、そのイシューの添付の ID（省略できる）
+	Attachments []int64 `json:"attachments"`
 }
 
 // apiPostVerify は POST /issues/{id}/verify（editor 以上）。コメントと issue_events kind verify を 1 トランザクションで残す。
@@ -136,7 +141,8 @@ func (s *Server) apiPostVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a := actor(r)
-	rec, err := s.svc.RecordVerify(r.Context(), a, pr, row.ID, service.VerifyInput{BodySHA256: req.BodySHA256, Results: req.Results, Host: req.Host, Workspace: req.Workspace}, reqLang(r))
+	rec, err := s.svc.RecordVerify(r.Context(), a, pr, row.ID, service.VerifyInput{BodySHA256: req.BodySHA256, Results: req.Results, Host: req.Host, Workspace: req.Workspace,
+		Attachments: req.Attachments}, reqLang(r))
 	if err != nil {
 		s.serviceError(w, r, err)
 		return
@@ -146,6 +152,9 @@ func (s *Server) apiPostVerify(w http.ResponseWriter, r *http.Request) {
 	d := rec.Detail
 	body := map[string]any{"issue": toIssueJSON(it), "seq": d.CommentSeq, "ok": d.OK, "passed": d.Passed, "failed": d.Failed,
 		"body_sha256": d.BodySHA256, "comment": it.Row.Doc.Comments[len(it.Row.Doc.Comments)-1].Content, "message": i18n.T(reqLang(r), "server.api.verify.recorded", "id", it.Item.ID)}
+	if len(d.Attachments) > 0 { // 添付を付けた記録だけ（付けない要求の応答はこれまでと同じ）
+		body["attachments"] = d.Attachments
+	}
 	if n := s.usageNotice(r.Context(), reqLang(r), a, pr, it, false); n != "" {
 		body["usage_notice"] = n
 	}

@@ -68,6 +68,51 @@ its password is for this throwaway container:
 docker compose -f deploy/dev/compose.yaml up -d
 ```
 
+The container restarts itself if it dies (`restart: unless-stopped`), but any
+test run in flight dies with it. If many tests suddenly fail with
+`dial tcp 127.0.0.1:13306: connect: connection refused`, first check whether the
+container stopped and whether it was killed for lack of memory:
+
+```bash
+docker inspect im-dev-mysql --format '{{.State.Status}} {{.RestartCount}} {{.State.StartedAt}} {{.State.OOMKilled}}'
+```
+
+Docker resets `OOMKilled` to false when it restarts the container, so after an
+automatic restart it no longer tells you anything. A `RestartCount` that went up,
+or a `StartedAt` in the middle of your run, means the container died and was
+started again; the kernel log (below) says why. That log is a ring buffer kept
+since the VM booted, so old records may be gone.
+
+`OOMKilled` being true doesn't mean MySQL itself grew. When the whole Docker
+Desktop VM runs short of memory, the kernel picks a victim, and a heavy image
+build in another container or another project can make it pick MySQL. The VM's
+kernel log tells you which case it was (`global_oom` means the whole VM ran
+short):
+
+```bash
+docker run --rm --privileged --entrypoint sh mysql:8.4 \
+  -c 'cat /dev/kmsg & p=$!; sleep 2; kill $p' | grep -E 'Killed process|global_oom'
+```
+
+Don't run a heavy image build and a database-backed full check side by side on
+the same VM. Whether to raise Docker Desktop's memory allocation is your call.
+
+A check that was interrupted leaves its throwaway databases (schemas starting
+with `im_test_`) behind. The tests don't delete them automatically, because they
+could be deleting another run's databases. Drop them by hand only after you've
+**looked at the list** from `ps -eo pid,etime,command | grep -E '[g]o test'` and
+confirmed that no database-backed check is running. List them first:
+
+```bash
+docker exec im-dev-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -N -e "SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE \"im\\_test\\_%\""'
+```
+
+Then drop each name the list shows:
+
+```bash
+docker exec im-dev-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "DROP DATABASE im_test_xxxx"'
+```
+
 Want to try the server itself? Run the setup wizard in a scratch directory and
 pick the single-user, SQLite answers:
 
@@ -195,11 +240,10 @@ test -c` only tell you that the code compiles. The test binary they produce
 can't run on macOS or Linux. How the code behaves at run time on Windows (path
 separators and drive letters, a temporary directory on `D:\`, the resolution of
 the monotonic clock, line endings) can't be checked locally at all. Only the
-`go test (windows, no database)` job in CI sees it. And that job doesn't run on
-a push or a pull request, because CI is triggered by hand (`workflow_dispatch`)
-and weekly only. So a change that touches anything Windows-specific has to wait
-for a manual run before you can call it green. Every local check can be green
-while Windows alone fails.
+`go test (windows, no database)` job in CI sees it. That job runs on every pull
+request and on every push to `main` in the public repository. So a change that
+touches anything Windows-specific has to wait for that run before you can call
+it green. Every local check can be green while Windows alone fails.
 
 Two more checks run in CI. They're worth running locally when you touch
 documents or dependencies:
@@ -315,8 +359,10 @@ here. That shows in the history, so here's what to expect before you read it.
   smaller commits behind it here. So `git log` is coarser than it would be for a
   project developed in the open, and `git blame` points at the release that
   published a line, not at the change that wrote it.
-- **[CHANGELOG.md](CHANGELOG.md) is where a change is explained.** Read that
-  record instead of reconstructing intent from a large diff.
+- **[CHANGELOG.md](CHANGELOG.md) (the server) and
+  [CHANGELOG-desktop.md](CHANGELOG-desktop.md) (the desktop app) are where a
+  change is explained.** Read those records instead of reconstructing intent
+  from a large diff.
 - **Pull requests from outside are ordinary pull requests.** They're reviewed
   and merged here like anywhere else. A merged contribution is also taken into
   the development repository with its author intact, so the next release carries
@@ -337,18 +383,24 @@ here. That shows in the history, so here's what to expect before you read it.
 - A pull request should say what problem it solves, what approach it takes, how
   you verified it, and anything reviewers should look at closely. Does it change
   behaviour users can see? Then update the documents in the same pull request
-  and add an entry to the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md),
-  in English and in Japanese (the Japanese follows the English after a `---`).
-- If it changes the user-facing guide under `docs/guide/`, change the English and
-  the Japanese versions together. `go test ./internal/docscheck/` checks that
-  their headings, code blocks and tables still line up.
+  and add an entry to the `Unreleased` section of the changelog for the people
+  it affects: [CHANGELOG.md](CHANGELOG.md) for those who run, administer or
+  connect to a server, [CHANGELOG-desktop.md](CHANGELOG-desktop.md) for desktop
+  app users (the CLI inside the desktop app included), or both. Write it in
+  English and in Japanese (the Japanese follows the English after a `---`), and
+  open the entry with what changes for that reader.
+- If it changes the user-facing guide under `docs/guide/` (including `server/`
+  and `desktop/`; the Japanese mirrors the same tree under `docs/guide/ja/`),
+  change the English and the Japanese versions together.
+  `go test ./internal/docscheck/` checks that their headings, code blocks and
+  tables still line up.
 - CI runs formatting, `go vet`, `go mod tidy -diff`, `govulncheck`, the Go tests
   on Linux and Windows, and the small checks on every run. The macOS tests, the
   cross-build and the desktop builds run on the weekly run and on a manual run
-  with `full`. CI is **not** triggered by a push or a pull request (the workflow
-  only carries `workflow_dispatch` and `schedule`). So run the commands above
-  locally and treat that as the evidence. A maintainer runs CI by hand before a
-  deployment, a release tag, or a batch of Windows-related changes.
+  with `full`. A pull request and a push to `main` trigger CI in the public
+  repository (`github.com/howashoji/looptrack`). In a fork the jobs are skipped,
+  so run the commands above locally before you open a pull request. A maintainer
+  still runs CI by hand, with `full`, before a deployment or a release tag.
 
 ## Where things live
 
@@ -372,3 +424,11 @@ docs/            guide, design, deployment, adding a project
 The design document, [docs/server/DESIGN.md](docs/server/DESIGN.md), describes
 the data model, the permission model, the API and the rules the server enforces.
 Read the section that covers what you're changing before you change it.
+
+The screenshots in the user guide and the README live in `docs/guide/images/ja`
+and `docs/guide/images/en`. When a screen changes, take them again with
+`deploy/dev/screenshots.sh`. It starts a throwaway SQLite server per language,
+fills it with made-up data and captures only the inside of the page in a
+headless Chrome, so nothing from your own machine or projects ends up in a
+picture. Look at every image before you commit it, and don't add one taken by
+hand.

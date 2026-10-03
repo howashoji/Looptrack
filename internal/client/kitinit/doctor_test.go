@@ -27,6 +27,16 @@ func writeFile(t *testing.T, p, body string) {
 	}
 }
 
+// makeSelfRepo は dir を looptrack 自身のリポジトリ（kit の正本）の形にする。kit/embed.go（ファイル）+ cmd/looptrack
+// （ディレクトリ）は cli.IsSelfRepo（TestIsSelfRepo）が実物で見ている配置と同じもの。
+func makeSelfRepo(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, "cmd", "looptrack"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "kit", "embed.go"), "package kit\n")
+}
+
 func doctor(t *testing.T, dir string, vars map[string]string) (int, string) {
 	t.Helper()
 	home := t.TempDir()
@@ -108,7 +118,7 @@ func TestDoctorKitSelfRepo(t *testing.T) {
 	wantSelfRepo := i18n.T(i18n.JA, "kitinit.doctor.kit.self_repo", "file", kitJSON)
 
 	// 正本の形: kit/embed.go（ファイル）+ cmd/looptrack（ディレクトリ）。cli.IsSelfRepo（TestIsSelfRepo）が
-	// 実物で見ている配置と同じもの。.looptrack-kit.json は置かない（init が拒否するので作られない）。
+	// 実物で見ている配置と同じもの。.looptrack-kit.json は置かない（正本では init が何も書かないので作られない）。
 	self := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(self, "cmd", "looptrack"), 0o755); err != nil {
 		t.Fatal(err)
@@ -194,77 +204,168 @@ func TestDoctorServerUpdate(t *testing.T) {
 // 取得 + init）なら、配線のやり直しと更新は MCP の setup ツールの手順（--url の無い init や self-update ではない）、copy など
 // それ以外なら従来どおり looptrack issue init の再実行と self-update。トークンが無いときのログインの案内は、PATH の
 // looptrack ではなく実行中の looptrack の絶対パスで出す。分岐の両側を同じテストで通す。
+// looptrack 自身のリポジトリ（kit の正本・cli.IsSelfRepo）で控えが server なら、init に触れない正本用の文（.self_repo）を出す。
+// 正本でも控えが copy なら従来どおり。正本でない側（従来の文）が対照。
 func TestDoctorRedoBySource(t *testing.T) {
 	stubs(t, true)
 	executable = func() (string, error) { return fakeBin, nil }
 	server, local := i18n.T(i18n.JA, "kitinit.doctor.redo.server"), i18n.T(i18n.JA, "kitinit.doctor.redo.local")
+	serverSelf := i18n.T(i18n.JA, "kitinit.doctor.redo.server.self_repo")
+	localSelf := i18n.T(i18n.JA, "kitinit.doctor.redo.local.self_repo")
 	if server == local || !strings.Contains(server, "setup ツール") || !strings.Contains(local, "looptrack issue init") {
 		t.Fatalf("前提が崩れています: やり直しの文が置き方で分かれていない: %q / %q", server, local)
+	}
+	if serverSelf == "kitinit.doctor.redo.server.self_repo" || serverSelf == server || !strings.Contains(serverSelf, "setup ツール") ||
+		!strings.Contains(serverSelf, "init はしない") || i18n.T(i18n.EN, "kitinit.doctor.redo.server.self_repo") == serverSelf {
+		t.Fatalf("前提が崩れています: 正本用のやり直しの文が ja.json / en.json に無いか、従来の文と分かれていない: %q", serverSelf)
+	}
+	if localSelf == "kitinit.doctor.redo.local.self_repo" || localSelf == local || strings.Contains(localSelf, "issue init") ||
+		!strings.Contains(localSelf, "init はしない") || i18n.T(i18n.EN, "kitinit.doctor.redo.local.self_repo") == localSelf {
+		t.Fatalf("前提が崩れています: 正本用のやり直しの文（server 以外）が ja.json / en.json に無いか、init を勧めている: %q", localSelf)
 	}
 	login := `トークンがありません（"` + fakeBin + `" issue login --browser --url https://example.invalid/im）`
 	if runtime.GOOS == "windows" {
 		login = `トークンがありません（& '` + fakeBin + `' issue login --browser --url https://example.invalid/im）`
 	}
-	for _, c := range []struct{ source, want, notWant string }{
-		{"server", server, local},
-		{"copy", local, server},
-		{"link", local, server},
+	for _, c := range []struct {
+		source        string
+		self          bool
+		want, notWant string
+	}{
+		{"server", false, server, local},
+		{"copy", false, local, server},
+		{"link", false, local, server},
+		{"server", true, serverSelf, server},
+		{"copy", true, localSelf, local},
+		{"link", true, localSelf, local},
 	} {
 		dir := t.TempDir()
+		if c.self {
+			makeSelfRepo(t, dir)
+		}
 		writeFile(t, filepath.Join(dir, ".codex", "hooks.json"),
 			`{"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "\"/nowhere/looptrack\" hook summary --agent codex"}]}]}}`)
 		writeFile(t, filepath.Join(dir, ".claude", ".looptrack-kit.json"), `{"project": "demo", "source": "`+c.source+`"}`)
 		code, out := doctor(t, dir, map[string]string{"LOOPTRACK_API_URL": "https://example.invalid/im"})
 		missing := "実行ファイル /nowhere/looptrack がありません（" + c.want + "）"
 		if code != 1 || !strings.Contains(out, missing) || strings.Contains(out, c.notWant) {
-			t.Errorf("置き方 %s: やり直しの案内に %q が無い（または %q がある）:\n%s", c.source, missing, c.notWant, out)
+			t.Errorf("置き方 %s・正本 %v: やり直しの案内に %q が無い（または %q がある）:\n%s", c.source, c.self, missing, c.notWant, out)
 		}
 		if !strings.Contains(out, login) {
 			t.Errorf("置き方 %s: ログインの案内が実行中の looptrack の絶対パスでない（%q が無い）:\n%s", c.source, login, out)
 		}
 	}
 	// 更新の案内（配布の最新との比較。--offline では出ないので、選ぶ関数を直接確かめる）
-	if _, u := doctorRedo(i18n.JA, "server"); u != i18n.T(i18n.JA, "kitinit.doctor.update.server") || strings.Contains(u, "self-update") {
+	if _, u := doctorRedo(i18n.JA, "server", false); u != i18n.T(i18n.JA, "kitinit.doctor.update.server") || strings.Contains(u, "self-update") {
 		t.Errorf("server の更新の案内: %q", u)
 	}
-	if _, u := doctorRedo(i18n.JA, "copy"); u != i18n.T(i18n.JA, "kitinit.doctor.update.local") || !strings.Contains(u, "self-update") {
+	if _, u := doctorRedo(i18n.JA, "copy", false); u != i18n.T(i18n.JA, "kitinit.doctor.update.local") || !strings.Contains(u, "self-update") {
 		t.Errorf("copy の更新の案内: %q", u)
+	}
+	// 正本（server）: 取得だけで init に触れない文。従来の文（--url 付きの init）とは別のもの
+	updSelf := i18n.T(i18n.JA, "kitinit.doctor.update.server.self_repo")
+	if updSelf == "kitinit.doctor.update.server.self_repo" || updSelf == i18n.T(i18n.JA, "kitinit.doctor.update.server") ||
+		i18n.T(i18n.EN, "kitinit.doctor.update.server.self_repo") == updSelf {
+		t.Fatalf("前提が崩れています: 正本用の更新の文が ja.json / en.json に無いか、従来の文と同じ: %q", updSelf)
+	}
+	if _, u := doctorRedo(i18n.JA, "server", true); u != updSelf || strings.Contains(u, "--url 付きの init") || !strings.Contains(u, "init はしない") {
+		t.Errorf("正本・server の更新の案内: %q", u)
+	}
+	if r, u := doctorRedo(i18n.JA, "copy", true); r != localSelf || u != i18n.T(i18n.JA, "kitinit.doctor.update.local") {
+		t.Errorf("正本・copy のやり直しと更新の案内: %q / %q", r, u)
 	}
 }
 
 // TestDoctorPathMissingBySource は、PATH から looptrack を解決できないときの doctor の注意が、サーバ版の導入（控えの置き方が
 // server）では直し方（setup の手順の再実行と、PATH を足すだけのコマンド）を示すことを確かめる。
 // 検知しない場合（PATH にある）と、ローカルの導入（従来の文）も同じテストで確かめる。
+//
+// looptrack 自身のリポジトリ（kit の正本）で控えが server なら、直し方は init に触れない正本用の文になる（正本でない側が対照）。
 func TestDoctorPathMissingBySource(t *testing.T) {
 	serverMark := i18n.T(i18n.JA, "kitinit.doctor.redo.server")
+	selfMark := i18n.T(i18n.JA, "kitinit.doctor.redo.server.self_repo")
 	cmd := setuppath.PosixCommand(i18n.JA)
 	if runtime.GOOS == "windows" {
 		cmd = setuppath.WinCommand(i18n.JA)
 	}
 	for _, c := range []struct {
 		source string
+		self   bool
 		onPath bool
 		want   []string
 		not    []string
 	}{
-		{"server", false, []string{"PATH で looptrack が見つかりません", serverMark, cmd}, []string{i18n.T(i18n.JA, "kitinit.doctor.path.missing")}},
-		{"copy", false, []string{i18n.T(i18n.JA, "kitinit.doctor.path.missing")}, []string{serverMark, cmd}},
-		{"server", true, []string{"PATH の looptrack: " + fakeBin}, []string{"PATH で looptrack が見つかりません", cmd}},
+		{"server", false, false, []string{"PATH で looptrack が見つかりません", serverMark, cmd}, []string{i18n.T(i18n.JA, "kitinit.doctor.path.missing"), selfMark}},
+		{"server", true, false, []string{"PATH で looptrack が見つかりません", selfMark, cmd}, []string{i18n.T(i18n.JA, "kitinit.doctor.path.missing"), serverMark}},
+		{"copy", false, false, []string{i18n.T(i18n.JA, "kitinit.doctor.path.missing")}, []string{serverMark, selfMark, cmd}},
+		{"server", false, true, []string{"PATH の looptrack: " + fakeBin}, []string{"PATH で looptrack が見つかりません", cmd}},
 	} {
 		stubs(t, c.onPath)
 		executable = func() (string, error) { return fakeBin, nil }
 		dir := t.TempDir()
+		if c.self {
+			makeSelfRepo(t, dir)
+		}
 		writeFile(t, filepath.Join(dir, ".claude", ".looptrack-kit.json"), `{"project": "demo", "source": "`+c.source+`"}`)
 		_, out := doctor(t, dir, map[string]string{"LOOPTRACK_API_URL": "https://example.invalid/im"})
 		for _, w := range c.want {
 			if !strings.Contains(out, w) {
-				t.Errorf("置き方 %s・PATH に %v: %q が無い:\n%s", c.source, c.onPath, w, out)
+				t.Errorf("置き方 %s・正本 %v・PATH に %v: %q が無い:\n%s", c.source, c.self, c.onPath, w, out)
 			}
 		}
 		for _, n := range c.not {
 			if strings.Contains(out, n) {
-				t.Errorf("置き方 %s・PATH に %v: %q がある:\n%s", c.source, c.onPath, n, out)
+				t.Errorf("置き方 %s・正本 %v・PATH に %v: %q がある:\n%s", c.source, c.self, c.onPath, n, out)
 			}
+		}
+	}
+}
+
+// TestDoctorSelfRepoNoInitAdvice は、looptrack 自身のリポジトリ（kit の正本）で doctor が init を勧めないことを確かめる。
+// 名前で配線した hook が PATH に無いとき（wire.not_in_path）と、配線が 1 つも無いとき（wire.none）の 2 つの経路を、
+// 正本と正本でない一時ディレクトリの両方で通す。正本でない側で従来の文（init を勧める）が出ることが対照。
+func TestDoctorSelfRepoNoInitAdvice(t *testing.T) {
+	const settings = `{"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "looptrack hook summary --agent claude-code"}]}]}}`
+	for _, self := range []bool{false, true} {
+		for _, wiredByName := range []bool{true, false} {
+			stubs(t, false)
+			executable = func() (string, error) { return fakeBin, nil }
+			dir := t.TempDir()
+			if self {
+				makeSelfRepo(t, dir)
+			}
+			var want string
+			switch {
+			case wiredByName && self:
+				writeFile(t, filepath.Join(dir, ".claude", "settings.json"), settings)
+				want = i18n.T(i18n.JA, "kitinit.doctor.wire.not_in_path.self_repo", "file", ".claude/settings.json", "hook", "summary",
+					"redo", i18n.T(i18n.JA, "kitinit.doctor.redo.local.self_repo"))
+			case wiredByName:
+				writeFile(t, filepath.Join(dir, ".claude", "settings.json"), settings)
+				want = i18n.T(i18n.JA, "kitinit.doctor.wire.not_in_path", "file", ".claude/settings.json", "hook", "summary",
+					"redo", i18n.T(i18n.JA, "kitinit.doctor.redo.local"))
+			case self:
+				want = i18n.T(i18n.JA, "kitinit.doctor.wire.none.self_repo")
+			default:
+				want = i18n.T(i18n.JA, "kitinit.doctor.wire.none")
+			}
+			_, out := doctor(t, dir, nil)
+			label := fmt.Sprintf("正本 %v・名前の配線 %v", self, wiredByName)
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: %q が無い:\n%s", label, want, out)
+			}
+			if self && (strings.Contains(out, "issue init") || strings.Contains(out, "init が絶対パスで配線し直す")) {
+				t.Errorf("%s: 正本で init を勧めている:\n%s", label, out)
+			}
+			if !self && !strings.Contains(out, "looptrack issue init") {
+				t.Errorf("%s: 前提が崩れています（正本でない側で従来の init の案内が出ない。対照になっていない）:\n%s", label, out)
+			}
+		}
+	}
+	for _, k := range []string{"kitinit.doctor.wire.not_in_path.self_repo", "kitinit.doctor.wire.none.self_repo", "kitinit.doctor.kit.self_repo"} {
+		ja, en := i18n.T(i18n.JA, k), i18n.T(i18n.EN, k)
+		if ja == k || en == k || ja == en || strings.Contains(ja, "使えない") || strings.Contains(ja, "issue init") {
+			t.Errorf("%s が ja.json / en.json に無いか、init を勧める・使えないと言う: ja=%q en=%q", k, ja, en)
 		}
 	}
 }

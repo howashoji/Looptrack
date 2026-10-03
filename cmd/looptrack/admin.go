@@ -616,7 +616,7 @@ func projectGuideCmd(args []string, lang i18n.Lang, u string) int {
 		if err := store.SetProjectGuide(ctx, db, p.ID, text+"\n", source); err != nil {
 			return fail(err)
 		}
-		fmt.Println(i18n.T(lang, "cmd.guide.set", "slug", p.Slug, "bytes", len(text)+1, "source", source))
+		fmt.Println(i18n.TN(lang, "cmd.guide.set", len(text)+1, "slug", p.Slug, "bytes", len(text)+1, "source", source))
 	case "show":
 		g, err := store.GetProjectGuide(ctx, db, p.ID)
 		if errors.Is(err, store.ErrNotFound) {

@@ -24,6 +24,8 @@
 //     plist_version・iss_version）を呼ぶ（Windows では skip）
 //   - testrecord_test.go: 全検査の記録の 1 行を作るスクリプトの集計（deploy/dev/test-record_test.sh。
 //     --parse と --count-ps を合成のログと ps の出力で確かめる）を呼ぶ（Windows では skip）
+//   - releasenotes_test.go: 2 本の CHANGELOG（サーバ版・デスクトップ版）から GitHub の Release の本文を作るスクリプト
+//     （deploy/release/release-notes_test.sh）を呼ぶ（Windows では skip）
 //
 // 実行: go test ./internal/docscheck/
 package docscheck

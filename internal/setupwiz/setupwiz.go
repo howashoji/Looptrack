@@ -3,7 +3,7 @@
 // 問いを順に聞き（①使い方 ②保存先 ③待ち受け ④最初の管理者 ⑤二段階認証 ⑥最初のプロジェクト）、答えから次を作る:
 //
 //   - <dir>/.env（LOOPTRACK_DSN・LOOPTRACK_SECRET_KEY ほか。本人だけ: unix は 0600、Windows は本人だけの ACL。privfile）
-//   - チームのサーバ（起動の方法 --service compose。既定）なら <dir>/compose.yaml（deploy/compose.yaml を元にした雛形）と、
+//   - チームのサーバ（起動の方法 --service compose。既定）なら <dir>/compose.yaml と、
 //     その build が使う <dir>/Dockerfile・<dir>/NOTICE（linux で動いていれば <dir>/looptrack に自分自身も複製する）
 //   - 保存先の DB のスキーマ（マイグレーション）と最初の管理者・二段階認証の設定
 //
@@ -58,6 +58,9 @@ const (
 	DefaultAdminLogin = "admin"
 	// sqliteContainerPath はチームのサーバで SQLite を使うときのコンテナ内のファイル（compose で ./data を /data に置く）。
 	sqliteContainerPath = "/data/im.db"
+	// attachContainerDir はチームのサーバ（compose）の添付の本体の置き場（コンテナの中。ホストの <dir>/data/attachments）。
+	// compose.yaml の environment の LOOPTRACK_ATTACH_DIR に書く。保存先が MySQL でも同じ
+	attachContainerDir = "/data/attachments"
 )
 
 var (
@@ -252,6 +255,20 @@ func apply(ctx context.Context, o Options, plan *Plan, replacing bool) (res *Res
 	// 出力先・SQLite のファイル: 新しく作ったものだけ、失敗したら消す
 	if _, err := mkdirTracked(o.Dir, &undo); err != nil {
 		return nil, err
+	}
+	if plan.compose() && plan.SQLiteFile == "" {
+		// MySQL の compose も添付の置き場として ./data を入れる。無いまま up すると Docker が root の持ち物で作り、
+		// uid 65534 のコンテナが書けない。SQLite のときは下で DB のディレクトリとして作る
+		data := filepath.Join(o.Dir, "data")
+		created, err := mkdirTracked(data, &undo)
+		if err != nil {
+			return nil, err
+		}
+		if created {
+			if err := privfile.ProtectDir(data); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if plan.SQLiteFile != "" {
 		created, err := mkdirTracked(filepath.Dir(plan.SQLiteFile), &undo)

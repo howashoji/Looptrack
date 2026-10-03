@@ -19,7 +19,7 @@ The server (its database) holds the issues, and it is the source of truth. There
 
 1. **Start**: `looptrack issue next` (`next` over MCP). If you have an issue in progress it returns that one; otherwise it moves the highest-ranked issue that is ready to start to In Progress and returns its body, acceptance criteria and related issues. A container such as an epic that still has open children is not counted as in progress even when it is In Progress; pick from its children instead. `--type` (`types` over MCP) also applies to which in-progress issue is picked. To check without changing any status, use `--dry-run` (`dry_run` over MCP).
 2. **Work**: comment the moment you know the cause, the decision or the way forward: `looptrack issue comment <ID> "…"` (`add_comment` over MCP). Do not write only the conclusion afterwards.
-3. **Verify**: check the acceptance criteria one by one.
+3. **Verify**: check the acceptance criteria one by one, and attach the evidence ("Evidence" below).
 4. **Finish**: `looptrack issue close <ID> --comment "the result of verifying the acceptance criteria"` (over MCP, `set_status` to Done with `comment`). Never set Done without leaving the verification result.
    - **Verifying and closing the requirement**: when closing this issue also closes every child of a requirement it points at through traces (the issues that trace to that requirement), the close response ends with one line per requirement urging you to verify and close it (that line holds `looptrack issue show <requirement-ID>` and the close command). **Decide from that command, not from the wording** (the wording changes with the user's language). Do not go straight on to the next `next`: check the requirement's acceptance criteria one by one (`looptrack issue show <requirement-ID>`; `get_issue` over MCP) and, if they are met, close it with `looptrack issue close <requirement-ID> --comment "the result of verifying the acceptance criteria"`. If they are not met, file what is missing (`--traces <requirement-ID>`) and say so in a comment. If it needs the user's decision, set it to In Review.
    - What slips through lines up under "requirements still open although every child is finished" in `looptrack issue matrix` and under (1) in `summary`. A requirement whose children are all Canceled is not counted (they were only decided against, so settle with the user whether to withdraw the requirement (Canceled) or file its children again).
@@ -33,6 +33,15 @@ If there is no user, or no answer, leave it In Review and go on to the next `nex
 If "outside feedback" in `summary` has unanswered items, put them to the user before the next `next`, settle what to do (a comment with the way forward, a new issue, a status change) and leave the answer as a comment with no lead word.
 
 5. On to the next round (back to 1). If nothing is ready to start, look at the whole picture with `looptrack issue ready` / `summary` and talk it over with the user.
+
+### Evidence (attaching proof of verification)
+
+**Once you have verified something, take the evidence and attach it to Looptrack.** A comment that only says "it passed" is something nobody can check afterwards.
+- **What to attach**: above all, the full output of the tests (its tail alone, or a summary, is not enough). If you changed a screen, take a screenshot of that screen too. Attach whatever you generated as well, such as a report, a built artifact or an exported file.
+- **Sending it from the CLI**: `looptrack issue attach <ID> <file>...` attaches the files and prints their attachment IDs. To put them on the verify record, use `looptrack issue verify <ID> --attach <file>`; add `--attach-output` and the full output, before it is cut down, goes on too.
+- **Sending it over MCP**: the MCP tools do not take files. Send them with `looptrack issue attach` from the CLI and pass the IDs that come back in `attachments` of `report_verify`.
+- **No attachment, no Done**: on an issue whose body holds at least one verify command, Done is rejected when the latest verify record for the current body carries no attachment at all. It is rejected when there is no record, too. This is the per-project rule `verify.require_evidence`, which is on by default. Override it (`--override "reason"`; `override_reason` over MCP) only on the user's explicit instruction. A project that turns the key off gets a note instead of a rejection.
+- Never attach a file that shows a secret (a token, a password, a value from `.env`).
 
 ### Filing and editing
 

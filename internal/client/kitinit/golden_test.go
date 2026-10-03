@@ -78,6 +78,22 @@ func TestInitGolden(t *testing.T) {
 	}
 }
 
+// TestInitGoldenEN は英語で導入したときの出力と置いたファイル（案内節を含む）を記録する。
+// 日本語の golden（TestInitGolden）と同じ形で、案内節が英語版になることを本文ごと固定する。
+func TestInitGoldenEN(t *testing.T) {
+	for _, agent := range []string{"claude-code", "codex", "copilot", "codex,copilot"} {
+		name := "en/" + strings.ReplaceAll(agent, ",", "+") + "/none"
+		t.Run(name, func(t *testing.T) {
+			stubs(t, true)
+			root := newRoot(t)
+			args := []string{"--url", fakeURL, "--project", "demo", "--agent", agent}
+			r := runInitIn(t, root, "", map[string]string{"LOOPTRACK_LANG": "en"}, args...)
+			got := golden(t, root, "LOOPTRACK_LANG=en init "+strings.Join(args[2:], " "), r)
+			checkGolden(t, name, maskKitDiffs(got))
+		})
+	}
+}
+
 // maskKitDiffs は dry-run の「作成」の差分のうち、kit のファイルの全文を作るもの（本文は kit の文面）を 1 行に縮める。
 func maskKitDiffs(s string) string {
 	files := embedded()

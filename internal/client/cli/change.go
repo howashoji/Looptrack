@@ -145,7 +145,20 @@ func cmdComment(c *Ctx, v *Values) error {
 	if err != nil {
 		return err
 	}
-	res, err := c.send(cl, "POST", path, jsonorder.NewObject().Set("text", text))
+	// 添付は全部読んで秘密の検査を通してから送る。添付を付けないときは本文に attachments を入れない（古いサーバは知らないキーを拒む）
+	files, err := readAttachments(v.List("attach"))
+	if err != nil {
+		return err
+	}
+	body := jsonorder.NewObject().Set("text", text)
+	if len(files) > 0 {
+		ids, _, err := c.uploadAttachments(cl, v.Str("id"), files, false)
+		if err != nil {
+			return err
+		}
+		body.Set("attachments", ids)
+	}
+	res, err := c.send(cl, "POST", path, body)
 	if err != nil {
 		return err
 	}

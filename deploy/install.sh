@@ -26,8 +26,9 @@
 #     （--require-signature で止める）。公開鍵は looptrack（selfupdate.MinisignPublicKey）・deploy/release/minisign.pub と同じ
 # 保存先に MySQL を選び、アプリ用の利用者を最小権限（deploy/grants.sql）にするときは、流す順番が決まっている:
 #   setup が表を作る → 管理用の資格情報で権限を与える → 起動。表ごとの GRANT は表ができてからしか流せないため。
-#   起動の前に「保存先の確認」でアプリ用の利用者が読めるかを試し、読めなければ管理用の資格情報を端末で尋ねて
-#   looptrack grants apply（権限の中身は実行ファイルに埋め込んだ deploy/grants.sql）で与え、読めることを確かめてから起動する。
+#   起動の前に「保存先の確認」でアプリ用の利用者が読めるかと、grants.sql の全部の表の権限があるか（looptrack grants check）を試し、
+#   足りなければ管理用の資格情報を端末で尋ねて looptrack grants apply（権限の中身は実行ファイルに埋め込んだ deploy/grants.sql）で与え、
+#   そろったことを確かめてから起動する。--upgrade で表が増えたときも同じ確認で気づいて与え直す（読める表があっても見落とさない）。
 #   資格情報はファイル・.env・install.conf・ログに残さない。アプリ用の利用者に DB 単位の広い権限を与える構成では、この確認は素通りする。
 #   DB がまだ無ければ、setup が接続の段（migrate の前）で気づき、同じ処理（looptrack grants apply）を先に動かす
 #   （管理用の資格情報を端末で尋ね、作るかを確かめてから DB・アプリ用の利用者・表・権限を作る）。そのあと起動の前の確認は素通りする。
@@ -53,6 +54,7 @@ CONF_DIR=/etc/looptrack                # systemd の設定（.env）と、どち
 STATE=$CONF_DIR/install.conf           # インストールが最後まで終わった印（2 回目は「設定済み」を示して終わる）
 BIN=/usr/local/bin/looptrack
 DATA_DIR=/var/lib/looptrack            # systemd のデータ（SQLite）
+ATTACH_SYS=$DATA_DIR/attachments       # systemd の添付の本体の置き場（.env の LOOPTRACK_ATTACH_DIR。add_attach_env）
 UNIT=/etc/systemd/system/looptrack.service
 SVC_USER=looptrack
 COMPOSE_DIR_DEFAULT=/opt/looptrack
@@ -595,6 +597,38 @@ add_dist_env() {
   say "  $envf に LOOPTRACK_DIST_DIR='$DIST_ENV' を足しました"
 }
 
+# ---------------------------------------------------------------- 添付の置き場
+
+# add_attach_env — systemd のサーバの .env に LOOPTRACK_ATTACH_DIR を足し、置き場を作る（入れるときと --upgrade のたび。
+# .env に既にあれば、管理者が決めた置き場なので触らない）。置き場は StateDirectory の中なので ProtectSystem=strict でも書ける。
+# serve は $STATE_DIRECTORY からも同じ置き場を決めるが、それに頼らず .env に書く。systemd 239 以前は $STATE_DIRECTORY を渡さず、
+# unit の外で .env を読んで動かす管理のサブコマンドにも届かないから。compose の置き場は setup が compose.yaml に書く
+add_attach_env() {
+  [ "$METHOD" = systemd ] || return 0
+  envf="$DIR/.env"
+  if [ -f "$envf" ] && grep -q '^LOOPTRACK_ATTACH_DIR=' "$envf"; then
+    return 0
+  fi
+  mkdir -p "$ATTACH_SYS"
+  chown "$SVC_USER:$SVC_USER" "$ATTACH_SYS"
+  chmod 0750 "$ATTACH_SYS"
+  if [ -s "$envf" ] && [ -n "$(tail -c 1 "$envf")" ]; then printf '\n' >>"$envf"; fi
+  printf '%s\n' "# install.sh が足した: 添付の本体の置き場（DB とは別にバックアップを取る。docs/server/DEPLOY.md の「添付の置き場とバックアップ」）" \
+    "LOOPTRACK_ATTACH_DIR='$ATTACH_SYS'" >>"$envf"
+  say "  $envf に LOOPTRACK_ATTACH_DIR='$ATTACH_SYS' を足しました"
+}
+
+# warn_compose_attach — 以前の setup が書いた MySQL の compose.yaml には添付の置き場が無い（read_only で、書ける volume も無い）。
+# compose.yaml はこのスクリプトでは書き換えないので、足し方を示すだけにする（サーバは起動し、添付だけが使えない）。
+# SQLite の compose.yaml は ./data を /data に入れているので、serve が DB の隣（/data/attachments）に決める
+warn_compose_attach() {
+  [ "$METHOD" = compose ] && is_mysql || return 0
+  if grep -q 'LOOPTRACK_ATTACH_DIR' "$DIR/compose.yaml" 2>/dev/null; then
+    return 0
+  fi
+  warn "$DIR/compose.yaml に添付の置き場が無いので、添付は使えません（ほかの機能はそのまま動きます）。services.looptrack の volumes に「- ./data:/data」を、environment に「LOOPTRACK_ATTACH_DIR: /data/attachments」を足し、mkdir -p $DIR/data && chown 65534:65534 $DIR/data の後に cd $DIR && docker compose up -d を実行してください（docs/server/DEPLOY.md の「添付の置き場とバックアップ」）"
+}
+
 # sums_hash <名前> — 取得元の SHA256SUMS（get_binary が署名を確かめたもの）の <名前> の行の SHA-256（無ければ空）
 sums_hash() {
   awk -v n="$1" 'NF == 2 { m = $2; sub(/^\*/, "", m); if (m == n) { print tolower($1); exit } }' "$TMP/SHA256SUMS"
@@ -857,7 +891,7 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_buffering off;                 # MCP の応答を溜めない
         proxy_read_timeout 300s;
-        client_max_body_size 20m;
+        client_max_body_size 20m;            # 添付の 1 ファイルの上限（既定 20MiB）より小さくしない
     }
 }
 
@@ -1096,6 +1130,7 @@ install_systemd() {
   step "設定（looptrack setup）"
   run_setup "$@"
   sync_dist # クライアントに配る looptrack（.env に LOOPTRACK_DIST_DIR を足す。setup が .env を書いた後）
+  add_attach_env # 添付の置き場（.env に LOOPTRACK_ATTACH_DIR を足す）
   fix_owner_systemd
   step "systemd の unit"
   write_unit
@@ -1161,6 +1196,7 @@ install_compose() {
   run_setup "$@"
   [ -f "$DIR/compose.yaml" ] || die "$DIR/compose.yaml がありません（compose では setup の ① で「チームのサーバ」を選びます。rm $DIR/.env してやり直してください）"
   sync_dist # クライアントに配る looptrack（compose.yaml が ./dist を /dist に読み取り専用で入れていれば。.env に LOOPTRACK_DIST_DIR='/dist' を足す）
+  warn_compose_attach # 以前の setup が書いた MySQL の compose.yaml には添付の置き場が無い（足し方を示す）
   if [ -d "$DIR/data" ]; then
     # コンテナは uid 65534 で動く（SQLite のファイルを書けるように。im.db は 0600 なので中のファイルごと渡す）
     chown -R 65534:65534 "$DIR/data"
@@ -1208,13 +1244,15 @@ app_run() {
   fi
 }
 
-# check_store_access — 起動の前に、サービスと同じ利用者で保存先を読めるかを確かめる。
+# check_store_access — 起動の前に、サービスと同じ利用者で保存先を読めるか（MySQL では全部の表の権限があるか）を確かめる。
 #
 # MySQL を最小権限（deploy/grants.sql）で使う構成では、権限を与える順番が決まっている: 表ごとの GRANT は
 # 表ができてからしか流せないので、「setup（migrate）が表を作る → 権限を与える → 起動」になる。
-# ここで先に読んでみて、読めなければ管理用の資格情報を端末で尋ね、looptrack grants apply で権限を与えてから
-# もう一度読む（黙って起動して 60 秒待たない）。与えられなければ、起動せずに止める。設定（.env）は残るので、
+# ここで先に確かめて（store_readable）、足りなければ管理用の資格情報を端末で尋ね、looptrack grants apply で権限を与えてから
+# もう一度確かめる（黙って起動して 60 秒待たない）。与えられなければ、起動せずに止める。設定（.env）は残るので、
 # もう一度実行すると setup を飛ばし、尋ねるところから続く。
+# --upgrade で migrate が表を足したときもここを通る。新しい表の権限はまだ無いが、ほかの表は読めるので、
+# 読めるかだけでは気づけない（/healthz も 200 を返し、新しい表を使う操作だけが失敗する）。だから全部の表を確かめる。
 # ついでに、読めたときは最初のプロジェクトの slug を控える（MCP の接続設定に出す）。
 #
 # 権限を与えるのは MySQL のときだけ。ここまで来ていれば setup（migrate）は繋がっているので、
@@ -1238,7 +1276,7 @@ check_store_access() {
   retry="$ONE_LINER"
   if [ "$ACTION" = upgrade ]; then retry="$ONE_LINER -s -- --upgrade"; fi
   printf '%s\n' "$out" >&2
-  step "MySQL の権限（アプリ用の利用者はまだ表を読めません。管理用の資格情報で権限を与えます）"
+  step "MySQL の権限（アプリ用の利用者はまだ表を読めないか、権限の足りない表があります。管理用の資格情報で権限を与えます）"
   say "  表ごとの GRANT は表ができてからしか流せないので、setup（表を作る）の後のここで与えます。"
   say "  管理用の資格情報は接続にだけ使い、保存しません。"
   if ! grants_apply; then
@@ -1251,14 +1289,18 @@ check_store_access() {
     return 0
   fi
   printf '%s\n' "$out" >&2
-  die "権限を与えた後も、MySQL の保存先をアプリ用の利用者で読めません（上の出力）。サービスは起動していません。
+  die "権限を与えた後も、MySQL の保存先をアプリ用の利用者で読めないか、権限の足りない表があります（上の出力）。サービスは起動していません。
 $DIR/.env の LOOPTRACK_DSN（アプリが使う接続先）が、権限を与えた DB・利用者と合っているかを確かめてください。
 表を作るときの接続先（LOOPTRACK_SETUP_DSN・LOOPTRACK_SETUP_MIGRATE_DSN）とは別に指定しています。"
 }
 
-# store_readable — サービスと同じ利用者・設定で保存先を読む（読めたら最初のプロジェクトの slug を控える）。出力は $out
+# store_readable — サービスと同じ利用者・設定で保存先を読み、MySQL では全部の表の権限があるかも確かめる
+# （store_grants_complete）。そろっていれば最初のプロジェクトの slug を控える。足りない・読めないときの出力は $out
 store_readable() {
   if out=$(app_run project list 2>&1); then
+    if is_mysql && ! store_grants_complete; then
+      return 1
+    fi
     say "  読めました"
     if [ -z "$PROJECT" ]; then
       # project list の 1 行目は見出し（SLUG PREFIX …）。2 行目の 1 列目が最初のプロジェクト
@@ -1267,6 +1309,38 @@ store_readable() {
     return 0
   fi
   return 1
+}
+
+# store_grants_complete — MySQL のアプリ用の利用者に、grants.sql の全部の表の権限があるか（looptrack grants check）。
+# 確かめの規則は looptrack の中（dbgrants.Check）の 1 か所だけに置き、ここは終了コードを読むだけにする。
+#   0: そろっている / 3: 足りない（足りない表と権限を $out に入れて 1 を返す。呼び出し元が権限を与え直す段に進む）
+#   2: 2 通りある。grants check を持たない前の版の実行ファイル（--version で古い版を入れたとき。使い方を出して 2）と、
+#      知っているのに 2 で終わったとき（Go の panic も 2）。終了コードでは見分けられないので、使い方（grants help）に
+#      grants check があるかで見分ける。無ければこれまでどおり読めたことだけで進み、あれば注意を出して 1 を返す
+#      （確かめられないまま起動せず、権限を与え直す段に進む。止める側に倒す）
+#   ほか（確かめそのものの失敗）: 注意を出して進む（読めることは project list で確かめ済み）
+store_grants_complete() {
+  grc=0
+  gout=$(app_run grants check 2>&1) || grc=$?
+  case $grc in
+    0) return 0 ;;
+    3)
+      out=$gout
+      return 1
+      ;;
+    2)
+      hout=$(app_run grants help 2>&1) || true
+      case $hout in
+        *"looptrack grants check"*) ;;
+        *) return 0 ;; # grants check を持たない前の版
+      esac
+      warn "looptrack grants check が終了コード 2 で終わりました（権限を確かめられません。権限を与え直す段に進みます）: $gout"
+      out=$gout
+      return 1
+      ;;
+  esac
+  warn "表ごとの権限を確かめられませんでした（このまま進みます）: $gout"
+  return 0
 }
 
 # grants_apply — .env の接続先（LOOPTRACK_DSN）に、管理用の資格情報で最小権限を与える（looptrack grants apply）。
@@ -1779,6 +1853,7 @@ upgrade() {
     if [ -n "$db" ]; then restrict_sqlite "$db"; fi
     # 起動する新しい版が起動時に配布物を確かめるので、起動の前に置く（無人の更新が戻すときは rollback_dist で前の版の配布に戻す）
     add_dist_env
+    add_attach_env # 添付の置き場（以前の install.sh で入れたサーバの .env には無い）
     commit_dist
     step "起動"
     systemctl daemon-reload || die "systemctl daemon-reload に失敗しました（上の出力）。新しい版 $NEW_VERSION を起動していません"
@@ -1810,6 +1885,7 @@ upgrade() {
     if [ -n "$db" ]; then restrict_sqlite "$db"; fi
     # 起動する新しい版が起動時に配布物を確かめるので、起動の前に置く（無人の更新が戻すときは rollback_dist で前の版の配布に戻す）
     add_dist_env
+    warn_compose_attach # 以前の setup が書いた MySQL の compose.yaml には添付の置き場が無い（足し方を示す）
     commit_dist
     step "起動"
     compose up -d
@@ -1832,7 +1908,7 @@ uninstall() {
   METHOD=$S_METHOD
   DIR=$S_DIR
   if [ "$PURGE" = 1 ] && [ "$YES" = 0 ]; then
-    say "--purge は設定（LOOPTRACK_SECRET_KEY を含む $DIR/.env）とデータ（SQLite）を消します。元に戻せません。"
+    say "--purge は設定（LOOPTRACK_SECRET_KEY を含む $DIR/.env）とデータ（SQLite と添付の本体）を消します。元に戻せません。"
     say "MySQL のデータベースは消しません（必要なら自分で DROP してください）。"
     ask "続けるなら purge と入力" ""
     [ "$ans" = purge ] || die "中止しました（何も変えていません）"
