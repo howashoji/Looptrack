@@ -94,6 +94,28 @@ func special() []Case {
 			Routes: []Route{r("PATCH", pIssue1, ok(pushRes))}},
 		{Name: "push/rebase-without-conflict", Args: []string{"push", "DEMO-0001", "--rebase"}, Seeds: workSeeds},
 
+		// ---- 添付（テキストのファイルに秘密らしい文字列があれば、1 件も送らずに止める）
+		{Name: "attach/secret", Args: []string{"attach", "DEMO-0001", "notes.txt", "env.txt"},
+			Seeds:  append([]Seed{{Path: "ws/env.txt", Content: "ok\nexport TOKEN=abc123\n"}}, attachSeeds...),
+			Routes: []Route{r("POST", pIssue1+"/attachments", created(attachRes(11, "notes.txt", "text/plain; charset=utf-8", 12)))}},
+		{Name: "attach/missing-file", Args: []string{"attach", "DEMO-0001", "no-such.png"}},
+		{Name: "attach/old-server", Args: []string{"attach", "DEMO-0001", "notes.txt"}, Seeds: attachSeeds},
+		{Name: "comment/attach-secret", Args: []string{"comment", "DEMO-0001", "見て", "--attach", "env.txt"},
+			Seeds:  []Seed{{Path: "ws/env.txt", Content: "Authorization: Bearer eyJhbGciOi\n"}},
+			Routes: []Route{r("POST", pIssue1+"/comments", created(commentRes))}},
+		{Name: "verify/attach-output", Args: []string{"verify", "DEMO-0001", "--attach-output", "--attach", "notes.txt"}, Seeds: attachSeeds, Routes: []Route{
+			r("GET", pIssue1+"/verify", ok(verifyPlan([]string{"echo ok", "echo password=hunter2"}, ""))),
+			r("POST", pIssue1+"/attachments", created(attachRes(21, "verify-output-DEMO-0001.txt", "text/plain; charset=utf-8", 60)), created(attachRes(22, "notes.txt", "text/plain; charset=utf-8", 12))),
+			r("POST", pIssue1+"/verify", created(`{"message":"verify を記録: DEMO-0001（2/2 成功）","attachments":[21,22]}`))}},
+		{Name: "verify/attach-secret", Args: []string{"verify", "DEMO-0001", "--attach", "env.txt"}, Seeds: []Seed{{Path: "ws/env.txt", Content: "api_key: sk-live\n"}},
+			Routes: []Route{r("GET", pIssue1+"/verify", ok(verifyPlan([]string{"echo ok"}, ""))), r("POST", pIssue1+"/verify", created(verifyPosted))}},
+		{Name: "verify/attach-with-list", Args: []string{"verify", "DEMO-0001", "--list", "--attach", "notes.txt"}, Seeds: attachSeeds,
+			Routes: []Route{r("GET", pIssue1+"/verify", ok(verifyPlan([]string{"echo ok"}, "")))}},
+		{Name: "verify/attach-fails", Args: []string{"verify", "DEMO-0001", "--attach-output"}, Routes: []Route{
+			r("GET", pIssue1+"/verify", ok(verifyPlan([]string{"echo ok"}, ""))),
+			r("POST", pIssue1+"/attachments", ErrorResponse(413, "attachment_too_large", "ファイルが 1 ファイルの上限（10 バイト）を超えています")),
+			r("POST", pIssue1+"/verify", created(verifyPosted))}},
+
 		// ---- verify の実行結果
 		{Name: "verify/no-commands", Args: []string{"verify", "DEMO-0001"},
 			Routes: []Route{r("GET", pIssue1+"/verify", ok(`{"id":"DEMO-0001","body_sha256":"00","commands":[],"message":"DEMO-0001 に検証コマンドの節がありません"}`))}},

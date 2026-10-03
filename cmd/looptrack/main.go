@@ -14,7 +14,9 @@
 //	                                   compact は全文の書き直しを版照合とロックつきで行う。internal/client/hook/loop）
 //	looptrack report pdf --report 集計.json --content 本文.json --out X.pdf
 //	                                   トークンレポートの PDF（build_report_pdf.py の Go 版。internal/client/report/pdf）
-//	looptrack self-update [--check]     サーバの配布（GET /api/v1/dist の binaries）から最新の looptrack に置き換える
+//	looptrack self-update [--check] [--from github|server]
+//	                                   最新の looptrack に置き換える。--url か LOOPTRACK_API_URL があればサーバの配布
+//	                                   （GET /api/v1/dist の binaries）、どちらも無ければ GitHub のリリースの署名つきの書庫から
 //	                                   （internal/client/selfupdate）
 //	looptrack doctor                   PATH・hook の配線・導入の記録・配布の版を確かめる（internal/client/kitinit）
 //	looptrack worktree list|prune|mark 作業が終わった作業ツリーとブランチの後始末（internal/client/worktree）
@@ -23,7 +25,7 @@
 //	                                   desktop ビルド（-tags desktop）は引数なしの起動（ダブルクリック）もこれ。headless はトレイなし
 //
 // サーバの操作（setup・serve・user・member・token・settings・project・secret-key・healthcheck・migrate・import・verify・
-// export・verify-files・repair-lists）は server.go の serverCommands。クライアントのサブコマンドと名前は重ならない。
+// export・verify-files・repair-lists・repair-attachments）は server.go の serverCommands。クライアントのサブコマンドと名前は重ならない。
 //
 //	looptrack version                  版とビルドの種類（headless / desktop）。サーバとクライアントで 1 つ
 //

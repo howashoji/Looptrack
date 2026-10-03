@@ -63,23 +63,23 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
       +<!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
       +## 課題管理（イシュー管理サーバ）
       +
-      +**作業はイシュー登録から始める。会話だけで進めない。不具合は発覚と同時に起票する。**
+      +**作業はイシュー登録から始めます。会話だけで進めないでください。不具合は発覚と同時に起票します。**
       +
-      +- **操作は MCP のツール（サーバ名 looptrack）で行う**（GitHub Copilot。VS Code は `.vscode/mcp.json`、Copilot CLI はリポジトリの `.github/mcp.json` か `~/.copilot/mcp-config.json` の looptrack。
-      +  CLI の MCP のツールは呼ぶたびに承認が要る。利用者が `copilot --allow-tool='looptrack'` で起動すれば要らない）。
-      +  CLI（`looptrack issue`）は MCP に無い操作だけに使う
-      +- **使い方とルールは最初に `guide` ツールで読む**（共通規則 + このプロジェクトのルール + 運用文書を 1 回で返す）
+      +- **操作は MCP のツール（サーバ名 looptrack）で行います。** GitHub Copilot の接続先は、VS Code が `.vscode/mcp.json`、Copilot CLI がリポジトリの `.github/mcp.json` か `~/.copilot/mcp-config.json` の looptrack。
+      +  CLI の MCP のツールは呼ぶたびに承認が要ります。利用者が `copilot --allow-tool='looptrack'` で起動すれば要りません。
+      +  CLI（`looptrack issue`）は MCP に無い操作だけに使います
+      +- **使い方とルールは、最初に `guide` ツールで読みます**。共通規則 + このプロジェクトのルール + 運用文書を 1 回で返します
       +- ループ運用の 1 周: `next`（着手）→ 作業 → `add_comment`（分かった時点で記録）→ 受け入れ条件を検証 → `set_status` で Done（`comment` に検証結果）→ 次の `next`。
-      +  起票は `create_issue`、本文の編集は `get_issue` で version と全文を取り `update_issue` に直した全文を渡す。拒否されたらメッセージの指示に従う
+      +  起票は `create_issue` です。本文の編集では `get_issue` で version と全文を取り、`update_issue` に直した全文を渡します。拒否されたらメッセージの指示に従ってください
       +- 検証コマンド（本文の「## 検証コマンド」節）: `verify_issue` で一覧を取り、手元のシェルで順に全部実行して、結果を `report_verify` で送る
       +- トークン情報: 利用者が GitHub Copilot の OpenTelemetry のファイル出力を有効にすると、フック（`.github/hooks/looptrack.json` の `looptrack hook usage`）が
-      +  MCP の操作・ターン終了のたびにイシューへ付ける（手順は AI-GUIDE §7-3-1）。有効にしていなければ付かず、未付与にも数えない。
-      +  Copilot CLI のシェルでは `looptrack issue usage attach <ID>` で付けられる（`COPILOT_AGENT_SESSION_ID` から会話を特定し、OTel のファイル出力から付ける）。
-      +  **VS Code の Copilot では `looptrack issue usage attach` を実行しない**（シェルにセッション ID が渡らず付けられない）
-      +- CLI が要るのは: `looptrack issue login --browser --url http://127.0.0.1:9/im`（初回だけ。フックの SessionStart が使うトークン。開いたブラウザで利用者がログインと承認をする）・
-      +  導入と更新（`init`・`installed`。`setup` ツールが返す手順どおり）。CLI を打つときはコマンドの前に `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` を付ける
-      +- MCP の looptrack が接続されていないときは、CLI の `next` / `comment` / `verify` / `close --comment` で同じ 1 周を回す（`LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` を前に付ける）。
-      +  本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡す。利用者に MCP の接続設定を勧める
+      +  MCP の操作・ターン終了のたびにイシューへ付けます（手順は AI-GUIDE §7-3-1）。有効にしていなければ付かず、未付与にも数えません。
+      +  Copilot CLI のシェルでは `looptrack issue usage attach <ID>` で付けられます。`COPILOT_AGENT_SESSION_ID` から会話を特定し、OTel のファイル出力から付ける仕組みです。
+      +  **VS Code の Copilot では `looptrack issue usage attach` を実行しないでください**。シェルにセッション ID が渡らず、付けられません
+      +- CLI が要る場面: `looptrack issue login --browser --url http://127.0.0.1:9/im`（初回だけ）と導入・更新（`init`・`installed`）。login で取るのはフックの SessionStart が使うトークンで、開いたブラウザで利用者がログインと承認をします。
+      +  導入・更新は `setup` ツールが返す手順どおりに行います。CLI を打つときはコマンドの前に `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` を付けてください
+      +- MCP の looptrack が接続されていないときは、CLI の `next` / `comment` / `verify` / `close --comment` で同じ 1 周を回します。`LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` は前に付けます。
+      +  本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡し、利用者には MCP の接続設定を勧めてください
       +- 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
       +<!-- looptrack:end -->
   作成         .claude/.looptrack-kit.json

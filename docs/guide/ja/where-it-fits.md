@@ -1,6 +1,6 @@
 # 本システムの位置: 3 層のどこに何が当たるか
 
-[ガイドの目次](README.md) · 前: [概念](concepts.md) · 次: [始め方](getting-started.md)
+[ガイドの目次](README.md) · 前: [概念](concepts.md) · 次: [サーバ版の始め方](server/getting-started.md) · [デスクトップ版の始め方](desktop/getting-started.md)
 
 ## 全体の図
 
@@ -57,7 +57,7 @@ flowchart LR
 ## プロジェクト別ルール
 
 サーバが守らせる規則は、プロジェクトごとに足せます。
-設定するのは管理者。詳しくは[管理者の手引き](admin.md)にあります。
+設定するのは管理者。詳しくは[管理者の手引き](server/admin.md)にあります。
 
 | ルール | 働き |
 | -- | -- |

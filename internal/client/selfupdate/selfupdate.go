@@ -1,6 +1,10 @@
 // Package selfupdate は looptrack self-update（DESIGN.md §5-1「配布と更新」）。
 //
-//	looptrack self-update [--check] [--force] [--url URL]
+//	looptrack self-update [--check] [--force] [--url URL] [--from github|server]
+//
+// 取得元は 2 つ。--from が無ければ、--url か LOOPTRACK_API_URL があればサーバの配布、どちらも無ければ GitHub のリリース。
+// 片方で失敗しても、もう片方へは切り替えない。GitHub のリリースから取る経路は github.go（署名が必須・--force は受けない）。
+// 以下はサーバの経路。
 //
 // サーバの配布の一覧（GET /api/v1/dist の binaries）から自分の OS・CPU の版を取り、SHA-256 を確かめてから実行中のファイルを置き換える。
 //   - 比べるのは relver の順（semver）。手元が最新以上なら何もしない。比べられない版（dev・日付-コミット ID）は --force のときだけ置き換える
@@ -110,6 +114,8 @@ type Options struct {
 	Exe     string // 置き換える実行ファイル（既定 os.Executable の実体）
 	// Install は install.sh で入れたサーバの判定に使う置き場（nil なら DefaultServerInstall。テストで差し替える）
 	Install *ServerInstall
+	// HTTPClient は GitHub の経路の取得に使う（nil なら既定。テストは httptest のクライアントを渡す）
+	HTTPClient *http.Client
 }
 
 // ServerInstall は deploy/install.sh が置く実行ファイルと、install.sh が作る設定の置き場。
@@ -158,10 +164,16 @@ func samePath(a, b string) bool {
 	return false
 }
 
+// 取得元（--from）。
+const (
+	sourceGitHub = "github"
+	sourceServer = "server"
+)
+
 // Main は looptrack self-update の本体（終了コードを返す）。
 func Main(args []string, o Options) int {
 	lang := i18n.FromEnv(o.Env.Get)
-	check, force, url := false, false, ""
+	check, force, url, from := false, false, "", ""
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; {
 		case a == "--check":
@@ -173,28 +185,71 @@ func Main(args []string, o Options) int {
 			url = args[i]
 		case strings.HasPrefix(a, "--url="):
 			url = strings.TrimPrefix(a, "--url=")
+		case a == "--from" && i+1 < len(args):
+			i++
+			from = args[i]
+		case strings.HasPrefix(a, "--from="):
+			from = strings.TrimPrefix(a, "--from=")
 		case a == "-h" || a == "--help":
 			fmt.Fprint(o.Stdout, usage(lang))
 			return 0
 		default:
-			fmt.Fprint(o.Stderr, i18n.T(lang, "cmd.prefix.error", "msg", i18n.T(lang, "selfupdate.err.unknown_arg", "arg", a))+"\n"+usage(lang))
-			return 2
+			return usageError(lang, o, i18n.T(lang, "selfupdate.err.unknown_arg", "arg", a))
 		}
 	}
-	if err := run(lang, o, check, force, url); err != nil {
+	src, err := source(from, url, o.Env)
+	if err != nil {
+		return usageError(lang, o, i18n.Text(lang, err))
+	}
+	if src == sourceGitHub && force {
+		// GitHub のリリースからは新しい版だけを入れる（古い版へ戻す道を作らない）
+		return usageError(lang, o, i18n.T(lang, "selfupdate.err.force_github"))
+	}
+	if o.GOOS == "" {
+		o.GOOS, o.GOARCH = runtime.GOOS, runtime.GOARCH
+	}
+	if src == sourceGitHub {
+		err = runGitHub(lang, o, check)
+	} else {
+		err = run(lang, o, check, force, url)
+	}
+	if err != nil {
 		fmt.Fprintln(o.Stderr, i18n.T(lang, "cmd.prefix.error", "msg", err))
 		return 1
 	}
 	return 0
 }
 
+// usageError は引数の誤りを使い方つきで出し、終了コード 2 を返す。
+func usageError(lang i18n.Lang, o Options, msg string) int {
+	fmt.Fprint(o.Stderr, i18n.T(lang, "cmd.prefix.error", "msg", msg)+"\n"+usage(lang))
+	return 2
+}
+
+// source は取得元を決める。--from が無ければ、--url か LOOPTRACK_API_URL があればサーバ、どちらも無ければ GitHub。
+// 片方で失敗しても、もう片方へは切り替えない（どこから取ったかを利用者が決められるように）。
+func source(from, url string, e env.Env) (string, error) {
+	switch from {
+	case "":
+		if url != "" || e.Value(env.APIURL) != "" {
+			return sourceServer, nil
+		}
+		return sourceGitHub, nil
+	case sourceServer:
+		return sourceServer, nil
+	case sourceGitHub:
+		if url != "" {
+			return "", i18n.Errorf("selfupdate.err.from_url")
+		}
+		return sourceGitHub, nil
+	}
+	return "", i18n.Errorf("selfupdate.err.bad_from", "value", from)
+}
+
 // usage は --help と、知らない引数のときに出す使い方。
 func usage(lang i18n.Lang) string { return i18n.T(lang, "selfupdate.usage") }
 
 func run(lang i18n.Lang, o Options, check, force bool, url string) error {
-	if o.GOOS == "" {
-		o.GOOS, o.GOARCH = runtime.GOOS, runtime.GOARCH
-	}
 	vars := map[string]string{}
 	if url != "" {
 		vars[env.Name(env.APIURL)] = url
@@ -226,25 +281,9 @@ func run(lang i18n.Lang, o Options, check, force bool, url string) error {
 		fmt.Fprintln(o.Stdout, i18n.T(lang, "selfupdate.available", "local", o.Version, "dist", b.Version, "os", o.GOOS, "arch", o.GOARCH))
 		return nil
 	}
-	exe := o.Exe
-	if exe == "" {
-		if exe, err = os.Executable(); err != nil {
-			return i18n.Wrapf(err, "selfupdate.err.exe_unknown")
-		}
-		if r, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = r
-		}
-	}
-	if strings.Contains(filepath.ToSlash(exe), ".app/Contents/") {
-		return i18n.Errorf("selfupdate.err.in_app", "exe", exe)
-	}
-	inst := DefaultServerInstall
-	if o.Install != nil {
-		inst = *o.Install
-	}
-	if m, ok := InstalledServer(o.GOOS, exe, inst); ok {
-		// 置き換えると migrate も再起動もされず、動いているサーバと実行ファイルの版がずれる
-		return i18n.Errorf("selfupdate.err.installed_server", "exe", exe, "marker", m)
+	exe, err := target(o)
+	if err != nil {
+		return err
 	}
 	cleanupOld(exe)
 	body, err := download(lang, cl, b)
@@ -263,6 +302,32 @@ func run(lang i18n.Lang, o Options, check, force bool, url string) error {
 	}
 	fmt.Fprintln(o.Stdout, i18n.T(lang, "selfupdate.note.reinit"))
 	return nil
+}
+
+// target は置き換える実行ファイル（シンボリックリンクを解いた実体）。アプリの中と、install.sh で入れたサーバは置き換えない。
+func target(o Options) (string, error) {
+	exe := o.Exe
+	if exe == "" {
+		var err error
+		if exe, err = os.Executable(); err != nil {
+			return "", i18n.Wrapf(err, "selfupdate.err.exe_unknown")
+		}
+		if r, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = r
+		}
+	}
+	if strings.Contains(filepath.ToSlash(exe), ".app/Contents/") {
+		return "", i18n.Errorf("selfupdate.err.in_app", "exe", exe)
+	}
+	inst := DefaultServerInstall
+	if o.Install != nil {
+		inst = *o.Install
+	}
+	if m, ok := InstalledServer(o.GOOS, exe, inst); ok {
+		// 置き換えると migrate も再起動もされず、動いているサーバと実行ファイルの版がずれる
+		return "", i18n.Errorf("selfupdate.err.installed_server", "exe", exe, "marker", m)
+	}
+	return exe, nil
 }
 
 // overlay は環境変数に上書きを重ねる（値が空なら消す）。

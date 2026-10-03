@@ -128,7 +128,7 @@ func onReady(a *desktop.App) {
 	ua := miUpdateAuto(lang)
 	updateAuto := systray.AddMenuItemCheckbox(ua.Label, ua.Tip, a.UpdateAutoEnabled())
 	if !a.ReplaceSupported() {
-		updateAuto.Hide() // Windows・.app / AppImage の外では置き換えない
+		updateAuto.Hide() // .app・AppImage・Looptrack.exe の外では置き換えない
 	}
 	// 版の表示（クリックできない）。rc を含む版をホバーのツールチップだけでなく、開かなくても
 	// 見える項目としても出す（利用者の決定: 画面にも rc を含む版を出す）。

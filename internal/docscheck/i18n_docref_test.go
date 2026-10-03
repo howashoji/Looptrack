@@ -125,3 +125,17 @@ func TestI18nDocRefsPointToRealHeadings(t *testing.T) {
 	}
 	t.Logf("対訳表から docs/guide/ への案内を %d 件確かめました", len(refs))
 }
+
+// TestScanDocRefsSubdirectory は、版ごとのサブディレクトリ（docs/guide/desktop/・docs/guide/server/）への案内を
+// scanDocRefs が日英それぞれの実物のパスに直すことを確かめる。日本語版は docs/guide/ja/ の下に同じ階層で置くので、
+// ja の側は docs/guide/ja/desktop/… になる（docs/guide/desktop/ja/… ではない）。
+func TestScanDocRefsSubdirectory(t *testing.T) {
+	ja := scanDocRefs(map[string]string{"k": "アプリごと置き換えてください（docs/guide/desktop/updating.md「更新」）"}, true)
+	en := scanDocRefs(map[string]string{"k": `replace the whole application (see "Update" in docs/guide/desktop/updating.md)`}, false)
+	if len(ja) != 1 || ja[0].docPath != "docs/guide/ja/desktop/updating.md" || ja[0].heading != "更新" {
+		t.Errorf("ja の案内の読み取りが違います: %+v", ja)
+	}
+	if len(en) != 1 || en[0].docPath != "docs/guide/desktop/updating.md" || en[0].heading != "Update" {
+		t.Errorf("en の案内の読み取りが違います: %+v", en)
+	}
+}

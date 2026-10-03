@@ -159,7 +159,7 @@ func reviewHeading(lang i18n.Lang, items []reviewItemJSON) string {
 }
 
 func feedbackHeading(lang i18n.Lang, fb feedbackJSON) string {
-	return i18n.T(lang, "server.api.summary.layer_feedback", "count", fb.Count, "issues", fb.IssueCount)
+	return i18n.TN(lang, "server.api.summary.layer_feedback", fb.IssueCount, "count", fb.Count, "issues", fb.IssueCount)
 }
 
 // selfReportedNote は ② の行末に付ける印（直近の verify が MCP の自己申告のとき。以前の CLI と同じ文言）。
@@ -203,7 +203,7 @@ func feedbackLayerText(lang i18n.Lang, fb feedbackJSON, loc *time.Location) stri
 		fmt.Fprintf(&b, "%-9s %s\n", it.ID, i18n.T(lang, "server.api.summary.feedback_row", "at", at, "count", it.Pending, "excerpt", it.Excerpt))
 	}
 	if rest := fb.IssueCount - len(fb.Issues); rest > 0 {
-		b.WriteString(i18n.T(lang, "server.api.summary.feedback_more", "count", rest) + "\n")
+		b.WriteString(i18n.TN(lang, "server.api.summary.feedback_more", rest, "count", rest) + "\n")
 	}
 	return b.String()
 }

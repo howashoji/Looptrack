@@ -33,6 +33,9 @@ type VerifyDetail struct {
 	SelfReported bool `json:"self_reported,omitempty"`
 	// Cached は results のどれかに結果キャッシュの印があった注記（無ければ省く。成否・件数は変えない）
 	Cached bool `json:"cached,omitempty"`
+	// Attachments はエビデンスとして記録に付けた、そのイシューの添付の ID（無ければ省く）。
+	// 「いまの本文に対する最新の記録にエビデンスがあるか」は、LastVerify の BodySHA256 と、これが空でないかで読める
+	Attachments []int64 `json:"attachments,omitempty"`
 }
 
 // VerifyEvent は直近の verify の記録。

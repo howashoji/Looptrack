@@ -1,0 +1,214 @@
+# LOOPTRACK_LANG=en init --project demo --agent codex,copilot
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws (project demo, http://127.0.0.1:9/im, AI codex, copilot)
+kit source: the kit embedded in the executable (looptrack dev)
+Wiring: looptrack hook <name> --agent <AI>
+Install set: core only. loop is not installed (--loop installs it).
+  create     .codex/hooks.json
+  create     .codex/config.toml
+  create     .github/hooks/looptrack.json
+  create     AGENTS.md
+  create     .claude/.looptrack-kit.json
+verify: checked 8 wiring(s), looptrack dev（headless・test）
+Next:
+  1. Trust the Codex hooks (see "Trusting hooks" below; run /hooks in the codex terminal)
+  2. Copilot: start a new chat (VS Code) or a new session (Copilot CLI, trusting this folder) so the hooks in .github/hooks/looptrack.json are loaded
+  3. No token yet: run looptrack issue login --browser --url http://127.0.0.1:9/im and log in and approve in the browser it opens (the AI may run this; it waits up to 5 minutes, so set the command timeout longer than 5 minutes. Without a browser, issue a token at http://127.0.0.1:9/im/account and paste it into login --url http://127.0.0.1:9/im).
+  4. Check (Codex): in a new session the MCP setup tool answers "already installed" and guide -> next (dry_run) works. Use the CLI only for what MCP does not have (AGENTS.md).
+  5. Check (Copilot): in a new session the MCP setup tool answers "already installed" and guide -> next (dry_run) works. Use the CLI only for what MCP does not have (AGENTS.md).
+Codex setup:
+
+  - The AI works mainly through the MCP tools (see AGENTS.md). You add the MCP connection to ~/.codex/config.toml yourself (init does not write it):
+
+      [mcp_servers.looptrack]
+      url = "http://127.0.0.1:9/im/mcp"
+      http_headers = { "X-Looptrack-Project" = "demo" }
+      # Authentication is the browser approval (codex mcp login looptrack)
+
+  - init wrote LOOPTRACK_API_URL / LOOPTRACK_PROJECT into the set of [shell_environment_policy] in .codex/config.toml (the project one)
+    (for the looptrack issue commands the AI runs for what MCP does not have. It does not open the sandbox network; every CLI run still needs your approval)
+  - Trusting hooks: Codex only runs hooks when the project is trusted and each hook has been trusted (untrusted or changed hooks are skipped silently). Start the Codex CLI (codex) in this directory and use /hooks to review and trust the hooks in .codex/hooks.json. The trust is recorded under [hooks.state] in ~/.codex/config.toml and applies to the desktop app too (/hooks is not a command in the desktop chat box). It takes effect in sessions started after that.
+  - When init changes the hook wiring (a re-run shows "updated .codex/hooks.json"), trust the changed hooks again the same way
+  - The old notify setting has been replaced by hooks (existing notify settings are left alone; update an old Codex that has no hooks)
+  - The freshness guard (which stops on Stop) is wired for Claude Code only
+GitHub Copilot setup (VS Code agent mode and Copilot CLI. Copilot CLI was checked against 1.0.86 on 2026-09-19; VS Code only against the official docs, not against the real thing):
+
+  - The AI works mainly through the MCP tools (see AGENTS.md). You add the MCP connection yourself (init writes .vscode/mcp.json only with --mcp):
+      VS Code (.vscode/mcp.json; the first connection asks for approval in the browser):
+        {"servers": {"looptrack": {"type": "http", "url": "http://127.0.0.1:9/im/mcp", "headers": {"X-Looptrack-Project": "demo"}}}}
+      Copilot CLI (.github/mcp.json or .mcp.json in the repository, or ~/.copilot/mcp-config.json. tools is required.
+      Since 1.0.22 it no longer reads .vscode/mcp.json. init writes .github/mcp.json only with --mcp. Authentication is /mcp auth looptrack in copilot):
+        {"mcpServers": {"looptrack": {"type": "http", "url": "http://127.0.0.1:9/im/mcp", "headers": {"X-Looptrack-Project": "demo"}, "tools": ["*"]}}}
+    Every MCP tool call in Copilot CLI needs approval. To allow them up front, start it with copilot --allow-tool='looptrack'
+  - Hooks (.github/hooks/looptrack.json): VS Code reads .github/hooks/*.json by default (a Preview feature; your organization may have it disabled).
+    Copilot CLI reads them only when you trusted this folder at startup ("always trust"). Both take effect in a new session.
+    The output is written in both the CLI form (top level) and the VS Code form (hookSpecificOutput). VS Code ignores matcher, so the hook itself filters on the tool name
+  - Windows: the hook is looptrack (the same looptrack hook is also placed in the powershell / windows fields for PowerShell; not checked on real Windows).
+    If the install is not recognized, report it with looptrack issue installed --agent copilot
+  - The token metering hook (looptrack hook usage --agent copilot; PostToolUse, Stop, SessionEnd) was installed. Metering happens once you enable Copilot's OpenTelemetry file output
+    (write it under ${COPILOT_HOME:-~/.copilot}/otel/. Copilot CLI does not pass the output path to the hook. See docs/AI-GUIDE.md section 7-3-1). Without it nothing is sent, and Copilot's actions are not counted as missing
+  - The freshness guard (which stops on Stop) is wired for Claude Code only
+  - The CLI the AI runs does not get LOOPTRACK_API_URL / LOOPTRACK_PROJECT (Copilot has no environment variable setting). AGENTS.md explains prefixing them.
+
+#### stderr
+
+#### files
+.claude/.looptrack-kit.json (0644)
+    {
+      "version": 1,
+      "url": "http://127.0.0.1:9/im",
+      "project": "demo",
+      "agent": [
+        "codex",
+        "copilot"
+      ],
+      "source": "copy",
+      "core": {
+        "bundle_sha256": "$SHA256",
+        "files": {
+          "kit/core/skills/issue/SKILL.md": "$SHA256",
+          "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+        }
+      },
+      "loop": {
+        "installed": false
+      }
+    }
+.codex/config.toml (0644)
+    # Added by looptrack issue init: tells the looptrack issue commands the AI runs where the issue server is (it does not open the sandbox to the network)
+    [shell_environment_policy]
+    set = { LOOPTRACK_API_URL = "http://127.0.0.1:9/im", LOOPTRACK_PROJECT = "demo" }
+.codex/hooks.json (0644)
+    {
+      "hooks": {
+        "SessionStart": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "SessionEnd": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ]
+      }
+    }
+.github/hooks/looptrack.json (0644)
+    {
+      "version": 1,
+      "hooks": {
+        "SessionStart": [
+          {
+            "type": "command",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent copilot",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent copilot",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook summary --agent copilot",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook summary --agent copilot",
+            "timeoutSec": 10
+          }
+        ],
+        "PostToolUse": [
+          {
+            "type": "command",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event PostToolUse",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event PostToolUse",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event PostToolUse",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event PostToolUse",
+            "timeoutSec": 10
+          }
+        ],
+        "Stop": [
+          {
+            "type": "command",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event Stop",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event Stop",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event Stop",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event Stop",
+            "timeoutSec": 10
+          }
+        ],
+        "SessionEnd": [
+          {
+            "type": "command",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event SessionEnd",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event SessionEnd",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event SessionEnd",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event SessionEnd",
+            "timeoutSec": 10
+          }
+        ]
+      }
+    }
+AGENTS.md (0644)
+    <!-- looptrack:begin (managed by looptrack issue init; to change it, run looptrack issue init again) -->
+    ## Issue tracking (issue server)
+
+    **Start every piece of work by filing an issue, not in conversation alone. File a bug as soon as you find one.**
+
+    - **Work through the MCP tools (server name looptrack).** Codex's sandbox blocks network access from shell commands,
+      so the CLI (`looptrack issue`) needs elevated permissions (the user's approval) every time it runs. The sandbox does not block the MCP tools' traffic
+    - **Before anything else, read how to use it and the rules with the `guide` tool**. It returns the common rules, this project's rules and the operating documents in one go
+    - One round of the loop: `next` (start) → work → `add_comment` (record what you learn as you learn it) → verify the acceptance criteria → `set_status` to Done (with the verification results in `comment`) → the next `next`.
+      File an issue with `create_issue`. To edit a body, take the version and the full text with `get_issue`, then pass the corrected full text to `update_issue`. When something is rejected, follow the instructions in the message
+    - Verify commands (the "## Verify commands" section of the body): get the list with `verify_issue`, run every one of them in order in your local shell, and send the results with `report_verify`
+    - Token usage: when you file, comment or change a status over MCP, a hook (`looptrack hook usage` in `.codex/hooks.json`) attaches it to the issue a few seconds later.
+      Leave a note of your progress with `add_comment` before Done, and the usage rule (which asks for token usage on an AI's Done) will not reject it
+    - Use the CLI only for operations that MCP lacks, with elevated permissions and the user's approval. init wrote the environment variables `LOOPTRACK_API_URL=http://127.0.0.1:9/im` / `LOOPTRACK_PROJECT=demo` into `.codex/config.toml`.
+      If `looptrack issue config` stops with an error saying there is no server URL, put `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` in front of the command. The CLI is for these cases:
+      - `looptrack issue usage attach <ID>`: when a tool result shows this command. The cue is the command, not the wording (the server's wording follows the user's language). If `set_status` is rejected by the usage rule,
+        wait a few seconds and retry once, since the hook may not have finished sending yet. If it is still rejected, attach the usage and then retry
+      - `looptrack issue login --browser --url http://127.0.0.1:9/im`: the first time only. It gets the token the hooks use. The user logs in and approves in the browser that opens, and the token never shows up in the conversation
+      - Installing and updating (`init`, `installed`): follow the steps the `setup` tool returns
+    - When the looptrack MCP server is not connected, go round the same loop with the CLI's `next` / `comment` / `verify` / `close --comment`. Each call then needs approval,
+      so suggest that the user add `[mcp_servers.looptrack]` to `~/.codex/config.toml`. Pass bodies and comments in a quoted heredoc (`<<'EOF'`)
+    - Browse: http://127.0.0.1:9/im/p/demo/ (login required, read-only)
+
+    ### When you use it from GitHub Copilot
+
+    - As above, the MCP tools are the main way in (looptrack in `.vscode/mcp.json` for VS Code, and in the repository's `.github/mcp.json` or `~/.copilot/mcp-config.json` for Copilot CLI). Copilot has no sandbox.
+      If you do type a CLI command, put `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` in front of it, because Copilot does not read `.codex/config.toml`
+    - Token usage: once the user turns on Copilot's OpenTelemetry file output, a hook (`looptrack hook usage` in `.github/hooks/looptrack.json`) attaches it
+      (see AI-GUIDE §7-3-1 for the steps). Without that output nothing is attached, and nothing counts as missing either.
+      In a Copilot CLI shell you can attach it with `looptrack issue usage attach <ID>`. The conversation is identified from `COPILOT_AGENT_SESSION_ID`.
+      **Do not run `looptrack issue usage attach` from Copilot in VS Code**. The shell never receives the session ID, and it may attach the record of a Codex session in the same directory instead
+    <!-- looptrack:end -->

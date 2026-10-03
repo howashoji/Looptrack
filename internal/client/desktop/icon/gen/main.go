@@ -6,7 +6,7 @@
 //
 //	app.png            1024×1024 のアプリのアイコン（Linux の AppImage・.desktop は 256 に縮めたもの app_256.png を使う）
 //	app_256.png        256×256
-//	app.icns           macOS の .app（Contents/Resources/Looptrack.icns）。PNG を入れた icns（16〜1024・@2x）
+//	app.icns           macOS の .app（Contents/Resources/Looptrack.icns）。16・32 は ARGB 形式（ic04・ic05）、それ以上は PNG（@2x を含む）
 //	app.ico            Windows の .exe に埋め込む（16・32・48・256。PNG を入れた ico）
 //	tray.png           トレイ（Linux）・色つき 64×64
 //	tray.ico           トレイ（Windows）・16・32・48
@@ -34,7 +34,8 @@ func main() {
 	bg := color.NRGBA{0x3B, 0x5B, 0xDB, 0xFF}
 	white := color.NRGBA{0xFF, 0xFF, 0xFF, 0xFF}
 	black := color.NRGBA{0, 0, 0, 0xFF}
-	app := func(n int) []byte { return encode(render(n, &bg, white, 0.22)) }
+	appImg := func(n int) *image.NRGBA { return render(n, &bg, white, 0.22) }
+	app := func(n int) []byte { return encode(appImg(n)) }
 	trayColor := func(n int) []byte { return encode(render(n, &bg, white, 0.30)) }
 	write := func(name string, b []byte) {
 		p := filepath.Join(*out, name)
@@ -46,7 +47,7 @@ func main() {
 	}
 	write("app.png", app(1024))
 	write("app_256.png", app(256))
-	write("app.icns", icns(app))
+	write("app.icns", icns(appImg))
 	write("app.ico", ico(app, 16, 32, 48, 256))
 	write("tray.png", trayColor(64))
 	write("tray.ico", ico(trayColor, 16, 32, 48))
@@ -172,18 +173,24 @@ func ico(f func(int) []byte, sizes ...int) []byte {
 	return b.Bytes()
 }
 
-// icns は PNG を入れた .icns（macOS 10.7 以降）。
-func icns(f func(int) []byte) []byte {
+// icns は .icns（macOS 10.7 以降）。16・32 の 1x は ARGB 形式（ic04・ic05）、それ以上は PNG で入れる。
+// 16・32 を PNG の icp4・icp5 で入れると、macOS は PNG ではなく旧形式の生データとして読み、小さい表示がノイズになる。
+func icns(f func(int) *image.NRGBA) []byte {
 	entries := []struct {
 		typ  string
 		size int
 	}{
-		{"icp4", 16}, {"icp5", 32}, {"ic07", 128}, {"ic08", 256}, {"ic09", 512}, {"ic10", 1024},
+		{"ic04", 16}, {"ic05", 32}, {"ic07", 128}, {"ic08", 256}, {"ic09", 512}, {"ic10", 1024},
 		{"ic11", 32}, {"ic12", 64}, {"ic13", 256}, {"ic14", 512},
 	}
 	var body bytes.Buffer
 	for _, e := range entries {
-		data := f(e.size)
+		var data []byte
+		if e.typ == "ic04" || e.typ == "ic05" {
+			data = argb(f(e.size))
+		} else {
+			data = encode(f(e.size))
+		}
 		body.WriteString(e.typ)
 		binary.Write(&body, binary.BigEndian, uint32(8+len(data)))
 		body.Write(data)
@@ -193,4 +200,61 @@ func icns(f func(int) []byte) []byte {
 	binary.Write(&b, binary.BigEndian, uint32(8+body.Len()))
 	b.Write(body.Bytes())
 	return b.Bytes()
+}
+
+// argb は icns の ARGB 形式（ic04・ic05）の中身。先頭の "ARGB" の後に A・R・G・B の各面（画素を左上から並べたもの）を、
+// それぞれ icns の RLE で続ける。R・G・B は A を掛けたプリマルチプライの値（macOS はそう読む。そのまま入れると、
+// 半透明の縁が白く浮く）。
+func argb(img *image.NRGBA) []byte {
+	b := img.Bounds()
+	n := b.Dx() * b.Dy()
+	planes := [4][]byte{make([]byte, 0, n), make([]byte, 0, n), make([]byte, 0, n), make([]byte, 0, n)}
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			c := img.NRGBAAt(x, y)
+			planes[0] = append(planes[0], c.A)
+			planes[1] = append(planes[1], premul(c.R, c.A))
+			planes[2] = append(planes[2], premul(c.G, c.A))
+			planes[3] = append(planes[3], premul(c.B, c.A))
+		}
+	}
+	out := []byte("ARGB")
+	for _, p := range planes {
+		out = append(out, packBits(p)...)
+	}
+	return out
+}
+
+func premul(v, a uint8) uint8 { return uint8((uint32(v)*uint32(a) + 127) / 255) }
+
+// packBits は icns の RLE。先頭の 1 バイトが 0x00〜0x7F なら続く (値+1) バイトがそのまま並び（1〜128）、
+// 0x80〜0xFF なら続く 1 バイトが (値-0x80+3) 回（3〜130）繰り返される。
+func packBits(p []byte) []byte {
+	var out []byte
+	for i := 0; i < len(p); {
+		run := 1
+		for i+run < len(p) && p[i+run] == p[i] && run < 130 {
+			run++
+		}
+		if run >= 3 {
+			out = append(out, byte(0x80+run-3), p[i])
+			i += run
+			continue
+		}
+		j := i
+		for j < len(p) && j-i < 128 {
+			r := 1
+			for j+r < len(p) && p[j+r] == p[j] && r < 3 {
+				r++
+			}
+			if r >= 3 {
+				break
+			}
+			j++
+		}
+		out = append(out, byte(j-i-1))
+		out = append(out, p[i:j]...)
+		i = j
+	}
+	return out
 }

@@ -59,7 +59,7 @@ VersionInfoVersion={#MyVersionInfo}
 VersionInfoProductName=Looptrack
 AppPublisher=Looptrack
 AppPublisherURL=https://github.com/howashoji/looptrack
-AppSupportURL=https://github.com/howashoji/looptrack/blob/main/docs/guide/desktop.md
+AppSupportURL=https://github.com/howashoji/looptrack/blob/main/docs/guide/desktop/README.md
 AppUpdatesURL=https://github.com/howashoji/looptrack/releases
 ; 管理者権限を要らなくする（利用者ごとの導入。昇格の選択肢も出さない）
 PrivilegesRequired=lowest
@@ -147,6 +147,29 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   StopRunningApp();
   Result := '';
+end;
+
+// デスクトップ版の 1 クリックの置き換え（internal/client/desktop/replace.go）は、取得して確かめた setup.exe を
+// /VERYSILENT … /RELAUNCH=1 で起こしてから終わる。/VERYSILENT では [Run] の起動（skipifsilent）が飛ばされるので、
+// ここでアプリを起動し直す。上書きが成功しても失敗しても（Inno が元に戻したときも）起こす。失敗の理由は setup の /LOG に残る。
+// {app} が決まる前に終わったとき（ExpandConstant が例外を出す）も setup を止めないよう、try で囲む。
+procedure DeinitializeSetup();
+var
+  Code: Integer;
+begin
+  if ExpandConstant('{param:relaunch|0}') <> '1' then
+    Exit;
+  try
+    if FileExists(AppExe()) then
+    begin
+      if not Exec(AppExe(), 'desktop --after-update', '', SW_SHOWNORMAL, ewNoWait, Code) then
+        Log('relaunch failed: ' + SysErrorMessage(Code));
+    end
+    else
+      Log('relaunch skipped: ' + AppExe() + ' not found');
+  except
+    Log('relaunch failed: ' + GetExceptionMessage);
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

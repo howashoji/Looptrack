@@ -146,8 +146,71 @@ func TestCatalogHasNoUnusedID(t *testing.T) {
 		}
 	}
 	for _, id := range IDs(JA) {
-		if _, ok := used[id]; !ok {
-			t.Errorf("対訳表の %q は、どこからも使われていません（消し忘れ。使う場所を足すか、ja.json と en.json から消す）", id)
+		if _, ok := used[id]; ok {
+			continue
+		}
+		// 単数の文面（<ID>_one）は、件数を取る入口が基の ID から選ぶので、コードに ID が出てこない。
+		// 基の ID が使われていれば使われている。選ばれるかどうかは TestCountIDsAndSingularsMatch が確かめる。
+		if base, isOne := strings.CutSuffix(id, OneSuffix); isOne {
+			if _, ok := used[base]; ok {
+				continue
+			}
+		}
+		t.Errorf("対訳表の %q は、どこからも使われていません（消し忘れ。使う場所を足すか、ja.json と en.json から消す）", id)
+	}
+}
+
+// TestCountIDsAndSingularsMatch は、件数で単数と複数を分ける文面の ID と、単数の文面（<ID>_one）が対になっていることを確かめる。
+//   - TN・MN・ErrorfN・WrapfN・{{TN …}} に渡している ID は、ja.json と en.json の両方に <ID>_one を持つ
+//     （無いと、件数が 1 のときも複数の文面が出て、気づけない）
+//   - <ID>_one は、基の <ID> が両方の言語にあり、かつ件数を取る入口に渡されている（コードが ID を直に使う
+//     単数の文面は例外。画面のスクリプトに渡すものと、名前が偶然 _one で終わるものがこれに当たる）。
+//     選ばれない単数の文面を残さない
+//   - 日本語の <ID>_one は <ID> と同じ文面（日本語は単数と複数で表示を変えない）
+func TestCountIDsAndSingularsMatch(t *testing.T) {
+	counted := collectCountIDs(t)
+	if len(counted) < 20 {
+		t.Fatalf("件数を取る入口に渡している ID が %d 件しか集まりません（走査が壊れている可能性）", len(counted))
+	}
+	for id, where := range counted {
+		for _, lang := range []Lang{JA, EN} {
+			if !Has(lang, id) {
+				continue // 基の ID の抜けは TestCatalogHasEveryUsedID が報告する
+			}
+			if !Has(lang, id+OneSuffix) {
+				t.Errorf("%s に %q がありません（%s の %q は件数で単数と複数を分けます）", lang, id+OneSuffix, where, id)
+			}
+		}
+	}
+	used := collectUsedIDs(t)
+	for id, where := range collectTemplateIDs(t) {
+		if _, seen := used[id]; !seen {
+			used[id] = where
+		}
+	}
+	for _, lang := range []Lang{JA, EN} {
+		for _, id := range IDs(lang) {
+			base, isOne := strings.CutSuffix(id, OneSuffix)
+			if !isOne {
+				continue
+			}
+			// コードが ID を直に使っているもの（画面のスクリプトへ渡す hub の単数の文面と、
+			// 「担当者: 〜」のように _one が名前の一部なだけの文面）は、件数の選び方の対象ではない
+			if _, direct := used[id]; direct {
+				continue
+			}
+			if !Has(lang, base) {
+				t.Errorf("%s の %q には基の %q がありません", lang, id, base)
+				continue
+			}
+			if _, viaCount := counted[base]; !viaCount {
+				t.Errorf("%s の %q は選ばれません（%q が件数を取る入口（TN・MN・ErrorfN・WrapfN・{{TN …}}）に渡されていません）", lang, id, base)
+			}
+		}
+	}
+	for id := range counted {
+		if Has(JA, id+OneSuffix) && T(JA, id+OneSuffix) != T(JA, id) {
+			t.Errorf("ja.json の %q は %q と同じ文面にしてください（日本語は単数と複数で表示を変えません）", id+OneSuffix, id)
 		}
 	}
 }
@@ -155,7 +218,28 @@ func TestCatalogHasNoUnusedID(t *testing.T) {
 // collectUsedIDs は i18n.T の第 2 引数の ID を集める（ID → 最初に見つけた場所）。
 func collectUsedIDs(t *testing.T) map[string]string {
 	t.Helper()
-	used := map[string]string{}
+	used, _ := scanCallIDs(t)
+	return used
+}
+
+// collectCountIDs は、件数で単数と複数を分ける入口（TN・MN・ErrorfN・WrapfN とテンプレートの TN）に
+// 渡している ID を集める（ID → 最初に見つけた場所）。これらの ID は <ID>_one の単数の文面を持たなければならない。
+func collectCountIDs(t *testing.T) map[string]string {
+	t.Helper()
+	_, counted := scanCallIDs(t)
+	for id, where := range collectTemplateCountIDs(t) {
+		if _, seen := counted[id]; !seen {
+			counted[id] = where
+		}
+	}
+	return counted
+}
+
+// scanCallIDs は Go のソースの文面の入口から ID を集める。used は入口すべて、counted は件数を取る入口だけ。
+func scanCallIDs(t *testing.T) (used, counted map[string]string) {
+	t.Helper()
+	used = map[string]string{}
+	counted = map[string]string{}
 	fset := token.NewFileSet()
 	for _, rel := range goSourceFiles(t) {
 		f, err := parser.ParseFile(fset, filepath.Join(repoRoot, rel), nil, 0)
@@ -180,7 +264,7 @@ func collectUsedIDs(t *testing.T) map[string]string {
 			if !ok {
 				return true
 			}
-			at, ok := idArgIndex(call.Fun)
+			at, isCount, ok := idArgIndex(call.Fun)
 			if !ok || len(call.Args) <= at {
 				return true
 			}
@@ -198,40 +282,49 @@ func collectUsedIDs(t *testing.T) map[string]string {
 			if _, seen := used[id]; !seen {
 				used[id] = where
 			}
+			if _, seen := counted[id]; isCount && !seen {
+				counted[id] = where
+			}
 			return true
 		})
 	}
-	return used
+	return used, counted
 }
 
 // idArgIndex は、その呼び出しが文面の ID を取るものなら、ID が何番目の引数かを返す。
 //
-// 文面の入口は 3 つある。どれも ID を文字列リテラルで受けるので、ここで一緒に集める。
+// 文面の入口は 8 つある。どれも ID を文字列リテラルで受けるので、ここで一緒に集める。
 //   - T(lang, id, …)     その場で言語を決めて文面にする
 //   - M(id, …)           言語を決めずに持ち回る（Msg）
 //   - Errorf(id, …)      言語を決めずに error として返す
 //   - Wrapf(err, id, …)  もとの error を包んだまま理由を足す
-func idArgIndex(fun ast.Expr) (int, bool) {
+//   - TN(lang, id, n, …)・MN(id, n, …)・ErrorfN(id, n, …)・WrapfN(err, id, n, …)
+//     上の 4 つの、件数 n で単数と複数を分ける版（isCount が true）
+func idArgIndex(fun ast.Expr) (at int, isCount, ok bool) {
 	name := ""
 	switch f := fun.(type) {
 	case *ast.SelectorExpr:
 		pkg, ok := f.X.(*ast.Ident)
 		if !ok || pkg.Name != "i18n" {
-			return 0, false
+			return 0, false, false
 		}
 		name = f.Sel.Name
 	case *ast.Ident:
 		name = f.Name
 	default:
-		return 0, false
+		return 0, false, false
 	}
 	switch name {
 	case "T", "Wrapf":
-		return 1, true
+		return 1, false, true
 	case "M", "Errorf":
-		return 0, true
+		return 0, false, true
+	case "TN", "WrapfN":
+		return 1, true, true
+	case "MN", "ErrorfN":
+		return 0, true, true
 	}
-	return 0, false
+	return 0, false, false
 }
 
 func mustRel(t *testing.T, path string) string {
@@ -253,7 +346,10 @@ func mustRel(t *testing.T, path string) string {
 //
 // 括弧の中（{{template "head" (T .Lang "id")}}）も拾う。訳した文字列を別のテンプレートへ渡すときの
 // 書き方で、ここで拾えないと「使っていない ID」と誤判定される。
-var templateCall = regexp.MustCompile(`(?:\{\{|\()-?\s*T\s+[^\s})]+\s+"([^"]+)"`)
+var templateCall = regexp.MustCompile(`(?:\{\{|\()-?\s*TN?\s+[^\s})]+\s+"([^"]+)"`)
+
+// templateCountCall は、件数で単数と複数を分ける {{TN .Lang "id" n …}} だけを拾う（templateCall の部分集合）。
+var templateCountCall = regexp.MustCompile(`(?:\{\{|\()-?\s*TN\s+[^\s})]+\s+"([^"]+)"`)
 
 // TestTemplateScanIsNotEmpty は、テンプレートの走査が空振りしていないことを確かめる。
 //
@@ -285,7 +381,14 @@ func TestTemplateScanIsNotEmpty(t *testing.T) {
 }
 
 // collectTemplateIDs は .html の中で使っている ID を集める（ID → 最初に見つけた場所）。
-func collectTemplateIDs(t *testing.T) map[string]string {
+func collectTemplateIDs(t *testing.T) map[string]string { return scanTemplateIDs(t, templateCall) }
+
+// collectTemplateCountIDs は .html の {{TN …}} に渡している ID を集める。
+func collectTemplateCountIDs(t *testing.T) map[string]string {
+	return scanTemplateIDs(t, templateCountCall)
+}
+
+func scanTemplateIDs(t *testing.T, call *regexp.Regexp) map[string]string {
 	t.Helper()
 	used := map[string]string{}
 	for _, rel := range repoFiles(t, ".html", nil) {
@@ -294,7 +397,7 @@ func collectTemplateIDs(t *testing.T) map[string]string {
 			t.Fatal(err)
 		}
 		for i, line := range strings.Split(string(b), "\n") {
-			for _, m := range templateCall.FindAllStringSubmatch(line, -1) {
+			for _, m := range call.FindAllStringSubmatch(line, -1) {
 				if _, seen := used[m[1]]; !seen {
 					used[m[1]] = fmt.Sprintf("%s:%d", rel, i+1)
 				}

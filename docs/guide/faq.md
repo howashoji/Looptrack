@@ -1,6 +1,6 @@
 # FAQ / Troubleshooting
 
-[Guide contents](README.md) · Previous: [Administration](admin.md)
+[Guide contents](README.md) · Previous: [Agent-specific notes](ai-agents.md) · Next: [Token reports](token-report.md)
 
 ## "[Setup incomplete]" appears
 
@@ -31,8 +31,9 @@ looptrack issue init --project <slug> --url <server URL> --agent <agent>   # ref
 
 `self-update` downloads the `looptrack` the server distributes and swaps it in for the running binary.
 Inside a project, `--url` comes from the `LOOPTRACK_API_URL` environment variable.
-But a server with no distribution directory configured doesn't distribute `looptrack` at all. Then you download the new version again, as in step 1 of [Getting started](getting-started.md).
-For how the notice works, and how to update the desktop app and the server, see [Updating](updating.md).
+But a server with no distribution directory configured doesn't distribute `looptrack` at all.
+Then replace it from GitHub releases with `looptrack self-update --from github`. It checks the signature and replaces the file only when a newer version exists. Downloading it again as in step 1 of [Getting started](server/getting-started.md) works too.
+For how the notice works, and how to update the server and the desktop app, see [Updating the server and the CLI](server/updating.md) and [Updating the desktop app](desktop/updating.md).
 
 ## "Token usage has not been attached yet" appears
 
@@ -130,9 +131,10 @@ Merge the difference shown into your working copy, then apply it with `looptrack
 | -- | -- |
 | `looptrack` is not found | PATH changes only apply to terminals and apps started afterwards. Restart PowerShell and the agent |
 | Only the agent's hooks cannot find `looptrack` | An agent launched from the Start menu may have a different PATH. If `looptrack` is not on PATH, init wires hooks with an absolute path in `.claude/settings.local.json`. Check with `looptrack doctor` |
-| Windows warns about the executable ("Windows protected your PC") | The Windows binaries are currently not signed, so SmartScreen may warn on first start. Confirm the SHA-256 matches `SHA256SUMS`, then click **More info** → **Run anyway** (see "Signatures and OS warnings" in [Getting started](getting-started.md)). The macOS binaries are signed and notarized |
+| Windows warns about the executable ("Windows protected your PC") | The Windows binaries are currently not signed, so SmartScreen may warn on first start. Confirm the SHA-256 matches `SHA256SUMS`, and that `SHA256SUMS` itself verifies against `SHA256SUMS.minisig`, then click **More info** → **Run anyway** ("Signatures and OS warnings" in [Getting started](server/getting-started.md) has both checks). The macOS binaries are signed and notarized |
+| Windows blocks the executable and there is no **Run anyway** | On Windows 11, Smart App Control blocks unsigned apps when it is turned on, and a PC your organization manages may block them by policy. In neither case can you allow Looptrack alone from your side. "Signatures and OS warnings" in [Getting started](server/getting-started.md) has what you can do |
 | Here-documents (`<<'EOF'`) do not work | PowerShell has none. Write the body to a file and pass `--body (Get-Content -Raw body.md)`. Git Bash supports them |
-| `. ./.env` does not work | In PowerShell, load it with the one-liner in step 4 of [Getting started](getting-started.md) |
+| `. ./.env` does not work | In PowerShell, load it with the one-liner in step 4 of [Getting started](server/getting-started.md) |
 | make fails when running gates (`looptrack gates`) | make on Windows may fail in directories whose path contains non-ASCII characters such as Japanese. Work in an ASCII-only path |
 | Codex hooks do not run | Start the terminal `codex` in the project and trust them with `/hooks`. Typing `/hooks` in the desktop app's chat box is not a command |
 | Port 8090 is in use | Change the port with `looptrack setup --force`, then update everything that uses the URL (init, MCP) |

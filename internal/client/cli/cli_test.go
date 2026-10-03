@@ -203,7 +203,7 @@ func TestKitSummary(t *testing.T) {
 	}
 }
 
-// TestIsSelfRepo: looptrack 自身のリポジトリ（kit の正本）の判定。init の拒否と導入済み通知の self_repo が
+// TestIsSelfRepo: looptrack 自身のリポジトリ（kit の正本）の判定。init が何もしないことと導入済み通知の self_repo が
 // 同じこの 1 つを使う。見るのは配置だけで、ディレクトリの名前は見ない。
 func TestIsSelfRepo(t *testing.T) {
 	self := t.TempDir()

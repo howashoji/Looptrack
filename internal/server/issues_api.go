@@ -151,7 +151,7 @@ func (s *Server) serviceError(w http.ResponseWriter, r *http.Request, err error)
 	status := map[service.Kind]int{
 		service.Invalid: http.StatusBadRequest, service.NotFound: http.StatusNotFound, service.Forbidden: http.StatusForbidden,
 		service.Conflict: http.StatusConflict, service.Rejected: http.StatusUnprocessableEntity,
-		service.PreconditionRequired: http.StatusPreconditionRequired,
+		service.PreconditionRequired: http.StatusPreconditionRequired, service.TooLarge: http.StatusRequestEntityTooLarge,
 	}[se.Kind]
 	if status == 0 {
 		status = http.StatusInternalServerError
@@ -758,6 +758,8 @@ func (s *Server) apiIssue(w http.ResponseWriter, r *http.Request) {
 
 type commentRequest struct {
 	Text *string `json:"text"`
+	// Attachments はコメントに付ける、そのイシューの添付の ID（POST …/attachments の応答の id）。省略できる
+	Attachments []int64 `json:"attachments"`
 }
 
 func (s *Server) apiComment(w http.ResponseWriter, r *http.Request) {
@@ -774,7 +776,7 @@ func (s *Server) apiComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a := actor(r)
-	it, err := s.svc.Comment(r.Context(), a, pr, row.ID, *req.Text)
+	it, err := s.svc.CommentAttach(r.Context(), a, pr, row.ID, *req.Text, req.Attachments)
 	if err != nil {
 		s.serviceError(w, r, err)
 		return
@@ -819,8 +821,11 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 	if res.AcceptanceNotice != "" { // Web は messages を出さないので、この欄を状態の変更フォームの下に出す
 		body["acceptance_notice"] = res.AcceptanceNotice
 	}
+	if res.EvidenceNotice != "" { // エビデンスの無い Done の注意（verify.require_evidence を切にしたプロジェクト）。Web は上と同じ位置に出す
+		body["evidence_notice"] = res.EvidenceNotice
+	}
 	// 下位の最後の 1 件を閉じたら要件の検証と close を促す。messages に入れるので古い CLI でも表示される
-	body["messages"] = withClosable(reqLang(r), statusMessages(reqLang(r), res, req.Comment), body, s.closedRequirements(r.Context(), pr, res))
+	body["messages"] = withClosable(reqLang(r), statusMessages(reqLang(r), res), body, s.closedRequirements(r.Context(), pr, res))
 	if n := s.usageNotice(r.Context(), reqLang(r), a, pr, it, it.Closed() && res.From != it.Item.Status); n != "" {
 		body["usage_notice"] = n
 	}
@@ -887,18 +892,22 @@ func (s *Server) apiUpdateIssue(w http.ResponseWriter, r *http.Request) {
 
 // statusMessages は状態変更の CLI の出力行。担当を明示で変えた・引き継いだときはその行も足す
 // （In Progress で未設定の担当を本人にした R1 は出さない。従来の出力のまま）。
-func statusMessages(lang i18n.Lang, res *service.StatusResult, comment string) []string {
+func statusMessages(lang i18n.Lang, res *service.StatusResult) []string {
 	it := res.Issue
 	messages := []string{it.Item.ID + ": " + res.From + " → " + it.Item.Status}
 	if res.AssigneeChanged && !res.AssigneeAuto {
 		messages = append(messages, (&service.AssignResult{Issue: it, From: res.AssigneeFrom, To: it.Row.Assignee.Login, Changed: true}).Message(lang))
 	}
-	if comment != "" {
+	if res.CommentAdded { // コメントを作ったかは service が決める（空白だけのコメントは作らない）
 		messages = append(messages, i18n.T(lang, "server.api.issue.comment_added", "id", it.Item.ID))
 	}
 	// 受け入れ条件が雛形のままの着手の注意（service が判定。REST の messages と MCP の本文で同じ行）
 	if res.AcceptanceNotice != "" {
 		messages = append(messages, res.AcceptanceNotice)
+	}
+	// エビデンスの無い Done の注意（service が判定。同じく REST の messages と MCP の本文で同じ行）
+	if res.EvidenceNotice != "" {
+		messages = append(messages, res.EvidenceNotice)
 	}
 	return messages
 }

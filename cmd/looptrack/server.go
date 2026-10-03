@@ -13,6 +13,7 @@
 //	looptrack export --out <dir> [slug…]  DB を旧形式で書き出す（移行時の確認・一時出力用）
 //	looptrack verify-files --root <dir>   Markdown の往復一致を検査する（DB 不要）
 //	looptrack repair-lists [--apply] [slug…] 空白区切りで 1 要素に入った ID を分割する（repair.go）
+//	looptrack repair-attachments [--apply]   添付の DB と置き場の食い違いを報告する（--apply でどこからも指されない本体を消す。repair_attachments.go）
 package main
 
 import (
@@ -25,6 +26,7 @@ import (
 
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/mdformat"
+	"github.com/howashoji/looptrack/internal/service"
 	"github.com/howashoji/looptrack/internal/store"
 	"github.com/howashoji/looptrack/internal/transfer"
 	"github.com/howashoji/looptrack/migrations"
@@ -33,22 +35,23 @@ import (
 // serverCommands はサーバ側のサブコマンド。
 // 引数はサブコマンド名の後ろ。返り値は終了コード。
 var serverCommands = map[string]func(args []string) int{
-	"setup":        setupCmd,
-	"serve":        serveCmd,
-	"user":         userCmd,
-	"member":       memberCmd,
-	"token":        tokenCmd,
-	"settings":     settingsCmd,
-	"project":      projectCmd,
-	"healthcheck":  func([]string) int { return healthcheck() },
-	"secret-key":   func([]string) int { return secretKeyCmd() },
-	"migrate":      migrateCmd,
-	"grants":       grantsCmd,
-	"import":       importCmd,
-	"verify":       verifyCmd,
-	"export":       exportCmd,
-	"verify-files": verifyFiles,
-	"repair-lists": repairListsCmd,
+	"setup":              setupCmd,
+	"serve":              serveCmd,
+	"user":               userCmd,
+	"member":             memberCmd,
+	"token":              tokenCmd,
+	"settings":           settingsCmd,
+	"project":            projectCmd,
+	"healthcheck":        func([]string) int { return healthcheck() },
+	"secret-key":         func([]string) int { return secretKeyCmd() },
+	"migrate":            migrateCmd,
+	"grants":             grantsCmd,
+	"import":             importCmd,
+	"verify":             verifyCmd,
+	"export":             exportCmd,
+	"verify-files":       verifyFiles,
+	"repair-lists":       repairListsCmd,
+	"repair-attachments": repairAttachmentsCmd,
 }
 
 // serverUsage は looptrack -h の「サーバの操作」の節。
@@ -156,7 +159,19 @@ func verifyFiles(args []string) int {
 		rel, _ := filepath.Rel(*root, path)
 		fmt.Fprintf(os.Stderr, "NG %s: %v\n", rel, err)
 	}
-	fmt.Printf("%s\n%s\n", i18n.T(lang, "cmd.verify_files.result", "ok", len(files)-failed, "total", len(files)), stats)
+	fmt.Printf("%s\n%s\n", i18n.TN(lang, "cmd.verify_files.result", len(files), "ok", len(files)-failed, "total", len(files)), stats)
+	// export が書いた添付の本体（目録 attachments.json を持つプロジェクトだけ。無ければ何も出さない）
+	reports, err := transfer.VerifyAttachmentFiles(*root)
+	if err != nil {
+		return fail(err)
+	}
+	for _, r := range reports {
+		fmt.Println(i18n.TN(lang, "cmd.verify_files.attachments", r.Bodies, "slug", r.Slug, "ok", r.OK, "total", r.Bodies))
+		for _, p := range r.Problems {
+			failed++
+			fmt.Fprintf(os.Stderr, "NG %s: %s\n", r.Slug, p.In(lang))
+		}
+	}
 	if failed > 0 {
 		return 1
 	}
@@ -185,7 +200,18 @@ func importCmd(args []string) int {
 	defer db.Close()
 	results, err := transfer.Import(context.Background(), db, src)
 	for _, r := range results {
-		fmt.Println(i18n.T(lang, "cmd.import.done", "slug", r.Slug, "issues", r.Issues, "comments", r.Comments))
+		fmt.Println(i18n.T(lang, "cmd.import.done", "slug", r.Slug,
+			"issues", i18n.MN("cmd.import.done_issues", r.Issues, "n", r.Issues), "comments", i18n.MN("cmd.import.done_comments", r.Comments, "n", r.Comments)))
+	}
+	// import は添付を運ばない。目録があれば、黙って捨てずにそう知らせる（取り込みが失敗しても、どれに目録があったかは出す）
+	for _, sp := range src {
+		switch {
+		case !sp.AttachmentManifest:
+		case sp.AttachmentCount < 0:
+			fmt.Println(i18n.T(lang, "cmd.import.attachments_skipped_unknown", "slug", sp.Project.Slug, "file", transfer.AttachmentManifestName))
+		default:
+			fmt.Println(i18n.TN(lang, "cmd.import.attachments_skipped", sp.AttachmentCount, "slug", sp.Project.Slug, "file", transfer.AttachmentManifestName, "count", sp.AttachmentCount))
+		}
 	}
 	if err != nil {
 		return fail(err)
@@ -214,11 +240,11 @@ func verifyCmd(args []string) int {
 	bad := 0
 	for _, r := range reports {
 		if len(r.Problems) == 0 {
-			fmt.Println(i18n.T(lang, "cmd.verify.match", "slug", r.Slug, "files", r.Files))
+			fmt.Println(i18n.TN(lang, "cmd.verify.match", r.Files, "slug", r.Slug, "files", r.Files))
 			continue
 		}
 		bad += len(r.Problems)
-		fmt.Println(i18n.T(lang, "cmd.verify.mismatch", "slug", r.Slug, "files", r.Files, "problems", len(r.Problems)))
+		fmt.Println(i18n.TN(lang, "cmd.verify.mismatch", r.Files, "slug", r.Slug, "files", r.Files, "problems", len(r.Problems)))
 		for _, p := range r.Problems {
 			fmt.Printf("  - %s\n", p.In(lang))
 		}
@@ -243,10 +269,20 @@ func exportCmd(args []string) int {
 		return fail(err)
 	}
 	defer db.Close()
-	n, err := transfer.Export(context.Background(), db, *out, fs.Args(), *archived)
+	// 添付の本体の置き場は serve と同じ決め方（無ければ添付は目録に missing として載り、終了コードは 1）
+	res, err := transfer.Export(context.Background(), db, *out, fs.Args(), *archived, service.AttachDirFromEnv(os.Getenv))
 	if err != nil {
 		return fail(err)
 	}
-	fmt.Println(i18n.T(lang, "cmd.export.done", "count", n, "dir", *out))
+	fmt.Println(i18n.TN(lang, "cmd.export.done", res.Files, "count", res.Files, "dir", *out))
+	if res.Attachments > 0 {
+		fmt.Println(i18n.TN(lang, "cmd.export.attachments", res.Bodies, "count", res.Attachments, "bodies", res.Bodies))
+	}
+	for _, p := range res.Problems {
+		fmt.Fprintf(os.Stderr, "NG %s\n", p.In(lang))
+	}
+	if len(res.Problems) > 0 {
+		return fail(i18n.ErrorfN("cmd.err.export_attachments_incomplete", len(res.Problems), "count", len(res.Problems)))
+	}
 	return 0
 }

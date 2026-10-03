@@ -118,7 +118,7 @@ func setTwoFactor(ctx context.Context, db *sql.DB, lang i18n.Lang, value string)
 	}
 	msg := i18n.T(lang, "cmd.two_factor.changed", "old", store.TwoFactorLabel(lang, res.Old), "new", store.TwoFactorLabel(lang, value))
 	if value == store.TwoFactorRequired {
-		msg += i18n.T(lang, "cmd.two_factor.revoked_sessions", "count", res.RevokedSessions)
+		msg += i18n.TN(lang, "cmd.two_factor.revoked_sessions", int(res.RevokedSessions), "count", res.RevokedSessions)
 	}
 	return msg, nil
 }

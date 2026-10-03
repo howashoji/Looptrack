@@ -391,6 +391,10 @@ func (r Result) Golden() string {
 
 func (r Result) body(q Request) string {
 	ct := q.Header.Get("Content-Type")
+	if !utf8.Valid(q.Body) || bytes.IndexByte(q.Body, 0) >= 0 { // 添付のバイナリ（files の欄と同じ形で記録する）
+		sum := sha256.Sum256(q.Body)
+		return fmt.Sprintf("(バイナリ %d バイト sha256=%s)\n", len(q.Body), hex.EncodeToString(sum[:]))
+	}
 	switch {
 	case strings.HasPrefix(ct, "application/json"):
 		if s, ok := r.Norm.JSON(q.Body); ok {

@@ -11,7 +11,7 @@ import (
 
 // CLI（looptrack issue verify）とサーバの往復。CLI は利用者の LOOPTRACK_* を除いた環境で起動し、テストサーバだけを指す。
 func TestVerifyCLIRoundTrip(t *testing.T) {
-	v := newVerifyEnv(t, "vc", `{"verify": {"require_on_close": true}}`)
+	v := newVerifyEnv(t, "vc", `{"verify": {"require_on_close": true, "require_evidence": false}}`) // エビデンスの網は evidence_api_test.go で見る
 	dir := t.TempDir()
 	run := func(args ...string) (string, int) {
 		t.Helper()

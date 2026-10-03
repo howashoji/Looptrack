@@ -174,7 +174,7 @@ func (s *Service) next(ctx context.Context, a Actor, p store.Project, opt NextOp
 			return nil, err
 		}
 		cur := domain.FromDocument(stored.Doc)
-		if _, err := s.checkStatus(ctx, s.DB, a, rules, p, id, stored.Doc, cur, "In Progress", opt.Comment, opt.OverrideReason); err != nil {
+		if _, _, err := s.checkStatus(ctx, s.DB, a, rules, p, id, stored.Doc, cur, "In Progress", opt.Comment, opt.OverrideReason); err != nil {
 			var se *Error
 			if !errors.As(err, &se) {
 				return nil, err
@@ -218,13 +218,13 @@ func (s *Service) next(ctx context.Context, a Actor, p store.Project, opt NextOp
 		// 文面は要求の言語（a.Lang）で作る。最初の違反の文面も同じ言語にそろえる（i18n.Text が ID から訳す。
 		// プロジェクトが設定した文面は ID を持たないので、判定の時点で a.Lang で作った Message がそのまま出る）
 		var hintComment, hintOverride any = "", ""
-		if opt.Comment == "" {
+		if strings.TrimSpace(opt.Comment) == "" { // 規則の判定と同じく、空白だけのコメントは無いものとして数える
 			hintComment = i18n.M("service.next.all_skipped.hint_comment")
 		}
 		if firstViolation.Overridable {
 			hintOverride = i18n.M("service.next.all_skipped.hint_override")
 		}
-		msg := i18n.T(a.Lang, "service.next.all_skipped", "message", i18n.Text(a.Lang, firstViolation),
+		msg := i18n.TN(a.Lang, "service.next.all_skipped", len(ids), "message", i18n.Text(a.Lang, firstViolation),
 			"count", len(ids), "ids", strings.Join(ids, ", "), "hint_comment", hintComment, "hint_override", hintOverride)
 		return nil, &Error{Kind: Rejected, Code: "rule_violation", Message: msg, Rule: firstViolation.Rule, Overridable: firstViolation.Overridable}
 	}

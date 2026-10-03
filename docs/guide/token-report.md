@@ -79,7 +79,7 @@ looptrack issue usage attach DEMO-0004          # attach this conversation's tot
 ```
 
 The end of `summary` lists your own operations from the last 7 days that still lack token information.
-Want to make it mandatory? Set the project rule `usage.require_on_close` (see [Administration](admin.md)).
+Want to make it mandatory? Set the project rule `usage.require_on_close` (see [Administration](server/admin.md)).
 Then an agent can't mark an issue Done or Canceled without token information from that conversation. The CLI attaches it and retries once.
 
 ## Making a report
@@ -157,5 +157,5 @@ With `--from-report`, these are copied from the figures JSON, along with the req
 | `TOKEN_REPORT_DIR` | Your environment | Where the skill saves reports |
 | `TOKEN_REPORT_FONT` | Your environment | The TrueType font for the PDF |
 
-Set project rules with `looptrack project rules set` (see [Administration](admin.md)).
+Set project rules with `looptrack project rules set` (see [Administration](server/admin.md)).
 The full design is in [DESIGN.md](../server/DESIGN.md) §9-5.

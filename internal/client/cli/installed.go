@@ -97,7 +97,7 @@ func (c *Ctx) reportInstall(cl *api.Client, agent, trigger string) (*jsonorder.O
 	body := jsonorder.NewObject().Set("agent", agent).Set("trigger", trigger).Set("source", source).Set("files", files).
 		Set("host", truncRunes(host, 255)).Set("workspace", truncRunes(filepath.Base(ws), 255))
 	// looptrack 自身のリポジトリ（kit の正本）からの通知は印を付ける。サーバはこの印がある導入の kit を
-	// 配布物と比べない（手元の kit のほうが新しいのは当たり前で、促される init の再実行も拒否される）。
+	// 配布物と比べない（手元の kit のほうが新しいのは当たり前で、正本では init は何もしない）。
 	// 偽のときは送らない（古いサーバは未知のキーを 400 で拒むので、普通のプロジェクトの通知の形を変えない）
 	if IsSelfRepo(c.Root) {
 		body.Set("self_repo", true)

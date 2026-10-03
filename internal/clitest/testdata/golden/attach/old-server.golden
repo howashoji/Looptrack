@@ -1,0 +1,28 @@
+# attach/old-server
+$ issue attach DEMO-0001 notes.txt
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 接続先のサーバは添付に対応していません。サーバを更新してから添付してください
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/attachments?project=demo  [フィクスチャなし → 404]
+  Authorization: Bearer imp_golden_token
+  Content-Type: text/plain; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Filename: notes.txt
+  X-Looptrack-Lang: ja
+  body:
+    PASS
+    ok  pkg
+
+
+#### files (2)
+ws/notes.txt (0644)
+    PASS
+    ok  pkg
+ws/shot.png (0644)
+    (バイナリ 12 バイト sha256=1b56b50ac4e976f488f128cabdcdffb2fc9331d6974bb9968131a415d14ade24)

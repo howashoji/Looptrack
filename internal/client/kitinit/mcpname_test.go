@@ -67,10 +67,14 @@ func TestGuidanceMCPServerName(t *testing.T) {
 		}
 	}
 	url, slug := "http://127.0.0.1:9/looptrack", "demo"
-	check("AGENTS.md（Copilot だけ）", agentsMDBody([]string{"copilot"}, url, slug), copilotName,
+	check("AGENTS.md（Copilot だけ）", agentsMDBody(i18n.JA, []string{"copilot"}, url, slug), copilotName,
 		"（サーバ名 {name}）", "`~/.copilot/mcp-config.json` の {name}。", "`copilot --allow-tool='{name}'`")
-	check("AGENTS.md（Codex・Copilot）", agentsMDBody([]string{"codex", "copilot"}, url, slug), codexName,
+	check("AGENTS.md（Codex・Copilot）", agentsMDBody(i18n.JA, []string{"codex", "copilot"}, url, slug), codexName,
 		"（サーバ名 {name}）", "`~/.copilot/mcp-config.json` の {name}）")
+	check("AGENTS.md（Copilot だけ・英語）", agentsMDBody(i18n.EN, []string{"copilot"}, url, slug), copilotName,
+		"(server name {name})", "connects to {name} in `.vscode/mcp.json`", "`copilot --allow-tool='{name}'`")
+	check("AGENTS.md（Codex・Copilot・英語）", agentsMDBody(i18n.EN, []string{"codex", "copilot"}, url, slug), codexName,
+		"(server name {name})", "({name} in `.vscode/mcp.json`")
 	check("init の Copilot の案内", copilotGuidance(i18n.JA, url, slug), copilotName,
 		"copilot --allow-tool='{name}'", "/mcp auth {name}）", `{"mcpServers": {"{name}": {`)
 	check("init の Codex の案内", codexGuidance(i18n.JA, url, slug), codexName, "[mcp_servers.{name}]", "codex mcp login {name}）")

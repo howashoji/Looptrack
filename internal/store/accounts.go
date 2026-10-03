@@ -226,9 +226,12 @@ type Session struct {
 	// TOTPVerified は TOTP を入力して発行したセッションか（マイグレーション 0010）。二段階認証が任意のとき、
 	// 未登録の利用者はパスワードだけで MFAPassed になる（TOTPVerified は false）。必須に切り替えるとそのセッションは使えない。
 	TOTPVerified bool
-	CreatedAt    time.Time
-	ExpiresAt    time.Time
-	LastSeenAt   time.Time
+	// Persistent はログイン画面の「ログインしたままにする」で発行したセッションか（マイグレーション 0008）。
+	// 無操作の切れを見ず、最終アクセスのたびに期限を延ばす（server の sessionFrom）。
+	Persistent bool
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	LastSeenAt time.Time
 }
 
 // CreateSession はセッションを保存する。
@@ -236,16 +239,16 @@ func CreateSession(ctx context.Context, q execQuerier, s Session, ip, userAgent 
 	if len(userAgent) > 255 {
 		userAgent = userAgent[:255]
 	}
-	_, err := q.ExecContext(ctx, `INSERT INTO web_sessions (id_hash, user_id, csrf_token, mfa_passed, totp_verified, expires_at, ip, user_agent)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, s.IDHash, s.UserID, s.CSRFToken, s.MFAPassed, s.TOTPVerified, s.ExpiresAt, ip, userAgent)
+	_, err := q.ExecContext(ctx, `INSERT INTO web_sessions (id_hash, user_id, csrf_token, mfa_passed, totp_verified, persistent, expires_at, ip, user_agent)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, s.IDHash, s.UserID, s.CSRFToken, s.MFAPassed, s.TOTPVerified, s.Persistent, s.ExpiresAt, ip, userAgent)
 	return err
 }
 
 // SessionByHash は有効期限内のセッションを引く。
 func SessionByHash(ctx context.Context, q execQuerier, hash []byte, now time.Time) (Session, error) {
 	var s Session
-	err := q.QueryRowContext(ctx, `SELECT id_hash, user_id, csrf_token, mfa_passed, totp_verified, created_at, expires_at, last_seen_at
-FROM web_sessions WHERE id_hash = ? AND expires_at > ?`, hash, now).Scan(&s.IDHash, &s.UserID, &s.CSRFToken, &s.MFAPassed, &s.TOTPVerified, &s.CreatedAt, &s.ExpiresAt, &s.LastSeenAt)
+	err := q.QueryRowContext(ctx, `SELECT id_hash, user_id, csrf_token, mfa_passed, totp_verified, persistent, created_at, expires_at, last_seen_at
+FROM web_sessions WHERE id_hash = ? AND expires_at > ?`, hash, now).Scan(&s.IDHash, &s.UserID, &s.CSRFToken, &s.MFAPassed, &s.TOTPVerified, &s.Persistent, &s.CreatedAt, &s.ExpiresAt, &s.LastSeenAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return s, ErrNotFound
 	}
@@ -256,6 +259,12 @@ FROM web_sessions WHERE id_hash = ? AND expires_at > ?`, hash, now).Scan(&s.IDHa
 func TouchSession(ctx context.Context, q execQuerier, hash []byte, now time.Time) error {
 	_, err := q.ExecContext(ctx, "UPDATE web_sessions SET last_seen_at = ? WHERE id_hash = ?", now, hash)
 	return err
+}
+
+// ExtendSession は最終アクセス時刻を更新し、期限も expiresAt に延ばす（「ログインしたままにする」のセッション）。
+// 行が無い（読んだ後にログアウトや破棄で消えた）ときは ErrNotFound。
+func ExtendSession(ctx context.Context, q execQuerier, hash []byte, now, expiresAt time.Time) error {
+	return affected(q.ExecContext(ctx, "UPDATE web_sessions SET last_seen_at = ?, expires_at = ? WHERE id_hash = ?", now, expiresAt, hash))
 }
 
 // DeleteSession はセッションを破棄する。

@@ -58,6 +58,8 @@ The decision looks only at **the words that actually run**, so the same **comman
 (`echo 'do not cat .env'` goes through). What it does look at is **a quoted string whose whole content is a single path**.
 Quotes are there to keep the shell from splitting a word (a path with a space in it, `$HOME` expansion), so `cat "$HOME/.env"`
 is the same act as `cat ~/.env` and is confirmed. A name that merely appears inside a sentence (`git commit -m "add .env to .gitignore"`) goes through.
+A heredoc whose terminator is quoted with a backslash (`<<\EOF`, `<<-\EOF`, `<< \EOF`) is the exception: words in its body are confirmed too.
+That is a form it stops by mistake; rewrite it as `<<'EOF'` and it goes through. A heredoc body after a line with an unclosed `'` (`echo it's`) is confirmed too.
 A command name may carry the path to its executable (`/bin/cat`, `C:\Windows\System32\findstr.exe`).
 Case is ignored only for **a word in command position** (`CAT .env` is confirmed); **a command name** in argument position is matched case-sensitively
 (`go test -run Type … .env` does not set it off). That is about command names: **file names and locations are matched case-insensitively**.
@@ -202,6 +204,9 @@ Every example listed on the catching side is pinned by a test. So is every examp
   Because of the Windows reading, `cat "x\" ; cat /tmp/x/.ssh/id_rsa \""` (one argument to sh, but in PowerShell
   `"x\"` closes and the `cat` after it runs) and `Get-ChildItem "C:\proj\" ; Get-Content "C:\proj\.env"` stay confirmed.
   The Windows reading is the earlier way of pairing, unchanged, so adding a reading never removes a confirmation.
+- **Heredocs and `$'…'`**: `echo $((1<<y))` + newline + `cat /tmp/x/.env` + newline + `y`, `cat /tmp/x/.env` in the body of
+  `cat <<EOF | sh`, and `bash -c $'cat /tmp/x/.env'`. Only when the earlier readings confirm nothing is the same extra reading as the git guard's applied.
+  A `<<` inside arithmetic is not read as an opening, and a body handed to a shell is judged as commands.
 
 ### What it does not catch (what was decided not to close)
 
@@ -240,6 +245,12 @@ Every one below **was measured** (it does not become a confirmation). None of th
   `` echo `cat /tmp/x/.env` ``. Text inside double quotes is dropped as data, and a backquote is not counted as a word
   boundary, so the command that actually runs inside the substitution disappears from the text being judged. A `$(…)`
   outside quotes (`echo $(cat /tmp/x/.env)`) is split at the `(` and is confirmed.
+- **A heredoc whose body is run some other way**: `eval "$(cat <<'EOF' …)"`, `(cat <<'EOF' …) | sh` and the like.
+  The opening line alone does not show that the body runs, so the body is read as data. The full list is in the git guard section of working-discipline.md.
+  The body of `bash -c 'sh' <<EOF` goes through as well.
+- **A nested shell's quotes swallowing an opening**: a command on the line after `bash -c 'cat <<EOF'`, `bash -c "cat <<EOF"` or `x=$(bash -c 'cat <<EOF')`.
+  The stage that reads the unwrapped contents takes the lines after the closed quote for a body (**it goes through at the base too**).
+- **A command whose judgment runs past the deadline (4 seconds)**: it goes through with no confirmation. For the length that fits, see "What it does not stop" in working-discipline.md.
 
 The hook catches nothing but slips, and is no substitute for the discipline. A secret it cannot tell by name (a temporary file made during the work,
 a value mixed into some output) is not caught.

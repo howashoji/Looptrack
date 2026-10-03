@@ -59,10 +59,12 @@ looptrack gates               # stages come from LOOPTRACK_LOOP_GATES_STAGES (bu
 Close only once all of these hold:
 
 - `gates.sh` is green on every stage — quote the `═══ gates result ═══` block verbatim in the comment
+- the evidence is attached (the gate logs, the full output of the tests, screenshots of the screens, generated files); on an issue with verify commands, put it on the record with `looptrack issue verify <ID> --attach-output`
 - everything this round turned up has been filed, and whatever you fixed has been closed
 - a pass or fail for every acceptance criterion; for anything you could not turn into an automated test, what you checked and how
 
 ```bash
+looptrack issue attach <ID> <file>...   # attach the evidence (what to send: "Evidence" in guide)
 looptrack issue close <ID> --comment "<the quoted gates result + pass/fail per acceptance criterion>"
 ```
 

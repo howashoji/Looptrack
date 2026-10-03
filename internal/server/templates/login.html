@@ -7,6 +7,7 @@
     <input type="hidden" name="next" value="{{.Next}}">
     <label>{{T .Lang "server.web.login.login_name"}}<input name="login" value="{{.Login}}" autocomplete="username" required autofocus></label>
     <label>{{T .Lang "server.web.login.password"}}<input name="password" type="password" autocomplete="current-password" required></label>
+    <label class="choice"><input type="checkbox" name="remember" value="1">{{T .Lang "server.web.login.remember"}}</label>
     <button type="submit">{{T .Lang "server.web.login.submit"}}</button>
   </form>
 </main>

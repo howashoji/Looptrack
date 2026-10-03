@@ -109,7 +109,9 @@ func run(rep, content any, out string, check bool, stdout, stderr io.Writer, env
 			}
 		}
 		total := rep.(map[string]any)["total_tokens"]
-		fmt.Fprintln(stdout, i18n.T(lang, "report.pdf.check_ok", "headings", headings, "tables", tables,
+		fmt.Fprintln(stdout, i18n.T(lang, "report.pdf.check_ok",
+			"headings", i18n.MN("report.pdf.check_sections", headings, "n", headings),
+			"tables", i18n.MN("report.pdf.check_tables", tables, "n", tables),
 			"tokens", report.Num(total)))
 		return nil
 	}

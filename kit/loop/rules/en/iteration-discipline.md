@@ -8,7 +8,8 @@
 ## Key points
 <!-- looptrack:inject session codex copilot -->
 
-- One iteration = one implementation issue: implement → gates (`looptrack gates`; if even one stage is missing, do not call it green) → confirm zero problems → close (with a comment showing the evidence) → next.
+- One iteration = one implementation issue: implement → gates (`looptrack gates`; if even one stage is missing, do not call it green) → confirm zero problems → attach the evidence → close (with a comment showing the evidence) → next.
+- Before you close, attach the evidence (the full output of the gates and the tests, screenshots, generated files) with `looptrack issue attach <ID> <file>...`. On an issue with verify commands, put it on the record with `looptrack issue verify <ID> --attach-output` (what `issue attach` sends goes to the issue, not to the verify record, so it is not enough on its own). The full rule is under "Evidence" in guide.
 - File every problem you find on the spot with `--type bug` (reproduction / expected / actual / the stage that caught it). Never pile new implementation on top of open bugs — fix what you can first.
 - Resolving a bug = the fix + a test that catches the same problem + all gates green + the real output quoted in the closing comment.
 
@@ -17,13 +18,16 @@
 One iteration = one implementation issue. Go in this order, and **never skip a stage**:
 
 ```
-implement → gates (build → lint → test …) → confirm zero problems → close (with a comment showing the evidence) → next implementation
+implement → gates (build → lint → test …) → confirm zero problems → attach the evidence → close (with a comment showing the evidence) → next implementation
 ```
 
 - Run the gates with `gates.sh` (a wrapper around `make -C <directory> <stage>`; fail-fast, saves the log).
   The project decides the stages and the directory (as arguments or through the environment variables `LOOPTRACK_LOOP_GATES_STAGES` / `LOOPTRACK_LOOP_GATES_DIR`).
   Even when you ran the tests by hand, always put every stage through `gates.sh` before you close.
 - **If even one stage is missing, never report it as green.** Treat a stage that is not in the Makefile, or that has no recipe, as a failure (this is what keeps a "false green" that PASSes without running anything from happening).
+- **Attach the evidence before you close.** Send the gate logs and the full output of the tests with `looptrack issue attach <ID> <file>...`.
+  On an issue with verify commands, put it on the record with `looptrack issue verify <ID> --attach-output`; Done can be rejected for a record with no attachment.
+  What to send and how is under "Evidence" in the common rules of guide.
 
 ## 2. Turning problems into issues (finding one means filing one)
 

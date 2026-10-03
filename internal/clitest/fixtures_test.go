@@ -118,6 +118,13 @@ const verifyLast = `{"at":"2024-05-02T02:40:00Z","passed":1,"failed":1,"via":"cl
 	`"results":[{"command":"echo ok","status":"ok","exit_code":0,"duration_ms":12,"output_tail":"ok\n"},` +
 	`{"command":"make test","status":"fail","exit_code":2,"duration_ms":3400,"output_tail":"FAIL: TestLogin\nmake: *** [test] Error 2\n"}]}`
 
+// 添付（POST /issues/{id}/attachments）の応答
+func attachRes(id int, filename, mediaType string, size int) string {
+	return fmt.Sprintf(`{"attachment":{"id":%d,"issue":"DEMO-0001","project":"demo","filename":%q,"media_type":%q,"size":%d,`+
+		`"sha256":"00","created_at":"2024-05-02T02:40:00Z","via":"cli","purged":false,"url":"/im/api/v1/attachments/%d"},`+
+		`"message":"DEMO-0001 に添付した（添付 ID %d・%s・%d バイト）"}`, id, filename, mediaType, size, id, id, filename, size)
+}
+
 const verifyPosted = `{"issue":` + `{"id":"DEMO-0001"}` + `,"seq":2,"ok":true,"passed":2,"failed":0,"message":"verify を記録: DEMO-0001（2/2 成功）"}`
 
 // summary（GET /projects/{slug}/summary）

@@ -64,14 +64,15 @@ func (b *bannerApplier) UpdateApplyState() (running bool, failedVersion, failedR
 	return a.UpdateApplyState()
 }
 
-// newUpdates は確認の部品を組む（動かすのは run）。結果は 1 回ごとにログに 1 行残す。
-func (o *Options) newUpdates(paths Paths, logger *slog.Logger) *updates {
+// newUpdates は確認の部品を組む（動かすのは run）。結果は 1 回ごとにログに 1 行残す。launcher（Launcher() の値）は
+// 照らす資産の名前を決める（Windows でインストーラで入れたものは setup.exe、zip を展開したものは zip。desktopAssetFor）。
+func (o *Options) newUpdates(paths Paths, logger *slog.Logger, launcher string) *updates {
 	u := &updates{store: &updatecheck.Store{Path: paths.UpdateCheck()}, getenv: o.Env.Get}
 	u.runner = &updatecheck.Runner{
 		Checker: &updatecheck.Checker{
 			Current:   o.Version,
 			PublicKey: o.UpdatePublicKey,
-			Asset:     updatecheck.DesktopAsset(o.GOOS, runtime.GOARCH),
+			Asset:     desktopAssetFor(o.GOOS, runtime.GOARCH, launcher),
 			Getenv:    o.Env.Get,
 			Client:    o.UpdateClient,
 		},
@@ -235,19 +236,21 @@ func (a *App) replacer() *replacer {
 	return r
 }
 
-// ReplaceSupported はこの環境で自分を置き換えられるか（macOS の .app・Linux の AppImage）。トレイの「新しい版を自動で入れる」を出すか。
+// ReplaceSupported はこの環境で自分を置き換えられるか（macOS の .app・Linux の AppImage・Windows の Looptrack.exe）。
+// トレイの「新しい版を自動で入れる」を出すか。
 func (a *App) ReplaceSupported() bool {
 	_, err := a.replacer().target()
 	return err == nil
 }
 
 // UpdateReplaceable は知らせている新しい版に 1 クリックで置き換えられるか（置き換えられる環境で、署名を確かめた結果が資産の
-// URL と SHA-256 を持つ）。false なら先頭の項目はリリースのページを開く（OpenUpdate）。
+// URL と SHA-256 を持ち、Windows では資産が入れ方に合う）。false なら先頭の項目はリリースのページを開く（OpenUpdate）。
 func (a *App) UpdateReplaceable() bool {
-	if a.updates == nil || !a.ReplaceSupported() {
+	if a.updates == nil {
 		return false
 	}
-	return check(a.updates.sourceResult()) == nil
+	_, err := a.replacer().ready(a.updates.sourceResult())
+	return err == nil
 }
 
 // ApplyUpdate は知らせている新しい版を取得・確認して置き換え、起動し直す（今のインスタンスは Quit で終わる）。
@@ -313,7 +316,7 @@ func (a *App) applyUpdate(auto bool) bool {
 func (a *App) runUpdate(auto bool) bool {
 	src := a.updates.sourceResult()
 	r := a.replacer()
-	if !auto && (check(src) != nil || !a.ReplaceSupported()) {
+	if _, err := r.ready(src); !auto && err != nil {
 		a.OpenUpdate()
 		return false
 	}

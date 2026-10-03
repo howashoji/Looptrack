@@ -26,6 +26,7 @@ import (
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/privfile"
 	"github.com/howashoji/looptrack/internal/server"
+	"github.com/howashoji/looptrack/internal/service"
 	"github.com/howashoji/looptrack/internal/setupwiz"
 	"github.com/howashoji/looptrack/internal/store"
 	"github.com/howashoji/looptrack/internal/updatecheck"
@@ -233,6 +234,8 @@ type Options struct {
 	UpdateStopInTray func() bool
 	// UpdateApplier は帯の「更新する」ボタンが呼ぶ置き換え（server.Config.UpdateApplier。nil ならボタンを出さない）
 	UpdateApplier server.UpdateApplier
+	// AttachDir は添付の本体の置き場（server.Config.AttachDir）。空なら DB と同じディレクトリの attachments
+	AttachDir string
 }
 
 // Instance は動いているサーバ。
@@ -255,6 +258,9 @@ func Start(ctx context.Context, o Options) (*Instance, error) {
 	}
 	if o.Listener == nil {
 		return nil, i18n.Errorf("localserve.err.no_listener")
+	}
+	if o.AttachDir == "" {
+		o.AttachDir = filepath.Join(filepath.Dir(o.DBPath), service.AttachDirName)
 	}
 	if err := server.CheckLocalListen(o.Listener.Addr().String()); err != nil {
 		return nil, err
@@ -290,6 +296,7 @@ func Start(ctx context.Context, o Options) (*Instance, error) {
 		UpdateNotice:     o.UpdateNotice,
 		UpdateStopInTray: o.UpdateStopInTray,
 		UpdateApplier:    o.UpdateApplier,
+		AttachDir:        o.AttachDir,
 	}, db)
 	if err != nil {
 		db.Close()

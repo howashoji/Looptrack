@@ -175,12 +175,17 @@ func (g *goSetup) posixFetchBody(tail string) string {
 	// OS・CPU の判定を先に置く。置き換えは .part に落としてから mv -f で行い、symlink ならリンクの先ではなくリンクを置き換える。
 	// 取得・確認・置き換えのどれかで失敗したら .part を消して失敗で終える（PowerShell の形と同じく、途中のファイルを残さない）。
 	// 置いた後、置き場が PATH に無ければ起動ファイルに足す（setuppath.PosixBody。書けなくても init は続ける）。
-	return fmt.Sprintf(`D="%s" && case "$(uname -s)/$(uname -m)" in %s esac && `+
+	// tail が空なら、置いた looptrack を呼ばずに PATH の段で終える（kit の正本では init を使えないため）。
+	body := fmt.Sprintf(`D="%s" && case "$(uname -s)/$(uname -m)" in %s esac && `+
 		`if [ -x "$D/looptrack" ] && echo "$S  $D/looptrack" | sum -c - >/dev/null 2>&1; then echo "%s: $D/looptrack" >&2; `+
 		`else mkdir -p "$D" && { curl -fsSL "$U" -o "$D/looptrack.part" && `+
 		`echo "$S  $D/looptrack.part" | sum -c - && chmod 755 "$D/looptrack.part" && mv -f "$D/looptrack.part" "$D/looptrack" || `+
-		`{ rm -f "$D/looptrack.part"; false; }; }; fi && { %s; } && %s %s`,
-		goPosixDir, strings.Join(cases, " "), i18n.T(g.lang, "server.mcp.setup.fetch.skip_same"), setuppath.PosixBody(g.lang), goPosixBin, tail)
+		`{ rm -f "$D/looptrack.part"; false; }; }; fi && { %s; }`,
+		goPosixDir, strings.Join(cases, " "), i18n.T(g.lang, "server.mcp.setup.fetch.skip_same"), setuppath.PosixBody(g.lang))
+	if tail == "" {
+		return body
+	}
+	return body + " && " + goPosixBin + " " + tail
 }
 
 // winFetch は PowerShell の取得と init（CPU は PROCESSOR_ARCHITECTURE。ARM64 に arm64 が無ければ amd64 をエミュレーションで使う）。
@@ -208,16 +213,21 @@ func (g *goSetup) winFetchBody(tail string) string {
 		i18n.T(g.lang, "server.mcp.setup.fetch.no_dist_cpu")))
 	// 置き場の looptrack.exe が配布物と SHA-256 で同じときだけ取得を省く（posixFetch と同じ理由）。Get-FileHash の値は
 	// 大文字で、-eq / -ne は大小を区別しないので、小文字の S とそのまま比べられる
-	return fmt.Sprintf(`$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'; `+
+	// tail が空なら、置いた looptrack.exe を呼ばずに PATH の段で終える（posixFetchBody と同じ）
+	body := fmt.Sprintf(`$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'; `+
 		`$D = Join-Path $env:LOCALAPPDATA 'Programs\looptrack'; $B = Join-Path $D 'looptrack.exe'; `+
 		`switch ($env:PROCESSOR_ARCHITECTURE) { %s }; `+
 		`if ((Test-Path -PathType Leaf $B) -and ((Get-FileHash -Algorithm SHA256 -Path $B).Hash -eq $S)) { Write-Host "%s: $B" } `+
 		`else { New-Item -ItemType Directory -Force -Path $D | Out-Null; `+
 		`$P = Join-Path $D 'looptrack.part'; Invoke-WebRequest -UseBasicParsing -Uri $U -OutFile $P; `+
 		`if ((Get-FileHash -Algorithm SHA256 -Path $P).Hash -ne $S) { Remove-Item $P; throw '%s' }; `+
-		`Move-Item -Force $P $B }; %s; %s %s`,
+		`Move-Item -Force $P $B }; %s`,
 		strings.Join(cases, " "), i18n.T(g.lang, "server.mcp.setup.fetch.skip_same"),
-		i18n.T(g.lang, "server.mcp.setup.fetch.sha_mismatch"), setuppath.WinBody(g.lang), goWinBin, tail)
+		i18n.T(g.lang, "server.mcp.setup.fetch.sha_mismatch"), setuppath.WinBody(g.lang))
+	if tail == "" {
+		return body
+	}
+	return body + "; " + goWinBin + " " + tail
 }
 
 // fetch は取得 + init の (主のコマンド, Windows のコマンド)。OS が分かっていれば 2 つ目は空。
@@ -269,7 +279,25 @@ func goInitCommand(bin, agent, slug, base, dist string) string {
 // fetchStep は looptrack の取得 + init の手順（note は見出しに添える利用者の答え。空なら添えない）。その OS 向けの looptrack を
 // 配っていなければ、取得の手順は出せないので、利用者が looptrack を用意した後に実行する init のコマンドを見出しに書いた
 // 利用者の手順にする（AI が実行できるコマンドは付けない）。
-func (g *goSetup) fetchStep(lang i18n.Lang, agent, slug, base, dist, loopFlag, note string) setupStepJSON {
+//
+// self は looptrack 自身のリポジトリ（kit の正本）からの通知があった導入（installStateJSON.SelfRepo）。正本に init は要らない
+// （kitinit の cli.IsSelfRepo）ので、取得・置き換え・PATH の段だけを返し、init を付けない。正本での init は、いまの
+// クライアントでは何もせずに成功で終わるが、それより前のクライアントは拒否する（付けると looptrack は置き換わったのに
+// コマンド全体が失敗で終わる）。loopFlag・note は使わない
+// （正本には loop を問わない: needLoopAsk）。
+func (g *goSetup) fetchStep(lang i18n.Lang, agent, slug, base, dist, loopFlag, note string, self bool) setupStepJSON {
+	if self {
+		if g.missing != "" {
+			return setupStepJSON{Who: "human", Title: i18n.T(lang, "server.mcp.setup.step.fetch_manual_self_repo", "reason", g.missing)}
+		}
+		c, w := g.both(func(win bool) string {
+			if win {
+				return g.winFetch("")
+			}
+			return g.posixFetch("")
+		})
+		return g.step("ai", i18n.T(lang, "server.mcp.setup.step.fetch_self_repo"), c, w)
+	}
 	if g.missing != "" {
 		return setupStepJSON{Who: "human", Title: i18n.T(lang, "server.mcp.setup.step.fetch_manual", "reason", g.missing,
 			"command", fmt.Sprintf("looptrack issue init --project %s --url %s --agent %s%s", slug, base, agent, loopFlag))}
@@ -287,8 +315,10 @@ func (g *goSetup) fetchStep(lang i18n.Lang, agent, slug, base, dist, loopFlag, n
 // PATH の looptrack・手元の CLI の既定の接続先・AI の作業環境にだけある環境変数に頼る手順（self-update や --url の無い
 // init）は返さない。利用者の端末にはそれらが無く、--url の無い init は CLI の既定（手元のローカルモード）に向くため。
 // loop の答えがあれば、setupStepsOf が 1 つ目を答えの旗を付けた取得 + init に置き換える（init は 1 回だけ）。
-func (g *goSetup) staleSteps(lang i18n.Lang, agent, slug, base, dist string) []setupStepJSON {
-	return []setupStepJSON{g.fetchStep(lang, agent, slug, base, dist, "", ""), g.updateConfirm(lang, agent, slug, base)}
+// self（kit の正本）では取得に init を付けない（fetchStep）。正本の導入済み通知は init からは届かないので、確認の手順
+// （issue installed。正本からも self_repo と実行ファイルの版を送る）が置き換えた版を知らせる経路になる。
+func (g *goSetup) staleSteps(lang i18n.Lang, agent, slug, base, dist string, self bool) []setupStepJSON {
+	return []setupStepJSON{g.fetchStep(lang, agent, slug, base, dist, "", "", self), g.updateConfirm(lang, agent, slug, base)}
 }
 
 // updateConfirm は更新の後の確認（任意）。置いた looptrack に、サーバの URL とプロジェクトを環境変数で明示して渡す
@@ -319,7 +349,7 @@ func (g *goSetup) baseSteps(lang i18n.Lang, agent, slug, base, dist string, st i
 		return []setupStepJSON{login, {Who: "human", Title: approveStep(lang, agent)}, confirm}
 	case "stale":
 		if st.ClientOS != "" {
-			return g.staleSteps(lang, agent, slug, base, dist)
+			return g.staleSteps(lang, agent, slug, base, dist, st.SelfRepo)
 		}
 		// 撤去した以前の CLI の導入を looptrack に置き換える: 取得 + init（core・loop の配線を looptrack hook で足す。以前の配線は置き換えずに残し、init が知らせる）
 	}
@@ -327,13 +357,13 @@ func (g *goSetup) baseSteps(lang i18n.Lang, agent, slug, base, dist string, st i
 		ic, iw := g.run("issue installed --agent other")
 		ic, iw = envPrefixSimple(ic, base, slug, g.os == "windows"), envPrefixSimple(iw, base, slug, true)
 		return []setupStepJSON{
-			g.fetchStep(lang, agent, slug, base, dist, "", ""),
+			g.fetchStep(lang, agent, slug, base, dist, "", "", st.SelfRepo),
 			{Who: "ai", Title: i18n.T(lang, "server.mcp.setup.step.other_wire")},
 			login,
 			g.step("ai", i18n.T(lang, "server.mcp.setup.step.other_installed"), ic, iw),
 		}
 	}
-	return []setupStepJSON{g.fetchStep(lang, agent, slug, base, dist, "", ""), login, {Who: "human", Title: approveStep(lang, agent)}, confirm}
+	return []setupStepJSON{g.fetchStep(lang, agent, slug, base, dist, "", "", st.SelfRepo), login, {Who: "human", Title: approveStep(lang, agent)}, confirm}
 }
 
 func joinOS(lang i18n.Lang, posix, win string) string {

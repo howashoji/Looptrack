@@ -1,0 +1,137 @@
+# LOOPTRACK_LANG=en init --project demo --agent codex
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws (project demo, http://127.0.0.1:9/im, AI codex)
+kit source: the kit embedded in the executable (looptrack dev)
+Wiring: looptrack hook <name> --agent <AI>
+Install set: core only. loop is not installed (--loop installs it).
+  create     .codex/hooks.json
+  create     .codex/config.toml
+  create     AGENTS.md
+  create     .claude/.looptrack-kit.json
+verify: checked 4 wiring(s), looptrack dev（headless・test）
+Next:
+  1. Trust the Codex hooks (see "Trusting hooks" below; run /hooks in the codex terminal)
+  2. No token yet: run looptrack issue login --browser --url http://127.0.0.1:9/im and log in and approve in the browser it opens (the AI may run this; it waits up to 5 minutes, so set the command timeout longer than 5 minutes. Without a browser, issue a token at http://127.0.0.1:9/im/account and paste it into login --url http://127.0.0.1:9/im).
+  3. Check (Codex): in a new session the MCP setup tool answers "already installed" and guide -> next (dry_run) works. Use the CLI only for what MCP does not have (AGENTS.md).
+Codex setup:
+
+  - The AI works mainly through the MCP tools (see AGENTS.md). You add the MCP connection to ~/.codex/config.toml yourself (init does not write it):
+
+      [mcp_servers.looptrack]
+      url = "http://127.0.0.1:9/im/mcp"
+      http_headers = { "X-Looptrack-Project" = "demo" }
+      # Authentication is the browser approval (codex mcp login looptrack)
+
+  - init wrote LOOPTRACK_API_URL / LOOPTRACK_PROJECT into the set of [shell_environment_policy] in .codex/config.toml (the project one)
+    (for the looptrack issue commands the AI runs for what MCP does not have. It does not open the sandbox network; every CLI run still needs your approval)
+  - Trusting hooks: Codex only runs hooks when the project is trusted and each hook has been trusted (untrusted or changed hooks are skipped silently). Start the Codex CLI (codex) in this directory and use /hooks to review and trust the hooks in .codex/hooks.json. The trust is recorded under [hooks.state] in ~/.codex/config.toml and applies to the desktop app too (/hooks is not a command in the desktop chat box). It takes effect in sessions started after that.
+  - When init changes the hook wiring (a re-run shows "updated .codex/hooks.json"), trust the changed hooks again the same way
+  - The old notify setting has been replaced by hooks (existing notify settings are left alone; update an old Codex that has no hooks)
+  - The freshness guard (which stops on Stop) is wired for Claude Code only
+
+#### stderr
+
+#### files
+.claude/.looptrack-kit.json (0644)
+    {
+      "version": 1,
+      "url": "http://127.0.0.1:9/im",
+      "project": "demo",
+      "agent": [
+        "codex"
+      ],
+      "source": "copy",
+      "core": {
+        "bundle_sha256": "$SHA256",
+        "files": {
+          "kit/core/skills/issue/SKILL.md": "$SHA256",
+          "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+        }
+      },
+      "loop": {
+        "installed": false
+      }
+    }
+.codex/config.toml (0644)
+    # Added by looptrack issue init: tells the looptrack issue commands the AI runs where the issue server is (it does not open the sandbox to the network)
+    [shell_environment_policy]
+    set = { LOOPTRACK_API_URL = "http://127.0.0.1:9/im", LOOPTRACK_PROJECT = "demo" }
+.codex/hooks.json (0644)
+    {
+      "hooks": {
+        "SessionStart": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "mcp__.*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "SessionEnd": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              }
+            ]
+          }
+        ]
+      }
+    }
+AGENTS.md (0644)
+    <!-- looptrack:begin (managed by looptrack issue init; to change it, run looptrack issue init again) -->
+    ## Issue tracking (issue server)
+
+    **Start every piece of work by filing an issue, not in conversation alone. File a bug as soon as you find one.**
+
+    - **Work through the MCP tools (server name looptrack).** Codex's sandbox blocks network access from shell commands,
+      so the CLI (`looptrack issue`) needs elevated permissions (the user's approval) every time it runs. The sandbox does not block the MCP tools' traffic
+    - **Before anything else, read how to use it and the rules with the `guide` tool**. It returns the common rules, this project's rules and the operating documents in one go
+    - One round of the loop: `next` (start) → work → `add_comment` (record what you learn as you learn it) → verify the acceptance criteria → `set_status` to Done (with the verification results in `comment`) → the next `next`.
+      File an issue with `create_issue`. To edit a body, take the version and the full text with `get_issue`, then pass the corrected full text to `update_issue`. When something is rejected, follow the instructions in the message
+    - Verify commands (the "## Verify commands" section of the body): get the list with `verify_issue`, run every one of them in order in your local shell, and send the results with `report_verify`
+    - Token usage: when you file, comment or change a status over MCP, a hook (`looptrack hook usage` in `.codex/hooks.json`) attaches it to the issue a few seconds later.
+      Leave a note of your progress with `add_comment` before Done, and the usage rule (which asks for token usage on an AI's Done) will not reject it
+    - Use the CLI only for operations that MCP lacks, with elevated permissions and the user's approval. init wrote the environment variables `LOOPTRACK_API_URL=http://127.0.0.1:9/im` / `LOOPTRACK_PROJECT=demo` into `.codex/config.toml`.
+      If `looptrack issue config` stops with an error saying there is no server URL, put `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` in front of the command. The CLI is for these cases:
+      - `looptrack issue usage attach <ID>`: when a tool result shows this command. The cue is the command, not the wording (the server's wording follows the user's language). If `set_status` is rejected by the usage rule,
+        wait a few seconds and retry once, since the hook may not have finished sending yet. If it is still rejected, attach the usage and then retry
+      - `looptrack issue login --browser --url http://127.0.0.1:9/im`: the first time only. It gets the token the hooks use. The user logs in and approves in the browser that opens, and the token never shows up in the conversation
+      - Installing and updating (`init`, `installed`): follow the steps the `setup` tool returns
+    - When the looptrack MCP server is not connected, go round the same loop with the CLI's `next` / `comment` / `verify` / `close --comment`. Each call then needs approval,
+      so suggest that the user add `[mcp_servers.looptrack]` to `~/.codex/config.toml`. Pass bodies and comments in a quoted heredoc (`<<'EOF'`)
+    - Browse: http://127.0.0.1:9/im/p/demo/ (login required, read-only)
+    <!-- looptrack:end -->

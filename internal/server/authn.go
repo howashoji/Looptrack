@@ -41,28 +41,51 @@ func (s *Server) clearSessionCookie(w http.ResponseWriter) {
 
 // sessionFrom は Cookie のセッションを検証する（期限・無操作時間・無効化された利用者）。
 func (s *Server) sessionFrom(r *http.Request) (*store.Session, store.User, error) {
+	sess, u, _, err := s.checkSession(r)
+	return sess, u, err
+}
+
+// sessionRefresh は sessionFrom と同じ検証をし、「ログインしたままにする」のセッションの期限を延ばしたときは
+// Cookie も同じ期限で出し直す。sessionFrom は ResponseWriter を持たないので、出し直しは応答を書く前の
+// 認証の入口（web・api とログイン画面）がこれを呼んで行う。pending は段階を終えていないセッションだけを通し、
+// それは延ばさないので sessionFrom のままでよい。期限を延ばすのと同じ時機に限るので、
+// Set-Cookie は最終アクセスの更新と同じく 5 分に 1 回だけ出る。
+func (s *Server) sessionRefresh(w http.ResponseWriter, r *http.Request) (*store.Session, store.User, error) {
+	sess, u, extended, err := s.checkSession(r)
+	if err == nil && extended {
+		if c, cerr := r.Cookie(sessionCookie); cerr == nil {
+			s.setSessionCookie(w, c.Value, sess.ExpiresAt)
+		}
+	}
+	return sess, u, err
+}
+
+// checkSession は sessionFrom の本体。extended は期限（expires_at）を延ばしたか。
+func (s *Server) checkSession(r *http.Request) (*store.Session, store.User, bool, error) {
 	c, err := r.Cookie(sessionCookie)
 	if err != nil || c.Value == "" {
-		return nil, store.User{}, store.ErrNotFound
+		return nil, store.User{}, false, store.ErrNotFound
 	}
 	ctx := r.Context()
 	now := s.cfg.Now()
 	hash := auth.HashToken(c.Value)
 	sess, err := store.SessionByHash(ctx, s.db, hash, now)
 	if err != nil {
-		return nil, store.User{}, err
+		return nil, store.User{}, false, err
 	}
-	if now.Sub(sess.LastSeenAt) > sessionIdleTimeout {
+	// 「ログインしたままにする」のセッションは無操作では切らない（期限を最終アクセスから延ばし続ける）
+	keep := sess.Persistent && sess.MFAPassed
+	if !keep && now.Sub(sess.LastSeenAt) > sessionIdleTimeout {
 		_ = store.DeleteSession(ctx, s.db, hash)
-		return nil, store.User{}, store.ErrNotFound
+		return nil, store.User{}, false, store.ErrNotFound
 	}
 	u, err := store.UserByID(ctx, s.db, sess.UserID)
 	if err != nil {
-		return nil, u, err
+		return nil, u, false, err
 	}
 	if u.Disabled {
 		_ = store.DeleteSession(ctx, s.db, hash)
-		return nil, u, store.ErrNotFound
+		return nil, u, false, store.ErrNotFound
 	}
 	// 二段階認証が必須のとき、TOTP を経ずに発行されたセッション（任意の間にパスワードだけで入ったもの）と
 	// TOTP 未登録の利用者のセッションは使わせない（再ログインで登録・入力を求める）。
@@ -71,17 +94,31 @@ func (s *Server) sessionFrom(r *http.Request) (*store.Session, store.User, error
 	if !s.cfg.LocalMode && sess.MFAPassed && (!sess.TOTPVerified || !u.TOTPEnabled) {
 		required, err := s.twoFactorRequired(ctx)
 		if err != nil {
-			return nil, u, err
+			return nil, u, false, err
 		}
 		if required {
 			_ = store.DeleteSession(ctx, s.db, hash)
-			return nil, u, store.ErrNotFound
+			return nil, u, false, store.ErrNotFound
 		}
 	}
+	extended := false
 	if now.Sub(sess.LastSeenAt) > 5*time.Minute {
-		_ = store.TouchSession(ctx, s.db, hash, now)
+		if keep {
+			exp := now.Add(persistentLifetime)
+			switch err := store.ExtendSession(ctx, s.db, hash, now, exp); {
+			case err == nil:
+				sess.LastSeenAt, sess.ExpiresAt, extended = now, exp, true
+			case errors.Is(err, store.ErrNotFound):
+				// 読んだ後にログアウトや破棄で消えたセッション。次の要求と同じく未ログインとして扱い、
+				// 消えた ID の Cookie を出し直さない
+				return nil, u, false, store.ErrNotFound
+			}
+			// ほかの失敗は TouchSession と同じく延ばさずに通す（DB の一時的な失敗で利用者を締め出さない）
+		} else {
+			_ = store.TouchSession(ctx, s.db, hash, now)
+		}
 	}
-	return &sess, u, nil
+	return &sess, u, extended, nil
 }
 
 // bearer は Authorization: Bearer のアクセストークンを検証する。
@@ -127,7 +164,7 @@ func (s *Server) api(next http.Handler) http.Handler {
 				return
 			}
 		} else {
-			sess, u, err := s.sessionFrom(r)
+			sess, u, err := s.sessionRefresh(w, r)
 			if err != nil || !sess.MFAPassed {
 				writeError(w, http.StatusUnauthorized, "unauthorized", i18n.T(reqLang(r), "server.api.err.auth_required"))
 				return
@@ -151,7 +188,7 @@ func (s *Server) web(next func(http.ResponseWriter, *http.Request, *principal)) 
 			s.localWeb(w, r, next)
 			return
 		}
-		sess, u, err := s.sessionFrom(r)
+		sess, u, err := s.sessionRefresh(w, r)
 		if err != nil {
 			s.redirectLogin(w, r)
 			return

@@ -226,16 +226,27 @@ func FromAcceptLanguage(header string) Lang {
 // 文面を作る場所と、それを見せる場所が離れているときに使う。たとえば入力を検査する関数は
 // 誤りの理由を返すが、その時点では相手の言語を知らない（知る必要もない）。Msg で返し、
 // 画面に出す側が In で言語を決める。
+//
+// 件数で単数と複数を分ける文面（TN）は、件数も一緒に持ち回る（MN）。
 type Msg struct {
 	ID string
 	KV []any
+
+	// n は件数。counted のときだけ意味を持ち、In が TN の選び方で文面を決める。
+	n       int
+	counted bool
 }
 
 // M は Msg を作る。
 func M(id string, kv ...any) Msg { return Msg{ID: id, KV: kv} }
 
-// In は Msg を lang の文面にする。
-func (m Msg) In(lang Lang) string { return T(lang, m.ID, m.KV...) }
+// In は Msg を lang の文面にする。MN で作った Msg は、件数に合わせて TN と同じ選び方をする。
+func (m Msg) In(lang Lang) string {
+	if m.counted {
+		return TN(lang, m.ID, m.n, m.KV...)
+	}
+	return T(lang, m.ID, m.KV...)
+}
 
 // Error は Msg を持つ error。利用者に見せる理由を、言語を決めずに返すために使う。
 type Error struct{ Msg Msg }

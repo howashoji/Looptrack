@@ -10,6 +10,11 @@ services:
   mysql:
     image: mysql:8.4
     container_name: im-dev-mysql
+    # Docker Desktop の VM 全体のメモリが足りなくなると、カーネルが mysqld を選んで殺すことがある。
+    # 落ちても Docker が起こし直す（走っていた検査は落ちる）。止めたときは手で止めたままにする。
+    # mem_limit と負の oom_score_adj は入れない。前者は上限を超えた mysqld 自身を殺す条件を足し、
+    # 後者は VM の不足の巻き添えを、同じ VM のほかのコンテナに回すだけになる。
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${LOOPTRACK_DEV_MYSQL_ROOT_PASSWORD:-imdev}
       TZ: Asia/Tokyo

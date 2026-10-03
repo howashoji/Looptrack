@@ -10,7 +10,7 @@ import (
 // next の受け入れ条件・verify の一覧（GET・MCP verify_issue）・verify.require_on_close の判定が日本語の見出しと同じ結果になる。
 // コードブロックの中の見出しは、どちらの言語でも見出しとしない。
 func TestEnglishHeadingsSameAsJapanese(t *testing.T) {
-	v := newVerifyEnv(t, "ve", `{"verify": {"require_on_close": true}}`)
+	v := newVerifyEnv(t, "ve", `{"verify": {"require_on_close": true, "require_evidence": false}}`) // エビデンスの網は evidence_api_test.go で見る
 	m := v.mcpAs(v.ed.token, map[string]string{"X-Looptrack-Project": "ve"})
 	const tmpl = "説明\n\n```md\n{A}\n- [ ] コードブロックの中\n{V}\necho no\n```\n\n{A}\n\n- [ ] 動く\n- [ ] テストが通る\n\n" +
 		"{V}\n\n```bash\ngo test ./...\n# コメント\nmake lint\n```\n\n## 関連\n\n- `false`\n"

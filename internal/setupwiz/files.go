@@ -43,7 +43,7 @@ func renderEnv(p *Plan, now time.Time, lang i18n.Lang) string {
 	return b.String()
 }
 
-// renderCompose はチームのサーバ用の compose.yaml の雛形を作る（deploy/compose.yaml を元にする）。
+// renderCompose はチームのサーバ用の compose.yaml を書き出す。雛形の文面はこの関数が持ち、元にするファイルは無い。
 // 注釈は setup を動かした人の言語で書く（.env と同じ）。設定の行は言語に依らない。
 func renderCompose(p *Plan, now time.Time, lang i18n.Lang) string {
 	port := strconv.Itoa(p.Port)
@@ -57,21 +57,24 @@ func renderCompose(p *Plan, now time.Time, lang i18n.Lang) string {
 	fmt.Fprintf(&b, `    build:
       context: .
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: looptrack
     env_file: .env
     environment:
       GOMEMLIMIT: 64MiB
+      LOOPTRACK_ATTACH_DIR: %s
     ports:
       - "127.0.0.1:%s:%s"
-`, port, port)
+`, attachContainerDir, port, port)
 	if p.Store == StoreSQLite {
 		writeComment(&b, "    ", i18n.T(lang, "files.compose.sqlite"))
 	}
+	// 添付の本体はどちらの保存先でもディスクに置く。read_only のコンテナで書けるのは volume だけなので、MySQL でも ./data を入れる。
+	// 置き場は compose.yaml の environment に書く（volume と同じファイルにあれば、片方だけが残る形にならない）
+	writeComment(&b, "    ", i18n.T(lang, "files.compose.attach", "dir", attachContainerDir))
 	writeComment(&b, "    ", i18n.T(lang, "files.compose.dist"))
 	b.WriteString("    volumes:\n")
-	if p.Store == StoreSQLite {
-		b.WriteString("      - ./data:/data\n")
-	}
+	b.WriteString("      - ./data:/data\n")
 	// install.sh はこの行（./dist を /dist に読み取り専用）があるときだけ配布ディレクトリを受け持つ（deploy/install.sh の dist_plan）
 	b.WriteString("      - ./dist:/dist:ro\n")
 	if p.Store != StoreSQLite {

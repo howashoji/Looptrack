@@ -1,0 +1,13 @@
+# attach/missing-file
+$ issue attach DEMO-0001 no-such.png
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: no-such.png がありません
+
+#### requests (0)
+
+#### files (0)

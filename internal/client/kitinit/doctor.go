@@ -110,7 +110,8 @@ func Doctor(args []string, o DoctorOptions) int {
 	// self-update に頼らず、MCP の setup ツールの手順（置き場の looptrack の取得と --url 付きの init）に寄せる
 	bin := runningBin(exe)
 	source := kitSourceOf(dir)
-	redo, update := doctorRedo(o.Lang, source)
+	selfRepo := cli.IsSelfRepo(dir)
+	redo, update := doctorRedo(o.Lang, source, selfRepo)
 
 	// 2. PATH
 	inPath := false
@@ -177,6 +178,9 @@ func Doctor(args []string, o DoctorOptions) int {
 				r.note(i18n.T(o.Lang, "kitinit.doctor.wire.agent_mismatch", "file", f.rel, "agent", f.agent, "cmd", e.cmd))
 			}
 			switch {
+			case bin == "looptrack" && !inPath && selfRepo:
+				// 正本では init をしないので、init が配線し直す旨を添えない（直し方は redo だけ）
+				r.bad(i18n.T(o.Lang, "kitinit.doctor.wire.not_in_path.self_repo", "file", f.rel, "hook", name, "redo", redo))
 			case bin == "looptrack" && !inPath:
 				r.bad(i18n.T(o.Lang, "kitinit.doctor.wire.not_in_path", "file", f.rel, "hook", name, "redo", redo))
 			case bin != "looptrack":
@@ -191,7 +195,10 @@ func Doctor(args []string, o DoctorOptions) int {
 			r.ok(i18n.T(o.Lang, "kitinit.doctor.wire.count", "file", f.rel, "count", n))
 		}
 	}
-	if wired == 0 {
+	switch {
+	case wired == 0 && selfRepo:
+		r.note(i18n.T(o.Lang, "kitinit.doctor.wire.none.self_repo"))
+	case wired == 0:
 		r.note(i18n.T(o.Lang, "kitinit.doctor.wire.none"))
 	}
 
@@ -216,7 +223,7 @@ func Doctor(args []string, o DoctorOptions) int {
 		} else {
 			r.bad(i18n.T(o.Lang, "kitinit.doctor.err.read_file", "file", kitJSON, "reason", err))
 		}
-	} else if cli.IsSelfRepo(dir) {
+	} else if selfRepo {
 		r.ok(i18n.T(o.Lang, "kitinit.doctor.kit.self_repo", "file", kitJSON))
 	} else if wired > 0 {
 		r.note(i18n.T(o.Lang, "kitinit.doctor.kit.missing", "file", kitJSON))
@@ -290,9 +297,18 @@ func kitSourceOf(dir string) string {
 }
 
 // doctorRedo は配線のやり直し方と、実行ファイルの更新の仕方の文（置き方が server ならサーバ版の手順）。
-func doctorRedo(lang i18n.Lang, source string) (redo, update string) {
+// selfRepo は looptrack 自身のリポジトリ（kit の正本。cli.IsSelfRepo）か。正本では init をしないので、
+// サーバ版の手順も取得と PATH だけを案内する。控えが server でない正本では、やり直しは PATH に置くか
+// 手で書いた配線を直すこと（redo は PATH に無い名前の配線と、実在しない実行ファイルの配線で出る）。
+func doctorRedo(lang i18n.Lang, source string, selfRepo bool) (redo, update string) {
 	if source == "server" {
+		if selfRepo {
+			return i18n.T(lang, "kitinit.doctor.redo.server.self_repo"), i18n.T(lang, "kitinit.doctor.update.server.self_repo")
+		}
 		return i18n.T(lang, "kitinit.doctor.redo.server"), i18n.T(lang, "kitinit.doctor.update.server")
+	}
+	if selfRepo {
+		return i18n.T(lang, "kitinit.doctor.redo.local.self_repo"), i18n.T(lang, "kitinit.doctor.update.local")
 	}
 	return i18n.T(lang, "kitinit.doctor.redo.local"), i18n.T(lang, "kitinit.doctor.update.local")
 }

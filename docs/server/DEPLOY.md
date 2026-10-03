@@ -21,6 +21,7 @@ MySQL を使うときは、アプリ用の DB 利用者にテーブル単位の�
 スキーマの変更（migrate）は管理用の資格情報で行い、アプリ用の利用者には DDL 権限を与えません。
 **テーブル単位の `GRANT` はテーブルができてからしか流せません。** そのため流す順番は「migrate → 権限 → 起動」になります。
 権限の中身は `looptrack` に埋め込んであり、`looptrack grants print` で DB 名・利用者名に合わせた GRANT 文を出し、`looptrack grants apply` で管理用の資格情報を尋ねて流せます。
+`looptrack grants check` は、アプリ用の利用者に `deploy/grants.sql` の全部の表の権限があるかを確かめます。足りなければ足りない表と権限を出し、終了コード 3 で終わります。
 install.sh での順番は下の「保存先に MySQL を選ぶとき」を見てください。
 
 ## 秘密情報
@@ -42,6 +43,7 @@ install.sh での順番は下の「保存先に MySQL を選ぶとき」を見�
 | `LOOPTRACK_LISTEN` | `:8090`（ローカルモードは `127.0.0.1:8090`） | 待ち受け |
 | `LOOPTRACK_TOTP_ISSUER` | `Looptrack` | TOTP の発行者名（認証アプリに表示される名前）。登録済みの認証アプリの表示を保つときは以前の名前を設定する |
 | `LOOPTRACK_COOKIE_SECURE`・`LOOPTRACK_TRUSTED_PROXIES` | `true`・`127.0.0.1/32,::1/128,172.16.0.0/12` | https 前提の Cookie・`X-Real-IP` を信用する接続元 |
+| `LOOPTRACK_ATTACH_DIR` | `$STATE_DIRECTORY/attachments`、無ければ SQLite の DB の隣の `attachments` | 添付の本体の置き場。どれにも当たらなければ添付だけが使えない（下の「添付の置き場とバックアップ」） |
 
 CLI（`looptrack issue`）の接続先は `LOOPTRACK_API_URL` か `init --url` / `login --url` で決まります。
 どれも無いときは手元のローカルモードのアドレス `http://127.0.0.1:8090/looptrack` が既定です。
@@ -65,7 +67,7 @@ looptrack setup --dir /opt/looptrack     # --dir を省くと今のディレク�
 | ⑤ 二段階認証 | 必須 / 任意（**必ず聞く**。既定はチームなら必須・ローカルなら任意。あとから `settings two-factor` や管理画面で変えられる） |
 | ⑥ 最初のプロジェクト | slug（ローカルの既定 [main]・チームの既定 [-]＝作らない）・接頭辞 [slug の英大文字]・表示名 [slug]。作ると最初の管理者を admin で参加させる |
 
-最後に内容を確認してから書き込みます。作られるものは次のとおりです。
+最後に内容を確認してから書き込みます。作られるものは次のとおり。
 
 - `<dir>/.env`（600）: `LOOPTRACK_DSN`・`LOOPTRACK_SECRET_KEY`（安全な乱数で生成）・`LOOPTRACK_LISTEN`・`LOOPTRACK_BASE_PATH`・`LOOPTRACK_PUBLIC_URL`・`LOOPTRACK_COOKIE_SECURE`。ローカルなら `LOOPTRACK_LOCAL_MODE=1` も入ります。
 - チームのサーバ（`--service compose`。既定）なら `<dir>/compose.yaml`。
@@ -98,7 +100,7 @@ LOOPTRACK_SETUP_DSN='im_app:<pw>@tcp(mysql:3306)/im?parseTime=true' LOOPTRACK_SE
   [--project web --project-prefix WEB --project-name "Web サイト"] [--service compose|systemd|none]
 ```
 
-`--yes` では、最初のプロジェクトは `--project` を付けたときだけ作ります。
+`--yes` で最初のプロジェクトを作るのは、`--project` を付けたときだけ。
 
 - **途中でやめても壊れません。** Ctrl-C・入力の終わり・接続やマイグレーションの失敗では、`.env` も利用者も残りません。
   ファイルは一時ファイルに書いて最後に置き換えます。管理者の作成は最後の段で、失敗したら置いたファイルを戻します。
@@ -115,7 +117,7 @@ LOOPTRACK_SETUP_DSN='im_app:<pw>@tcp(mysql:3306)/im?parseTime=true' LOOPTRACK_SE
 Ubuntu の LTS や Debian のサーバなら、`deploy/install.sh`（POSIX sh）1 つで取得 → 照合 → 展開 → 設定（`looptrack setup`）→（MySQL の権限）→ 起動 → 動作確認まで進みます。
 問いに答えるだけで、公開 URL（リバースプロキシの後ろ）からブラウザでログインできるようになります。MCP と CLI の接続設定も表示されます。
 
-インストーラは raw.githubusercontent.com の main から 1 行で取って走らせます（Homebrew の初期インストールと同じ形）。
+インストーラは raw.githubusercontent.com の main から 1 行で取って走らせます。Homebrew の初期インストールと同じ形。
 README の 1 行は版を含まないので、リリースのたびに変わりません。インストーラは既定で GitHub Releases の最新（`releases/latest`）の書庫を取ります。
 
 ```bash
@@ -130,7 +132,7 @@ sudo sh install.sh
 sudo sh deploy/install.sh --from /path/to/dist
 ```
 
-**インストーラのスクリプト自身は HTTPS で取るだけで、照合できません**（照合の鍵と手順をそのスクリプトが持つため）。
+**インストーラのスクリプト自身は HTTPS で取るだけで、照合できません。** 照合の鍵と手順をそのスクリプトが持つため。
 照合するのは、スクリプトが取る書庫です（下の「取得元の規約」）。スクリプトを信用できないときは、取って読んでから実行してください。
 
 ```bash
@@ -208,6 +210,7 @@ Releases の最新は、公開側でプレリリースを Latest にしてあれ
 | 設定 | `/etc/looptrack/.env`（root 600。systemd の `EnvironmentFile` が読む。サービスの利用者はファイルを読めない） | `<dir>/.env`（600）と setup が書く `<dir>/compose.yaml` |
 | データ（SQLite） | `/var/lib/looptrack/im.db`（利用者 `looptrack`・ディレクトリ 0750・ファイル 0600） | `<dir>/data/im.db`（uid 65534・0600。コンテナの `/data`） |
 | クライアントに配る looptrack | `/usr/local/share/looptrack/dist`（root 0755。サービスは読むだけ） | `<dir>/dist`（setup の compose.yaml が `./dist:/dist:ro` でコンテナの `/dist` に読み取り専用で入れる） |
+| 添付の本体 | `/var/lib/looptrack/attachments`（`.env` の `LOOPTRACK_ATTACH_DIR`。利用者 `looptrack`・0750） | `<dir>/data/attachments`（uid 65534。setup の compose.yaml の `LOOPTRACK_ATTACH_DIR: /data/attachments`。保存先が MySQL でも同じ） |
 | 動く利用者 | 専用のシステム利用者 `looptrack`（ログイン不可） | 65534（`read_only`・`cap_drop: ALL`・`no-new-privileges`。上の「コンテナ」と同じ） |
 | 前提 | systemd | Docker Engine と compose プラグイン |
 | 管理コマンド | `sudo sh -c 'set -a; . /etc/looptrack/.env; exec setpriv --reuid looptrack --regid looptrack --init-groups looptrack user list'` | `cd <dir> && docker compose run --rm --no-deps looptrack user list` |
@@ -235,7 +238,8 @@ Releases の最新は、公開側でプレリリースを Latest にしてあれ
   compose はコンテナの中で確かめるので、この確認はしません。
 - setup への渡し方: install.sh は `looptrack setup --dir <設定の置き場> --mode team` に、動かし方に応じた引数を足して呼びます。
   systemd なら `--service systemd --sqlite-path /var/lib/looptrack/im.db`、compose なら `--service compose` です（`--service` の違いは上の「新しく立ち上げる」の表）。
-  `.env` は setup が書いたまま使います。install.sh が足すのは `LOOPTRACK_DIST_DIR` の 1 行だけです（無いときだけ。下の「クライアントに配る looptrack」）。
+  `.env` は setup が書いたまま使います。install.sh が足すのは `LOOPTRACK_DIST_DIR` と、systemd では `LOOPTRACK_ATTACH_DIR` の行だけです
+  （どちらも無いときだけ。下の「クライアントに配る looptrack」と「添付の置き場とバックアップ」）。
   `--dir`・`--mode`・`--service`・`--yes`・`--force` は install.sh が決めるので、`--` の後ろには置けません。setup の最後の「■ 起動」の案内は、install.sh が実行済みです。
 - compose のイメージ: ビルド済みのイメージは配っていません。取得して SHA-256 を確かめた実行ファイルから、その場で作ります（`FROM scratch` の数行で deploy/Dockerfile と同じ形）。
   第三者のライセンス文はイメージの `/NOTICE` に入ります。取得元から取るのではなく、入れる実行ファイル自身の `looptrack licenses` の出力を書き出します。なので実行ファイルと必ず同じ版になります。
@@ -244,7 +248,7 @@ Releases の最新は、公開側でプレリリースを Latest にしてあれ
 ### 保存先に MySQL を選ぶとき（権限を与える順番）
 
 アプリ用の DB 利用者を最小権限（`deploy/grants.sql`）にする構成では、権限を与える順番が決まっています。
-**テーブル単位の `GRANT` は、そのテーブルができてからしか流せません。** DB 単位で広く与えてから取り消す形が取れないので、テーブル単位にしています。
+**テーブル単位の `GRANT` は、そのテーブルができてからしか流せません。** テーブル単位にしているのは、DB 単位で広く与えてから取り消す形が取れないため。
 install.sh はこの順番を 1 回の実行の中で進めます。
 
 1. `LOOPTRACK_SETUP_DSN` はアプリ用の利用者（`.env` の `LOOPTRACK_DSN` になる）にします。
@@ -266,7 +270,7 @@ install.sh はこの順番を 1 回の実行の中で進めます。
    - アプリ用の利用者が無ければ、確かめてから `LOOPTRACK_DSN` のパスワードで作ります（`--yes` なら確かめずに作ります）。DB が無ければ DB も同じように作ります。
    - 権限の中身は looptrack の実行ファイルに埋め込んだ `deploy/grants.sql` です。DB 名と利用者名は `LOOPTRACK_DSN` のものに置き換えます（`im`・`im_app` でなくてよい）。
      照合済みの実行ファイルから出るので、取得の鎖の外にある別のファイルを信用しなくて済みます。流す GRANT 文は `looptrack grants print` で見られます。
-   - 流した後で、アプリ用の利用者で読めることを確かめてから起動と動作確認に進みます。
+   - 流した後で、アプリ用の利用者に全部の表の権限がそろったことを確かめてから、起動と動作確認に進みます。
 4. 管理用の資格情報が合わないときは、権限を与えず、サービスを起動せずに、何が合わなかったか（接続先・利用者・MySQL のエラー）を出して止まります。
    `.env` とテーブルは残るので、もう一度実行すると setup を飛ばし、尋ねるところから続きます。
    DB が無いときの 2 で合わなかったときは `.env` を書かずに止まるので、もう一度実行すると setup から進みます。
@@ -274,17 +278,20 @@ install.sh はこの順番を 1 回の実行の中で進めます。
 端末が無い（自動化の）ときは、systemd の構成に限り `LOOPTRACK_INSTALL_DB_ADMIN_USER` と `LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE`（1 行目がパスワードのファイル。使った後は自分で消す）で渡せます。
 自分で流すなら、`sudo sh -c 'set -a; . /etc/looptrack/.env; exec looptrack grants print'` で GRANT 文を出し、管理用の資格情報で流してから install.sh をもう一度実行します。
 アプリ用の利用者に DB 単位の広い権限を与える構成なら、2 の確認では止まらずに最後まで進みます。
-**テーブルが増えた更新でも同じです。** `--upgrade` の `migrate` の後に読めなければ、同じように尋ねて権限を与え直してから起動します。
+**テーブルが増えた更新でも同じ。** `--upgrade` は `migrate` の後に `looptrack grants check` で全部の表の権限を確かめます。
+新しい表の権限が無ければ、同じように尋ねて権限を与え直してから起動します。ほかの表が読めても見落としません。
+新しい表の権限が無いまま起動すると `/healthz` は 200 を返し、新しい表を使う操作だけが失敗するからです。
+`LOOPTRACK_INSTALL_DB_ADMIN_PASSWORD_FILE` を渡していれば尋ねずに与えます。尋ねる端末も渡したファイルも無いときは、新しい版を起動せずに止まります。無人の更新なら前の版に戻して起動し直します。
 この確認を入れる前は、権限が無いまま起動していました。`/healthz` が上がらず、60 秒待ってから「ログを見てください」で終わっていたのです。
 
 ### TLS はリバースプロキシが持つ
 
-サーバ（looptrack serve）は TLS を持たず、`127.0.0.1:<port>` だけで待ち受けます。
+サーバの looptrack serve は TLS を持たず、`127.0.0.1:<port>` だけで待ち受けます。
 install.sh は nginx と Caddy の設定例を表示し、`/etc/looptrack/proxy-examples.txt` にも置きます。
 設定例では接頭辞（`LOOPTRACK_BASE_PATH`）を剥がさずに渡し、`X-Real-IP` を付けます。サーバは既定で 127.0.0.1 と Docker のネットワークからの `X-Real-IP` を信用します。
 nginx の設定を手で書くときも `proxy_buffering off;` を入れてください。MCP の購読は SSE で接続を開いたまま通知を流すので、nginx が溜めるとクライアントに届かず、クライアントが待ちきれずに切ります。
 サーバは `/mcp` の応答に `X-Accel-Buffering: no` を付けるので、nginx はこの見出しを無視する設定（`proxy_ignore_headers X-Accel-Buffering`）でない限り、`/mcp` の応答を溜めません。
-TLS をプロキシに任せる理由は次の 3 つです。
+TLS をプロキシに任せる理由は次の 3 つ。
 
 - 証明書の取得・更新（ACME）はプロキシの役目です（Caddy は自動、nginx は certbot）。
   サーバに持たせると、更新の失敗・鍵の置き場・443 番を開くための特権（`CAP_NET_BIND_SERVICE`）を抱えることになります。unit のサンドボックスも弱まります。
@@ -304,17 +311,19 @@ TLS をプロキシに任せる理由は次の 3 つです。
 
 ### 更新（--upgrade）
 
-`curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` で、次の順に進みます
-（取得元は入れるときと同じで、`--from` なしなら GitHub Releases の最新・`--version <版>` でその版）。
+`curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` で、次の順に進みます。
+取得元は入れるときと同じで、`--from` なしなら GitHub Releases の最新・`--version <版>` でその版。
 
 1. 新しい版を取得して確かめます（書庫は照合してから展開します）。クライアントに配る looptrack（6 対象）も取って確かめます（下の「クライアントに配る looptrack」）。MySQL なら、続けて止める前の確認をします（下の「止める前の確認（MySQL）」）。
 2. 停止します。
 3. SQLite なら、止めた状態で `im.db`（と `-wal`・`-shm`）を `backup-<日時>/` に写します。
 4. 実行ファイルを入れ替えます。前の版は `looptrack.prev` に残ります（compose は新しいイメージを作ります）。
 5. `migrate` を流します。MySQL でテーブル作成用の利用者を別にするときは `LOOPTRACK_SETUP_MIGRATE_DSN` を使います（渡し方は下の「止める前の確認（MySQL）」）。
-6. クライアントに配る looptrack を配布ディレクトリに置き、起動して `/healthz` を待ちます（systemd では、2 の後に別のプロセスが `/healthz` に応えていれば、何も置き換えずに止まります。起動の後も、応えたのがサービスかを確かめます。上の「動かし方」）。MySQL を最小権限で使っていて、5 の後にアプリ用の利用者が読めなければ、起動の前に管理用の資格情報を尋ねて権限を与え直します（上の「保存先に MySQL を選ぶとき」）。
+6. クライアントに配る looptrack を配布ディレクトリに置き、起動して `/healthz` を待ちます（systemd では、2 の後に別のプロセスが `/healthz` に応えていれば、何も置き換えずに止まります。起動の後も、応えたのがサービスかを確かめます。上の「動かし方」）。MySQL を最小権限で使っていて、5 の後にアプリ用の利用者が読めないか、権限の足りない表があれば、起動の前に管理用の資格情報を尋ねて権限を与え直します（上の「保存先に MySQL を選ぶとき」）。
 
-同じ版ならサーバは置き換えません（クライアントに配る looptrack だけをその版にそろえます）。MySQL のバックアップは各自で取ってください（`mysqldump` など）。
+同じ版ならサーバは置き換えません。その版にそろえるのは、クライアントに配る looptrack だけ。MySQL のバックアップは各自で取ってください（`mysqldump` など）。
+**3 の控えに添付の本体は入りません。** 理由と添付のバックアップの取り方は下の「添付の置き場とバックアップ」にあります。
+systemd では、`.env` に `LOOPTRACK_ATTACH_DIR` が無ければ 6 の前に足し、置き場を作ります。以前の install.sh で入れたサーバも、1 度 `--upgrade` すれば置き場が決まる。
 
 **止める前の確認（MySQL）。** 1 の後、止める前（実行ファイル・イメージ・印を置き換える前）に、新しい版の `looptrack migrate --check` で未適用の migrate を確かめます。
 systemd も compose も同じ判定です（compose は作った新しい版のイメージを `docker compose run` で動かします。動いているコンテナは止めません）。
@@ -322,7 +331,7 @@ systemd も compose も同じ判定です（compose は作った新しい版の�
 表を作れる接続先を `LOOPTRACK_SETUP_MIGRATE_DSN` で渡さないと、サービスを止めた後に `migrate` が失敗し、止まったまま残ります。
 
 - 未適用が無ければ、今までどおり進みます。
-- 未適用があり、`LOOPTRACK_SETUP_MIGRATE_DSN` を渡していれば、尋ねずに進みます（`migrate` はその接続先で流します）。
+- 未適用があり、`LOOPTRACK_SETUP_MIGRATE_DSN` を渡していれば、尋ねずに進みます。`migrate` を流すのはその接続先。
 - 未適用があり、`LOOPTRACK_SETUP_MIGRATE_DSN` を渡していなければ、未適用の一覧と「アプリ用の接続先では表を作れず、止めた後に失敗する」ことを示して、続けるかを尋ねます。
   **既定は「続けない」です**（`--yes` では尋ねずに既定の答えにします。尋ねる端末が無いときも同じです）。
   続けないときはサービスを止めず、実行ファイル・印（`install.conf`）・版を変えずに、0 でない終了コードで終わります。
@@ -346,6 +355,21 @@ LOOPTRACK_SETUP_MIGRATE_DSN="root:$p@${d##*@}" LOOPTRACK_INSTALL_DB_ADMIN_USER=r
 渡し忘れると止めた後に失敗します（前の実行ファイルは `looptrack.prev` に残ります）。
 
 **前の版に戻すときは、実行ファイル（`looptrack.prev`・compose の前の版のイメージ）だけでは戻りません。** 手順 5 の migrate が 1 本でも適用していれば、前の版は「新しい版の looptrack で migrate した DB」と出して、migrate も serve も止まります（前の版がこの確かめを持つ版の場合）。古い版が新しい形の DB に書き込んで壊さないためです。前の版で動かすには、DB も手順 3 の控え（SQLite）か各自の控え（MySQL）に戻します。控えの後に書かれたデータは失われるので、戻すより新しい版のまま直すほうを先に考えてください。
+
+**1.0.0-rc.5 の次の版から、検証コマンドのあるイシューの Done には既定でエビデンスが要ります。**
+本文に検証コマンドが 1 つ以上あるイシューは、いまの本文に対する最新の verify の記録に添付が無いと Done を拒否されます。記録が無いときも同じ。
+プロジェクト別ルール `verify.require_evidence` の働きで、ルールを何も設定していないプロジェクトでも入っています。理由を付ければ上書きできます（`--override "理由"`。MCP は `override_reason`）。
+これまでの動きのままにしたいプロジェクトは、更新の後に次のように切ってください。拒否の代わりに注意だけが返ります。
+
+```bash
+# 既存のルールがあれば、その JSON の "verify" に "require_evidence": false を足して設定し直します（set は丸ごと置き換えます）
+looptrack project rules show <slug>
+echo '{"verify": {"require_evidence": false}}' | looptrack project rules set <slug> -
+```
+
+1.0.0-rc.5 までのクライアントは添付を送れません。この網の掛かるイシューを閉じるには上書きが要るので、クライアントも合わせて更新してください。
+このキーを知らない前の版のサーバは、キーを含む rules を `project rules set` で拒否します。キーを DB に残したまま前の版に戻すと、そのプロジェクトのルールを読めずに操作が失敗します。
+戻す前に `looptrack project rules set` でキーを外すか、そのプロジェクトのルールが `verify` だけなら `looptrack project rules clear <slug>` で消してください。
 
 ### クライアントに配る looptrack（配布ディレクトリ）
 
@@ -375,7 +399,7 @@ install.sh は、入れるときと `--upgrade`（自動の置き換えの timer
 - **`looptrack doctor`**: admin のトークンで実行すると、注意の行にサーバの新しい版と更新の 1 行が出ます
 - **起動時のログ**: `journalctl -u looptrack`（compose は `docker compose logs`）に、確認の結果の 1 行と、新しい版があれば更新の 1 行が出ます
 
-確認の控えは `/var/lib/looptrack/update-check.json`（compose の SQLite は `data/update-check.json`）です。確認を止めるには `.env` に `LOOPTRACK_UPDATE_CHECK=off` を書いて起動し直します（GitHub へ通信しなくなります）。
+確認の控えは `/var/lib/looptrack/update-check.json` で、compose の SQLite では `data/update-check.json` です。確認を止めるには `.env` に `LOOPTRACK_UPDATE_CHECK=off` を書いて起動し直します。GitHub への通信もそれで止まります。
 
 **既定では自動で置き換えません。** 知らせを見て、上の `--upgrade` を実行します。systemd で動かしているサーバは、設定で自動の置き換えを有効にできます。
 
@@ -401,12 +425,12 @@ journalctl -u looptrack-upgrade                         # 自動の置き換え�
 - **compose では有効にできません。** コンテナのイメージは自動では置き換えず、知らせるだけです（更新は `--upgrade`）。`--no-start` で入れたサーバも有効にできません。
 - **MySQL では、DB の形を変える版を自動では置き換えません。** 止める前に新しい版の `looptrack migrate --check` で未適用の migrate を確かめ、あれば置き換えずに失敗として終わります
   （migrate の後に新しい表の権限を与え直す管理用の資格情報を無人では尋ねられず、MySQL の DB は控えから戻せないため）。サービスは今の版のまま動き、知らせは続きます。
-  `journalctl -u looptrack-upgrade` を見て、表を作れる接続先を `LOOPTRACK_SETUP_MIGRATE_DSN` で渡して、端末で `--upgrade` を実行してください
+  `journalctl -u looptrack-upgrade` を見てください。そのうえで表を作れる接続先を `LOOPTRACK_SETUP_MIGRATE_DSN` で渡し、端末で `--upgrade` を実行してください
   （上の「止める前の確認（MySQL）」。有効にするときにも注意を出します）。
 - 端末で動かす手動の `--upgrade` は、DB の形を変える版も置き換えます（権限が足りなければ尋ねて与え直します）。ただし表を作れる接続先が渡されていなければ、止める前に続けるかを尋ねます（既定は続けない）。
 
 install.sh で入れたサーバでは `looptrack self-update` は置き換えずにエラーで止まり、インストーラの 1 行の `--upgrade`（`curl … | sudo sh -s -- --upgrade`）を案内します。
-1.0.0-rc.1・rc.2 の install.sh で入れたサーバも同じ 1 行で上げられます（置いた `install.conf`・`.env`・unit / `compose.yaml` をそのまま読みます）。
+1.0.0-rc.1・rc.2 の install.sh で入れたサーバも同じ 1 行で上げられます。置いた `install.conf`・`.env`・unit / `compose.yaml` をそのまま読むため。
 手元に残した古い install.sh を新しいリリースの Releases に `--from` で向けると、素の実行ファイルが Releases に無いので、何も入れ替えずに止まります。
 置き換えると migrate も再起動もされず、動いているサーバと版がずれるからです。更新があるかを見る `self-update --check` はそのまま使えます。
 ここでいう「install.sh で入れたサーバ」は、linux で `/usr/local/bin/looptrack` から動いていて次のどれかがあるものです。
@@ -416,14 +440,20 @@ install.sh で入れたサーバでは `looptrack self-update` は置き換え�
 
 ```bash
 bash deploy/install_test.sh                            # Docker で ubuntu:24.04・ubuntu:22.04・debian:12 + 対話 + systemd の実起動（数分）
-INSTALL_TEST_COMPOSE=1 bash deploy/install_test.sh     # compose の実起動も（ホストの Docker のソケットを渡す。im という名前のコンテナがあると省く）
+INSTALL_TEST_COMPOSE=1 bash deploy/install_test.sh     # compose の実起動も（ホストの Docker のソケットを渡す。looptrack という名前のコンテナがあると省く）
+INSTALL_TEST_COMPOSE=1 INSTALL_TEST_COMPOSE_PORT=18091 bash deploy/install_test.sh   # compose が公開するポートを替える（既定 18090。使われていれば始める前に止まる）
 INSTALL_TEST_SYSTEMD=0 INSTALL_TEST_IMAGES=debian:12 bash deploy/install_test.sh
 ```
+
+compose の場面は既定では回りません。最後の行（`install_test: すべて通りました（…）`）に、compose の場面を含めたかが出ます。
+「全場面が通った」と伝えるときは、その括弧の中も添えてください。
+macOS の Docker Desktop の bind mount は所有者を保たない（chown が効かず、同じファイルの `stat` の所有者が 65534 とも 0 とも読める）ので、
+compose の場面は DB の所有者（uid 65534）を比べず、権限（600）だけを比べます。比べなかったときは `省略:` の行が出て、最後の行に省略した比較の数と理由が出ます。
 
 材料は `deploy/release/dist.sh` で作った 2 つの版です（…1 は Docker の CPU の linux/<arch> だけ、…2 はクライアントに配る looptrack の確認のために 6 対象）。素の形（`dist.sh build` の出力）は `--from <ディレクトリ>` で、
 GitHub Releases と同じ並び（書庫）は `LOOPTRACK_INSTALL_REPO`（`--from` なしのときの取得元のリポジトリ。テスト・ミラー用）で渡します。
 README の 1 行は、一時 HTTP サーバに置いた `raw/deploy/install.sh` と `gh/releases/…` に読み替えて通します（`--upgrade` の一部も一時 HTTP サーバの URL から）。
-確かめるのは次のことです。
+確かめるのは次のこと。
 
 - SHA-256 の不一致・署名・setup の失敗・中断で何も残さない
 - 権限と置き場（DB は 0600・警告なし）
@@ -469,6 +499,109 @@ README の 1 行は、一時 HTTP サーバに置いた `raw/deploy/install.sh` 
 実機（VM）の Ubuntu LTS・Debian で、本物の証明書（ACME）を使うリバースプロキシの後ろから通してください。
 認証アプリでの二段階認証の登録 → `looptrack issue login --browser` → `claude mcp add` までを 15 分以内に終えるのが目安です。
 
+## 添付の置き場とバックアップ
+
+イシューに添付するテストのエビデンスのファイルは、本体をディスクに、メタデータを DB に置きます。設計は DESIGN.md §2-4。
+**バックアップは DB と添付の 2 系統になります。** DB のダンプだけでは本体は戻りません。
+
+### 置き場
+
+サーバは次の順で置き場を決めます。
+
+1. 環境変数 `LOOPTRACK_ATTACH_DIR`
+2. `$STATE_DIRECTORY/attachments`（systemd の `StateDirectory`）
+3. SQLite の DB と同じディレクトリの `attachments`
+
+どれにも当たらなければ、サーバは起動したまま添付だけが使えません。API は「置き場が設定されていない」と返します。
+保存先が MySQL で systemd も compose も使わずに動かすなら、`LOOPTRACK_ATTACH_DIR` を必ず設定してください。
+
+| 動かし方 | 置き場 | 誰が決めるか |
+| -- | -- | -- |
+| systemd（install.sh） | `/var/lib/looptrack/attachments` | install.sh が `.env` に `LOOPTRACK_ATTACH_DIR` を足し、`looptrack` の持ち物（0750）で作る。入れるときと `--upgrade` のたびに確かめ、既に行があれば触らない |
+| compose（setup） | `<dir>/data/attachments`（コンテナの `/data/attachments`） | setup の compose.yaml が `./data:/data` を入れ、`environment` に `LOOPTRACK_ATTACH_DIR: /data/attachments` を書く |
+| デスクトップ版 | データの置き場（`DataDir`）の `attachments` | デスクトップ版 |
+
+- systemd の置き場は `StateDirectory` の中なので、unit の `ProtectSystem=strict` のままで書けます（`ReadWritePaths` は足していません）。
+  `.env` に書くのは、`$STATE_DIRECTORY` を渡さない systemd（239 以前）と、unit の外で `.env` を読んで動かす管理のサブコマンド（上の「動かし方」の管理コマンドの形）にも同じ置き場を届けるためです。
+- compose の置き場を `.env` ではなく compose.yaml に書くのは、volume と同じファイルに置くためです。
+  コンテナは `read_only` なので、書けるのは volume の中だけ。コンテナを作り直しても、ホストの `<dir>/data` は残ります。
+- **以前の setup が書いた MySQL の compose.yaml** には `./data:/data` も置き場もありません。install.sh は compose.yaml を書き換えないので、`--upgrade` で注意を出すだけです（添付が使えないだけで、ほかは動きます）。
+  使うときは `services.looptrack` に次の 2 か所を足し、`<dir>/data` をコンテナの利用者に渡してから作り直します。
+
+  ```yaml
+      environment:
+        LOOPTRACK_ATTACH_DIR: /data/attachments
+      volumes:
+        - ./data:/data
+  ```
+
+  ```bash
+  cd <dir> && sudo mkdir -p data && sudo chown -R 65534:65534 data && docker compose up -d
+  ```
+
+  以前の SQLite の compose.yaml は `./data:/data` を持っているので、3 番目の決め方で `/data/attachments` に決まり、足さなくても使えます。
+
+### バックアップ
+
+**DB を先に、添付を後に取ります。** サーバは本体を置いてからメタデータを入れるので、この順なら DB の控えが指す本体は、添付の控えに必ずあります。
+逆の順だと、間に添付された分は DB の控えにだけ残り、本体がありません。
+
+- DB: 今までどおり。SQLite は止めて写すか `sqlite3 <DB> ".backup <控え>"`、MySQL は `mysqldump` などで取ります。
+- 添付: 置き場をディレクトリごと写します。本体は sha256 の名前で置かれ、書き換えられないので、差分の写しで足ります。
+
+  ```bash
+  sudo rsync -a --delete /var/lib/looptrack/attachments/ /backup/looptrack/attachments/
+  ```
+
+  `--delete` は、管理者が消去した本体を控えからも消すために付けます。消去は秘密を誤って添付したときの逃げ道。
+  日付ごとに残している古い控えには、消去した本体が残ります。消去したら古い控えからも同じ sha256 のファイルを消してください。
+
+`looptrack export` も添付の本体と目録（`<slug>/attachments.json`）を書き出し、`looptrack verify-files --root <書き出し先>` で本体のバイトが目録の SHA-256 と一致するかを確かめられます。
+`looptrack import` は添付を運ばないので、書き出しは控えの代わりになりません。控えは上の 2 系統で取ります。
+
+戻すときは DB と添付の両方を戻し、`looptrack repair-attachments` で食い違いを確かめます。
+管理のサブコマンドなので、上の「動かし方」の管理コマンドの形で動かす（systemd なら `.env` を読んで `looptrack` の利用者で、compose なら `docker compose run --rm --no-deps looptrack repair-attachments`）。
+置き場はサーバと同じ決め方で選びます。
+
+- 引数なし: 本体の欠け（DB にあって置き場に無い）と、どこからも指されない本体を報告するだけ。何も変えません。
+- `--apply`: どこからも指されない本体を消します。書かれて 1 時間以内のものは、添付の途中かもしれないので残す。本体の欠けは直せません（控えから戻します）。
+
+### `--upgrade` の控えに添付を入れない理由
+
+install.sh の `--upgrade` は、SQLite なら止めた状態で DB を `backup-<日時>/` に写す（上の「更新」）。添付の本体はこの控えに入れません。
+
+- 本体は sha256 の名前で置き、上書きも移動もしません。更新の途中で失敗して DB だけを控えに戻しても、DB が指す本体はそのまま残ります。
+- 戻した後で「どこからも指されない本体」（控えの後に添付された分）が残ることはあります。見つけるのは `repair-attachments`。
+- 添付はプロジェクトあたり最大 1GiB（既定）まで増えます。更新のたびに写すと、時間もディスクも DB とは桁が違ってきます。
+
+`--uninstall --purge` は、systemd では `/var/lib/looptrack` ごと（添付の本体を含む）、compose では `<dir>` ごと消します。MySQL の DB は消しません。
+
+### 前段のプロキシの上限
+
+添付の要求の本文はファイルそのものなので、プロキシの本文の上限を 1 ファイルの上限（既定 20MiB・管理者の画面で変えられる）より小さくしないでください。
+上限に当たった要求は、サーバに届く前にプロキシが 413 で返します。
+
+- **nginx**: `client_max_body_size` の既定は 1MB です。install.sh の設定例は `client_max_body_size 20m;`（20MiB）にしてあります。
+  1 ファイルの上限を上げたら、ここも合わせて上げます。
+
+  ```nginx
+      location /looptrack/ {
+          proxy_pass http://127.0.0.1:8090;
+          client_max_body_size 20m;   # 添付の 1 ファイルの上限に合わせる
+      }
+  ```
+
+- **Caddy**: 本文の上限は `request_body` の `max_size` で付けます。付けるなら、1 ファイルの上限より小さくしないでください。
+
+  ```caddy
+      handle /looptrack/* {
+          request_body {
+              max_size 20MiB
+          }
+          reverse_proxy 127.0.0.1:8090
+      }
+  ```
+
 ## 利用者の登録
 
 **最初の管理者だけ**はサーバ上で作ります。`looptrack setup` と install.sh なら問いの ④ で作られます。
@@ -504,7 +637,7 @@ systemd で入れたときの管理コマンドの呼び方は、上の「動か
 ## プロジェクトの運用文書とルール（guide が返すもの）
 
 各プロジェクトの運用文書をサーバに登録します（DESIGN §5-2）。
-運用文書は `docs/projects/<slug>.md` のような Markdown で、雛形は [../templates/project-rules.md](../templates/project-rules.md) にあります。
+運用文書は `docs/projects/<slug>.md` のような Markdown で、雛形の置き場は [../templates/project-rules.md](../templates/project-rules.md)。
 直したときも同じコマンドで置き換えます。プロジェクト別ルール（例 `deploy/rules/example.json`）も同じ形で入れます。
 
 ```bash
@@ -516,9 +649,9 @@ sudo docker compose exec -T looptrack /looptrack project rules set <slug> - < <s
 ## MCP の setup・導入済み通知
 
 取得 URL の券は `LOOPTRACK_SECRET_KEY` で封じます。別の秘密は要りません。
-`<接頭辞>/setup/<券>/…` はトークンなしで配布物を返します（券の検査はサーバが行います）。
+`<接頭辞>/setup/<券>/…` はトークンなしで配布物を返します。券を検査するのはサーバ。
 リバースプロキシが接頭辞の配下をそのまま渡していれば、設定を変える必要はありません。
-実物（Claude Code・Codex）での確認手順は [../ADD-PROJECT.md](../ADD-PROJECT.md) §4-2 にあります。
+Claude Code・Codex の実物での確認手順は [../ADD-PROJECT.md](../ADD-PROJECT.md) §4-2 にあります。
 
 ## CLI のブラウザログインと更新トークン
 
@@ -529,7 +662,7 @@ sudo docker compose exec -T looptrack /looptrack project rules set <slug> - < <s
 
 ## 管理者 0 人のときの「セットアップ未完了」
 
-有効な管理者が 1 人もいないサーバは、通常モードでも画面を「セットアップ未完了」にします。API・MCP には 503 を返します（DESIGN.md §3-3）。
+有効な管理者が 1 人もいないサーバは、通常モードでも画面を「セットアップ未完了」にします。API・MCP には 503 を返します。設計は DESIGN.md §3-3。
 **更新の前に、有効な管理者がいることを確かめてください。** `ROLE` が `admin` で `STATE` が `active` の行が 1 つ以上あれば大丈夫です。
 
 ```bash

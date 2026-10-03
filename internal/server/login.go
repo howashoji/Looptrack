@@ -21,7 +21,7 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, s.cfg.BasePath+"/", http.StatusSeeOther)
 		return
 	}
-	if sess, u, err := s.sessionFrom(r); err == nil {
+	if sess, u, err := s.sessionRefresh(w, r); err == nil {
 		if sess.MFAPassed {
 			http.Redirect(w, r, s.safeNext(r.URL.Query().Get("next")), http.StatusSeeOther)
 			return
@@ -91,7 +91,8 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	full := !u.TOTPEnabled && !required
-	if err := s.startSession(w, r, u, full, false); err != nil {
+	remember := r.PostFormValue("remember") == "1"
+	if err := s.startSession(w, r, u, full, false, remember); err != nil {
 		s.internalError(w, r, err)
 		return
 	}
@@ -110,13 +111,14 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 
 // startSession は新しいセッション ID を発行する（セッション固定化を防ぐため、段階が進むたびに作り直す）。
 // mfaPassed はログインの段階をすべて終えたか、totpVerified はそのうち TOTP を入力したか。
-func (s *Server) startSession(w http.ResponseWriter, r *http.Request, u store.User, mfaPassed, totpVerified bool) error {
-	_, err := s.createSession(w, r, u, mfaPassed, totpVerified)
+// persistent はログイン画面の「ログインしたままにする」で、作り直すときは元のセッションの値を引き継ぐ。
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, u store.User, mfaPassed, totpVerified, persistent bool) error {
+	_, err := s.createSession(w, r, u, mfaPassed, totpVerified, persistent)
 	return err
 }
 
 // createSession は startSession の本体で、作ったセッションを返す（ローカルモードの自動ログインが使う）。
-func (s *Server) createSession(w http.ResponseWriter, r *http.Request, u store.User, mfaPassed, totpVerified bool) (store.Session, error) {
+func (s *Server) createSession(w http.ResponseWriter, r *http.Request, u store.User, mfaPassed, totpVerified, persistent bool) (store.Session, error) {
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
 		_ = store.DeleteSession(r.Context(), s.db, auth.HashToken(c.Value))
 	}
@@ -129,11 +131,16 @@ func (s *Server) createSession(w http.ResponseWriter, r *http.Request, u store.U
 		return store.Session{}, err
 	}
 	now := s.cfg.Now()
+	// TOTP を待つ仮のセッションは persistent でも 10 分のまま（フラグだけを持たせ、段階を終えたセッションへ引き継ぐ）
 	life := sessionLifetime
-	if !mfaPassed {
+	switch {
+	case !mfaPassed:
 		life = pendingLifetime
+	case persistent:
+		life = persistentLifetime
 	}
-	sess := store.Session{IDHash: auth.HashToken(id), UserID: u.ID, CSRFToken: csrf, MFAPassed: mfaPassed, TOTPVerified: mfaPassed && totpVerified, ExpiresAt: now.Add(life)}
+	sess := store.Session{IDHash: auth.HashToken(id), UserID: u.ID, CSRFToken: csrf, MFAPassed: mfaPassed, TOTPVerified: mfaPassed && totpVerified,
+		Persistent: persistent, ExpiresAt: now.Add(life)}
 	if err := store.CreateSession(r.Context(), s.db, sess, s.clientIP(r), r.UserAgent()); err != nil {
 		return store.Session{}, err
 	}
@@ -186,7 +193,7 @@ func (s *Server) totpSubmit(w http.ResponseWriter, r *http.Request, p *principal
 
 func (s *Server) completeLogin(w http.ResponseWriter, r *http.Request, p *principal, next string) {
 	ctx := r.Context()
-	if err := s.startSession(w, r, p.User, true, true); err != nil {
+	if err := s.startSession(w, r, p.User, true, true, p.Session.Persistent); err != nil {
 		s.internalError(w, r, err)
 		return
 	}

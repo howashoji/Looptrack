@@ -1,0 +1,130 @@
+# LOOPTRACK_LANG=en init --project demo --agent copilot
+
+#### exit 0
+
+#### stdout
+init: $TMP/ws (project demo, http://127.0.0.1:9/im, AI copilot)
+kit source: the kit embedded in the executable (looptrack dev)
+Wiring: looptrack hook <name> --agent <AI>
+Install set: core only. loop is not installed (--loop installs it).
+  create     .github/hooks/looptrack.json
+  create     AGENTS.md
+  create     .claude/.looptrack-kit.json
+verify: checked 4 wiring(s), looptrack dev（headless・test）
+Next:
+  1. Copilot: start a new chat (VS Code) or a new session (Copilot CLI, trusting this folder) so the hooks in .github/hooks/looptrack.json are loaded
+  2. No token yet: run looptrack issue login --browser --url http://127.0.0.1:9/im and log in and approve in the browser it opens (the AI may run this; it waits up to 5 minutes, so set the command timeout longer than 5 minutes. Without a browser, issue a token at http://127.0.0.1:9/im/account and paste it into login --url http://127.0.0.1:9/im).
+  3. Check (Copilot): in a new session the MCP setup tool answers "already installed" and guide -> next (dry_run) works. Use the CLI only for what MCP does not have (AGENTS.md).
+GitHub Copilot setup (VS Code agent mode and Copilot CLI. Copilot CLI was checked against 1.0.86 on 2026-09-19; VS Code only against the official docs, not against the real thing):
+
+  - The AI works mainly through the MCP tools (see AGENTS.md). You add the MCP connection yourself (init writes .vscode/mcp.json only with --mcp):
+      VS Code (.vscode/mcp.json; the first connection asks for approval in the browser):
+        {"servers": {"looptrack": {"type": "http", "url": "http://127.0.0.1:9/im/mcp", "headers": {"X-Looptrack-Project": "demo"}}}}
+      Copilot CLI (.github/mcp.json or .mcp.json in the repository, or ~/.copilot/mcp-config.json. tools is required.
+      Since 1.0.22 it no longer reads .vscode/mcp.json. init writes .github/mcp.json only with --mcp. Authentication is /mcp auth looptrack in copilot):
+        {"mcpServers": {"looptrack": {"type": "http", "url": "http://127.0.0.1:9/im/mcp", "headers": {"X-Looptrack-Project": "demo"}, "tools": ["*"]}}}
+    Every MCP tool call in Copilot CLI needs approval. To allow them up front, start it with copilot --allow-tool='looptrack'
+  - Hooks (.github/hooks/looptrack.json): VS Code reads .github/hooks/*.json by default (a Preview feature; your organization may have it disabled).
+    Copilot CLI reads them only when you trusted this folder at startup ("always trust"). Both take effect in a new session.
+    The output is written in both the CLI form (top level) and the VS Code form (hookSpecificOutput). VS Code ignores matcher, so the hook itself filters on the tool name
+  - Windows: the hook is looptrack (the same looptrack hook is also placed in the powershell / windows fields for PowerShell; not checked on real Windows).
+    If the install is not recognized, report it with looptrack issue installed --agent copilot
+  - The token metering hook (looptrack hook usage --agent copilot; PostToolUse, Stop, SessionEnd) was installed. Metering happens once you enable Copilot's OpenTelemetry file output
+    (write it under ${COPILOT_HOME:-~/.copilot}/otel/. Copilot CLI does not pass the output path to the hook. See docs/AI-GUIDE.md section 7-3-1). Without it nothing is sent, and Copilot's actions are not counted as missing
+  - The freshness guard (which stops on Stop) is wired for Claude Code only
+  - The CLI the AI runs does not get LOOPTRACK_API_URL / LOOPTRACK_PROJECT (Copilot has no environment variable setting). AGENTS.md explains prefixing them.
+
+#### stderr
+
+#### files
+.claude/.looptrack-kit.json (0644)
+    {
+      "version": 1,
+      "url": "http://127.0.0.1:9/im",
+      "project": "demo",
+      "agent": [
+        "copilot"
+      ],
+      "source": "copy",
+      "core": {
+        "bundle_sha256": "$SHA256",
+        "files": {
+          "kit/core/skills/issue/SKILL.md": "$SHA256",
+          "kit/core/skills/issue/en/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/SKILL.md": "$SHA256",
+          "kit/core/skills/token-report/en/SKILL.md": "$SHA256"
+        }
+      },
+      "loop": {
+        "installed": false
+      }
+    }
+.github/hooks/looptrack.json (0644)
+    {
+      "version": 1,
+      "hooks": {
+        "SessionStart": [
+          {
+            "type": "command",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent copilot",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent copilot",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook summary --agent copilot",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook summary --agent copilot",
+            "timeoutSec": 10
+          }
+        ],
+        "PostToolUse": [
+          {
+            "type": "command",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event PostToolUse",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event PostToolUse",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event PostToolUse",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event PostToolUse",
+            "timeoutSec": 10
+          }
+        ],
+        "Stop": [
+          {
+            "type": "command",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event Stop",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event Stop",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event Stop",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event Stop",
+            "timeoutSec": 10
+          }
+        ],
+        "SessionEnd": [
+          {
+            "type": "command",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event SessionEnd",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent copilot --event SessionEnd",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event SessionEnd",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook usage --agent copilot --event SessionEnd",
+            "timeoutSec": 10
+          }
+        ]
+      }
+    }
+AGENTS.md (0644)
+    <!-- looptrack:begin (managed by looptrack issue init; to change it, run looptrack issue init again) -->
+    ## Issue tracking (issue server)
+
+    **Start every piece of work by filing an issue, not in conversation alone. File a bug as soon as you find one.**
+
+    - **Work through the MCP tools (server name looptrack).** GitHub Copilot connects to looptrack in `.vscode/mcp.json` for VS Code, and in the repository's `.github/mcp.json` or `~/.copilot/mcp-config.json` for Copilot CLI.
+      In the CLI, each call to an MCP tool needs approval, unless the user starts it with `copilot --allow-tool='looptrack'`.
+      Use the CLI (`looptrack issue`) only for operations that MCP lacks
+    - **Before anything else, read how to use it and the rules with the `guide` tool**. It returns the common rules, this project's rules and the operating documents in one go
+    - One round of the loop: `next` (start) → work → `add_comment` (record what you learn as you learn it) → verify the acceptance criteria → `set_status` to Done (with the verification results in `comment`) → the next `next`.
+      File an issue with `create_issue`. To edit a body, take the version and the full text with `get_issue`, then pass the corrected full text to `update_issue`. When something is rejected, follow the instructions in the message
+    - Verify commands (the "## Verify commands" section of the body): get the list with `verify_issue`, run every one of them in order in your local shell, and send the results with `report_verify`
+    - Token usage: once the user turns on GitHub Copilot's OpenTelemetry file output, a hook (`looptrack hook usage` in `.github/hooks/looptrack.json`)
+      attaches it to the issue after every MCP operation and at the end of every turn (see AI-GUIDE §7-3-1 for the steps). Without that output nothing is attached, and nothing counts as missing either.
+      In a Copilot CLI shell you can attach it with `looptrack issue usage attach <ID>`, which identifies the conversation from `COPILOT_AGENT_SESSION_ID` and reads the OTel file output.
+      **Do not run `looptrack issue usage attach` from Copilot in VS Code**. The shell never receives the session ID, so it cannot attach anything
+    - When you need the CLI: `looptrack issue login --browser --url http://127.0.0.1:9/im` (the first time only) and installing or updating (`init`, `installed`). login gets the token the hooks' SessionStart uses; the user logs in and approves in the browser that opens.
+      For installing and updating, follow the steps the `setup` tool returns. Whenever you type a CLI command, put `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` in front of it
+    - When the looptrack MCP server is not connected, go round the same loop with the CLI's `next` / `comment` / `verify` / `close --comment`, with `LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo` in front.
+      Pass bodies and comments in a quoted heredoc (`<<'EOF'`), and suggest that the user set up the MCP connection
+    - Browse: http://127.0.0.1:9/im/p/demo/ (login required, read-only)
+    <!-- looptrack:end -->

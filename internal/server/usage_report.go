@@ -520,10 +520,14 @@ func reportText(lang i18n.Lang, rep usageReportJSON, loc *time.Location) string 
 	if _, err := time.Parse(time.RFC3339Nano, rep.DataEnd); err == nil {
 		b.WriteString(i18n.T(lang, "server.api.report.data_end", "at", loc3(rep.DataEnd, loc), "raw", rep.DataEnd, "tz", tzLabel(lang, loc)) + "\n\n")
 	}
-	b.WriteString(i18n.T(lang, "server.api.report.totals", "total", num(rep.TotalTokens), "stages", rep.Stages,
-		"conversations", len(rep.Conversations), "unattributed", num(rep.Unattributed.TotalTokens),
-		"unattributed_stages", rep.Unattributed.Stages, "excluded", num(rep.ExcludedTokens),
-		"excluded_conversations", len(rep.ExcludedConversations), "inconsistent", rep.Inconsistent) + "\n")
+	b.WriteString(i18n.T(lang, "server.api.report.totals", "total", num(rep.TotalTokens),
+		"stages", i18n.MN("server.api.report.totals_stages", rep.Stages, "n", rep.Stages),
+		"conversations", i18n.MN("server.api.report.totals_conversations", len(rep.Conversations), "n", len(rep.Conversations)),
+		"unattributed", num(rep.Unattributed.TotalTokens),
+		"unattributed_stages", i18n.MN("server.api.report.totals_unattributed_stages", rep.Unattributed.Stages, "n", rep.Unattributed.Stages),
+		"excluded", num(rep.ExcludedTokens),
+		"excluded_conversations", i18n.MN("server.api.report.totals_excluded_conversations", len(rep.ExcludedConversations), "n", len(rep.ExcludedConversations)),
+		"inconsistent", rep.Inconsistent) + "\n")
 	t := rep.Total
 	b.WriteString(i18n.T(lang, "server.api.report.breakdown", "input", num(t.Main.Input+t.Sub.Input),
 		"cache_write", num(t.Main.CacheCreate+t.Sub.CacheCreate), "cache_read", num(t.Main.CacheRead+t.Sub.CacheRead),
@@ -668,7 +672,7 @@ func ledgerText(lang i18n.Lang, items []ledgerJSON, s *Server) string {
 		}
 		fmt.Fprintf(&b, "%-6d %-19s %-19s %-19s %12s %s\n", it.ID, from, s.local(it.DataEnd), s.local(it.CreatedAt), total, it.Name)
 	}
-	b.WriteString("\n" + i18n.T(lang, "server.api.report.ledger_footer", "count", len(items), "from", s.local(items[0].DataEnd),
+	b.WriteString("\n" + i18n.TN(lang, "server.api.report.ledger_footer", len(items), "count", len(items), "from", s.local(items[0].DataEnd),
 		"tz", tzLabel(lang, s.svc.Loc)))
 	return b.String()
 }

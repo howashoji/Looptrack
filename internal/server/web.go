@@ -208,7 +208,8 @@ func (s *Server) assignSubmit(w http.ResponseWriter, r *http.Request, p *princip
 		return
 	}
 	status := map[service.Kind]int{service.Invalid: http.StatusBadRequest, service.NotFound: http.StatusNotFound,
-		service.Forbidden: http.StatusForbidden, service.Conflict: http.StatusConflict, service.Rejected: http.StatusUnprocessableEntity}[se.Kind]
+		service.Forbidden: http.StatusForbidden, service.Conflict: http.StatusConflict, service.Rejected: http.StatusUnprocessableEntity,
+		service.TooLarge: http.StatusRequestEntityTooLarge}[se.Kind]
 	if status == 0 {
 		status = http.StatusBadRequest
 	}

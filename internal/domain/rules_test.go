@@ -383,3 +383,63 @@ func TestViolationFollowsLang(t *testing.T) {
 		}
 	}
 }
+
+// verify.require_evidence は未設定（ルールなし・verify なし・キーなし）で入、false で切。
+// 未知のキーは verify の中でも拒否される（DisallowUnknownFields は入れ子にも効く）。この性質のため、
+// このキーを知らない旧版のサーバは、キーを含む rules を設定時に拒否し、DB に残っていれば読めない（DEPLOY.md の更新の節）。
+func TestRequireEvidenceKey(t *testing.T) {
+	var none *Rules
+	for name, raw := range map[string]string{
+		"verify なし":  `{"usage": {"require_on_close": false}}`,
+		"キーなし":       `{"verify": {"require_on_close": true}}`,
+		"明示の true":   `{"verify": {"require_evidence": true}}`,
+		"ルールなし（nil）": "",
+	} {
+		r := none
+		if raw != "" {
+			var err error
+			if r, err = ParseRules([]byte(raw)); err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+		}
+		if !r.RequiresEvidence() {
+			t.Errorf("%s: 既定が入になっていない", name)
+		}
+	}
+	off, err := ParseRules([]byte(`{"verify": {"require_evidence": false}}`))
+	if err != nil || off.RequiresEvidence() || off.RequiresVerify("Done") {
+		t.Fatalf("切: %v %+v", err, off)
+	}
+	if _, err := ParseRules([]byte(`{"verify": {"require_evidenc": false}}`)); err == nil || !strings.Contains(i18n.Text(i18n.JA, err), "unknown field") {
+		t.Errorf("verify の中の未知のキーを受け付けた: %v", err)
+	}
+}
+
+// CheckEvidence: 入なら上書きできる違反（上書きで Override）、切なら注意だけ。対象外（Done 以外・コマンドなし・添付あり）は何も返さない。
+func TestCheckEvidence(t *testing.T) {
+	off, _ := ParseRules([]byte(`{"verify": {"require_evidence": false}}`))
+	var on *Rules
+	base := EvidenceCheck{ID: "ABC-0001", To: "Done", HasCommands: true, State: EvidenceMissing}
+	if o, v, n := on.CheckEvidence(i18n.JA, base); o != nil || v == nil || !v.Overridable || v.Rule != "verify_evidence_required" || n != "" {
+		t.Errorf("入・添付なし: %v %+v %q", o, v, n)
+	}
+	withReason := base
+	withReason.OverrideReason = " 利用者の指示 "
+	if o, v, _ := on.CheckEvidence(i18n.JA, withReason); v != nil || o == nil || o.Rule != "verify_evidence_required" || o.Reason != "利用者の指示" {
+		t.Errorf("上書き: %+v %+v", o, v)
+	}
+	if o, v, n := off.CheckEvidence(i18n.EN, base); o != nil || v != nil || !strings.HasPrefix(n, "Note: ABC-0001 is now Done") {
+		t.Errorf("切: %v %v %q", o, v, n)
+	}
+	for name, c := range map[string]EvidenceCheck{
+		"Canceled": {ID: "ABC-0001", To: "Canceled", HasCommands: true, State: EvidenceNone},
+		"コマンドなし":   {ID: "ABC-0001", To: "Done", HasCommands: false, State: EvidenceNone},
+		"添付あり":     {ID: "ABC-0001", To: "Done", HasCommands: true, State: EvidencePresent},
+	} {
+		for _, r := range []*Rules{on, off} {
+			if o, v, n := r.CheckEvidence(i18n.JA, c); o != nil || v != nil || n != "" {
+				t.Errorf("%s: %v %v %q", name, o, v, n)
+			}
+		}
+	}
+}

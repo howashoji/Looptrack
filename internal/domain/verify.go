@@ -162,16 +162,46 @@ func NoVerifyCommandsMsg(id string) i18n.Msg {
 }
 
 // 出力のマスク（DESIGN.md §9-3-2）。CLI が送る前にかけ、サーバも同じ規則で再度かける。
+// 添付のテキストのファイルを送る前の検査（FindSecret）も同じ並びを使う。label はどの規則に当たったかを人に示す語で、
+// 値そのものは含まない（$1 は当たった鍵の名前。値は入らない）。
 var secretMasks = []struct {
-	re   *regexp.Regexp
-	repl string
+	re    *regexp.Regexp
+	repl  string
+	label string
 }{
-	{regexp.MustCompile(`(?s)(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----|\z)`), "${1}***${2}"},
-	{regexp.MustCompile(`imp_[A-Za-z0-9_-]+`), "imp_***"},
-	{regexp.MustCompile(`(?i)bearer\s+\S+`), "Bearer ***"},
-	{regexp.MustCompile(`(?i)(password|passwd|secret|token|api[_-]?key)(\s*[=:]\s*)\S+`), "${1}${2}***"},
-	{regexp.MustCompile(`sk-[A-Za-z0-9_-]{20,}`), "sk-***"},
-	{regexp.MustCompile(`AKIA[0-9A-Z]{16}`), "AKIA***"},
+	{regexp.MustCompile(`(?s)(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----|\z)`), "${1}***${2}", "${1}"},
+	{regexp.MustCompile(`imp_[A-Za-z0-9_-]+`), "imp_***", "imp_…"},
+	{regexp.MustCompile(`(?i)bearer\s+\S+`), "Bearer ***", "Bearer …"},
+	{regexp.MustCompile(`(?i)(password|passwd|secret|token|api[_-]?key)(\s*[=:]\s*)\S+`), "${1}${2}***", "${1}${2}…"},
+	{regexp.MustCompile(`sk-[A-Za-z0-9_-]{20,}`), "sk-***", "sk-…"},
+	{regexp.MustCompile(`AKIA[0-9A-Z]{16}`), "AKIA***", "AKIA…"},
+}
+
+// SecretFinding は秘密らしい文字列が見つかった場所（値そのものは持たない）。
+type SecretFinding struct {
+	Line  int    // 1 から数えた行
+	Label string // 当たった規則を示す語（例「token=…」「Bearer …」。値は含まない）
+}
+
+// FindSecret は MaskSecrets が置き換える文字列（秘密らしいもの）を探し、最初に見つかった場所を返す。
+// 既にマスクした形（「token=***」のように置き換えても変わらないもの）は数えない。添付のテキストを送る前に CLI が使う。
+func FindSecret(s string) (SecretFinding, bool) {
+	best := -1
+	var found SecretFinding
+	for _, m := range secretMasks {
+		for _, loc := range m.re.FindAllStringSubmatchIndex(s, -1) {
+			match := s[loc[0]:loc[1]]
+			if m.re.ReplaceAllString(match, m.repl) == match {
+				continue
+			}
+			if best < 0 || loc[0] < best {
+				best = loc[0]
+				found = SecretFinding{Line: strings.Count(s[:loc[0]], "\n") + 1, Label: string(m.re.ExpandString(nil, m.label, s, loc))}
+			}
+			break
+		}
+	}
+	return found, best >= 0
 }
 
 // MaskSecrets は出力の中の秘密らしい文字列を置き換える（何度かけても同じ結果）。

@@ -77,7 +77,7 @@ type Options struct {
 	UpdateClient    *http.Client // 新しい版の確認と取得の HTTP クライアント（テスト用。nil は既定）
 	// UpdateRun は置き換えで使う外部のコマンド（codesign・spctl・hdiutil・ditto・open）の実行（テスト用。nil は実行する）
 	UpdateRun func(ctx context.Context, name string, args ...string) (string, error)
-	// UpdateStart は置き換えた後の起動し直し（Linux の AppImage。テスト用。nil は別のセッションで起こす）
+	// UpdateStart は置き換えた後の起動し直し（Linux の AppImage・Windows の Looptrack.exe と setup.exe。テスト用。nil は切り離して起こす）
 	UpdateStart func(name string, args ...string) error
 }
 
@@ -426,10 +426,12 @@ func (o *Options) primary(paths Paths, background, noTray bool) int {
 		return o.fail(i18n.T(o.Lang, "desktop.err.listen"), err)
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
-	// 新しい版の確認（知らせはトレイのメニューの先頭と画面の帯。起動時に 1 回、その後は 24 時間ごと）
-	upd := o.newUpdates(paths, logger)
+	// 新しい版の確認（知らせはトレイのメニューの先頭と画面の帯。起動時に 1 回、その後は 24 時間ごと）。
+	// 照らす資産は入れ方で決まる（Windows の unins000.exe）ので、アプリの場所を先に求める
+	launcher, _ := Launcher(o.Env)
+	upd := o.newUpdates(paths, logger, launcher)
 	inst, err := localserve.Start(context.Background(), localserve.Options{
-		DBPath: paths.DB(), Listener: ln, BasePath: BasePath, Logger: logger, UpdateNotice: upd.current, UpdateStopInTray: upd.tray.Load,
+		DBPath: paths.DB(), AttachDir: paths.Attachments(), Listener: ln, BasePath: BasePath, Logger: logger, UpdateNotice: upd.current, UpdateStopInTray: upd.tray.Load,
 		UpdateApplier: &bannerApplier{u: upd},
 	})
 	if err != nil {
@@ -451,7 +453,6 @@ func (o *Options) primary(paths Paths, background, noTray bool) int {
 		}
 	})
 	defer stopWatch()
-	launcher, _ := Launcher(o.Env)
 	a := &App{opts: o, paths: paths, inst: inst, port: port, logger: logger, launcher: launcher, quit: make(chan struct{}), updates: upd}
 	upd.onAuto = a.autoApply // 自動の置き換え（控えの "auto" を入れたときだけ。確認を始める前に入れる）
 	upd.app.Store(a)         // 画面の帯の「更新する」（bannerApplier。入れるまではボタンを出さない）

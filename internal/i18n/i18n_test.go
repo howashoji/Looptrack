@@ -298,3 +298,138 @@ func TestEnglishSelfReportedMarkIsUniform(t *testing.T) {
 	}
 	t.Logf("self-reported を含む値: %d 件", n)
 }
+
+// TN は件数 n で単数と複数を分ける。n が 1 で <ID>_one があるときだけ単数の文面を使う。
+func TestTN(t *testing.T) {
+	orig := catalogs
+	t.Cleanup(func() { catalogs = orig })
+	catalogs = map[Lang]map[string]string{
+		JA: {
+			"items":     "{count} 件",
+			"items_one": "{count} 件",
+			"plain":     "{count} 個",
+		},
+		EN: {
+			"items":     "{count} items",
+			"items_one": "{count} item",
+			"plain":     "{count} things",
+		},
+	}
+	for _, tt := range []struct {
+		lang Lang
+		id   string
+		n    int
+		want string
+	}{
+		{EN, "items", 0, "0 items"},
+		{EN, "items", 1, "1 item"},
+		{EN, "items", 2, "2 items"},
+		{EN, "items", 21, "21 items"},
+		// 単数の文面が無ければ、1 件でも基の文面を使う
+		{EN, "plain", 1, "1 things"},
+		// 日本語は単数と複数で同じ文面（英語の対照）
+		{JA, "items", 0, "0 件"},
+		{JA, "items", 1, "1 件"},
+		{JA, "items", 2, "2 件"},
+		{JA, "plain", 1, "1 個"},
+	} {
+		if got := TN(tt.lang, tt.id, tt.n, "count", tt.n); got != tt.want {
+			t.Errorf("TN(%s, %q, %d) = %q, want %q", tt.lang, tt.id, tt.n, got, tt.want)
+		}
+	}
+	// 単数の文面を別の言語から借りない（英語に _one が無いとき、日本語の _one を出さない）
+	delete(catalogs[EN], "items_one")
+	if got, want := TN(EN, "items", 1, "count", 1), "1 items"; got != want {
+		t.Errorf("英語に単数の文面が無いとき TN = %q, want %q", got, want)
+	}
+}
+
+// MN は、件数つきの語句を別の文面の {名前} に埋める使い方と、error に持ち回る使い方ができる。
+func TestMNAndCountedErrors(t *testing.T) {
+	orig := catalogs
+	t.Cleanup(func() { catalogs = orig })
+	catalogs = map[Lang]map[string]string{
+		JA: {
+			"done": "{slug} {issues}・{comments}", "done.issues": "イシュー {n} 件", "done.issues_one": "イシュー {n} 件",
+			"done.comments": "コメント {n} 件", "done.comments_one": "コメント {n} 件",
+			"fail": "{count} 件の問題", "fail_one": "{count} 件の問題", "wrap": "{count} 件の途中: {reason}", "wrap_one": "{count} 件の途中: {reason}",
+		},
+		EN: {
+			"done": "{slug}: {issues} and {comments}", "done.issues": "{n} issues", "done.issues_one": "{n} issue",
+			"done.comments": "{n} comments", "done.comments_one": "{n} comment",
+			"fail": "{count} problems", "fail_one": "{count} problem", "wrap": "after {count} items: {reason}", "wrap_one": "after {count} item: {reason}",
+		},
+	}
+	// 2 つの件数を 1 つの文面に入れる（片方が 1 でも、もう片方は複数のまま）
+	for _, tt := range []struct {
+		lang   Lang
+		si, sc int
+		want   string
+	}{
+		{EN, 1, 2, "p: 1 issue and 2 comments"},
+		{EN, 2, 1, "p: 2 issues and 1 comment"},
+		{EN, 1, 1, "p: 1 issue and 1 comment"},
+		{EN, 0, 0, "p: 0 issues and 0 comments"},
+		{JA, 1, 1, "p イシュー 1 件・コメント 1 件"},
+		{JA, 2, 0, "p イシュー 2 件・コメント 0 件"},
+	} {
+		got := T(tt.lang, "done", "slug", "p",
+			"issues", MN("done.issues", tt.si, "n", tt.si), "comments", MN("done.comments", tt.sc, "n", tt.sc))
+		if got != tt.want {
+			t.Errorf("%s (%d, %d) = %q, want %q", tt.lang, tt.si, tt.sc, got, tt.want)
+		}
+	}
+	// error（言語を決めずに持ち回る）も件数で選ぶ
+	for _, tt := range []struct {
+		lang Lang
+		n    int
+		want string
+	}{{EN, 1, "1 problem"}, {EN, 3, "3 problems"}, {JA, 1, "1 件の問題"}, {JA, 3, "3 件の問題"}} {
+		if got := Text(tt.lang, ErrorfN("fail", tt.n, "count", tt.n)); got != tt.want {
+			t.Errorf("ErrorfN %s n=%d = %q, want %q", tt.lang, tt.n, got, tt.want)
+		}
+	}
+	base := os.ErrNotExist
+	err := WrapfN(base, "wrap", 1, "count", 1)
+	if got, want := Text(EN, err), "after 1 item: file does not exist"; got != want {
+		t.Errorf("WrapfN(1) = %q, want %q", got, want)
+	}
+	if got, want := Text(EN, WrapfN(base, "wrap", 2, "count", 2)), "after 2 items: file does not exist"; got != want {
+		t.Errorf("WrapfN(2) = %q, want %q", got, want)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Error("errors.Is が包んだ先まで届いていない")
+	}
+	if got, want := MN("fail", 1, "count", 1).In(EN), "1 problem"; got != want {
+		t.Errorf("MN.In(EN) = %q, want %q", got, want)
+	}
+}
+
+// TNFunc はテンプレートから呼ぶ TN。件数は int のほか、読める整数型を受ける。
+func TestTNFunc(t *testing.T) {
+	orig := catalogs
+	t.Cleanup(func() { catalogs = orig })
+	catalogs = map[Lang]map[string]string{
+		JA: {"items": "{n} 件", "items_one": "{n} 件"},
+		EN: {"items": "{n} items", "items_one": "{n} item"},
+	}
+	for _, tt := range []struct {
+		lang any
+		n    any
+		want string
+	}{
+		{EN, 1, "1 item"},
+		{"en", int64(1), "1 item"},
+		{EN, 2, "2 items"},
+		{"en", uint(1), "1 item"},
+		{JA, 1, "1 件"},
+		{"ja", 2, "2 件"},
+		{nil, 1, "1 件"}, // 言語が空なら、TFunc と同じく正本（日本語）で出る
+		{EN, "1", "1 items"},
+	} {
+		n := tt.n
+		if got := TNFunc(tt.lang, "items", n, "n", n); got != tt.want {
+			t.Errorf("TNFunc(%v, %v) = %q, want %q", tt.lang, tt.n, got, tt.want)
+		}
+	}
+}

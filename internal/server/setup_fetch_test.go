@@ -493,3 +493,229 @@ func TestSetupFetchWrappedForEveryAgent(t *testing.T) {
 		}
 	}
 }
+
+// TestSetupSelfRepoFetchOmitsInit: looptrack 自身のリポジトリ（kit の正本）からの通知（self_repo）があった導入で
+// looptrack が古いとき、setup の取得の手順は取得・置き換え・PATH の段だけで、init を含まない（init はクライアントが
+// 「自身です」と拒否するので、含めると looptrack は置き換わったのにコマンド全体が失敗で終わる）。古いときの案内
+// （update_command）と手順の見出しも init を書かず、同じ結果の loop の行（init を使えない）と食い違わない。
+// 対照として、同じ中身で印の無い通知では従来どおり取得 + init を返すことを同じテストで確かめる。
+// sh と PowerShell の両方を、OS の指定ごと（macOS・Linux・Windows・不明で両方）に見る。
+func TestSetupSelfRepoFetchOmitsInit(t *testing.T) {
+	withLoopKit(t, loopFixture())
+	e, _, ed := newAPIEnv(t)
+	withFakeDist(t, e) // 配布中は v1.0.0（全 OS）
+	m := e.mcpAsClient(ed.token, map[string]string{"X-Looptrack-Project": "req"}, "claude-code", "2.1.0", "2025-06-18")
+	latest, _ := latestDist()
+	post := func(body map[string]any) installStateJSON {
+		t.Helper()
+		var st installStateJSON
+		ed.json(200, "POST", "/projects/req/install", body, &st)
+		return st
+	}
+	// stale は配布中の v1.0.0 より古い v0.9.0 の looptrack からの通知。loop は入れた（問いが出ない）か未選択
+	body := func(self bool, loop map[string]any) map[string]any {
+		b := installBody("claude-code", "hook", "server", latest.Core, loop)
+		b["client"] = map[string]any{"version": "v0.9.0", "os": "darwin", "arch": "arm64"}
+		if self {
+			b["self_repo"] = true
+		}
+		return b
+	}
+	installed := map[string]any{"installed": true, "bundle_sha256": latest.Loop, "version": "v1.0.0"}
+	fetchTitle := i18n.T(i18n.JA, "server.mcp.setup.step.fetch")
+	selfTitle := i18n.T(i18n.JA, "server.mcp.setup.step.fetch_self_repo")
+	refetch, selfRefetch := i18n.T(i18n.JA, "server.mcp.setup.update.refetch"), i18n.T(i18n.JA, "server.mcp.setup.update.refetch_self_repo")
+	if selfTitle == "server.mcp.setup.step.fetch_self_repo" || selfRefetch == "server.mcp.setup.update.refetch_self_repo" ||
+		i18n.T(i18n.EN, "server.mcp.setup.step.fetch_self_repo") == selfTitle || i18n.T(i18n.EN, "server.mcp.setup.update.refetch_self_repo") == selfRefetch {
+		t.Fatalf("正本向けの文面が ja.json / en.json に無いか、日英が同じ")
+	}
+	// 本文の配布物の注記: 印なしは「init が kit を一覧の SHA-256 で確かめる」、正本は init に触れない文
+	distInitNote := "init が kit を一覧の SHA-256 で確かめる"
+	distSelfNote := "kit の SHA-256 は使わない"
+	for _, k := range []string{"server.mcp.setup.text.dist_note_self_repo", "server.mcp.setup.step.fetch_manual_self_repo"} {
+		if ja, en := i18n.T(i18n.JA, k), i18n.T(i18n.EN, k); ja == k || en == k || ja == en || strings.Contains(en, "init verifies") {
+			t.Fatalf("%s が ja.json / en.json に無いか、日英が同じか、init に触れている: ja=%q en=%q", k, ja, en)
+		}
+	}
+	posixEnd := "{ " + setuppath.PosixBody(i18n.JA) + "; })"
+	winEnd := "; " + setuppath.WinBody(i18n.JA) + " }"
+	osCases := []struct {
+		name       string
+		args       map[string]any
+		posix, win bool // 手順に sh / PowerShell の形が出るか
+	}{
+		{"macOS", map[string]any{"os": "darwin"}, true, false},
+		{"Linux", map[string]any{"os": "linux"}, true, false},
+		{"Windows", map[string]any{"os": "windows"}, false, true},
+		{"不明", map[string]any{}, true, true},
+	}
+	// fetchCmds は取得の手順の (sh, PowerShell) のコマンド。Windows を指定したときは主のコマンドが PowerShell
+	fetchCmds := func(out loopSetupOut, win bool) (string, string) {
+		if win && out.Steps[0].CommandWindows == "" {
+			return "", out.Steps[0].Command
+		}
+		return out.Steps[0].Command, out.Steps[0].CommandWindows
+	}
+
+	// 対照（印なし・loop 入れた）: 取得 + init を返す
+	if st := post(body(false, installed)); st.State != "stale" || st.SelfRepo || st.UpdateCommand != refetch {
+		t.Fatalf("前提が崩れています（印なしの古い通知が stale にならない）: %+v", st)
+	}
+	for _, c := range osCases {
+		out := loopSetupOf(t, second(m.call("setup", c.args, false)))
+		if out.Ask != "" || len(out.Steps) != 2 || out.Steps[0].Title != fetchTitle {
+			t.Fatalf("前提が崩れています（印なし・%s の手順）: ask=%q %+v", c.name, out.Ask, out.Steps)
+		}
+		sh, ps := fetchCmds(out, c.win && !c.posix)
+		if c.posix && (!strings.Contains(sh, `curl -fsSL "$U"`) || !strings.Contains(sh, goPosixBin+" issue init --project req")) {
+			t.Errorf("前提が崩れています（印なし・%s の sh に取得 + init が無い）: %s", c.name, sh)
+		}
+		if c.win && (!strings.Contains(ps, "Invoke-WebRequest") || !strings.Contains(ps, goWinBin+" issue init --project req")) {
+			t.Errorf("前提が崩れています（印なし・%s の PowerShell に取得 + init が無い）: %s", c.name, ps)
+		}
+		if !strings.Contains(out.Text, distInitNote) {
+			t.Errorf("前提が崩れています（印なし・%s の本文に「init が kit を確かめる」の文が無い）:\n%s", c.name, out.Text)
+		}
+	}
+
+	// 正本（self_repo）: loop を入れた導入でも、未選択の導入でも、取得の手順は init を含まない
+	for _, loop := range []map[string]any{installed, {"installed": false}} {
+		st := post(body(true, loop))
+		if st.State != "stale" || !st.SelfRepo || st.UpdateCommand != selfRefetch || strings.Contains(st.Message, refetch) ||
+			!strings.Contains(st.Message, selfRefetch) {
+			t.Errorf("self_repo（loop=%v）の古いときの案内: %+v", loop["installed"], st)
+		}
+		for _, c := range osCases {
+			label := fmt.Sprintf("self_repo（loop=%v・%s）", loop["installed"], c.name)
+			out := loopSetupOf(t, second(m.call("setup", c.args, false)))
+			if out.Ask != "" || len(out.Steps) != 2 {
+				t.Errorf("%s の手順: ask=%q %+v", label, out.Ask, out.Steps)
+				continue
+			}
+			if out.Steps[0].Who != "ai" || out.Steps[0].Title != selfTitle || strings.Contains(out.Steps[0].Title, "init を行う") {
+				t.Errorf("%s の取得の手順の見出し: %+v", label, out.Steps[0])
+			}
+			sh, ps := fetchCmds(out, c.win && !c.posix)
+			if c.posix && (!strings.Contains(sh, `curl -fsSL "$U"`) || !strings.HasSuffix(sh, posixEnd)) {
+				t.Errorf("%s の sh が取得・置き換え・PATH の段で終わっていない: %s", label, sh)
+			}
+			if c.win && (!strings.Contains(ps, "Invoke-WebRequest") || !strings.HasSuffix(ps, winEnd)) {
+				t.Errorf("%s の PowerShell が取得・置き換え・PATH の段で終わっていない: %s", label, ps)
+			}
+			if (sh != "") != c.posix || (ps != "") != c.win {
+				t.Errorf("%s の OS の形: sh=%q ps=%q", label, sh, ps)
+			}
+			// 手順のどこにも init のコマンドが無い（本文の辞退の勧めを含めて）。確認の issue installed は残す
+			for _, s := range out.Steps {
+				if strings.Contains(s.Command+s.CommandWindows+s.Title, "issue init") {
+					t.Errorf("%s の手順に init がある: %+v", label, s)
+				}
+			}
+			if strings.Contains(out.Text, "issue init") || !strings.Contains(out.Steps[1].Command+out.Steps[1].CommandWindows, "issue installed --agent claude-code") {
+				t.Errorf("%s の本文か確認の手順:\n%s", label, out.Text)
+			}
+			// loop が未選択の正本では「init を使えない」の行が出る。手順もそれと食い違わない（上で init が無いことを確かめた）
+			if loop["installed"] == false && !strings.Contains(out.Text, i18n.T(i18n.JA, "server.mcp.setup.loop.self_repo")) {
+				t.Errorf("%s の本文に正本の loop の行が無い:\n%s", label, out.Text)
+			}
+			// 配布物の注記も init に触れない（手順に init が無いのに「init が kit を確かめる」と書かない）
+			if strings.Contains(out.Text, distInitNote) || !strings.Contains(out.Text, distSelfNote) {
+				t.Errorf("%s の本文の配布物の注記:\n%s", label, out.Text)
+			}
+		}
+	}
+
+	// 配布物にその OS 向けの looptrack が無い（取得の手順を出せず、利用者の手順になる）経路。
+	// 配布は darwin/arm64 だけにして、os=linux で呼ぶ。対照: 印なしは init のコマンドを見出しに書く
+	e.s.cfg.DistDir = t.TempDir()
+	writeDist(t, e.s.cfg.DistDir, map[string]string{"looptrack_v1.0.0_darwin_arm64": "da"})
+	manualSelf := i18n.T(i18n.JA, "server.mcp.setup.step.fetch_manual_self_repo", "reason",
+		i18n.T(i18n.JA, "server.mcp.setup.dist.missing_os", "os", "linux"))
+	if st := post(body(false, installed)); st.State != "stale" || st.SelfRepo {
+		t.Fatalf("前提が崩れています（印なし・配布が darwin だけで stale にならない）: %+v", st)
+	}
+	out := loopSetupOf(t, second(m.call("setup", map[string]any{"os": "linux"}, false)))
+	if len(out.Steps) == 0 || out.Steps[0].Who != "human" || out.Steps[0].Command != "" ||
+		!strings.Contains(out.Steps[0].Title, "looptrack issue init --project req") || out.Steps[0].Title == manualSelf {
+		t.Fatalf("前提が崩れています（印なし・配布の無い OS で init のコマンドを書いた利用者の手順にならない）: %+v", out.Steps)
+	}
+	if st := post(body(true, installed)); st.State != "stale" || !st.SelfRepo {
+		t.Fatalf("self_repo・配布が darwin だけ: %+v", st)
+	}
+	out = loopSetupOf(t, second(m.call("setup", map[string]any{"os": "linux"}, false)))
+	if len(out.Steps) == 0 || out.Steps[0].Who != "human" || out.Steps[0].Command != "" || out.Steps[0].Title != manualSelf {
+		t.Errorf("self_repo・配布の無い OS の手順: %+v", out.Steps)
+	}
+	for _, st := range out.Steps {
+		if strings.Contains(st.Title+st.Command+st.CommandWindows, "issue init") {
+			t.Errorf("self_repo・配布の無い OS の手順に init がある: %+v", st)
+		}
+	}
+	if strings.Contains(out.Text, "issue init") || strings.Contains(out.Text, distInitNote) {
+		t.Errorf("self_repo・配布の無い OS の本文:\n%s", out.Text)
+	}
+}
+
+// TestSetupFetchWithoutInitRuns: 取得の後ろの init を外した形（kit の正本向け。posixFetch("")）を sh で実際に流し、
+// 取得して置き換え、PATH の段まで進んで成功で終わり、置いた looptrack を一度も呼ばないことを確かめる。
+// 対照として、同じ材料で init を付けた形は置いた looptrack を呼ぶ（呼び出しの記録が検査として働いている）ことを同じテストで見る。
+func TestSetupFetchWithoutInitRuns(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+		t.Skip("sh の取得コマンドは macOS・Linux 向け")
+	}
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip("配布の対象でない CPU")
+	}
+	sumCmd := "shasum"
+	if runtime.GOOS == "linux" {
+		sumCmd = "sha256sum"
+	}
+	if _, err := exec.LookPath(sumCmd); err != nil {
+		t.Skip(sumCmd + " が無い")
+	}
+	tmp := t.TempDir()
+	fakeBin := filepath.Join(tmp, "fakebin")
+	if err := os.MkdirAll(fakeBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeExec(t, filepath.Join(fakeBin, "curl"), "#!/bin/sh\necho \"$@\" >> \"$CURL_LOG\"\n"+
+		"while [ $# -gt 0 ]; do if [ \"$1\" = -o ]; then cp \"$PAYLOAD\" \"$2\"; fi; shift; done\n")
+	payload := "#!/bin/sh\necho \"dist $*\" >> \"$INIT_LOG\"\n"
+	payloadPath := filepath.Join(tmp, "payload")
+	writeExec(t, payloadPath, payload)
+	sum := sha256.Sum256([]byte(payload))
+	g := &goSetup{lang: i18n.JA, os: runtime.GOOS, bins: []distBinaryJSON{{
+		Name: "looptrack_v1.0.0_" + runtime.GOOS + "_" + runtime.GOARCH, OS: runtime.GOOS, Arch: runtime.GOARCH,
+		Version: "v1.0.0", SHA256: hex.EncodeToString(sum[:]), URL: "https://example.invalid/looptrack/setup/x/looptrack",
+	}}}
+	run := func(cmdText string) (home, curlLog, initLog string) {
+		t.Helper()
+		home, logs := t.TempDir(), t.TempDir()
+		cmd := exec.Command("/bin/sh", "-c", cmdText)
+		cmd.Env = []string{"HOME=" + home, "SHELL=/bin/sh", "PATH=" + fakeBin + string(os.PathListSeparator) + os.Getenv("PATH"),
+			"CURL_LOG=" + filepath.Join(logs, "curl"), "INIT_LOG=" + filepath.Join(logs, "init"), "PAYLOAD=" + payloadPath}
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("取得コマンドが失敗した: %v\n%s", err, out)
+		}
+		c, _ := os.ReadFile(filepath.Join(logs, "curl"))
+		i, _ := os.ReadFile(filepath.Join(logs, "init"))
+		return home, string(c), string(i)
+	}
+	const tail = "issue init --project req --url https://example.invalid/looptrack --agent claude-code"
+	if _, _, initLog := run(g.posixFetch(tail)); initLog != "dist "+tail+"\n" {
+		t.Fatalf("前提が崩れています（init を付けた形で、置いた looptrack の呼び出しが記録されない）: %q", initLog)
+	}
+	home, curlLog, initLog := run(g.posixFetch(""))
+	if !strings.Contains(curlLog, g.bins[0].URL) {
+		t.Errorf("init を外した形で取得の経路を通っていない: %q", curlLog)
+	}
+	if b, err := os.ReadFile(filepath.Join(home, ".local", "bin", "looptrack")); err != nil || string(b) != payload {
+		t.Errorf("init を外した形で取得した looptrack が置かれていない: %v %q", err, b)
+	}
+	if initLog != "" {
+		t.Errorf("init を外した形で置いた looptrack が呼ばれた: %q", initLog)
+	}
+	if strings.Contains(g.posixFetch("")+g.winFetch(""), "issue init") || strings.Contains(g.winFetch(""), goWinBin) {
+		t.Errorf("init を外した形に looptrack の呼び出しが残っている")
+	}
+}
