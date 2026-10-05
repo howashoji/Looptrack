@@ -23,6 +23,58 @@ Nothing yet.
 
 まだありません。
 
+## [1.0.1] - 2026-10-05
+
+1.0.1 is a stable release with the same contents as 1.0.1-rc.1. Nothing
+changed after that release candidate, so the changes below are relative to
+`v1.0.0`. Unlike the release candidate, 1.0.1 becomes the Latest release on
+GitHub Releases and takes the `latest` tag on GHCR. The one-line installer
+installs it, and a server on 1.0.0 tells you about it. For a running server,
+the one change is a newer SQLite driver. A server that stores its data in
+MySQL does not use that driver.
+
+### Changed
+
+- **The SQLite driver is now `modernc.org/sqlite` 1.60.1.** It is what a
+  server that keeps its data in SQLite (`LOOPTRACK_DSN=sqlite:<file>`) reads
+  and writes the database with. It moved up from 1.59.0, and
+  `modernc.org/libc` from 1.75.7 to 1.77.1. The new driver ships its own list
+  of third-party licenses (`LICENSE-3RD-PARTY.md`), and `NOTICE` now carries
+  it in full.
+- **Contributors: `deploy/public-scan.sh` reads its list of internal names
+  from outside the published tree.** In a clone of the public repository the
+  list is not there, so the scan prints one line saying it skipped that check
+  and goes on with the others. The check for issue IDs still runs.
+  `CONTRIBUTING.md` describes it.
+
+### Moving from 1.0.0 / 1.0.1-rc.1
+
+- This version adds no migrations.
+- A server on 1.0.0 shows the new version in a banner at the top of the web
+  UI for admins, in `looptrack doctor` and in the startup log. The upgrade is one line:
+  `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade`.
+  With `--auto-upgrade on`, the daily timer replaces the server by itself.
+  There are no migrations, so that includes servers on MySQL.
+- A server on 1.0.1-rc.1 already runs the same contents. It follows release
+  candidates as well, so it tells you about 1.0.1 too, and the same
+  `--upgrade` takes it there. Once on 1.0.1, it follows stable releases only;
+  set `LOOPTRACK_UPDATE_CHANNEL=prerelease` to keep seeing release candidates.
+
+---
+
+1.0.1 は正式版で、中身は 1.0.1-rc.1 と同じです。その候補版の後に変更は無く、下の変更は `v1.0.0` からの差分になります。候補版と違うのは公開のされ方。1.0.1 は GitHub Releases の Latest になり、GHCR の `latest` タグも付きます。1 行のインストーラが入れるのはこの版で、1.0.0 のサーバもこの版を知らせます。動いているサーバにとっての変更は、SQLite のドライバが新しくなったことだけ。データを MySQL に置くサーバは、このドライバを使いません。
+
+### 変更
+
+- **SQLite のドライバを `modernc.org/sqlite` 1.60.1 に上げました。** データを SQLite に置くサーバ（`LOOPTRACK_DSN=sqlite:<ファイル>`）は、このドライバで DB を読み書きします。前の版は 1.59.0 です。あわせて `modernc.org/libc` も 1.75.7 から 1.77.1 に上がりました。新しいドライバには第三者のライセンスの一覧（`LICENSE-3RD-PARTY.md`）が付いています。`NOTICE` にもその全文を収めました。
+- **開発に加わる人向け: `deploy/public-scan.sh` は、内部の名前の一覧を公開物の外から読みます。** 公開リポジトリの clone にはこの一覧が無いので、検査はその項目を飛ばしたことを 1 行出し、残りの項目を続けます。イシューの ID の検査はこれまでどおり。説明は `CONTRIBUTING.md` にあります。
+
+### 1.0.0 / 1.0.1-rc.1 から上げるとき
+
+- この版にマイグレーションはありません。
+- 1.0.0 のサーバは、管理画面の上部の帯・`looptrack doctor`・起動時のログでこの版を知らせます。上げるときの 1 行は `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` です。`--auto-upgrade on` にしたサーバでは、1 日 1 回の timer が自分で置き換えます。マイグレーションが無いので、MySQL のサーバも同じです。
+- 1.0.1-rc.1 のサーバは、既に同じ中身で動いています。リリース候補も追う設定なので 1.0.1 も知らせ、同じ `--upgrade` で上がります。1.0.1 に上げた後は正式版だけを追います。リリース候補も見続けたいときは、`LOOPTRACK_UPDATE_CHANNEL=prerelease` を設定してください。
+
 ## [1.0.1-rc.1] - 2026-10-05
 
 First release candidate for 1.0.1, relative to `v1.0.0`. Because it comes
@@ -1243,7 +1295,8 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけで、リモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの、まだ手を動かす必要がある所、うまくいかないときに確かめることも書いています。手を動かす所は、auto モードでも Claude Code で要るインストールのコマンド、認可の後の Copilot CLI の 2 回目の再起動、再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - **新しいガイド「更新」。** 更新するとき何が自動で何が手作業かを、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.1-rc.1...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1
 [1.0.1-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1-rc.1
 [1.0.0]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0
 [1.0.0-rc.5]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.5

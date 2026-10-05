@@ -23,6 +23,42 @@ Nothing yet.
 
 まだありません。
 
+## [1.0.1] - 2026-10-05
+
+1.0.1 is a stable release with the same contents as 1.0.1-rc.1. Nothing
+changed after that release candidate, so the changes below are relative to
+`v1.0.0`. Unlike the release candidate, it becomes the Latest release on
+GitHub Releases, and an app on 1.0.0 offers it as an update.
+
+### Changed
+
+- **The SQLite driver is now `modernc.org/sqlite` 1.60.1.** The app keeps
+  your data in a single SQLite file and reads and writes it with this driver.
+  It moved up from 1.59.0, and `modernc.org/libc` from 1.75.7 to 1.77.1. The
+  new driver ships its own list of third-party licenses
+  (`LICENSE-3RD-PARTY.md`), and `NOTICE` now carries it in full.
+
+### Moving from 1.0.0 / 1.0.1-rc.1
+
+- Update the app as a whole, as usual. Choose "Update to version 1.0.1" at
+  the top of the tray menu, or leave it to "Install updates automatically".
+  On Windows, too, the 1.0.0 app replaces itself in place.
+- An app on 1.0.1-rc.1 already runs the same contents and offers 1.0.1 as
+  well. After that update it follows stable releases only.
+
+---
+
+1.0.1 は正式版で、中身は 1.0.1-rc.1 と同じです。その候補版の後に変更は無く、下の変更は `v1.0.0` からの差分になります。候補版との違いは、GitHub Releases の Latest になること。1.0.0 のアプリも、この版を更新として知らせます。
+
+### 変更
+
+- **SQLite のドライバを `modernc.org/sqlite` 1.60.1 に上げました。** アプリはデータを 1 つの SQLite のファイルに置き、このドライバで読み書きします。前の版は 1.59.0 です。あわせて `modernc.org/libc` も 1.75.7 から 1.77.1 に上がりました。新しいドライバには第三者のライセンスの一覧（`LICENSE-3RD-PARTY.md`）が付いています。`NOTICE` にもその全文を収めました。
+
+### 1.0.0 / 1.0.1-rc.1 から上げるとき
+
+- いつもどおりアプリごと更新します。トレイのメニューのいちばん上の「新しい版 1.0.1 に更新する」を選ぶか、「新しい版を自動で入れる」に任せてください。Windows でも、1.0.0 のアプリはその場で置き換わります。
+- 1.0.1-rc.1 のアプリは既に同じ中身で動いていて、1.0.1 も知らせます。この更新の後は正式版だけを追います。
+
 ## [1.0.1-rc.1] - 2026-10-05
 
 First release candidate for 1.0.1, relative to `v1.0.0`. Because it comes
@@ -796,7 +832,8 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定から、チャットだけで AI エージェントをつなぐ方法。
 - **新しいガイド「更新」。** デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.1-rc.1...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1
 [1.0.1-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1-rc.1
 [1.0.0]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0
 [1.0.0-rc.5]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.5
