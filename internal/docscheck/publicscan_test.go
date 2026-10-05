@@ -1,6 +1,7 @@
 package docscheck
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -39,6 +40,15 @@ func TestPublicScan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("公開物の検査が落ちました（%v）。上の一覧の区分と行を直す"+
 			"（イシューの ID なら、経緯はイシューに書き、コードには理由だけを残す）", err)
+	}
+	// 社内固有の語の一覧は private/ にある。開発側（private/ がある）では読んだこと、
+	// 公開側（private/ が無い）では飛ばしたことが出力に出ているかを見る（開発側で黙って飛ばしていれば落とす）。
+	if fi, err := os.Stat(filepath.Join(repoRoot, "private")); err == nil && fi.IsDir() {
+		if !strings.Contains(string(out), "\n== 社内の語の一覧: private/") {
+			t.Errorf("private/ がある作業ツリーなのに、社内固有の語の一覧を読んだ行がありません（検査を飛ばしています）")
+		}
+	} else if !strings.Contains(string(out), "この検査は飛ばしました") {
+		t.Errorf("private/ が無い作業ツリーなのに、社内固有の語の検査を飛ばしたことを知らせる行がありません")
 	}
 	// 0 件で緑になる形を塞ぐ: 書き出した木のファイルと、調べた相対リンクの本数に下限を置く
 	// （下限は実物（2026-09 にファイル 1,400 件ほど・相対リンク 268 本）の半分より下）。

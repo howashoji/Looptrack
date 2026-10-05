@@ -21,9 +21,18 @@ const publicScanProbeID = "IM" + "-9999"
 
 // publicScanProbeWord は「公開物に残してはいけない社内固有の語」の見本。
 //
-// publicScanProbeID と同じ理由で 1 つの文字列としては書かない（この _test.go 自身は公開物として配られるので、
-// そのまま書くと検査が自分自身を見つけて常時赤になる）。組み立てた結果は検査の一覧に載っている語になる。
-const publicScanProbeWord = "req" + "weave"
+// 社内固有の語の一覧は private/ のファイル（公開物に入らない）にあり、この _test.go は公開物として配られるので、
+// 実在の語は使わない。使い捨てのリポジトリに置く一覧（publicScanWordsFile）にこの合成の語を載せて、検出の見本にする。
+const publicScanProbeWord = "acmeinternal"
+
+// publicScanProbePrefix は、一覧の id で足す「ほかのプロジェクトの内部管理番号」の接頭辞の見本（合成）。
+const publicScanProbePrefix = "ZZX"
+
+// publicScanWordsPath は public-scan.sh が読む社内固有の語の一覧の置き場（リポジトリからの相対パス）。
+const publicScanWordsPath = "private/deploy/public-scan-words.txt"
+
+// publicScanWordsFile は使い捨てのリポジトリに置く一覧の中身（語 1 つ・接頭辞 1 つ）。
+const publicScanWordsFile = "# 見本の一覧\n\ntext " + publicScanProbeWord + "\nid " + publicScanProbePrefix + "\n"
 
 // TestPublicScanScope は公開物の検査（deploy/public-scan.sh）が
 // 「公開物に入るものを調べ、公開物に入らないものは調べない」ことを、使い捨ての git リポジトリで確かめる。
@@ -47,6 +56,8 @@ func TestPublicScanScope(t *testing.T) {
 		".gitignore":       "/scratch/\n",
 		"README.md":        "# 見本\n\n公開物に入る文書。\n",
 		"private/notes.md": "# 社内の記録\n\n公開物には入らない。\n",
+		// private/ がある作業ツリー（開発側）では、社内固有の語の一覧が無いと検査が止まる
+		publicScanWordsPath: publicScanWordsFile,
 	}
 
 	t.Run("公開物に入らない場所の未コミットの変更は調べない", func(t *testing.T) {
@@ -372,8 +383,9 @@ func TestPublicScanAIToolConfig(t *testing.T) {
 		// 未コミットの git mv（改名）は、元のパスの削除として重ねる。改名の検出が効くと新しいパスしか
 		// 重ね合わせの対象に出ず、外したつもりの元のパスが HEAD の中身のまま調べられて赤になった。
 		dir, env := publicScanRepo(t, map[string]string{
-			".gitattributes": "* text=auto eol=lf\n/private/ export-ignore\n",
-			"docs/notes.md":  "# 社内の記録\n\n" + publicScanProbeID + " の経緯。\n",
+			".gitattributes":    "* text=auto eol=lf\n/private/ export-ignore\n",
+			"docs/notes.md":     "# 社内の記録\n\n" + publicScanProbeID + " の経緯。\n",
+			publicScanWordsPath: publicScanWordsFile,
 		})
 		// 対照: 移す前は赤（中身が検査に当たることの確認）。
 		if out, ok := runPublicScan(t, dir, env); ok || !strings.Contains(out, "docs/notes.md:") {

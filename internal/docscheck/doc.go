@@ -10,6 +10,8 @@
 //     使い捨ての git リポジトリで確かめる。AI ツールの設定（.claude/・CLAUDE.md など）が公開物に入ったら落ちることも（Windows では skip）
 //   - publicscan_python_test.go: 「Python の名残」検査（python_left）が旧実装に固有の語だけを狙い、
 //     文書中の一般的な python への言及（語そのもの・URL・バージョン表記）には当たらないことを確かめる
+//   - publicscan_words_test.go: 社内固有の語の一覧（private/ の下）を、開発側では読んで検査し（置くと赤）、
+//     公開側（private/ が無い）では飛ばしたことを 1 行出し、開発側で一覧が無い・空なら止めることを確かめる
 //   - embedscan_test.go: 実行ファイルに埋め込むもの（//go:embed）に配るつもりのないものが混ざっていないこと
 //   - removedids_test.go: 撤去した ID（ルールのキー・エラーコード・対訳キー・サブコマンド名）の残骸が無いこと
 //   - mcptoolsets_test.go: 「イシューを変える MCP のツール」の一覧が 4 か所（サーバの登録・付与の hook・
