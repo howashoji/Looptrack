@@ -23,6 +23,51 @@ Nothing yet.
 
 まだありません。
 
+## [1.0.1-rc.1] - 2026-10-05
+
+First release candidate for 1.0.1, relative to `v1.0.0`. Because it comes
+after 1.0.0, it is published as a pre-release: `v1.0.0` stays the Latest
+release on GitHub Releases and keeps the `latest` tag on GHCR, so the one-line
+installer still installs 1.0.0. For a running server, the one change is a newer
+SQLite driver. A server that stores its data in MySQL does not use that driver.
+
+### Changed
+
+- **The SQLite driver is now `modernc.org/sqlite` 1.60.1.** It is what a
+  server that keeps its data in SQLite (`LOOPTRACK_DSN=sqlite:<file>`) reads
+  and writes the database with. It moved up from 1.59.0, and
+  `modernc.org/libc` from 1.75.7 to 1.77.1. The new driver ships its own list
+  of third-party licenses (`LICENSE-3RD-PARTY.md`), and `NOTICE` now carries
+  it in full.
+- **Contributors: `deploy/public-scan.sh` reads its list of internal names
+  from outside the published tree.** In a clone of the public repository the
+  list is not there, so the scan prints one line saying it skipped that check
+  and goes on with the others. The check for issue IDs still runs.
+  `CONTRIBUTING.md` describes it.
+
+### Moving from 1.0.0
+
+- This version adds no migrations.
+- A server on 1.0.0 follows stable releases and does not tell you about this
+  release candidate. To try it, upgrade to it by version:
+  `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade --version v1.0.1-rc.1`.
+  Set `LOOPTRACK_UPDATE_CHANNEL=prerelease` if you want the new-version notice
+  to include release candidates.
+
+---
+
+1.0.1 のリリース候補の 1 つ目で、下の変更は `v1.0.0` からの差分です。1.0.0 の後に出す版はプレリリースとして公開します。GitHub Releases の Latest と GHCR の `latest` タグは `v1.0.0` のまま。1 行のインストーラが入れるのも 1.0.0 です。動いているサーバにとっての変更は、SQLite のドライバが新しくなったことだけ。データを MySQL に置くサーバは、このドライバを使いません。
+
+### 変更
+
+- **SQLite のドライバを `modernc.org/sqlite` 1.60.1 に上げました。** データを SQLite に置くサーバ（`LOOPTRACK_DSN=sqlite:<ファイル>`）は、このドライバで DB を読み書きします。前の版は 1.59.0 です。あわせて `modernc.org/libc` も 1.75.7 から 1.77.1 に上がりました。新しいドライバには第三者のライセンスの一覧（`LICENSE-3RD-PARTY.md`）が付いています。`NOTICE` にもその全文を収めました。
+- **開発に加わる人向け: `deploy/public-scan.sh` は、内部の名前の一覧を公開物の外から読みます。** 公開リポジトリの clone にはこの一覧が無いので、検査はその項目を飛ばしたことを 1 行出し、残りの項目を続けます。イシューの ID の検査はこれまでどおり。説明は `CONTRIBUTING.md` にあります。
+
+### 1.0.0 から上げるとき
+
+- この版にマイグレーションはありません。
+- 1.0.0 のサーバは正式版だけを追うので、このリリース候補を知らせません。試すなら、版を指定して上げてください: `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade --version v1.0.1-rc.1`。新しい版の知らせにリリース候補も含めたいときは、`LOOPTRACK_UPDATE_CHANNEL=prerelease` を設定します。
+
 ## [1.0.0] - 2026-10-03
 
 1.0.0 is the first release that is not a release candidate. The changes below
@@ -1198,7 +1243,8 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけで、リモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの、まだ手を動かす必要がある所、うまくいかないときに確かめることも書いています。手を動かす所は、auto モードでも Claude Code で要るインストールのコマンド、認可の後の Copilot CLI の 2 回目の再起動、再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - **新しいガイド「更新」。** 更新するとき何が自動で何が手作業かを、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.1-rc.1...HEAD
+[1.0.1-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1-rc.1
 [1.0.0]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0
 [1.0.0-rc.5]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.4

@@ -23,6 +23,11 @@
 # 例外（公開物に残してよいもの）:
 #   - 公開リポジトリとイメージの名前と、配布元の識別子: github.com/howashoji/looptrack（API の api.github.com/repos/howashoji/looptrack・インストーラを取る raw.githubusercontent.com/howashoji/looptrack も）・ghcr.io/howashoji/looptrack・net.howashoji.looptrack
 #   - 配布元・著作権者としての社名の表記: 行に「配布元」「copyright」「Developer ID」を含むもの
+#
+# 社内固有の語と、ほかのプロジェクトの内部管理番号の接頭辞は private/deploy/public-scan-words.txt に置く
+# （一覧そのものが社内の固有名なので、公開物のこのファイルには書かない）。private/ がある作業ツリー（開発側）で
+# 一覧が無い・読めない・空なら止める。private/ の無い作業ツリー（公開側）では、社内の語の検査を飛ばしたことを
+# 1 行出して続ける（内部管理番号はこのリポジトリの IM だけを見る）。
 set -euo pipefail
 
 rev=HEAD
@@ -35,7 +40,7 @@ while [ $# -gt 0 ]; do
     --head) overlay=0; shift ;;
     --summary) summary=1; shift ;;
     --only) only=$2; shift 2 ;;
-    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) echo "public-scan: 知らない引数: $1" >&2; exit 2 ;;
   esac
 done
@@ -107,8 +112,59 @@ fi
 # 語の境界: grep -E の \b は実装で差があるので、英数字以外（行頭・行末を含む）で囲む。
 w() { printf '(^|[^A-Za-z0-9_])(%s)([^A-Za-z0-9_]|$)' "$1"; }
 
-# 社内固有の語
-company="howashoji|宝和|153\.126\.|devnew|reqweave|dev-infra|$(w 'hpc|hpcm|issui')"
+# 社内固有の語と、ほかのプロジェクトの内部管理番号の接頭辞（private/ の一覧から読む）。
+# 一覧そのものが社内の固有名なので、公開物に入るこのファイルには書かない。
+# 開発側（private/ がある作業ツリー）で一覧が無い・読めない・空なら、社内の語の検査を飛ばさずに止める。
+# 飛ばすと、社内の語が公開物に入っても緑のままになり、誰も気づけない。
+# 公開側（private/ が無い作業ツリー）は一覧を持たないので、飛ばしたことを 1 行出して続ける。
+# 社内の語を公開物に入れない責任は、公開物を作る開発側の検査（公開の前に --rev で回す）が持つ。
+words_rel=private/deploy/public-scan-words.txt
+company=""
+id_prefixes="IM" # このリポジトリ自身の接頭辞。公開側でも見る
+words_loaded=0
+case "$only" in
+  all|company|ids)
+    if [ -d "$root/private" ]; then
+      words_file=$root/$words_rel
+      if [ ! -f "$words_file" ] || [ ! -r "$words_file" ]; then
+        echo "public-scan: 社内の語の一覧 $words_rel がありません（読めません）。private/ がある作業ツリーなので、社内の語の検査を飛ばさずに止めます" >&2
+        exit 1
+      fi
+      n_words=0 n_ids=0 lineno=0
+      while IFS= read -r line || [ -n "$line" ]; do
+        lineno=$((lineno + 1))
+        line=${line%$'\r'}
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        case "$line" in ''|'#'*) continue ;; esac
+        kind=${line%%[[:space:]]*}
+        val=${line#"$kind"}
+        val="${val#"${val%%[![:space:]]*}"}"
+        if [ -z "$val" ]; then kind=bad; fi
+        case "$kind" in
+          text) company="${company:+$company|}$val"; n_words=$((n_words + 1)) ;;
+          word) company="${company:+$company|}$(w "$val")"; n_words=$((n_words + 1)) ;;
+          id)
+            if ! printf '%s' "$val" | grep -qE '^[A-Z][A-Z0-9-]*$'; then
+              echo "public-scan: $words_rel:$lineno: id の接頭辞は英大文字・数字・- だけで書きます: $val" >&2
+              exit 1
+            fi
+            id_prefixes="$id_prefixes|$val"; n_ids=$((n_ids + 1)) ;;
+          *)
+            # 書き損じの行を黙って捨てると、その語だけが検査から抜ける
+            echo "public-scan: $words_rel:$lineno: 読めない行です（text・word・id のどれかと値を書きます）: $line" >&2
+            exit 1 ;;
+        esac
+      done < "$words_file"
+      if [ "$n_words" -eq 0 ] || [ "$n_ids" -eq 0 ]; then
+        echo "public-scan: 社内の語の一覧 $words_rel が空です（語 $n_words 個・接頭辞 $n_ids 個。どちらも 1 つ以上要ります）。社内の語の検査を飛ばさずに止めます" >&2
+        exit 1
+      fi
+      words_loaded=1
+      echo "== 社内の語の一覧: ${words_rel}（語 $n_words 個・内部管理番号の接頭辞 $n_ids 個）"
+    fi
+    ;;
+esac
 # Python の名残: 旧 Python 実装（scripts/*.py 等）に固有のファイル名・環境変数名だけを狙う。
 # 素の「python」（語の境界つき）は、文書中の一般的な言及（「Python 製ツール」）・python.org のような URL・
 # 「Python3.12」のようなバージョン表記にも当たってしまうため、この検査の対象からは外した（実測して確認済み）。
@@ -121,8 +177,8 @@ python_skip="$python_skip"'|^\./migrations/' # 本番に適用済みで変更し
 python_skip="$python_skip"'|^\./go\.sum:' # 依存の名前（go-difflib）。外部のものなので変えられない
 python_skip="$python_skip"'|^\./internal/client/worktree/' # 片付けで無視する生成物の名前（__pycache__・.pyc）。Python への依存ではない
 python_skip="$python_skip"'|^\./internal/client/hook/loop/worktrees' # 同上（hook 側）
-# 内部管理番号（このリポジトリ自身のイシューの ID。公開物に残さない）
-ids_bare='(IM|HPC-DEV|HPC-M|REQ|RW)-[0-9]{3,4}'
+# 内部管理番号（このリポジトリ自身のイシューの ID と、private/ の一覧にあるほかのプロジェクトの ID。公開物に残さない）
+ids_bare="($id_prefixes)-[0-9]{3,4}"
 ids="$(w "$ids_bare")"
 # 調べない場所（パスの前置きで外す）
 # テスト（_test.go・_test.mjs）は、入力・期待値としてイシューの ID をそのままデータに使うので、この区分では外す。
@@ -283,7 +339,13 @@ ids_comments() { # テスト（_test.go・_test.mjs）の説明コメントに�
 }
 
 status=0
-if [ "$only" = all ] || [ "$only" = company ]; then scan "社内固有の語" "$company" || status=1; fi
+if [ "$only" = all ] || [ "$only" = company ]; then
+  if [ "$words_loaded" = 1 ]; then
+    scan "社内固有の語" "$company" || status=1
+  else
+    echo "== 社内固有の語: 社内の語の一覧（${words_rel}）が無いので、この検査は飛ばしました（private/ の無い作業ツリー。内部管理番号は IM だけを見ます）"
+  fi
+fi
 if [ "$only" = all ] || [ "$only" = names ]; then scan "旧名" "$names" "$names_skip" case || status=1; fi
 if [ "$only" = all ] || [ "$only" = python ]; then scan "Python の名残" "$python_left" "$python_skip" || status=1; fi
 if [ "$only" = all ] || [ "$only" = ids ]; then

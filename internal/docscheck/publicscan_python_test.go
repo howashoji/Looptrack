@@ -9,7 +9,7 @@ import (
 //
 // この _test.go も公開物として配られ、python_skip は _test.go を除外しない（ids_skip と違う点。実測で確かめた）。
 // そのため文字列リテラルのまま書くと、この見本そのものが検査に当たって常時赤になる。
-// publicScanProbeID・publicScanProbeWord と同じ理由で、1 つの文字列としては書かず組み立てる。
+// publicScanProbeID と同じ理由で、1 つの文字列としては書かず組み立てる。
 var (
 	pythonRemnantProbeFile  = "issue" + ".py"
 	pythonRemnantProbeCache = "__pycache" + "__"

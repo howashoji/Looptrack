@@ -23,6 +23,29 @@ Nothing yet.
 
 まだありません。
 
+## [1.0.1-rc.1] - 2026-10-05
+
+First release candidate for 1.0.1, relative to `v1.0.0`. Because it comes
+after 1.0.0, it is published as a pre-release, and `v1.0.0` stays the Latest
+release on GitHub Releases. An app on 1.0.0 follows stable releases, so it
+does not offer this version. To try it, download it from the release page.
+
+### Changed
+
+- **The SQLite driver is now `modernc.org/sqlite` 1.60.1.** The app keeps
+  your data in a single SQLite file and reads and writes it with this driver.
+  It moved up from 1.59.0, and `modernc.org/libc` from 1.75.7 to 1.77.1. The
+  new driver ships its own list of third-party licenses
+  (`LICENSE-3RD-PARTY.md`), and `NOTICE` now carries it in full.
+
+---
+
+1.0.1 のリリース候補の 1 つ目で、下の変更は `v1.0.0` からの差分です。1.0.0 の後に出す版はプレリリースとして公開します。GitHub Releases の Latest は `v1.0.0` のまま。1.0.0 のアプリは正式版だけを追うため、この版を知らせません。試すときは、リリースのページから取得してください。
+
+### 変更
+
+- **SQLite のドライバを `modernc.org/sqlite` 1.60.1 に上げました。** アプリはデータを 1 つの SQLite のファイルに置き、このドライバで読み書きします。前の版は 1.59.0 です。あわせて `modernc.org/libc` も 1.75.7 から 1.77.1 に上がりました。新しいドライバには第三者のライセンスの一覧（`LICENSE-3RD-PARTY.md`）が付いています。`NOTICE` にもその全文を収めました。
+
 ## [1.0.0] - 2026-10-03
 
 1.0.0 is the first release that is not a release candidate. The changes below
@@ -773,7 +796,8 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定から、チャットだけで AI エージェントをつなぐ方法。
 - **新しいガイド「更新」。** デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.1-rc.1...HEAD
+[1.0.1-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1-rc.1
 [1.0.0]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0
 [1.0.0-rc.5]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/howashoji/looptrack/releases/tag/v1.0.0-rc.4

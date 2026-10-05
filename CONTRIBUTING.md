@@ -260,6 +260,11 @@ it scanned, including how many untracked files went in and their names. Files
 ignored by `.gitignore` are left out. They never reach the published tree unless
 they get tracked, so scanning them only produces false positives.
 
+The list of internal words the scan looks for is kept under `private/`, which
+the published tree leaves out. In a clone without `private/`, the scan prints one
+line saying it skipped that check and goes on with the others. Tracker IDs are
+still checked there, for this repository's own `IM-` prefix.
+
 Run the scan in a worktree pinned to the SHA you're checking. In a shared main
 worktree, another session's untracked files can turn it red. `go test
 ./internal/docscheck/` runs it too, so it fails locally as well as in CI (on
