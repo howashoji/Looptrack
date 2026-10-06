@@ -284,7 +284,7 @@ Tracking branches are a bit different. A worktree whose branch tracks a remote b
 is treated as a permanent one (the kind you deploy or cut over from) and is never cleaned up. Once the
 upstream is gone, it's an ordinary temporary branch again. Build leftovers (`node_modules`, `.DS_Store`,
 interpreter caches and friends) don't count as uncommitted changes. A worktree with uncommitted changes
-older than a day is reported as **about to be lost**, so you move the work somewhere safe
+older than a day is reported as "about to be lost", so you move the work somewhere safe
 instead of forgetting it. Branches left behind by a removed worktree are listed too.
 
 `mark` never overwrites another session's marker. If one is already there, it fails with exit

@@ -18,15 +18,15 @@
 | 再起動したら AI の MCP の接続が切れた | ほかのプログラムがポートを使っていたので、空いているポートに替わりました。ログにも出ます。接続設定をコピーし直してください |
 | ブラウザが開かない | `looptrack desktop --status` が出す URL を自分で開いてください |
 
-端末からは次のコマンドを使います。ここでの `looptrack` は、AppImage のファイル・`Looptrack.app/Contents/MacOS/looptrack`・Windows の `cli\looptrack.exe` でもかまいません。
+端末からは次のコマンドを使います。ここでの `looptrack` は AppImage のファイル・`Looptrack.app/Contents/MacOS/looptrack`・Windows の `cli\looptrack.exe` でもかまいません。
 
 ```bash
 looptrack desktop --status   # 起動中なら URL を出す
 looptrack desktop --quit     # 起動中のアプリを止める
 ```
 
-`--quit` は、まずアプリに終了を頼みます。データを書き終えてから止まります。
-頼み方は macOS と Linux では SIGTERM、Windows では終了を頼む印。トレイを出していなくても同じです。
-頼んでも止まらなかったら？ Windows だけは強制終了に進み、その理由を表示します。macOS と Linux に強制終了はありません。
+`--quit` はまずアプリに終了を頼みます。データを書き終えてから止まります。
+頼み方は macOS と Linux では SIGTERM、Windows では終了を頼む印です。トレイを出していなくても同じです。
+頼んでも止まらなかったら？ Windows だけは強制終了に進んでその理由を表示します。macOS と Linux に強制終了はありません。
 
 CLI を Windows で使うときのつまずき（PATH・hook・ヒアドキュメント）は、FAQ の [Windows でつまずきやすい点](../faq.md#windows-でつまずきやすい点)にあります。

@@ -52,8 +52,8 @@ The agent in the next session doesn't remember what was decided before.
 
 So Looptrack keeps two things in the issue:
 
-- **What to do next**: status, priority, what it waits for (blocked_by), acceptance criteria
-- **Why it was done that way**: causes, decisions, reasons for sending back, verification results (comments)
+- What to do next: status, priority, what it waits for (blocked_by), acceptance criteria
+- Why it was done that way: causes, decisions, reasons for sending back, verification results (comments)
 
 Each issue exists exactly once, in the server's database. Every agent and every session reads that same issue.
 Comments are append-only. Nobody can edit or delete them, and once an issue is closed, its body can't change either.
