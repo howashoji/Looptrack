@@ -1,0 +1,73 @@
+# 利用者ガイドのサイト（GitHub Pages）を作って配る。手順の道具は site/（site/build.mjs の冒頭に形の説明がある）。
+#
+# 起動:
+#   - ブランチ site への push と手動（workflow_dispatch）。サイトの道具は公開側では専用のブランチ site に置く。
+#     main に置くと、届くのが次のリリースの公開のときだけになり、文書だけを直した版をリリースせずに出せないため。
+#   - ジョブが回るのは公開のリポジトリ（github.com/howashoji/looptrack）だけ。ほかのリポジトリ（開発側・フォーク）では
+#     run はできるが、ジョブは飛ばす（各ジョブの if:）。
+#
+# 中身: リリースの形のタグ（v<数>.<数>.<数> と -rc.<数>）を全部版として拾い、その docs/guide から作る。
+# site/versions.json の overrides に書いた版だけは、そこの ref（guide/v<版> のブランチなど）から作る。
+# どの ref のどのコミットから作ったかは build の段のログに版ごとに出る。
+name: pages
+
+on:
+  push:
+    branches: [site]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  # 配っている途中の run を打ち切ると、Pages が半端な状態で残ることがあるので、順に回す。
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  SITE_BASE: /Looptrack/
+
+jobs:
+  build:
+    name: 利用者ガイドのサイトを作る
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # リポジトリは URL で比べる（式の == は大文字と小文字を区別しない）。
+    if: format('{0}/{1}', github.server_url, github.repository) == 'https://github.com/howashoji/looptrack'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 各版の中身はタグと guide/* のブランチから git archive で取るので、全履歴が要る。
+          fetch-depth: 0
+          persist-credentials: false
+      - name: タグと guide/* のブランチを取る
+        # build.mjs は ref をタグ・origin/<名前>・ローカルのブランチの順に探す。guide/* は origin/guide/* として置く。
+        run: git fetch --force --tags origin '+refs/heads/guide/*:refs/remotes/origin/guide/*'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: npm ci
+        working-directory: site
+        run: npm ci --no-audit --no-fund
+      - name: build
+        run: node site/build.mjs . "$RUNNER_TEMP/site"
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/site
+
+  deploy:
+    name: Pages に配る
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: format('{0}/{1}', github.server_url, github.repository) == 'https://github.com/howashoji/looptrack'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,25 @@
+.lt-version {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.lt-version select {
+  padding: 2px 6px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background-color: var(--vp-c-bg-alt);
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lt-mermaid {
+  margin: 16px 0;
+  overflow-x: auto;
+}
+
+.lt-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
