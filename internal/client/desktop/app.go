@@ -414,6 +414,14 @@ func (a *App) Logf(format string, args ...any) {
 	a.logger.Warn(fmt.Sprintf(format, args...))
 }
 
+// serveOptions は画面のサーバ（localserve）に渡す設定を組む（primary が使う。版が渡ることを確かめるために切り出した）。
+func (o *Options) serveOptions(paths Paths, ln net.Listener, logger *slog.Logger, upd *updates) localserve.Options {
+	return localserve.Options{
+		DBPath: paths.DB(), AttachDir: paths.Attachments(), Listener: ln, BasePath: BasePath, Logger: logger, UpdateNotice: upd.current, UpdateStopInTray: upd.tray.Load,
+		UpdateApplier: &bannerApplier{u: upd}, Version: o.Version,
+	}
+}
+
 func (o *Options) primary(paths Paths, background, noTray bool) int {
 	logger, closeLog, err := openLog(paths)
 	if err != nil {
@@ -430,10 +438,7 @@ func (o *Options) primary(paths Paths, background, noTray bool) int {
 	// 照らす資産は入れ方で決まる（Windows の unins000.exe）ので、アプリの場所を先に求める
 	launcher, _ := Launcher(o.Env)
 	upd := o.newUpdates(paths, logger, launcher)
-	inst, err := localserve.Start(context.Background(), localserve.Options{
-		DBPath: paths.DB(), AttachDir: paths.Attachments(), Listener: ln, BasePath: BasePath, Logger: logger, UpdateNotice: upd.current, UpdateStopInTray: upd.tray.Load,
-		UpdateApplier: &bannerApplier{u: upd},
-	})
+	inst, err := localserve.Start(context.Background(), o.serveOptions(paths, ln, logger, upd))
 	if err != nil {
 		ln.Close()
 		logger.Error("start", "err", err)

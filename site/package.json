@@ -1,0 +1,21 @@
+{
+  "name": "looptrack-guide-site",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "chevrotain-allstar": "0.5.0",
+    "fastdom": "1.0.12",
+    "heap": "0.2.7",
+    "js-yaml": "4.3.0",
+    "langium": "4.4.0",
+    "lodash": "4.18.1",
+    "mermaid": "12.1.0",
+    "vitepress": "1.6.4",
+    "vscode-jsonrpc": "9.0.3",
+    "vscode-languageserver-protocol": "3.18.4",
+    "vscode-languageserver-textdocument": "1.0.15",
+    "vscode-languageserver-types": "3.18.4",
+    "vscode-uri": "3.1.0",
+    "vue": "3.5.43"
+  }
+}

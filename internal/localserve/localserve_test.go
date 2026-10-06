@@ -8,9 +8,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/howashoji/looptrack/internal/auth"
+	"github.com/howashoji/looptrack/internal/store"
 )
 
 func TestShellQuoteAll(t *testing.T) {
@@ -97,5 +101,72 @@ func TestStartRejectsNonLoopback(t *testing.T) {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err == nil {
 		t.Fatal("全アドレスの待ち受けで起動した")
+	}
+}
+
+// Options の版は、そのままサーバの設定の版になる（利用者メニューの「ガイド」の行き先がこの版で決まる）。
+// 版を渡し忘れると、空の版として黙って latest へ向かうので、渡した値が返ることを表で確かめる。
+func TestServerConfigCarriesVersion(t *testing.T) {
+	for _, v := range []string{"v1.0.1", "v1.0.0-rc.5", "dev", ""} {
+		cfg := serverConfig(Options{Version: v, BasePath: "/looptrack"}, nil)
+		if cfg.Version != v {
+			t.Errorf("Options.Version %q → Config.Version %q", v, cfg.Version)
+		}
+		if !cfg.LocalMode || cfg.BasePath != "/looptrack" {
+			t.Errorf("版以外の設定が崩れた: LocalMode=%v BasePath=%q", cfg.LocalMode, cfg.BasePath)
+		}
+	}
+	if a, b := serverConfig(Options{Version: "v1.0.1"}, nil), serverConfig(Options{Version: "dev"}, nil); a.Version == b.Version {
+		t.Errorf("対照: 版の違いが設定に出ていない: %q", a.Version)
+	}
+}
+
+// Start に渡した版は、ローカルモードの画面の利用者メニューの「ガイド」の行き先まで届く
+// （Start の中で組む設定から版が落ちても、serverConfig だけを見る上の表では気づけない）。
+// 版を dev にした対照では latest/ になる。
+func TestStartVersionReachesGuideLink(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	client := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	t.Cleanup(client.CloseIdleConnections)
+	guideHref := regexp.MustCompile(`<a class="usermenu-item" href="([^"]*)" target="_blank"`)
+	for _, c := range []struct{ version, lang, want string }{
+		{"v1.0.1", "en", "/v1.0.1/"},
+		{"v1.0.1", "ja", "/v1.0.1/ja/"},
+		{"dev", "en", "/latest/"}, // 対照: 版が無ければ latest
+	} {
+		t.Run(c.version+"・"+c.lang, func(t *testing.T) {
+			ln, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			inst, err := Start(context.Background(), Options{DBPath: filepath.Join(t.TempDir(), "looptrack.db"), Listener: ln, Logger: logger, Version: c.version})
+			if err != nil {
+				t.Fatalf("Start: %v", err)
+			}
+			t.Cleanup(func() { inst.Shutdown(context.Background()) })
+			// ローカルモードは最初の管理者として通す。管理者がいないと画面は初回設定へ転送される
+			hash, err := auth.HashPassword("local-password-12")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := store.CreateUser(context.Background(), inst.DB, "boss", "boss", hash, "admin"); err != nil {
+				t.Fatal(err)
+			}
+			req, _ := http.NewRequest("GET", "http://"+ln.Addr().String()+"/looptrack/account", nil)
+			req.Header.Set("Accept-Language", c.lang)
+			res, err := client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			b, _ := io.ReadAll(res.Body)
+			if res.StatusCode != 200 {
+				t.Fatalf("/looptrack/account: %d", res.StatusCode)
+			}
+			m := guideHref.FindStringSubmatch(string(b))
+			if m == nil || !strings.HasPrefix(m[1], "https://") || !strings.HasSuffix(m[1], c.want) {
+				t.Errorf("ガイドの href = %v, want …%s", m, c.want)
+			}
+		})
 	}
 }

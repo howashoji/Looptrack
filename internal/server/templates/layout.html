@@ -89,6 +89,7 @@
   <div class="usermenu-panel">
     <div class="usermenu-who"><strong>{{who .}}</strong><span>{{T $.Lang "server.web.common.login_role" "login" .Login "role" .Role}}</span></div>
     <a class="usermenu-item" href="{{base}}/account">{{T $.Lang "server.web.common.account_settings"}}</a>
+    <a class="usermenu-item" href="{{guideURL $.Lang}}" target="_blank" rel="noopener noreferrer">{{T $.Lang "server.web.common.guide"}}</a>
     {{if eq .Role "admin"}}<a class="usermenu-item" href="{{base}}/admin/users">{{T $.Lang "server.web.common.admin_users"}}</a>
     <a class="usermenu-item" href="{{base}}/admin/projects">{{T $.Lang "server.web.common.admin_projects"}}</a>
     <a class="usermenu-item" href="{{base}}/admin/attachments">{{T $.Lang "server.web.common.admin_attachments"}}</a>{{end}}

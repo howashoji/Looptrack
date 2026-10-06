@@ -168,6 +168,15 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 			}
 			return cfg.UpdateNotice()
 		},
+		// guideURL は利用者メニューの「ガイド」の行き先（サーバ自身の版と、画面の言語で決まる。guideSiteURL）
+		// 言語が読めないときは T と同じく日本語に倒し、リンクの文面と行き先の言語をそろえる
+		"guideURL": func(lang any) string {
+			l := templateLang(lang)
+			if l == "" {
+				l = i18n.JA
+			}
+			return guideSiteURL(cfg.Version, l)
+		},
 		// updateStopInTray は帯の止め方の案内をトレイのメニューにするか（しないなら環境変数）
 		"updateStopInTray": func() bool { return cfg.UpdateStopInTray != nil && cfg.UpdateStopInTray() },
 		// updateServer は帯をサーバ版の知らせ（管理者だけ・更新の 1 行）にするか。updateCommand はその 1 行

@@ -2178,6 +2178,7 @@
   "server.web.common.back_suffix": " に戻る",
   "server.web.common.back_to_projects": "プロジェクト選択へ戻る",
   "server.web.common.brand": "Looptrack",
+  "server.web.common.guide": "ガイド",
   "server.web.common.html_lang": "ja",
   "server.web.common.login_role": "{login}（{role}）",
   "server.web.common.logout": "ログアウト",

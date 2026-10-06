@@ -14,3 +14,8 @@
 .claude/handoff-pending.d/
 .claude/worktrees/
 .claude/.looptrack-work/
+
+# 利用者ガイドのサイト（site/）の依存と生成の途中物
+/site/node_modules/
+/site/.work/
+/site/dist/

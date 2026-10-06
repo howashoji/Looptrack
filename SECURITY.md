@@ -22,8 +22,8 @@ software.
 
 Report it privately through GitHub instead:
 
-1. Go to the repository's **Security** tab.
-2. Choose **Report a vulnerability** (GitHub's Private vulnerability reporting).
+1. Go to the repository's Security tab.
+2. Choose "Report a vulnerability" (GitHub's Private vulnerability reporting).
 3. Fill in the form and submit it. Only you and the maintainers can see the
    report and the conversation that follows.
 
@@ -91,12 +91,12 @@ not as security reports:
   that port to a network is a deployment mistake, not a product bug. But a way
   to reach local mode *from a web page in the user's browser* is a
   vulnerability. Please do report that one.
-- **The server doesn't terminate TLS.** It's meant to sit behind a reverse
+- The server doesn't terminate TLS. It's meant to sit behind a reverse
   proxy that does. Plain HTTP on the loopback port is expected behaviour.
-- **Anything a project `editor` can legitimately do:** editing issue bodies,
+- Anything a project `editor` can legitimately do: editing issue bodies,
   adding comments, changing status. The privilege boundaries that matter are
   viewer vs. editor vs. admin, and crossing between projects.
-- **Unsigned Windows binaries.** Known, and documented in the README. We plan
+- Unsigned Windows binaries. Known, and documented in the README. We plan
   to address it with an OSS code-signing programme.
 
 The security model the server is built on (authentication, per-project

@@ -3,6 +3,7 @@ package docscheck
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -148,3 +149,72 @@ func TestPublicScanCompanyWords(t *testing.T) {
 }
 
 func wordsPtr(s string) *string { return &s }
+
+// TestPublicScanPublicNameBoundary は、公開名の例外が「名前そのもの」だけに効くことを確かめる。
+//
+// 公開名（リポジトリ・イメージ・識別子）は、社名を含んでいても公開してよいので、検査の前に行から取り除く。
+// 前方一致で取り除くと、looptrack-internal のように公開名で始まる別の名前まで、社名の部分ごと消えてしまう。
+// そうなると社内固有の語に当たらず、黙って通る。だから公開名の直後が英数字・_・- のときは例外にしない。
+// 一覧の語に、公開名の中に現れる社名を使うのは、取り除かれる側を直接通すため。
+func TestPublicScanPublicNameBoundary(t *testing.T) {
+	requirePublicScanTools(t)
+
+	// 社名は公開名の中にしか書けない（公開物の検査が、社名を書いた行を見つける）。
+	// 検査が見るのは、この断片のつなぎ目ではなく、つないだ後の文字列。
+	const co = "how" + "ashoji"
+	const attrs = "* text=auto eol=lf\n/private/ export-ignore\n"
+	const words = "# 見本の一覧\n\ntext " + co + "\nid " + publicScanProbePrefix + "\n"
+
+	// 3 行目から 1 行ずつ。検出される形は公開名の続きの名前で、されない形は公開名そのもの。
+	detected := []string{
+		"https://github.com/" + co + "/looptrack-internal",
+		"ghcr.io/" + co + "/looptrackops",
+		"net." + co + ".looptrack-x",
+		"https://api.github.com/repos/" + co + "/looptrack_old",
+		"https://raw.githubusercontent.com/" + co + "/looptrack2/main/install.sh",
+	}
+	passed := []string{
+		"https://github.com/" + co + "/looptrack/",
+		"https://github.com/" + co + "/looptrack.git",
+		"ghcr.io/" + co + "/looptrack:1.0.2",
+		"net." + co + ".looptrack",
+		"\"github.com/" + co + "/looptrack\"",
+		"https://api.github.com/repos/" + co + "/looptrack/releases/latest",
+		"https://raw.githubusercontent.com/" + co + "/looptrack/main/install.sh",
+		"https://" + co + ".github.io/Looptrack/guide/",
+	}
+
+	body := "# 見本\n\n"
+	for _, l := range detected {
+		body += l + "\n"
+	}
+	for _, l := range passed {
+		body += l + "\n"
+	}
+
+	dir, env := publicScanRepo(t, map[string]string{
+		".gitattributes":    attrs,
+		"README.md":         body,
+		publicScanWordsPath: words,
+	})
+	out, _ := runPublicScan(t, dir, env, "--only", "company")
+
+	// 対照: 検出が生きていること。一覧の語が公開名の続きの名前の中の社名を実際に拾う。
+	// 公開名の続きの名前の行は、全部が出力に出る。
+	for i, l := range detected {
+		want := "README.md:" + strconv.Itoa(3+i) + ":"
+		if !strings.Contains(out, want) {
+			t.Errorf("公開名の続きの名前が社内固有の語として検出されていません（%s）:\n%s", l, out)
+		}
+	}
+	// 公開名そのものの行は、1 行も出ない。
+	for i, l := range passed {
+		bad := "README.md:" + strconv.Itoa(3+len(detected)+i) + ":"
+		if strings.Contains(out, bad) {
+			t.Errorf("公開名そのものが検出されています（%s）:\n%s", l, out)
+		}
+	}
+	if want := "== 社内固有の語: " + strconv.Itoa(len(detected)) + " 行・1 ファイル"; !strings.Contains(out, want) {
+		t.Fatalf("前提が崩れています。検出は公開名の続きの %d 行だけのはずです（%s）:\n%s", len(detected), want, out)
+	}
+}

@@ -41,15 +41,15 @@ They reach the agent straight from the server.
 | `core/skills/token-report/SKILL.md` | skill | The steps to build the token consumption report (PDF) and hand it over | The server holds the aggregation. The skill only says how to ask for it | — | ① (accounting) |
 | The guidance section in CLAUDE.md / AGENTS.md | document | The server's URL, how to call the CLI, how to read the guide | What it says follows from the server's settings | `internal/client/kitinit` | — |
 
-**Tying an MCP start to its conversation (a side effect of token accounting)**: when the connection settings can't send a
+Tying an MCP start to its conversation (a side effect of token accounting): when the connection settings can't send a
 session ID, an issue started over MCP looks like this from the CLI: "started through another path (CLI / MCP); whether it is the same
-session cannot be told". Now let the token-accounting hook send the snapshot for the same tool call. The server ties that start to
+session cannot be told". When the token-accounting hook also sends the snapshot for the same tool call, the server ties that start to
 the conversation's session ID, and the CLI can tell "my own start" from "another session is working on it" (how it works:
 the part of §6 on tying MCP operations to a conversation in [docs/server/DESIGN.md](../docs/server/DESIGN.md)).
 **It works for Claude Code only**, because only Claude Code puts the tool call's ID into the MCP request. It also depends on the
 token-accounting hook. Without that hook, nothing gets tied and the old note stays.
 
-**Telling the "self" of the side calling over MCP (the call key)**: the tie above can't tell you the session of the side calling over MCP.
+Telling the "self" of the side calling over MCP (the call key): the tie above can't tell you the session of the side calling over MCP.
 That's the call-key hook's job. Right before the call, it hands over the conversation's session ID, and the server looks it up by the tool
 call's ID in `_meta`. With it, MCP's `next` and the lists tell your own conversation's start from a start by another conversation of
 the same user, even over the same MCP connection (how it works: the part of §6 on telling sessions apart in DESIGN).
@@ -114,26 +114,26 @@ kit/
 
 ### The language of these texts (Japanese and English)
 
-**Japanese is of record and stays where it is. The English goes into `en/` in the same directory, under the same file
-name** (`loop/rules/background-process.md` ↔ `loop/rules/en/background-process.md`).
+Japanese is of record and stays where it is. The English goes into `en/` in the same directory, under the same file
+name (`loop/rules/background-process.md` ↔ `loop/rules/en/background-process.md`).
 
 - The `README.md` / `README.ja.md` at the root, this document (`kit/README.md` / `kit/README.ja.md`) and `docs/guide/`
   work the other way round: English on top, `ja/` below. But **none of those are used for wiring**.
   kit's paths are a different story. `manifest.json`, the hook wiring and `internal/client/kitinit` all reference them, so
   moving what's of record would move all of the wiring with it. This layout also matches how `internal/i18n` works:
   Japanese is of record, and English catches up to it.
-- **For rules, installation distributes both languages.** Which one gets read is decided at run time (a hook injecting rules follows
+- For rules, installation distributes both languages. Which one gets read is decided at run time (a hook injecting rules follows
   the same order as `i18n.FromEnv`: `LOOPTRACK_LANG` → `LC_ALL` → `LC_MESSAGES` → `LANG`, and a file with no
   translation falls back to the Japanese of record).
   Don't make installation pick one language for rules. It couldn't follow `LOOPTRACK_LANG` when you switch it.
   The exception is `AGENTS.md` for Codex and Copilot. It's generated, so it's written in the language of the
   installation (run `looptrack issue init --loop` again after changing the language).
-- **For skills, only the one in the language of the installation is placed.** The AI's harness just reads a skill from the
+- For skills, only the one in the language of the installation is placed. The AI's harness just reads a skill from the
   fixed path `.claude/skills/<name>/SKILL.md`, and nothing picks a language at run time. An `en/SKILL.md` placed
   next to it would simply never be read. So init picks the text in the language of the installation (same order as above)
   and places that one as `SKILL.md`. Its `description` comes out in that language too.
   The next init clears away any `en/SKILL.md` an earlier init placed (one edited by hand is kept).
-  **To change the language of the skills, run `looptrack issue init` again** (same as the `AGENTS.md` exception).
+  To change the language of the skills, run `looptrack issue init` again (same as the `AGENTS.md` exception).
 - `TestKitStructure` in `go test ./internal/docscheck/` checks that the two match in shape: the order of the heading
   levels, the number of code blocks, the number of tables, the injection markers and the relative links.
   A file with no translation doesn't fail. Only what's been translated gets checked.
@@ -166,7 +166,7 @@ name** (`loop/rules/background-process.md` ↔ `loop/rules/en/background-process
    {"name": "skills/iterate/SKILL.md", "kind": "skill", "codex": {"agents_md": "description"}, "copilot": {"agents_md": "description"}}, …]}
 ```
 
-- `name` is relative to `kit/loop/`. rules and skills map **one to one onto the files in kit/loop** (except
+- `name` is relative to `kit/loop/`. rules and skills map one to one onto the files in kit/loop (except
   manifest.json itself and the `en/` translations). A hook is `hooks/<name>` and has no file: it's the name in
   `looptrack hook <name>`, one to one with the registry in Go.
   `TestManifest` in `internal/client/hook/loop` checks this.
@@ -181,13 +181,13 @@ name** (`loop/rules/background-process.md` ↔ `loop/rules/en/background-process
   That adds `--no-block` to the wiring, and the hook just reports with `{"systemMessage": …}` (exit 0) instead of
   sending the turn back.
 - The `codex` of rules and skills (what goes into the `<!-- looptrack:loop:begin -->` section of `AGENTS.md`):
-  null = **leave it out**; `{"agents_md": "sections"}` on rules = that file's `<!-- looptrack:inject session -->`
+  null = leave it out; `{"agents_md": "sections"}` on rules = that file's `<!-- looptrack:inject session -->`
   sections, plus one line pointing at where the full text is kept (`.claude/rules/looptrack-loop/<name>`);
   `{"agents_md": "description"}` on a skill = one line from the frontmatter description, plus the path to the steps.
   `output-discipline.md` is specific to Claude's format, so it's null.
 - A hook's `copilot`: `{event, matcher, block?}` = wire it into `.github/hooks/looptrack.json`, null = don't wire it
   (the reasons are under "How Copilot is handled" below). The `copilot` of rules and skills reads just like `codex`.
-  **Every entry carries a `codex` and a `copilot` column** (null is fine).
+  Every entry carries a `codex` and a `copilot` column (null is fine).
 - An injection marker can name an agent too. `<!-- looptrack:inject session claude-code -->`, for example, goes in only for that agent.
 
 | kind | Where it goes (real files; no symlinks, so Windows works) |
@@ -196,12 +196,12 @@ name** (`loop/rules/background-process.md` ↔ `loop/rules/en/background-process
 | rules | `.claude/rules/looptrack-loop/`. session-start-rules and user-prompt-rules read from there (change it with `LOOPTRACK_LOOP_RULES_DIR`) |
 | skill | `.claude/skills/iterate/` and `.claude/skills/session-handoff/` (init's marker is inside SKILL.md) |
 
-**What a hook promises**: the project root is decided in the order `CLAUDE_PROJECT_DIR` →
+What a hook promises: the project root is decided in the order `CLAUDE_PROJECT_DIR` →
 `git rev-parse --show-toplevel` → `pwd`. The state files (`task-mode.d/`, `handoff-pending.d/`, `session-scope/`) live
 in `<root>/.claude/` (change it with `LOOPTRACK_LOOP_STATE_DIR`; `.codex/` when there's no `CLAUDE_PROJECT_DIR` but
 there is a `CODEX_THREAD_ID`).
 Can't decide? It lets the call through (fail-open).
-**When something other than Claude Code starts it through the wiring in `.claude/settings.json`, it does nothing**
+When something other than Claude Code starts it through the wiring in `.claude/settings.json`, it does nothing
 (`hookio.ForeignHost`).
 You make every per-project adjustment with a `LOOPTRACK_LOOP_*` environment variable (`env` in settings.json).
 
@@ -220,7 +220,7 @@ You make every per-project adjustment with a `LOOPTRACK_LOOP_*` environment vari
 | `LOOPTRACK_LOOP_WAITLOOP_ALLOW` | wait-loop-guard | none |
 | `LOOPTRACK_LOOP_HOOK_LOG` | all (the core hooks too) | no record (no file is created). With `1`, every verdict is appended as one JSONL line to `<state dir>/.looptrack-freshness/hook-log.jsonl`. A line holds only `ts`, `hook`, `event`, `decision` (`deny`, `block`, `ask`, `update`, `context`, `system`, `pass`, `error`, `timeout`, `panic`), `session`, `subagent` and `kind` (a word for the kind of reason, e.g. `git-guard: reset_hard`, `secrets: show .env`) — never the command, the prompt, the wording of the reason or a path. Past 1 MiB it is rotated to `.1`, one generation only. A failed write never changes the verdict. Codex's `.codex/.looptrack-freshness/` (and wherever `LOOPTRACK_LOOP_STATE_DIR` moves it) is not in the `.gitignore` of the project it was installed into |
 
-**Verified by**: `go test ./internal/client/hook/loop/` (table-driven tests).
+Verified by: `go test ./internal/client/hook/loop/` (table-driven tests).
 After installation, a self-check (init's verify) confirms four things: the wiring matches the manifest, looptrack
 starts, session-start-rules injects the marked sections of the rules it placed, and the entry point can call
 looptrack. If it fails? It puts back what it wrote and stops. Skip it with `--no-verify`.
@@ -278,12 +278,12 @@ Here's the shape of one entry that init writes to `.github/hooks/looptrack.json`
 | token accounting (core) | Wired (`looptrack hook usage --agent copilot --event <event>` on `PostToolUse`, `Stop` and `SessionEnd` (the CLI only), with no matcher, so the hook narrows the MCP tool names itself). OTel writes only under `$COPILOT_HOME/otel/` (Copilot CLI does not pass the destination to a hook). Only a user who enabled OpenTelemetry's file output sends anything (the steps are in [docs/AI-GUIDE.md](../docs/AI-GUIDE.md)) |
 | the freshness guard (core) | Not wired (Claude Code only) |
 
-**Guidance text**: Copilot CLI reads AGENTS.md, CLAUDE.md and `.github/copilot-instructions.md` and merges all of them.
+Guidance text: Copilot CLI reads AGENTS.md, CLAUDE.md and `.github/copilot-instructions.md` and merges all of them.
 VS Code reads AGENTS.md and CLAUDE.md by default (doc). But the administration section of CLAUDE.md is written for Claude Code
 (guidance for a CLI that assumes the `env` of `.claude/settings.json`). So it opens with "For Claude Code. GitHub
 Copilot and Codex follow the section in AGENTS.md".
 
-**`.claude/settings.json` is read as well**: VS Code and Copilot CLI go on to read the hooks in `.claude/settings.json` and
+`.claude/settings.json` is read as well: VS Code and Copilot CLI go on to read the hooks in `.claude/settings.json` and
 `.claude/settings.local.json` too (both are documented).
 Copilot CLI passes `CLAUDE_PROJECT_DIR`, `COPILOT_CLI=1` and `COPILOT_PROJECT_DIR` to such a hook
 (there's no `CLAUDECODE`, and the `env` of settings isn't passed; real).
