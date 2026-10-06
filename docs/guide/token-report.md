@@ -1,7 +1,7 @@
 # Token reports
 
 Looptrack records the tokens your coding agents spend, pins them to issues, and turns them into a PDF report for a period.
-This page has two readers: **administrators who read the reports** and **developers whose agents get measured**.
+This page has two readers: administrators who read the reports and developers whose agents get measured.
 Here's what gets recorded, how it's added up, and how a report comes together.
 
 ## What is recorded
@@ -39,7 +39,7 @@ GitHub Copilot can be measured only if the user turns on OpenTelemetry file expo
 
 **What you type isn't sent by default.**
 The server gets only the numbers for each segment.
-The first 44 characters of each instruction (the segment's "task name") go out only when **both** of these allow it:
+The first 44 characters of each instruction (the segment's "task name") go out only when both of these allow it:
 
 - the project rule `usage.send_prompts` is `true` (an administrator switches it at `<server URL>/admin/projects`, or writes it with `looptrack project rules set`)
 - the user has not set `LOOPTRACK_USAGE_SEND_PROMPTS=0`
@@ -59,9 +59,9 @@ The server won't store task names that arrive for a project that doesn't allow t
 The server doesn't store differences. It works them out each time you ask:
 
 1. The snapshots of each conversation are lined up in order of their running totals.
-2. The difference between two neighbouring snapshots is what that **segment** consumed.
+2. The difference between two neighbouring snapshots is what that segment consumed.
 3. A segment belongs to **the issue of the snapshot that closed it**. Research before filing goes to the issue you filed; the work before a comment goes to that issue.
-4. A segment closed at the end of a turn or a session goes to the issue the conversation last touched, if that issue is still open. If not, it's **unattributed**.
+4. A segment closed at the end of a turn or a session goes to the issue the conversation last touched, if that issue is still open. If not, it's unattributed.
 
 `looptrack issue usage show <ID>` shows one issue's consumption per stage (the operation that closed each segment).
 One catch, though. Because of rule 3, parallel work on two issues in one conversation can't be told apart.

@@ -45,14 +45,14 @@ There are two places to fetch from.
 With `--url` or the `LOOPTRACK_API_URL` environment variable it fetches from the server's distribution; with neither, from GitHub releases.
 You can also pick one with `--from server` or `--from github`. A failure on one never falls back to the other.
 
-**From the server's distribution**, `self-update` fetches the newest `looptrack` for this OS and CPU from the distribution listing. Inside a project, `--url` can come from the `LOOPTRACK_API_URL` environment variable.
+From the server's distribution, `self-update` fetches the newest `looptrack` for this OS and CPU from the distribution listing. Inside a project, `--url` can come from the `LOOPTRACK_API_URL` environment variable.
 It checks the file against the SHA-256 in the listing. Official builds also verify the minisign signature on `SHA256SUMS`.
 They check one more thing: that the version in the listing is the one that was signed. The file name in `SHA256SUMS` (`looptrack_<version>_<os>_<arch>`) and, for a release, the version in the signature's trusted comment must both match it.
 If anything doesn't match, nothing gets replaced.
 If your version is the same as or newer than the distributed one, it does nothing. To go back to an older version, add `--force`.
 A version you built yourself (`dev` and the like) can't be compared with the distributed one, so replacing it takes `--force` too.
 
-**From GitHub releases**, the version is picked the same way as in [Checking for new versions](#checking-for-new-versions-desktop-app-and-server). If you run an rc it follows rcs too, and the `LOOPTRACK_UPDATE_CHANNEL` environment variable changes that.
+From GitHub releases, the version is picked the same way as in [Checking for new versions](#checking-for-new-versions-desktop-app-and-server). If you run an rc it follows rcs too, and the `LOOPTRACK_UPDATE_CHANNEL` environment variable changes that.
 What it fetches is the server archive (`looptrack_<version>_<os>_<arch>_server.tar.gz`, or `.zip` on Windows).
 The archive is checked against the signed `SHA256SUMS`, only the `looptrack` inside is extracted, and that file is checked once more against the `looptrack_<version>_<os>_<arch>` line of the same `SHA256SUMS`.
 It replaces the file only when a newer version exists, and `--force` is not accepted.
@@ -64,10 +64,10 @@ Windows can't delete a running file. So the old file is renamed to `looptrack.ex
 
 In these two cases `self-update` stops with an error and replaces nothing. `--check` still works.
 
-- **The `looptrack` inside the desktop app on macOS and Linux**: replace the whole app ([Updating the desktop app](../desktop/updating.md)).
+- The `looptrack` inside the desktop app on macOS and Linux: replace the whole app ([Updating the desktop app](../desktop/updating.md)).
   The distributed `looptrack` has no tray. Swap it in, and the app won't start on a double-click anymore.
   On Windows the CLI is a separate file from the app (`Looptrack.exe`), so `self-update` can replace it. What that leaves behind is in [Updating only the CLI with self-update](../desktop/updating.md#updating-only-the-cli-with-self-update).
-- **The `looptrack` of a server installed with `install.sh`**: update it with `install.sh --upgrade` ([Server](#server)).
+- The `looptrack` of a server installed with `install.sh`: update it with `install.sh --upgrade` ([Server](#server)).
   Replacing the file alone neither migrates the database nor restarts the server, so the running server and the file would end up on different versions.
 
 ### Bringing each project's kit up to date
@@ -160,7 +160,7 @@ Stop the service, replace the binary, run `looptrack migrate` with the settings 
 ### The looptrack you distribute to users
 
 Replacing the server doesn't update the `looptrack` on users' machines.
-`self-update` and "[Update the distributed files]" use the `looptrack` placed in the server's **distribution directory**.
+`self-update` and "[Update the distributed files]" use the `looptrack` placed in the server's distribution directory.
 You set that directory with `LOOPTRACK_DIST_DIR` in `.env`. Without it, the server doesn't distribute `looptrack`.
 
 **On a server installed with `install.sh`, `install.sh` takes care of it.** Every time it installs or runs `--upgrade` (including the automatic replacement), it fills the directory from the release it downloaded: the binaries for all six platforms, each checked against the signed `SHA256SUMS`, plus that `SHA256SUMS` and its signature.
