@@ -9,6 +9,9 @@ Server design and deployment details? Those live in separate documents for devel
 
 日本語: [ja/README.md](ja/README.md)
 
+You can also read this guide on the web, built separately for each release: <https://howashoji.github.io/Looptrack/latest/>.
+For the pages that match the version you run, open `https://howashoji.github.io/Looptrack/<version>/`. For 1.0.1, that is `v1.0.1/`.
+
 ## Choosing an edition
 
 Looptrack comes in two editions. Installing it and connecting your AI agent differ between them, and everything after that is shared.

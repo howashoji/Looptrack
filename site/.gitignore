@@ -1,0 +1,4 @@
+# 公開側の orphan のブランチ site にはルートの .gitignore が無いので、site/ の中で依存と生成の途中物を外す。
+node_modules/
+.work/
+dist/

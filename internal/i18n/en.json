@@ -2178,6 +2178,7 @@
   "server.web.common.back_suffix": "",
   "server.web.common.back_to_projects": "Back to the project list",
   "server.web.common.brand": "Looptrack",
+  "server.web.common.guide": "Guide",
   "server.web.common.html_lang": "en",
   "server.web.common.login_role": "{login} ({role})",
   "server.web.common.logout": "Sign out",

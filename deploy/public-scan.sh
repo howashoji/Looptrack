@@ -21,7 +21,7 @@
 # （赤になったとき、原因が未追跡のファイルかどうかがその場で分かるように）。
 #
 # 例外（公開物に残してよいもの）:
-#   - 公開リポジトリとイメージの名前と、配布元の識別子: github.com/howashoji/looptrack（API の api.github.com/repos/howashoji/looptrack・インストーラを取る raw.githubusercontent.com/howashoji/looptrack も）・ghcr.io/howashoji/looptrack・net.howashoji.looptrack
+#   - 公開リポジトリとイメージの名前と、配布元の識別子: github.com/howashoji/looptrack（API の api.github.com/repos/howashoji/looptrack・インストーラを取る raw.githubusercontent.com/howashoji/looptrack も）・ghcr.io/howashoji/looptrack・net.howashoji.looptrack・利用者ガイドのサイト howashoji.github.io/Looptrack/
 #   - 配布元・著作権者としての社名の表記: 行に「配布元」「copyright」「Developer ID」を含むもの
 #
 # 社内固有の語と、ほかのプロジェクトの内部管理番号の接頭辞は private/deploy/public-scan-words.txt に置く
@@ -207,7 +207,12 @@ names_skip="$names_skip"'|^\./internal/client/kitinit/texts_test\.go:' # kit に
 # 本番に適用済みで変更しない（COMMENT に旧名が残る）
 names_skip="$names_skip"'|^\./migrations/|^\./internal/store/testdata/legacy/'
 # 例外の語（行から取り除いてから判定する）
+# 公開名の例外。名前の後ろが英数字・_・- のときは別の名前の一部なので例外にしない
+# （looptrack-internal や looptrackops の社名の部分まで消すと、社内固有の語に当たらず通ってしまう）。
+# サイトの URL は末尾の / で名前を締めているので、後ろの文字は見ない。
 allow='api\.github\.com/repos/howashoji/looptrack|raw\.githubusercontent\.com/howashoji/looptrack|github\.com/howashoji/looptrack|ghcr\.io/howashoji/looptrack|net\.howashoji\.looptrack'
+allow_end='([^A-Za-z0-9_-]|$)'
+allow_site='howashoji\.github\.io/[Ll]ooptrack/'
 allow_line='配布元|[Cc]opyright|Developer ID'
 # 生成物だけの残骸の説明（利用者ガイド）。例として __pycache__ を挙げるのは Python の名残ではない
 allow_line="$allow_line"'|生成物だけの残骸'
@@ -223,7 +228,7 @@ scan() { # $1: 区分名 $2: パターン $3: 調べないパスの前置き（�
     { if [ -n "$skip" ]; then grep -vE -- "$skip" || true; else cat; fi; } |
     while IFS= read -r line; do
       body=${line#*:*:}
-      stripped=$(printf '%s' "$body" | sed -E "s#$allow##g")
+      stripped=$(printf '%s' "$body" | sed -E -e "s#($allow)$allow_end#\\2#g" -e "s#$allow_site##g")
       if printf '%s' "$stripped" | grep -qE $gq -- "$pat"; then printf '%s\n' "${line#./}"; fi
     done || true)
   local n=0 files=0

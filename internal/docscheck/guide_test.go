@@ -18,7 +18,7 @@ import (
 //  2. 各ファイルの見出しの階層の並び（コードブロックの外）・コードブロックの数・表の数が同じ
 //  3. 相対リンクの先のファイルがある
 //  4. 社内固有の名前・内部の番号が無い（公開リポジトリ github.com/<組織>/looptrack と、そのインストーラを取る
-//     raw.githubusercontent.com/<組織>/looptrack は除く）
+//     raw.githubusercontent.com/<組織>/looptrack と、利用者ガイドのサイト <組織>.github.io/Looptrack/ は除く）
 
 // 語は分けて書く（このファイル自身が公開物の検査に掛からないように）
 var (
@@ -26,6 +26,10 @@ var (
 	forbidden = regexp.MustCompile(strings.Join([]string{`IM` + `-[0-9]`, "HP" + "C-", "REQ" + "-", "RW" + "-", org, "宝" + "和", `dev\.` + org}, "|"))
 	allowed   = "github.com/" + org + "/looptrack"
 	allowRaw  = "raw.githubusercontent.com/" + org + "/looptrack"
+	// 公開名の直後が英数字・_・- のときは別の名前の一部なので許さない（looptrack-internal の社名まで消さない）。
+	allowNames = regexp.MustCompile(`(` + regexp.QuoteMeta(allowRaw) + `|` + regexp.QuoteMeta(allowed) + `)([^A-Za-z0-9_-]|$)`)
+	// 利用者ガイドのサイト。末尾の / まで含めるので、Looptrack-internal/ のような別の名前は通さない。
+	allowSite = org + ".github.io/Looptrack/"
 	link      = regexp.MustCompile(`\]\(([^)#\s]+)(#[^)]*)?\)`)
 	fence     = regexp.MustCompile("^\\s*(```|~~~)")
 	heading   = regexp.MustCompile(`^(#{1,6})\s`)
@@ -38,6 +42,12 @@ const guideDir = "../../docs/guide"
 type shape struct {
 	headings       []int
 	fences, tables int
+}
+
+// guideLineForbidden は、1 行に社内固有の名前か内部の番号が残っているかを返す（許す公開名を除いてから判定する）。
+func guideLineForbidden(line string) bool {
+	rest := allowNames.ReplaceAllString(line, "$2")
+	return forbidden.MatchString(strings.ReplaceAll(rest, allowSite, ""))
 }
 
 func shapeOf(text string) shape {
@@ -182,6 +192,39 @@ func TestGuideStructure(t *testing.T) {
 	}
 }
 
+// 許す公開名は、名前そのものだけに効く。続きの名前（looptrack-internal など）は社名ごと検出する。
+func TestGuideAllowedNameBoundary(t *testing.T) {
+	detected := []string{
+		"https://" + allowed + "-internal",
+		"https://" + allowRaw + "-internal/main/install.sh",
+		allowed + "ops",
+		allowed + "_old",
+	}
+	passed := []string{
+		"https://" + allowed + "/",
+		"https://" + allowed + ".git",
+		"https://" + allowed,
+		"`" + allowed + "`",
+		"https://" + allowRaw + "/main/install.sh",
+		"https://" + allowSite + "guide/",
+	}
+	// 対照: 続きの名前が検出されること（ここが通らなければ、通る側の確認は何も言えない）。
+	for _, l := range detected {
+		if !guideLineForbidden(l) {
+			t.Errorf("公開名の続きの名前が検出されていません: %s", l)
+		}
+	}
+	for _, l := range passed {
+		if guideLineForbidden(l) {
+			t.Errorf("公開名そのものが検出されています: %s", l)
+		}
+	}
+	// 前提: 許す語を取り除く前は、通る側の行も社名で当たる（取り除きが働いている証拠）。
+	if !forbidden.MatchString(passed[0]) {
+		t.Fatalf("前提が崩れています。公開名を含む行は、取り除く前なら社名に当たるはずです: %s", passed[0])
+	}
+}
+
 func TestGuideWordsAndLinks(t *testing.T) {
 	// 相対リンクを 1 本も見ずに緑になるのを塞ぐ（link の式か読み方が崩れると、リンク切れの検査は何も見ずに通る）。
 	checked := map[string]bool{} // 調べた相対リンク（"<guide からの相対パス> -> <リンク先>"）
@@ -195,7 +238,7 @@ func TestGuideWordsAndLinks(t *testing.T) {
 			p := filepath.Join(side.dir, filepath.FromSlash(n))
 			rel, _ := filepath.Rel(guideDir, p)
 			for i, line := range strings.Split(read(t, p), "\n") {
-				if forbidden.MatchString(strings.ReplaceAll(strings.ReplaceAll(line, allowRaw, ""), allowed, "")) {
+				if guideLineForbidden(line) {
 					t.Errorf("%s:%d: 社内固有の名前か内部の番号: %s", rel, i+1, strings.TrimSpace(line))
 				}
 				for _, m := range link.FindAllStringSubmatch(line, -1) {

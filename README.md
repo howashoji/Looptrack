@@ -12,25 +12,25 @@ report on them.
 
 Why does that matter? Four reasons.
 
-- **External memory for AI coding agents.** In vibe coding, an AI remembers only
+- External memory for AI coding agents: in vibe coding, an AI remembers only
   what fits in its context window. Anything beyond that, it can't hold. So
   across sessions it sometimes repeats work, or skips work it should have done.
   The answer is a memory kept outside the AI, and Looptrack was built to be
   exactly that: a task memory made for AI. Every session and every agent reads
   the same issues, so what one session decided is still there for the next.
-- **Loop engineering, made real.** By loop engineering we mean running
+- Loop engineering, made real: by loop engineering we mean running
   *start → work → verify → close* from an issue, with the AI and people working
   on the same record. The biggest win? It takes you a step beyond solo vibe
-  coding, so you can run that loop **with team development in mind**. People
+  coding, so you can run that loop with team development in mind. People
   review the same issues in a browser. That's how a whole team shares one loop.
-- **AI-planned work items, kept apart from project issues.** The feature requests
+- AI-planned work items, kept apart from project issues: the feature requests
   and bug reports people discuss stay in your project's own tracker. Looptrack
   holds something else: the units an AI breaks that work into (requirements,
   designs, tasks, the bugs it runs into, tests). They're tied together by parent
   and trace links, and each is small enough to pick up on its own and close with
   evidence.
-- **Plans, decisions and tokens in plain view.** The plan is the issue itself:
-  its body, its acceptance criteria, its child tasks. Causes found, decisions
+- Plans, decisions and tokens in plain view: the plan is the issue itself
+  (its body, its acceptance criteria, its child tasks). Causes found, decisions
   made, verification results. They all pile up as comments that can never be
   edited or deleted. Anything that needs a human's judgement collects in
   *In Review*, and people read all of it in a browser. The tokens each task
@@ -218,10 +218,10 @@ Whichever entry point you pick, `looptrack setup` is what configures the server:
 looptrack setup
 ```
 
-It asks, in order: (1) how you'll use it — single user or a team server,
-(2) where to store data — SQLite or MySQL, (3) what to listen on, (4) the first
+It asks, in order: (1) how you'll use it (single user or a team server),
+(2) where to store data (SQLite or MySQL), (3) what to listen on, (4) the first
 administrator, (5) whether two-factor authentication is required or optional,
-(6) the first project — slug, ID prefix and display name (`-` creates none; you
+(6) the first project: slug, ID prefix and display name (`-` creates none; you
 can also create one later from the admin screen).
 Once you've answered, it writes `.env` (plus `compose.yaml`, `Dockerfile` and
 `NOTICE` for a team server) and the first administrator. Then it prints the
@@ -240,6 +240,16 @@ The user guide comes in [English](docs/guide/README.md) and
 Getting started with the [server](docs/guide/server/getting-started.md)
 or the [desktop app](docs/guide/desktop/getting-started.md) →
 [Daily use](docs/guide/daily-use.md).
+
+The guide is also published as a website, built separately for each release.
+<https://howashoji.github.io/Looptrack/latest/> opens the newest stable release,
+the highest version by semver that is not a release candidate. Only while no
+stable release exists does it go to the highest version including release
+candidates. To match the version you run, open
+`https://howashoji.github.io/Looptrack/<version>/`. For example, `v1.0.1/` is
+version 1.0.1. Add `ja/` after the version for Japanese.
+In the web UI, "Guide" in the user menu opens the pages for the version the
+server runs.
 
 ### Language
 

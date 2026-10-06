@@ -97,7 +97,7 @@ So open a new PowerShell window before you continue.
 
 > **`looptrack issue verify` needs Git Bash on Windows.** Verification commands run under `bash -c`, and
 > Looptrack does not fall back to `cmd.exe` or PowerShell (a POSIX command line means something else there).
-> Install Git for Windows — `winget install --id Git.Git -e` — if you want `verify`. Without it you cannot
+> If you want `verify`, install Git for Windows with `winget install --id Git.Git -e`. Without it you cannot
 > close an issue that has a `## Verify commands` section in a project with `verify.require_on_close`.
 > `looptrack doctor` says whether it found a shell.
 

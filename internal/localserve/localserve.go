@@ -236,6 +236,8 @@ type Options struct {
 	UpdateApplier server.UpdateApplier
 	// AttachDir は添付の本体の置き場（server.Config.AttachDir）。空なら DB と同じディレクトリの attachments
 	AttachDir string
+	// Version は動いている looptrack の版（server.Config.Version）。利用者メニューの「ガイド」の行き先を決める
+	Version string
 }
 
 // Instance は動いているサーバ。
@@ -245,6 +247,22 @@ type Instance struct {
 	srv      *http.Server
 	done     chan error
 	stopHK   context.CancelFunc
+}
+
+// serverConfig は Options からサーバの設定を組む（Start が使う。受け取った値がサーバに渡ることを表で確かめるために切り出した）。
+func serverConfig(o Options, box *auth.Box) server.Config {
+	return server.Config{
+		BasePath:         o.BasePath,
+		CookieSecure:     false, // http（127.0.0.1）で使う
+		Box:              box,
+		Logger:           o.Logger,
+		LocalMode:        true,
+		UpdateNotice:     o.UpdateNotice,
+		UpdateStopInTray: o.UpdateStopInTray,
+		UpdateApplier:    o.UpdateApplier,
+		AttachDir:        o.AttachDir,
+		Version:          o.Version,
+	}
 }
 
 // Start は鍵・DB・スキーマを用意して、Listener で待ち受けを始める（戻った時点で要求を受け付ける）。
@@ -287,17 +305,7 @@ func Start(ctx context.Context, o Options) (*Instance, error) {
 		return nil, err
 	}
 	WarnSQLitePerms(dsn, o.Logger)
-	h, err := server.New(server.Config{
-		BasePath:         o.BasePath,
-		CookieSecure:     false, // http（127.0.0.1）で使う
-		Box:              box,
-		Logger:           o.Logger,
-		LocalMode:        true,
-		UpdateNotice:     o.UpdateNotice,
-		UpdateStopInTray: o.UpdateStopInTray,
-		UpdateApplier:    o.UpdateApplier,
-		AttachDir:        o.AttachDir,
-	}, db)
+	h, err := server.New(serverConfig(o, box), db)
 	if err != nil {
 		db.Close()
 		return nil, err

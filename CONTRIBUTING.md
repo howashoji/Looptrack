@@ -18,16 +18,16 @@ means for you in practice.
 
 ## Before you start
 
-- **Bug reports, feature requests and questions all go to GitHub Issues.**
+- Bug reports, feature requests and questions all go to GitHub Issues.
   There's no Discussions tab. Search the existing issues first, please. Then
   include the version (`looptrack version`), how the server is deployed, and the
   exact commands and output.
 - **Security problems do not go to GitHub Issues.** See [SECURITY.md](SECURITY.md).
-- **For anything larger than a bug fix, open an issue before you write code.**
+- For anything larger than a bug fix, always open an issue before you write code.
   A short description of the problem and the approach you have in mind saves
   everyone a rewrite. Behaviour that every project sees (the CLI, the hooks, the
   kit, the API) changes carefully, and rarely.
-- **Writing acceptance criteria is research, not drafting.** Check every path,
+- Writing acceptance criteria is research, not drafting. Check every path,
   file, string and line number you put in a criterion against the real thing
   first, at a pinned revision (`git show <rev>:<path>`, `git grep <rev>`, the
   routing definitions). Never copy the wording of someone else's report: a
@@ -100,7 +100,7 @@ the same VM. Whether to raise Docker Desktop's memory allocation is your call.
 A check that was interrupted leaves its throwaway databases (schemas starting
 with `im_test_`) behind. The tests don't delete them automatically, because they
 could be deleting another run's databases. Drop them by hand only after you've
-**looked at the list** from `ps -eo pid,etime,command | grep -E '[g]o test'` and
+looked at the list from `ps -eo pid,etime,command | grep -E '[g]o test'` and
 confirmed that no database-backed check is running. List them first:
 
 ```bash
@@ -162,14 +162,14 @@ any of them are skipped on the Linux job.
 actually run.
 
 `internal/server` creates more than 100 throwaway databases in a single run. It
-used to take over ten minutes. **But that was waiting, not weight**: concurrent
+used to take over ten minutes. But that was waiting, not weight: concurrent
 runs were serialized behind a named lock shared across the whole MySQL instance
 (the reason is in the comment on `migrateLockPrefix` in
 `internal/store/migrate.go`). The lock is now per schema and nothing is
 serialized. Measured in 2026-09 with nothing else running, it takes around two
 minutes on its own, and the whole suite two to three.
 
-**The catch: runs going at the same time now genuinely compete**, for creating
+The catch: runs going at the same time now genuinely compete, for creating
 the throwaway databases and for the CPU. What parallelism costs has turned from
 "you wait your turn" into "the results wobble". That's why taking the window
 isn't a nicety. It's the thing that keeps a result clean. Slower machines
@@ -179,9 +179,9 @@ Never judge from the elapsed time alone whether the tests ran. No `(cached)` in
 the output means the package really did run. But **run plain, the skip count
 doesn't tell you whether a database was used**: without `LOOPTRACK_TEST_DSN`
 there's a path that falls through to SQLite (the branch in `MigratedDB` and
-`AppDB` in `internal/testutil`), and it prints no skip. **Run it with
+`AppDB` in `internal/testutil`), and it prints no skip. Run it with
 `LOOPTRACK_TEST_DB=mysql`, and a skip count of 0 becomes evidence that nothing
-fell through to SQLite** (with that value `Dialect()` returns mysql, so the
+fell through to SQLite (with that value `Dialect()` returns mysql, so the
 SQLite branch can't be taken and a missing DSN turns into a `t.Skip`). If you
 ran without it, show the dialect (`testutil.Dialect()`) or the number of
 throwaway databases created instead. `--- PASS: TestSQLiteSchemaMatchesMySQL`
@@ -191,7 +191,7 @@ connection on its own.
 
 Several sessions hammering the one development MySQL container at the same time
 drain the result of its meaning. So before you start, count the runs already
-going by **looking at the list** from
+going by looking at the list from
 `ps -eo pid,etime,command | grep -E '[g]o test'`. (`grep -c` also matches the
 command line of the wrapping shell.
 Measured, it returned 3 where the real count was 0.)
@@ -312,11 +312,11 @@ ordinary pull request:
   a comment when the reason for a decision isn't obvious from the code. What the
   code does is usually clear enough. Why it does it that way isn't.
   Identifiers, error strings for programs, and log keys stay in English.
-- **Keep project-specific behaviour out of the shared paths.** The CLI, the hooks
+- Keep project-specific behaviour out of the shared paths. The CLI, the hooks
   and the kit reach every project that installs Looptrack. Something that only
   makes sense for one project belongs in that project's rules
   (`looptrack project rules set`) or in its guide document. Not in a branch here.
-- **Put rules in one place.** Anything the server should enforce goes into the
+- Put rules in one place. Anything the server should enforce goes into the
   shared service layer (`internal/service`), not into one of the handlers. Then
   REST, MCP, the CLI and the Web UI all get it.
 - Run `gofmt`; CI rejects unformatted files. Follow the surrounding style.
@@ -364,16 +364,16 @@ here. That shows in the history, so here's what to expect before you read it.
   smaller commits behind it here. So `git log` is coarser than it would be for a
   project developed in the open, and `git blame` points at the release that
   published a line, not at the change that wrote it.
-- **[CHANGELOG.md](CHANGELOG.md) (the server) and
+- [CHANGELOG.md](CHANGELOG.md) (the server) and
   [CHANGELOG-desktop.md](CHANGELOG-desktop.md) (the desktop app) are where a
-  change is explained.** Read those records instead of reconstructing intent
+  change is explained. Read those records instead of reconstructing intent
   from a large diff.
-- **Pull requests from outside are ordinary pull requests.** They're reviewed
+- Pull requests from outside are ordinary pull requests. They're reviewed
   and merged here like anywhere else. A merged contribution is also taken into
   the development repository with its author intact, so the next release carries
   it forward instead of overwriting it. You don't have to do anything
   differently because of the arrangement.
-- **Release commits go straight onto `main`,** on top of the previous release
+- Release commits go straight onto `main`, on top of the previous release
   and of any pull requests merged since. The history of `main` is never
   rewritten, so a branch you started from `main` stays valid across releases.
 

@@ -1,22 +1,22 @@
 # 公開候補を、まっさらな環境で通す（quickstart の再現）
 
-公開したあと第三者が最初にやることを、ひととおり通す手順です。開発者の手元の設定・タグ・環境変数が無い環境で行います。
-**目的は README と `docs/guide`・`docs/server/DEPLOY.md` だけで最後まで行けるかを確かめることです。**
+公開したあと第三者が最初にやることをひととおり通す手順です。開発者の手元の設定・タグ・環境変数が無い環境で行います。
+目的は README と `docs/guide`・`docs/server/DEPLOY.md` だけで最後まで行けるかを確かめることです。
 通らなかった箇所やそれ以外の知識が要った箇所を見つけたら、直しは別のイシューで行います。
 
 リリースの前（版を切る前）と、README・ガイド・`install.sh`・`setup` のどれかを変えたときに実行します。
 
 - 所要: 30〜45 分（イメージの構築を含む）
 - 前提: Docker（Linux のコンテナが動くもの）と Go（配布物を作るため）
-- 【CI 可】の印がある節は、コンテナの中だけで完結するので e2e に移せます。
-  印の無い節には、ホストの Docker・実物の AI の CLI・人の目が要ります。
+- 【CI 可】の印がある節はコンテナの中だけで完結するので e2e に移せます。
+  印の無い節にはホストの Docker・実物の AI の CLI・人の目が要ります。
 
 > **既存の環境に触らないでください。** 作るコンテナ・イメージ・ネットワークの名前は、すべて `ltcheck-` で始めます。
 > ほかのコンテナを止めたり消したりしません。本番のサーバも使いません。終わったら「10. 片付け」を必ず実行してください。
 
 ## 0. 公開候補の tarball を作る 【CI 可】
 
-`git archive` で作ります。`.gitattributes` の `export-ignore` が効くので、`private/` と開発用の設定は入りません。
+`git archive` で作ります。`.gitattributes` の `export-ignore` が効くので `private/` と開発用の設定は入りません。
 
 ```sh
 S=$(mktemp -d)
@@ -65,7 +65,7 @@ $S/release: NOTICE / OFL-BIZUDGothic.txt
 ```
 
 `install.sh` は 0755、`grants.sql` は 0644 です。`$S/release` に `install.sh`・`grants.sql`・素の実行ファイルはありません。
-`verify` はすべて `OK` になります（書庫の中の実行ファイルの行は「OK（<書庫> の中）」）。
+`verify` はすべて `OK` になります。書庫の中の実行ファイルの行は「OK（<書庫> の中）」と出ます。
 手元では署名しないので、`SHA256SUMS.minisig` が無いという注意は出て構いません。
 
 ## 2. まっさらなコンテナを用意する 【CI 可】
@@ -96,7 +96,7 @@ CMD ["/sbin/init"]
 EOF
 ```
 
-箱を起こしたら、まず素性を確かめます。**ここが汚れていると確認の意味がありません。**
+箱を起こしたらまず素性を確かめます。ここが汚れていると確認の意味がありません。
 
 ```sh
 docker run -d --name ltcheck-a --network ltcheck-net -v "$S/dist:/dist:ro" -v "$S/release:/release:ro" ltcheck-base:v1 sleep infinity
@@ -104,7 +104,7 @@ docker exec ltcheck-a sh -c 'env | grep -E "LOOPTRACK|^IM_" || echo "(none) OK"'
 docker exec ltcheck-a grep PRETTY_NAME /etc/os-release
 ```
 
-期待する結果: `(none) OK`・`PRETTY_NAME="Ubuntu 24.04…LTS"`（点リリースの番号は変わってよい）。
+期待する結果: `(none) OK` と `PRETTY_NAME="Ubuntu 24.04…LTS"` が出ます。点リリースの番号は変わってかまいません。
 
 ## 3. ローカル + SQLite（ウィザード） 【CI 可】
 
@@ -133,11 +133,11 @@ EOF
 期待する結果:
 
 - チェックサムが `OK`、`looptrack version` が `v1.0.0 (headless, linux/<arch>)`（既定は英語で、日本語の形で確かめるときは `LOOPTRACK_LANG=ja looptrack version`）
-- ウィザードは **6 つ**問う（① 使い方 ② 保存先 ③ 待ち受け ④ 最初の管理者 ⑤ 二段階認証 ⑥ 最初のプロジェクト）
+- ウィザードは 6 つ問う（① 使い方 ② 保存先 ③ 待ち受け ④ 最初の管理者 ⑤ 二段階認証 ⑥ 最初のプロジェクト）
 - `~/looptrack-server/.env`（600）と `im.db`（600）ができ、「起動」「ブラウザで開く URL」
   「CLI のログイン」「MCP の接続設定」が表示される
 
-起動して、ブラウザの代わりに `curl` で見ます。
+起動してブラウザの代わりに `curl` で見ます。
 
 ```sh
 docker exec -d ltcheck-a sudo -u dev bash -c \
@@ -151,8 +151,8 @@ docker exec ltcheck-a curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:
 docker exec ltcheck-a curl -s http://127.0.0.1:8090/looptrack/api/v1/projects
 ```
 
-期待する結果: `healthz` が 200、`/`・`/p/demo/`・`/account` が 200（**ローカル利用はログイン画面を出さない**）、
-`api/v1/projects` に `"slug":"demo"`。
+期待する結果: `healthz` が 200 を返し、`/`・`/p/demo/`・`/account` も 200 を返します。ローカル利用ではログイン画面を出しません。
+`api/v1/projects` に `"slug":"demo"` が出ます。
 
 ## 4. 空のリポジトリへの導入と最初の 1 周 【CI 可】
 
@@ -177,8 +177,8 @@ EOF
 
 - `--dry-run` は差分だけを出して何も書かない
 - 本番は `.claude/settings.json`・`CLAUDE.md`・`.claude/skills/issue/`・`.claude/skills/token-report/`・
-  `.mcp.json`・`.gitignore`・`.claude/.looptrack-kit.json` の 7 つを作り、`verify: checked <n> wiring(s)` で終わる。
-  `<n>` は `grep -c 'looptrack hook' .claude/settings.json` の数と同じで、`doctor` の配線の件数とも一致する
+  `.mcp.json`・`.gitignore`・`.claude/.looptrack-kit.json` の 7 つを作って `verify: checked <n> wiring(s)` で終わる。
+  `<n>` は `grep -c 'looptrack hook' .claude/settings.json` の数と同じ。`doctor` の配線の件数とも一致する
 - `doctor` は「問題はありません」（`LOOPTRACK_API_URL` が無い注意は、素のシェルでは出てよい）
 - `issue new` が `DEMO-0001` を採番し、`next` が `Todo → In Progress` にして受け入れ条件と検証コマンドを出す
 - `summary` が 3 層（いまの周／人の判断待ち／外からの反応）で出る
@@ -223,7 +223,7 @@ cat /raw/install.sh | LOOPTRACK_INSTALL_REPO=/gh sh -s -- --yes --method systemd
   --project demo --project-prefix DEMO --project-name Demo'
 ```
 
-期待する結果（**1 回の実行で最後まで進む**）:
+期待する結果（1 回の実行で最後まで進む）:
 
 ```
 ==> 実行ファイルを取得します（/gh/releases/latest/download・linux/<arch>）
@@ -255,21 +255,21 @@ DB im がありません。作りますか (y/n) [y]: y
 ```
 
 - `systemctl is-active looptrack` が `active`・`is-enabled` が `enabled`
-- `/etc/looptrack/.env` が 600、`/looptrack/healthz` が 200
-- `GRANT <n> 件` の `<n>` が、展開した木で数えた `grep -c '^GRANT' deploy/grants.sql` と同じ
+- `/etc/looptrack/.env` が 600 で `/looptrack/healthz` が 200
+- `GRANT <n> 件` の `<n>` が展開した木で数えた `grep -c '^GRANT' deploy/grants.sql` と同じ
 - `docker exec ltcheck-mysql mysql -uroot -pqscheckroot -e "SHOW GRANTS FOR 'im_app'@'%'"` に `deploy/grants.sql` と同じ表ごとの権限が出る
 - `grep -rF qscheckroot /etc/looptrack /var/lib/looptrack` が何も出さない（管理用のパスワードを残さない）
-- **2 回目**を実行すると「設定済みです（/etc/looptrack/install.conf）。何も変えていません。」
+- 2 回目を実行すると「設定済みです（/etc/looptrack/install.conf）。何も変えていません。」
 - 管理用の資格情報を尋ねるのは 1 回だけ（「保存先の確認」では尋ねない）
-- 管理用のパスワードを間違えると、`管理用の資格情報で ltcheck-mysql:3306 に接続できません（利用者 root）` と出て、起動せずに止まる。
-  `.env` は書かないので、もう一度実行すると setup から進む
+- 管理用のパスワードを間違えると `管理用の資格情報で ltcheck-mysql:3306 に接続できません（利用者 root）` と出て起動せずに止まる。
+  `.env` は書かない。もう一度実行すると setup から進む
 - この手順は DB が無い経路を通ります。「DB があり、アプリ用の利用者だけが無い」経路は `deploy/install_test.sh` の `mysql-bad`・`mysql-good` が通しています
-- DB を作るかの確認に `n` と答えると、`DB im を作らずに止めました` と自分で流す `CREATE DATABASE im CHARACTER SET utf8mb4 COLLATE utf8mb4_bin` が出て、
+- DB を作るかの確認に `n` と答えると `DB im を作らずに止めました` と自分で流す `CREATE DATABASE im CHARACTER SET utf8mb4 COLLATE utf8mb4_bin` が出る。
   DB も `im_app` も作らずに止まる
 
 ### リバースプロキシ（設定例をそのまま使う）
 
-`/etc/looptrack/proxy-examples.txt` の nginx の節を取り出し、**証明書の 2 行だけ**を自己署名のものに替えます。
+`/etc/looptrack/proxy-examples.txt` の nginx の節を取り出し、証明書の 2 行だけを自己署名のものに替えます。
 公開の CA はコンテナでは使えないからで、ここが実機との差です。
 
 ```sh
@@ -290,11 +290,11 @@ docker exec ltcheck-b bash -c '
 docker exec ltcheck-b curl -sk -o /dev/null -w '%{http_code}\n' https://im.example.test/looptrack/healthz
 ```
 
-期待する結果: `nginx -t` が成功、`https` 越しの `healthz` が 200、`/looptrack/` が 303 で `/looptrack/login` へ。
+期待する結果: `nginx -t` が成功して `https` 越しの `healthz` が 200 を返します。`/looptrack/` には 303 が返り、行き先は `/looptrack/login` です。
 
 ## 6. ブラウザ相当（curl）のログインとプロジェクト作成
 
-二段階認証が**必須**の構成（5 の続き）で確かめます。`oathtool` は確認する側の道具で、実際には認証アプリがこの役をします。
+二段階認証が必須の構成（5 の続き）で確かめます。`oathtool` は確認する側の道具で、実際には認証アプリがこの役をします。
 
 ```sh
 docker exec -i ltcheck-b bash -s <<'EOF'
@@ -313,9 +313,9 @@ EOF
 
 期待する結果:
 
-- パスワードだけの POST は **303 で `/login/totp/setup` へ**（必須の構成なので一覧には入れない）
+- パスワードだけの POST は 303 で `/login/totp/setup` へ（必須の構成なので一覧には入れない）
 - 登録の画面に QR（`data:image/png;base64` の `<img class="qr">`）と手入力用の 32 文字が出る
-- 確認コードを入れると 303 で `/looptrack/`、以後 `/`・`/admin/users`・`/admin/projects` が 200
+- 確認コードを入れると 303 で `/looptrack/` へ。以後 `/`・`/admin/users`・`/admin/projects` が 200
 
 画面からプロジェクトを作ります（`/admin/projects` の「プロジェクトを作る」）。
 
@@ -330,27 +330,26 @@ POST /looptrack/admin/projects  csrf=… slug=shop prefix=SHOP name=Shop
 
 ### 二段階認証が「任意」の構成
 
-別の箱で `--two-factor optional` にして入れ、同じ `curl` の手順を踏みます。
+別の箱で `--two-factor optional` にして入れます。同じ `curl` の手順を踏みます。
 
-期待する結果: パスワードだけの POST が **303 で `/looptrack/` へ**（確認コードを求めない）。
-`/account` に「未登録です。このサーバでは二段階認証は任意です。」と「二段階認証を登録する」が出る。
+期待する結果: 確認コードは求めません。パスワードだけの POST が 303 で `/looptrack/` へ移ります。
+`/account` に「未登録です。このサーバでは二段階認証は任意です。」と「二段階認証を登録する」が出ます。
 
 ## 7. 実物の AI（Claude Code）から MCP
 
-ホスト側の本物の `claude` を使います。**`~/.claude.json`・`~/.claude/settings.json` は変えません。**
-そのため `--strict-mcp-config` を必ず付けます。こうすると MCP サーバが利用者の設定に登録されません。
+ホスト側の本物の `claude` を使います。`~/.claude.json`・`~/.claude/settings.json` は一切変えないので `--strict-mcp-config` を必ず付けます。こうすると MCP サーバが利用者の設定に登録されません。
 
 > **ホストの資格情報を読まない・表示しないでください。** キーチェーン（`security find-generic-password`）・
 > `~/.claude/.credentials.json`・`~/.config/looptrack/credentials.json` など、手元の認証情報には触れません。
-> この確認に要るのは、上でサーバに発行した使い捨てのトークンだけです。それは `$S/token.txt`（600）に置きます。
-> **この節を人や AI に頼むときは、この禁止を指示にそのまま書いてください。** 「`claude` がどこに
+> この確認に要るのは上でサーバに発行した使い捨てのトークンだけです。それは `$S/token.txt`（600）に置きます。
+> この節を人や AI に頼むときはこの禁止を必ず指示にそのまま書いてください。「`claude` がどこに
 > 認証情報を置くか」を調べる過程でその中身を出力に残す事故が、過去に 2 回起きています。
 
-コンテナの中のサーバが待ち受けるのは `127.0.0.1` だけ。
-ホストから届かせるには**文書どおり前段にリバースプロキシを置き、その口だけを公開します**。
+コンテナの中のサーバが待ち受けるのは `127.0.0.1` だけです。
+ホストから届かせるには文書どおり前段にリバースプロキシを置き、その口だけを公開します。
 5 章の `docker run` で付けた `-p 127.0.0.1:18391:80` がその口です。
 デスクトップ版は既定で `127.0.0.1:18090` を使うので、同じ番号にするとデスクトップ版が動いている端末では始められません。
-設定例の nginx が待ち受けるのは 443 番だけ。80 番の口を足し、80 番を先に取っている default の site を外します。
+設定例の nginx が待ち受けるのは 443 番だけです。80 番の口を足し、80 番を先に取っている default の site を外します。
 
 ```sh
 docker exec ltcheck-b bash -c '
@@ -376,13 +375,13 @@ mkdir -p "$S/mcp-work" && cd "$S/mcp-work" && claude -p "setup を workspace=$S/
 ```
 
 プロンプトは `-p` の直後に置きます。`--mcp-config` と `--allowedTools` は値をいくつでも取るので、後ろに置くとプロンプトまで値として読まれます。
-そのときの出力は `Error: Input must be provided either through stdin or as a prompt argument when using --print` の 1 行だけ。
+そのときの出力は `Error: Input must be provided either through stdin or as a prompt argument when using --print` の 1 行だけです。
 
 期待する結果:
 
 - 認証なしの `POST /looptrack/mcp` は 401 と
   `WWW-Authenticate: Bearer realm="im", resource_metadata="…/.well-known/oauth-protected-resource/looptrack/mcp"`
-- トークンありの `initialize` が通り、`tools/list` に `setup`・`guide`・`next`・`create_issue` ほか 24 本
+- トークンありの `initialize` が通る。`tools/list` に `setup`・`guide`・`next`・`create_issue` ほか 24 本
 - `claude -p` が `setup`（プロジェクト `demo`・loop を入れるかの問い）→ `guide`（権限 admin・ID は `DEMO-0001` 形式）
   → `next`（着手できるイシューが無ければ `create_issue` の後に `Todo → In Progress`）を返す
 - 実行の前後で `~/.claude/settings.json` の md5 が変わらず、`~/.claude.json` に `mcpServers` の追加も
@@ -390,12 +389,12 @@ mkdir -p "$S/mcp-work" && cd "$S/mcp-work" && claude -p "setup を workspace=$S/
 
 ## 8. サーバ + compose（README の入口 3） 【CI 可】
 
-README の入口 3「Docker があるところで — compose」を、**そのイメージが 1 つも無い状態から**なぞります。
-`looptrack setup` が書く `compose.yaml` は `pull_policy: build` を持ち、隣の `Dockerfile` からイメージを作ります。
+README の入口 3「Docker があるところで」の compose の手順を、そのイメージが 1 つも無い状態からなぞります。
+`looptrack setup` が書く `compose.yaml` は `pull_policy: build` を持ちます。隣の `Dockerfile` からイメージを作ります。
 レジストリには取りに行きません。他人が同じ名前のイメージを公開していても引きません。
 
 ここだけは**まっさらなコンテナの中ではなくホストで**行います。中で docker を動かす必要があるからです。
-手元の `looptrack:latest` を上書きしないよう、`LOOPTRACK_IMAGE` と `-p` で名前を分けます。
+手元の `looptrack:latest` を上書きしないよう `LOOPTRACK_IMAGE` と `-p` で名前を分けます。
 ウィザードは展開した木から作った候補の `looptrack` で動かします。手元に入っている別の版の `looptrack` を使うと、確かめたい `compose.yaml` になりません。
 
 ```sh
@@ -427,16 +426,16 @@ docker inspect looptrack --format '{{.State.Health.Status}} restarts={{.RestartC
 - `compose.yaml` の `build:` の直後に `pull_policy: build` がある
 - 3 で `Building` → `Built` と出てイメージが手元で作られ、`Pulling` の行が 1 つも出ない
 - `healthz` が 200
-- `pull_policy: build` なので、`up -d` は `--build` を付けなくても毎回ビルドを走らせる。変わっていない層は使い回す
+- `pull_policy: build` なので `up -d` は `--build` を付けなくても毎回ビルドを走らせる。変わっていない層は使い回す
 
-`docker inspect` の健全性は **`healthy` になるのが正しい状態です**。`unhealthy` のまま `restarts` が増えるときは、
+`docker inspect` の健全性は `healthy` になるのが正しい状態です。`unhealthy` のまま `restarts` が増えるときは、
 `compose.yaml` の `mem_limit` が足りていません（サーバと healthcheck の 2 プロセスが 1 つの枠に入らない）。
 
-片付け: `docker compose -p ltcheck-compose down -v && docker rmi ltcheck-compose:latest && rm -rf "$D" "$PW"`
+`docker compose -p ltcheck-compose down -v && docker rmi ltcheck-compose:latest && rm -rf "$D" "$PW"` で片付けます。
 
 ## 9. コンテナでは代えられないもの（限界）
 
-この手順で確かめられないものは、実機での確認として別に行います。
+この手順で確かめられないものは実機での確認として別に行います。
 
 | 代えたもの | 実物 |
 | -- | -- |
@@ -458,6 +457,6 @@ docker network rm ltcheck-net
 rm -rf "$S"          # tarball・配布物・トークンの控え
 ```
 
-`docker ps -a` で `ltcheck-` のものが無いこと、**それ以外のコンテナが動いたままであること**を確かめます。
+`docker ps -a` で `ltcheck-` のものが無いこと、それ以外のコンテナが動いたままであることを確かめます。
 サーバに作った使い捨てのアクセストークンはコンテナごと消えるので、失効の操作は要りません。
 本番のサーバに作った場合は `/account` で失効させてください。
