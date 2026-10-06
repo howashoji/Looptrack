@@ -13,7 +13,9 @@
 //   <SITE_BASE><版>/      英語（docs/guide 直下）
 //   <SITE_BASE><版>/ja/   日本語（docs/guide/ja）
 //   <SITE_BASE>latest/    最新の正式版（rc でない版のうち semver で最大）の同じパスへ転送するページ。
-//                         正式版が 1 つも無いときだけ、rc を含めて最大の版へ転送する
+//                         正式版が 1 つも無いときだけ、rc を含めて最大の版へ転送する。
+//                         英語のパスは、言語のメニューで選んだ言語かブラウザの言語が日本語なら ja/ の同じページへ転送する
+//                         （site/lib/lang.mjs）。JavaScript が無いときは英語のまま
 //   <SITE_BASE>           latest/ へ転送するページ
 //   404.html              無いページの案内。版をまたいで移った先にページが無いときに、その版の先頭へ案内する。
 //                         版の付かないパスは latest/ の同じパスへ転送する
@@ -26,6 +28,7 @@ import path from 'node:path'
 import { collectNotices, expandWithDependencies, packageRootOf, packagesBundledInside, packagesFromBundleList, renderNotices } from './lib/notices.mjs'
 import { VERSION_TAG_RE, loadOverrides, parseVersion, siteDir, sortNewestFirst } from './lib/versions.mjs'
 import { BRAND_FILES, DESCRIPTION, SITE_ORIGIN, brandDir, openGraphTags } from './lib/brand.mjs'
+import { redirectScript } from './lib/lang.mjs'
 
 function fail(msg) {
   console.error(`build.mjs: ${msg}`)
@@ -145,7 +148,8 @@ const headTags = (tags) => tags.map(([tag, attrs]) => `<${tag}${Object.entries(a
 const openGraphHead = ({ lang, url }) =>
   headTags(openGraphTags({ siteBase, lang, title: 'Looptrack', description: DESCRIPTION[lang], url: url ? `${SITE_ORIGIN}${url}` : null }))
 
-function redirectPage(target, lang = 'en') {
+// jaTarget は、日本語のページがあるときのその行き先。言語を決めるのは script だけで、JavaScript が無ければ target へ移る。
+function redirectPage(target, lang = 'en', jaTarget = null) {
   const t = escapeHtml(target)
   return `<!doctype html>
 <html lang="en">
@@ -156,7 +160,7 @@ function redirectPage(target, lang = 'en') {
 <link rel="canonical" href="${t}">
 <meta http-equiv="refresh" content="0; url=${t}">
 ${openGraphHead({ lang, url: target })}
-<script>location.replace(${scriptJson(target)} + location.search + location.hash)</script>
+<script>${redirectScript(target, jaTarget)}</script>
 </head>
 <body><p><a href="${t}">${t}</a></p></body>
 </html>
@@ -285,7 +289,8 @@ try {
     const page = rel === 'index.html' ? '' : rel.endsWith('/index.html') ? rel.slice(0, -'index.html'.length) : rel
     const dest = path.join(out, 'latest', rel)
     fs.mkdirSync(path.dirname(dest), { recursive: true })
-    fs.writeFileSync(dest, redirectPage(`${siteBase}${latest}/${page}`, rel.startsWith('ja/') ? 'ja' : 'en'))
+    const ja = !rel.startsWith('ja/') && fs.existsSync(path.join(latestDir, 'ja', rel)) ? `${siteBase}${latest}/ja/${page}` : null
+    fs.writeFileSync(dest, redirectPage(`${siteBase}${latest}/${page}`, rel.startsWith('ja/') ? 'ja' : 'en', ja))
   }
   fs.writeFileSync(path.join(out, 'index.html'), redirectPage(`${siteBase}latest/`))
   fs.writeFileSync(path.join(out, '404.html'), notFoundPage())
