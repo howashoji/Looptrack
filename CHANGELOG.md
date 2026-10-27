@@ -23,6 +23,55 @@ Nothing yet.
 
 まだありません。
 
+## [1.1.0] - 2026-10-27
+
+1.1.0 is a stable release. The changes below are relative to `v1.1.0-rc.1`,
+and no migrations were added after it. If you upgrade from `v1.0.2`, read the
+section for 1.1.0-rc.1 as well, starting with "Moving from 1.0.2". Unlike the
+release candidate, 1.1.0 becomes the Latest release on GitHub Releases and
+takes the `latest` tag on GHCR, so the one-line installer installs it. A
+server on 1.0.2 tells you about it, and so does one on 1.1.0-rc.1; once on
+1.1.0, a server follows stable releases only.
+
+One change needs your own hands. The nginx example that install.sh prints now
+sets `client_max_body_size 33m;`, and the Caddy example in DEPLOY.md sets
+`max_size 33MiB`, so a transcript chunk of the default limit (32MiB) gets
+through. A proxy you set up from the old `20m` / `20MiB` example keeps its old
+limit. If you use transcripts, change it yourself.
+
+### Fixed
+
+- On Windows, when the path of the placed transcript contains `'` (a home
+  directory such as `C:\Users\O'Brien`), the resume command that
+  `looptrack session transcript pull` prints for Claude Code now passes the
+  new session ID instead of the path: `claude --resume <ID> --fork-session`.
+  No single quoting of that path works in both PowerShell and Git Bash, and an
+  ID needs no quoting. Other paths and other OSes print the same command as
+  before.
+- A project that turned transcript sending on but has no Stop / SessionEnd
+  hook wired for it is now told so. This happens to a project set up with
+  `looptrack issue init` from 1.0.2 or earlier when only the CLI was
+  replaced. Where `issue summary` and the summary injected at SessionStart
+  used to say that sending was on, they now ask you to run
+  `looptrack issue init` again.
+- The nginx example that install.sh prints sets `client_max_body_size 33m;`
+  (it was `20m`), so a transcript chunk of the default limit (32MiB) gets
+  through. The Caddy example in DEPLOY.md now sets `max_size 33MiB` (it was
+  `20MiB`) for the same reason. A proxy already set up from the old example
+  still needs the change described under "Moving from 1.0.2" in 1.1.0-rc.1.
+
+---
+
+1.1.0 は正式版で、下の変更は `v1.1.0-rc.1` からの差分です。rc.1 の後に足したマイグレーションはありません。`v1.0.2` から上げるなら 1.1.0-rc.1 の節も読み、まず「1.0.2 から上げるとき」を確かめてください。候補版と違って 1.1.0 は GitHub Releases の Latest になり、GHCR の `latest` タグも付きます。1 行のインストーラが入れるのもこの版です。1.0.2 と 1.1.0-rc.1 のサーバはこの版を知らせます。1.1.0 に上げた後は正式版だけを追います。
+
+運用者が手で直すものが 1 つあります。install.sh が示す nginx の例を `client_max_body_size 33m;` に、DEPLOY.md の Caddy の例を `max_size 33MiB` にしました。既定の上限（32MiB）の会話記録のチャンクが通る値です。前の `20m`・`20MiB` の例を写したプロキシは古い上限のまま残ります。会話記録を使うなら自分で直してください。
+
+### 修正
+
+- Windows で置いた会話記録のパスに `'` を含むとき（`C:\Users\O'Brien` のようなホーム）は、`looptrack session transcript pull` が出す Claude Code の再開のコマンドで、パスの代わりに新しいセッション ID を渡します（`claude --resume <ID> --fork-session`）。そのパスは 1 つの引用で PowerShell と Git Bash の両方を満たせません。ID なら引用が要りません。ほかのパスとほかの OS では出力は変わりません。
+- 会話記録の自動送信を入れたのに Stop・SessionEnd の hook が配線されていないプロジェクトに、そのことを知らせるようにしました。1.0.2 以前の `looptrack issue init` で入れたまま CLI だけを置き換えるとこの状態になります。`issue summary` と SessionStart で注入する要約は、これまで「自動送信: 入」と出していた行で `looptrack issue init` のやり直しを案内します。
+- install.sh が示す nginx の例を `client_max_body_size 33m;` にしました（これまでは `20m`）。既定の上限（32MiB）の会話記録のチャンクが通ります。DEPLOY.md の Caddy の例も `max_size 33MiB` にしました（これまでは `20MiB`）。前の例を写した設定は 1.1.0-rc.1 の「1.0.2 から上げるとき」のとおりに直す必要があります。
+
 ## [1.1.0-rc.1] - 2026-10-27
 
 First release candidate for 1.1.0. It is published as a pre-release, so

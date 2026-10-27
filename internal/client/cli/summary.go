@@ -122,7 +122,7 @@ func (c *Ctx) summaryBody(v *Values) error {
 	if local := localUsageFailure(c.Env, slug); local != nil { // この PC のフックの送信の失敗（サーバには届いていない）
 		data.Set("usage_send_failure", local)
 	}
-	if tr := localTranscriptState(c.Env, slug); tr != nil { // 会話記録の自動送信の鍵と、この PC の hook の失敗（DESIGN.md §9-8）
+	if tr := localTranscriptState(c.Env, c.Root, slug, v.Str("agent")); tr != nil { // 会話記録の自動送信の鍵と配線、この PC の hook の失敗（DESIGN.md §9-8）
 		data.Set("transcript_send", tr)
 	}
 	if agent := v.Str("agent"); agent != "" {
@@ -425,7 +425,10 @@ func usageFailureText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) s
 // localTranscriptState は会話記録の自動送信（DESIGN.md §9-8「hook」）の、この PC での状態。auto は 2 つの鍵の組み合わせ
 // （on: 端末のオプトインと覚えたルールの両方が入・opt_in_off: ルールは入だが端末のオプトインが切。ルールが切か、覚えていなければ載せない）。
 // 失敗と退避の件数は usagesnap の transcript-failure.json と transcript-spool（このプロジェクトの分）。出すものが無ければ nil。
-func localTranscriptState(e env.Env, project string) *jsonorder.Object {
+// 両方の鍵が入なのに送る hook の配線が無い AI は unwired に挙げ、配線し直す init のコマンドを rewire に載せる（正本では載せない）。
+// 鍵のどちらかが切なら hook は配線があっても送らないので、配線は見ない（`init --no-transcript` は控えに残らないので、鍵が両方とも入で外した利用者には案内が出る）。
+// agent は SessionStart の hook から呼ばれたときの AI（その AI の設定だけを見る）。手で打った要約では空で、Claude Code と Codex を見る。
+func localTranscriptState(e env.Env, root, project, agent string) *jsonorder.Object {
 	dir := usagesnap.StateDir(e)
 	f := usagesnap.ReadTranscriptFailure(dir)
 	spooled := len(usagesnap.SpoolFiles(usagesnap.TranscriptSpoolDir(dir, e.Value(env.APIURL), project)))
@@ -443,6 +446,18 @@ func localTranscriptState(e env.Env, project string) *jsonorder.Object {
 	o := jsonorder.NewObject()
 	if auto != "" {
 		o.Set("auto", auto)
+	}
+	if auto == "on" && root != "" {
+		if agents := transcriptUnwired(root, agent); len(agents) > 0 {
+			list := make([]any, len(agents))
+			for i, a := range agents {
+				list[i] = a
+			}
+			o.Set("unwired", list)
+			if !IsSelfRepo(root) {
+				o.Set("rewire", transcriptRewireCommand(e, root, project, agents))
+			}
+		}
 	}
 	if f != nil || spooled > 0 {
 		o.Set("spooled", spooled)
@@ -468,6 +483,20 @@ func transcriptStateText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location
 	optIn := env.Name(env.SessionTranscripts)
 	switch getStr(o, "auto", "") {
 	case "on":
+		if unwired := get(o, "unwired", nil); jsonorder.Truthy(unwired) {
+			// 鍵は入でも送る hook が無いので「送ります」とは言わず、配線のやり直しを案内する
+			var names []string
+			for _, a := range unwired.([]any) {
+				names = append(names, jsonorder.Str(a))
+			}
+			agents := strings.Join(names, ", ")
+			if cmd := getStr(o, "rewire", ""); cmd != "" {
+				lines = append(lines, i18n.T(lang, "cli.summary.transcript_unwired", "agents", agents, "cmd", cmd))
+			} else {
+				lines = append(lines, i18n.T(lang, "cli.summary.transcript_unwired.self_repo", "agents", agents))
+			}
+			break
+		}
 		lines = append(lines, i18n.T(lang, "cli.summary.transcript_auto_on", "env", optIn))
 	case "opt_in_off":
 		lines = append(lines, i18n.T(lang, "cli.summary.transcript_auto_opt_in_off", "env", optIn))

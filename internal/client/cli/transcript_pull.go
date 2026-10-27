@@ -11,7 +11,7 @@ package cli
 //  4. チャンクの本体を seq の順に取り、sha256 を確かめて伸ばし、transcript.Restore でこの端末の値に戻して、ファイルごとにつなぐ。
 //  5. 新しいセッション ID で置く（元の ID は使わない。行の中の元の ID も新しい ID に書き換える）。新しい ID は記録ごとに決まった値
 //     （forkedID）なので、2 回目の pull は同じ場所を見て、同じ中身なら何も変えずに再開のコマンドだけを出す。違えば置かずに止める。
-//  6. 再開のコマンドを表示する（Claude Code は `claude --resume <置いた本体> --fork-session`、Codex は `codex fork <ID>`）。AI は起動しない。
+//  6. 再開のコマンドを表示する（Claude Code は `claude --resume <置いた本体> --fork-session`。Windows で本体のパスが ' を含むときは本体の代わりに新しい ID。Codex は `codex fork <ID>`）。AI は起動しない。
 //
 // 置く場所:
 //   - Claude Code: <設定の置き場>/projects/<ルートの realpath の slug（agentdirs.ClaudeSlug）>/<新しい ID>.jsonl と <新しい ID>/ の下。
@@ -167,7 +167,7 @@ func cmdTranscriptPull(c *Ctx, v *Values) error {
 	lay.main = filepath.Join(lay.base, filepath.FromSlash(mainRel))
 	if out == "" {
 		if t.Agent == trAgentClaude {
-			lay.resume = "claude --resume " + shellQuote(lay.main) + " --fork-session"
+			lay.resume = "claude --resume " + claudeResumeArg(runtime.GOOS, lay.main, newID) + " --fork-session"
 			// 同じ写しが別の slug にあれば置かない（別の作業ツリーで取り込んだもの）
 			if hits, _ := filepath.Glob(filepath.Join(filepath.Dir(lay.base), "*", newID+".jsonl")); len(hits) > 0 {
 				for _, h := range hits {
@@ -429,4 +429,18 @@ func writePlaced(base string, placed []trPlaced) (int, error) {
 		}
 	}
 	return len(written), nil
+}
+
+// claudeResumeArg は claude --resume に渡す値を、利用者がそのまま貼って動く形で返す。
+// ふだんは置いた本体の絶対パスを shellQuote で囲む（--resume はパスを直接読む）。
+// Windows で ' を含むパスだけは、1 つの引用で PowerShell と Git Bash の両方を満たせない
+// （POSIX の '"'"' は PowerShell では閉じた後の文字になり、PowerShell の ' を 2 つ重ねる形は Git Bash で連結されて ' が消える）。
+// そこではパスの代わりに新しいセッション ID を渡す。ID は UUID の形で引用が要らず、
+// --resume は ID なら設定の置き場の projects の下から探す（どの cwd からでも見つかる。実測）。
+// 同じ ID の写しを別の slug に置かないので、ID で選ぶ本体は置いたものに 1 つに決まる。
+func claudeResumeArg(goos, path, id string) string {
+	if goos == "windows" && strings.Contains(path, "'") {
+		return id
+	}
+	return shellQuote(path)
 }

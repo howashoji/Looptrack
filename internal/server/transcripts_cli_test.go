@@ -343,6 +343,44 @@ func claudeExpected(t *testing.T, src []byte, kind transcript.Kind, from, to *tr
 	return bytes.ReplaceAll(b.Bytes(), []byte(trCLISID), []byte(newID))
 }
 
+// 取り込む端末の設定の置き場が ' を含む（利用者名が O'Brien の Windows のホームなど）とき、再開のコマンドは
+// Windows では新しいセッション ID（PowerShell と Git Bash のどちらでも引用が要らない）、ほかの OS では
+// ' を '"'"' にした引用のパスになる。2 回目の pull（置き済み）も同じ 1 行を出す。
+func TestTranscriptCLIPullResumeQuote(t *testing.T) {
+	a := newTranscriptAPIEnv(t)
+	p := newTrProxy(t, a)
+	from := newTrMachine(t, a, p.srv.URL+"/im", "box-a")
+	writeClaudeSession(t, from)
+	if code, out, errOut := from.run(t, "push", trCLISID); code != 0 {
+		t.Fatalf("push: exit %d\n%s%s", code, out, errOut)
+	}
+	to := newTrMachine(t, a, p.srv.URL+"/im", "box-b")
+	to.claude = filepath.Join(to.home, "O'Brien", "cfg-claude")
+	to.vars["CLAUDE_CONFIG_DIR"] = to.claude
+	for i := 1; i <= 2; i++ {
+		code, out, errOut := to.run(t, "pull", "--print-resume", "1")
+		if code != 0 {
+			t.Fatalf("pull %d 回目: exit %d\n%s%s", i, code, out, errOut)
+		}
+		entries, err := filepath.Glob(filepath.Join(to.sessionDir(), "*.jsonl"))
+		if err != nil || len(entries) != 1 {
+			t.Fatalf("置いた本体: %v %v（1 つのはず）\n%s%s", entries, err, out, errOut)
+		}
+		placed := entries[0]
+		if !strings.Contains(placed, "'") {
+			t.Fatalf("前提が崩れています: 置いた本体のパスに ' がありません: %s", placed)
+		}
+		newID := strings.TrimSuffix(filepath.Base(placed), ".jsonl")
+		want := "claude --resume '" + strings.ReplaceAll(placed, "'", `'"'"'`) + "' --fork-session\n"
+		if runtime.GOOS == "windows" {
+			want = "claude --resume " + newID + " --fork-session\n"
+		}
+		if out != want {
+			t.Errorf("pull %d 回目の再開のコマンド:\n%q\n期待:\n%q", i, out, want)
+		}
+	}
+}
+
 // 受け入れ条件: 別の CLAUDE_CONFIG_DIR と別の git のルートの 2 つの端末で push → pull すると、置いた本体の各行の cwd と
 // tool_use の input.file_path が取り込む端末のルートを指す。同じ sessionId のファイルが別の slug にあると置かずに止まり、
 // ファイルの数が増えない。2 回目の pull は何も変えない。--print-resume の標準出力はコマンドの 1 行だけ。消去済みは置かずに終了コード 1。

@@ -138,3 +138,27 @@ func TestTranscriptNeverExecutes(t *testing.T) {
 		t.Fatalf("前提が崩れています: session.go に外部のコマンドの起動が見つかりません（走査が死んでいる）")
 	}
 }
+
+// TestClaudeResumeArg は再開のコマンドに入れる値の形を OS ごとに固定する。
+// Windows で ' を含むパスは、PowerShell と Git Bash のどちらでも同じに読める新しいセッション ID にする
+// （PowerShell の ' を 2 つ重ねる形も POSIX の '"'"' も、もう片方のシェルでは別のパスになる）。
+// 対照: ' を含まない Windows のパスと Windows 以外は、これまでどおり shellQuote で囲んだパスのまま。
+func TestClaudeResumeArg(t *testing.T) {
+	const id = "93655595-bf42-4dd0-9d95-433d6b918412"
+	for _, c := range []struct{ goos, in, want string }{
+		{"windows", `C:\Users\O'Brien\.claude\projects\p\` + id + `.jsonl`, id},
+		{"windows", `D:\tmp\x\` + id + `.jsonl`, `'D:\tmp\x\` + id + `.jsonl'`},
+		{"windows", `C:\Users\Taro Yamada\` + id + `.jsonl`, `'C:\Users\Taro Yamada\` + id + `.jsonl'`},
+		{"darwin", "/Users/x/.claude/projects/p/" + id + ".jsonl", "/Users/x/.claude/projects/p/" + id + ".jsonl"},
+		{"linux", "/home/o'brien/" + id + ".jsonl", `'/home/o'"'"'brien/` + id + `.jsonl'`},
+		{"darwin", "/Users/o'brien/" + id + ".jsonl", `'/Users/o'"'"'brien/` + id + `.jsonl'`},
+	} {
+		if got := claudeResumeArg(c.goos, c.in, id); got != c.want {
+			t.Errorf("%s %q: %s（期待 %s）", c.goos, c.in, got, c.want)
+		}
+	}
+	// ID の形は引用の要らない文字だけ（shellQuote が囲まない）。PowerShell・cmd・Git Bash のどれでも 1 語のまま渡る
+	if !uuidV4.MatchString(id) || shellQuote(id) != id {
+		t.Fatalf("前提が崩れています: セッション ID %s が引用の要る形です", id)
+	}
+}
