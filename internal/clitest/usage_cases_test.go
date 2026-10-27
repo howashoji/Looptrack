@@ -15,6 +15,7 @@ const (
 	ccPath    = "home/.claude/projects/-work-demo/" + ccSession + ".jsonl"
 	cxThread  = "0199aaaa-bbbb-cccc-dddd-eeeeffff0001"
 	cxPath    = "home/.codex/sessions/2026/09/18/rollout-2026-09-18T10-00-00-" + cxThread + ".jsonl"
+	cxZstPath = "home/.codex/sessions/2026/09/17/rollout-2026-09-17T10-00-00-" + cxThread + ".jsonl.zst"
 	pUsage    = pProj + "/usage"
 )
 
@@ -89,6 +90,9 @@ func usageCases() []Case {
 			Routes: []Route{r("POST", pUsage, ok(usageDuplicate))}},
 		{Name: "usage-attach/codex", Args: []string{"usage", "attach", "DEMO-0002"}, Env: map[string]string{"CODEX_THREAD_ID": cxThread},
 			Seeds: []Seed{{Path: cxPath, Content: cxTranscript}}, Routes: []Route{r("POST", pUsage, created(usageAttached))}},
+		// 圧縮済みの rollout（.jsonl.zst）は読まない。累計は変えず、読まなかった件数を標準エラーに出す
+		{Name: "usage-attach/codex-compressed", Args: []string{"usage", "attach", "DEMO-0002"}, Env: map[string]string{"CODEX_THREAD_ID": cxThread},
+			Seeds: []Seed{{Path: cxPath, Content: cxTranscript}, {Path: cxZstPath, Content: "synthetic-not-zstd"}}, Routes: []Route{r("POST", pUsage, created(usageAttached))}},
 		{Name: "usage-attach/post-fails", Args: []string{"usage", "attach", "DEMO-0001"}, Env: cc, Seeds: ccSeed,
 			Routes: []Route{r("POST", pUsage, ErrorResponse(500, "internal", "内部エラー"))}},
 		{Name: "usage-attach/down", Args: []string{"usage", "attach", "DEMO-0001"}, Env: cc, Seeds: ccSeed,

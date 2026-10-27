@@ -132,6 +132,12 @@ The highest-priority code of conduct, distilled from the instructions and correc
   start only once the other side has stepped down. For one that has been held a long time, it may have been handed over and then left (check first in that case too).
 - **When you hand an issue to another session, the side handing it over puts the state back to Todo and clears the assignee.** Handed over while still In Progress, it keeps
   looking like "somebody is on it" even though the receiving side has not started.
+- **When you work from several machines, keep one machine to one issue and one branch** (if one issue has to be split, cut child issues). Push before you switch machines.
+  The side taking over re-declares with `looptrack issue status <ID> "In Progress"`, and the side handing over puts it back to Todo first (the rule above).
+  A shell with no AI session id (a terminal a person types into) treats every In Progress issue of the same user as its own, so never run `looptrack issue next` from one.
+- **Never resume the same conversation in two places at once. To continue on another machine or in another directory, always fork** (Claude Code: `claude --resume <id> --fork-session`; Codex: `codex fork <id>`).
+  A `claude --resume <id>` without the fork appends to the original transcript file even when run from another directory, so what is said in the two places ends up mixed in one transcript.
+  Even after a fork, absolute paths inside the conversation are used as they were (measured: the first edit after continuing in another worktree changed the original worktree). Give the path of the worktree you continue in, in your first instruction.
 - **Before you start, check which other sessions are running in the same working directory** (with a session-list tool if there is one; otherwise ask the user).
   Never judge "has the other side finished?" from a file's modification time (a lagging indicator).
 - **In a shared worktree, stage only the paths you touched** (`git add -A` / `git add .` / `git commit -a` sweep up other sessions' uncommitted changes).

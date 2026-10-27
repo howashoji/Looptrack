@@ -103,8 +103,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err := db.QueryRow("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()").Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 26 { // 25 テーブル + schema_migrations
-		t.Errorf("テーブル数 = %d, want 26", n)
+	if n != 30 { // 29 テーブル + schema_migrations
+		t.Errorf("テーブル数 = %d, want 30", n)
 	}
 }
 

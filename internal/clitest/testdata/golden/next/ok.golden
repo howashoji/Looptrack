@@ -6,6 +6,12 @@ $ issue next --type bug,task --comment 着手します --assignee me --override 
 #### stdout
 着手: DEMO-0002 保存でエラーになる（Todo → In Progress）
 
+※ DEMO-0002 の最新のセッション要約は別のセッションが書いたものです（home-mac・3時間前）:
+  branch: feature/login
+  head: ce768dc
+  ai: claude-code
+  次の一手: 画面のテストを足す
+
 ## 内容
 
 保存でエラーになる。

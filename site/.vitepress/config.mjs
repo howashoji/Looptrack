@@ -3,6 +3,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig } from 'vitepress'
+import { DESCRIPTION, ICON, IMAGE_ALT, SITE_ORIGIN, SOCIAL_PREVIEW, openGraphTags } from '../lib/brand.mjs'
 
 // 公開リポジトリの名前は Looptrack だが、GitHub の URL は大小を区別しないので、ほかの公開物と同じ小文字で書く。
 const REPO_URL = 'https://github.com/howashoji/looptrack'
@@ -120,7 +121,29 @@ function bundledModules(file) {
   }
 }
 
-const versionSelect = { siteBase, current: version, versions }
+// 全版で共有する画像（build.mjs が土台の直下に置く）。themeConfig.logo は VitePress が版の base を前に足すので使えず、
+// テーマのスロットでこのパスをそのまま出す。
+const brand = {
+  icon: `${siteBase}${ICON.file}`,
+  socialPreview: { src: `${siteBase}${SOCIAL_PREVIEW.file}`, width: SOCIAL_PREVIEW.width, height: SOCIAL_PREVIEW.height },
+}
+
+// 版ごとのページの Open Graph。無いページの案内は、どのパスで出るかが決まらないので og:url を付けない。
+const versionUrl = `${SITE_ORIGIN}${siteBase}${version}/`
+const pageUrl = (relativePath) => versionUrl + relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '.html')
+
+function openGraph({ pageData, title, description }) {
+  const notFound = pageData.isNotFound || pageData.relativePath === '404.md'
+  return openGraphTags({
+    siteBase,
+    lang: pageData.relativePath.startsWith('ja/') ? 'ja' : 'en',
+    title,
+    description,
+    url: notFound ? null : pageUrl(pageData.relativePath),
+  })
+}
+
+const versionSelect = { siteBase, current: version, versions, brand, imageAlt: IMAGE_ALT }
 
 export default defineConfig({
   base: `${siteBase}${version}/`,
@@ -129,6 +152,8 @@ export default defineConfig({
   cacheDir: required('SITE_CACHE'),
   title: 'Looptrack',
   titleTemplate: `:title | Looptrack ${version}`,
+  description: DESCRIPTION.en,
+  transformHead: openGraph,
   rewrites: toIndex,
   vite: { plugins: [bundledModules(required('SITE_MODULES'))] },
   // ガイドは生の HTML を使わず、本文に <version> や <ID> のような置き換えの印を書く。
@@ -172,6 +197,7 @@ export default defineConfig({
       label: '日本語',
       lang: 'ja',
       link: '/ja/',
+      description: DESCRIPTION.ja,
       themeConfig: {
         outline: { level: [2, 3], label: '目次' },
         docFooter: { prev: '前のページ', next: '次のページ' },

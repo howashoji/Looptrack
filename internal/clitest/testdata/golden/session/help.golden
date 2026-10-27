@@ -1,0 +1,24 @@
+# session/help
+$ session -h
+
+#### exit 0
+
+#### stdout
+usage: looptrack session [-h] {digest,pull,transcript} ...
+
+セッション要約（別の端末のセッションに作業の文脈を渡す）と会話記録の搬送（transcript）
+
+positional arguments:
+  {digest,pull,transcript}
+    digest               セッション要約をイシューのコメントとして送る（欠けた見出しの行を足す）
+    pull                 最新のセッション要約を .claude/.looptrack-work/<ID>-digest.md に書き、標準出力にも出す
+    transcript           会話記録を自分の別の端末へ運ぶ（取り込みは常に fork）
+
+options:
+  -h, --help             show this help message and exit
+
+#### stderr
+
+#### requests (0)
+
+#### files (0)

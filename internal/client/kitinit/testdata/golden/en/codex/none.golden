@@ -11,7 +11,7 @@ Install set: core only. loop is not installed (--loop installs it).
   create     .codex/config.toml
   create     AGENTS.md
   create     .claude/.looptrack-kit.json
-verify: checked 4 wiring(s), looptrack dev（headless・test）
+verify: checked 6 wiring(s), looptrack dev（headless・test）
 Next:
   1. Trust the Codex hooks (see "Trusting hooks" below; run /hooks in the codex terminal)
   2. No token yet: run looptrack issue login --browser --url http://127.0.0.1:9/im and log in and approve in the browser it opens (the AI may run this; it waits up to 5 minutes, so set the command timeout longer than 5 minutes. Without a browser, issue a token at http://127.0.0.1:9/im/account and paste it into login --url http://127.0.0.1:9/im).
@@ -94,6 +94,11 @@ Codex setup:
                 "type": "command",
                 "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
                 "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
+                "timeout": 10
               }
             ]
           }
@@ -104,6 +109,11 @@ Codex setup:
               {
                 "type": "command",
                 "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
                 "timeout": 10
               }
             ]

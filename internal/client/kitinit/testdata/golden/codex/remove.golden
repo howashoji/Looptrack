@@ -146,6 +146,11 @@ init --remove-loop: $TMP/ws
               },
               {
                 "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
                 "command": "looptrack hook stop-handoff-freshness --agent codex --no-block",
                 "timeout": 10
               },
@@ -163,6 +168,11 @@ init --remove-loop: $TMP/ws
               {
                 "type": "command",
                 "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
                 "timeout": 10
               }
             ]
@@ -285,6 +295,11 @@ init --remove-loop: $TMP/ws
                 "type": "command",
                 "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
                 "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
+                "timeout": 10
               }
             ]
           }
@@ -295,6 +310,11 @@ init --remove-loop: $TMP/ws
               {
                 "type": "command",
                 "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
                 "timeout": 10
               }
             ]

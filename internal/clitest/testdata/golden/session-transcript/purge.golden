@@ -1,0 +1,22 @@
+# session-transcript/purge
+$ session transcript purge 7 --reason 別の端末へ移した
+
+#### exit 0
+
+#### stdout
+会話記録 7 の本体を消しました（チャンク 2 個）
+
+#### stderr
+
+#### requests (1)
+POST /im/api/v1/transcripts/7/purge
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "reason": "別の端末へ移した"
+    }
+
+#### files (0)

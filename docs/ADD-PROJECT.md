@@ -89,7 +89,7 @@ init が置くスクリプトは 1 つもありません。フックは `looptra
 | 入るもの（Claude Code・既定） | 内容 |
 | -- | -- |
 | `.claude/settings.json` の `env` | `LOOPTRACK_API_URL` / `LOOPTRACK_PROJECT`。**トークン（`LOOPTRACK_TOKEN`）は書かない**（各自の `looptrack issue login --browser`） |
-| フック | `looptrack hook …`: SessionStart の `summary`・鮮度ガード（[AI-GUIDE.md](AI-GUIDE.md) §9）・トークン計測（MCP の操作・ターン終了・セッション終了） |
+| フック | `looptrack hook …`: SessionStart の `summary`・鮮度ガード（[AI-GUIDE.md](AI-GUIDE.md) §9）・トークン計測（MCP の操作・ターン終了・セッション終了）・会話記録の自動送信（Claude Code と Codex の Stop・SessionEnd。プロジェクト別ルール `session.transcripts` と端末の `LOOPTRACK_SESSION_TRANSCRIPTS=1` が両方入のときだけ送る） |
 | 許可 | `permissions.allow` に `Bash(looptrack issue:*)` |
 | skill | `.claude/skills/issue/SKILL.md`（`/issue`）と `.claude/skills/token-report/SKILL.md`（kit/core から実体で置く。「トークンレポートを作成して」・画面の「レポート作成」の依頼（summary に出る）から、集計 → 本文 → PDF（`looptrack report pdf`・手元）→ 台帳登録まで。`--no-skill` では入れない） |
 | 案内 | `CLAUDE.md` に `<!-- looptrack:begin -->`〜`<!-- looptrack:end -->` の節（内容は [templates/CLAUDE-snippet.md](templates/CLAUDE-snippet.md)） |
@@ -109,7 +109,7 @@ init が置くスクリプトは 1 つもありません。フックは `looptra
   - Windows では `powershell` / `windows` のフィールドに、`command` と同じ `looptrack hook …` が入ります（実物は未確認）。詳しくは [AI-GUIDE.md](AI-GUIDE.md) §7-3 で。
 - 組み合わせるなら `--agent claude-code,codex,copilot`。それ以外の AI は `--agent other`（案内文だけ）を使います。
 - MCP の接続設定も入れたいときは `--mcp`（`.mcp.json` の `looptrack`）。
-- 入れたくないものは `--no-freshness` / `--no-usage` / `--no-summary` / `--no-session-bind` / `--no-skill` で外せます。
+- 入れたくないものは `--no-freshness` / `--no-usage` / `--no-summary` / `--no-session-bind` / `--no-transcript` / `--no-skill` で外せます。
 - Looptrack のリポジトリが手元に無い端末では、トークンを `login` してから `--source server` を付けます。サーバの `/api/v1/dist` から取得し、SHA-256 を確かめてから置く仕組みです。MCP だけを接続した端末なら §4-2（setup ツール）へ。
 - 手で配線したプロジェクトも一度 `init` を通してください。SessionStart の `summary` に `--agent claude-code` が付き、導入済みであることがサーバへ通知されます。付かないままだと、MCP のツール結果に【導入が未完了】が出続けます。
 - ルールの強制を hook で作らないこと。サーバのプロジェクト別ルール（§1）に置けば、CLI でも MCP でも同じ判定になります。

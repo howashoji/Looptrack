@@ -588,6 +588,8 @@ if [ "${1:-}" = --in-container ]; then
       check ".env に LOOPTRACK_DIST_DIR を足す（単引用符）" grep -qx "LOOPTRACK_DIST_DIR='$DISTD'" /etc/looptrack/.env
       check ".env に LOOPTRACK_ATTACH_DIR を足す（StateDirectory の中）" grep -qx "LOOPTRACK_ATTACH_DIR='/var/lib/looptrack/attachments'" /etc/looptrack/.env
       check "添付の置き場は looptrack の所有・750" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/attachments)" = looptrack:750 ]'
+      check ".env に LOOPTRACK_TRANSCRIPT_DIR を足す（添付とは別の StateDirectory の中）" grep -qx "LOOPTRACK_TRANSCRIPT_DIR='/var/lib/looptrack/transcripts'" /etc/looptrack/.env
+      check "会話記録の置き場は looptrack の所有・750" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/transcripts)" = looptrack:750 ]'
       r=$(dist_matches v0.0.0-installtest1 /dist/SHA256SUMS 1) && ok "配布ディレクトリにこの版の linux/${CARCH}（SHA256SUMS と一致）" || ng "配布ディレクトリ: $r"
       check "配布ディレクトリは root 755・ファイルは 644" sh -c '[ "$(stat -c %U:%a '"$DISTD"')" = root:755 ] && [ "$(stat -c %a '"$DISTD"'/SHA256SUMS)" = 644 ]'
       contains "$out" "次の対象は置きません" && contains "$out" "windows_arm64（SHA256SUMS に無い）" && ok "SHA256SUMS に無い対象は置かずに知らせる" || ng "足りない対象の表示: $out"
@@ -636,6 +638,7 @@ if [ "${1:-}" = --in-container ]; then
       contains "$out" "作成済みです" && ok "setup を飛ばす" || ng "入れ直しの表示: $out"
       [ "$(grep -c '^LOOPTRACK_DIST_DIR=' /etc/looptrack/.env)" = 1 ] && ok "入れ直しても LOOPTRACK_DIST_DIR は 1 行のまま" || ng "LOOPTRACK_DIST_DIR の行: $(grep -c '^LOOPTRACK_DIST_DIR=' /etc/looptrack/.env)"
       [ "$(grep -c '^LOOPTRACK_ATTACH_DIR=' /etc/looptrack/.env)" = 1 ] && ok "入れ直しても LOOPTRACK_ATTACH_DIR は 1 行のまま" || ng "LOOPTRACK_ATTACH_DIR の行: $(grep -c '^LOOPTRACK_ATTACH_DIR=' /etc/looptrack/.env)"
+      [ "$(grep -c '^LOOPTRACK_TRANSCRIPT_DIR=' /etc/looptrack/.env)" = 1 ] && ok "入れ直しても LOOPTRACK_TRANSCRIPT_DIR は 1 行のまま" || ng "LOOPTRACK_TRANSCRIPT_DIR の行: $(grep -c '^LOOPTRACK_TRANSCRIPT_DIR=' /etc/looptrack/.env)"
       r=$(dist_matches v0.0.0-installtest1 /dist/SHA256SUMS 1) && ok "入れ直すと配布ディレクトリも置き直す" || ng "入れ直しの配布ディレクトリ: $r"
       [ "$key" = "$(grep ^LOOPTRACK_SECRET_KEY /etc/looptrack/.env)" ] && ok "LOOPTRACK_SECRET_KEY は同じ" || ng "LOOPTRACK_SECRET_KEY が変わった"
       check "入れ直しで広い DB（644）を 600 に直す" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/im.db)" = looptrack:600 ]'
@@ -1262,13 +1265,15 @@ UPEOF
       case "$(/usr/local/bin/looptrack version)" in "looptrack v0.0.0-installtest2（"*) ok "版が変わった" ;; *) ng "版: $(/usr/local/bin/looptrack version)" ;; esac
       check "動いている" systemctl is-active looptrack
       # .env は元の行をそのまま残し、足すのはクライアントに配る looptrack の置き場（LOOPTRACK_DIST_DIR）と
-      # 添付の置き場（LOOPTRACK_ATTACH_DIR）の 2 行と注釈だけ
+      # 添付の置き場（LOOPTRACK_ATTACH_DIR）と会話記録の置き場（LOOPTRACK_TRANSCRIPT_DIR）の 3 行と注釈だけ
       n=$(wc -l </tmp/env.rc2)
       [ "$(head -n "$n" /etc/looptrack/.env)" = "$(cat /tmp/env.rc2)" ] && ok ".env の元の行はそのまま" || ng ".env の元の行が変わった"
       [ "$(tail -n +"$((n + 1))" /etc/looptrack/.env | grep -v '^#')" = "LOOPTRACK_DIST_DIR='$DISTD'
-LOOPTRACK_ATTACH_DIR='/var/lib/looptrack/attachments'" ] &&
-        ok ".env に足したのは LOOPTRACK_DIST_DIR と LOOPTRACK_ATTACH_DIR の 2 行だけ" || ng ".env に足した行: $(tail -n +"$((n + 1))" /etc/looptrack/.env)"
+LOOPTRACK_ATTACH_DIR='/var/lib/looptrack/attachments'
+LOOPTRACK_TRANSCRIPT_DIR='/var/lib/looptrack/transcripts'" ] &&
+        ok ".env に足したのは LOOPTRACK_DIST_DIR・LOOPTRACK_ATTACH_DIR・LOOPTRACK_TRANSCRIPT_DIR の 3 行だけ" || ng ".env に足した行: $(tail -n +"$((n + 1))" /etc/looptrack/.env)"
       check "--upgrade で添付の置き場を作る（looptrack の所有・750）" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/attachments)" = looptrack:750 ]'
+      check "--upgrade で会話記録の置き場を作る（looptrack の所有・750）" sh -c '[ "$(stat -c %U:%a /var/lib/looptrack/transcripts)" = looptrack:750 ]'
       curl -fsS "$GH_URL/releases/download/v0.0.0-installtest2/SHA256SUMS" >/tmp/gh-v2.sums
       r=$(dist_matches v0.0.0-installtest2 /tmp/gh-v2.sums 6 2>&1) || true
       [ -z "$r" ] && ok "rc.2 で入れたサーバも --upgrade で配布ディレクトリが 6 対象になる" || ng "rc.2 の後の配布ディレクトリ: $r"

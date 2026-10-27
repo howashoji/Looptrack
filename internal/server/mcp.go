@@ -506,8 +506,15 @@ type (
 	}
 	commentIn struct {
 		issueIDArg
-		Text        string  `json:"text" jsonschema:"server.mcp.arg.add_comment.text"`
-		Attachments []int64 `json:"attachments,omitempty" jsonschema:"server.mcp.arg.add_comment.attachments"`
+		Text        string        `json:"text" jsonschema:"server.mcp.arg.add_comment.text"`
+		Attachments []int64       `json:"attachments,omitempty" jsonschema:"server.mcp.arg.add_comment.attachments"`
+		PathHints   *pathHintsArg `json:"path_hints,omitempty" jsonschema:"server.mcp.arg.add_comment.path_hints"`
+	}
+	// pathHintsArg は add_comment の path_hints（REST の path_hints と同じ形。service.PathHints に写す）
+	pathHintsArg struct {
+		Roots        []string `json:"roots,omitempty" jsonschema:"server.mcp.arg.add_comment.path_hints.roots"`
+		Home         string   `json:"home,omitempty" jsonschema:"server.mcp.arg.add_comment.path_hints.home"`
+		MachineLocal []string `json:"machine_local,omitempty" jsonschema:"server.mcp.arg.add_comment.path_hints.machine_local"`
 	}
 	statusIn struct {
 		issueIDArg
@@ -702,13 +709,22 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			if err != nil {
 				return nil, nil, err
 			}
-			it, err := s.svc.CommentAttach(ctx, c.actor, pr, row.ID, in.Text, in.Attachments)
+			ci := service.CommentInput{Text: in.Text, Attachments: in.Attachments}
+			if h := in.PathHints; h != nil {
+				ci.PathHints = &service.PathHints{Roots: h.Roots, Home: h.Home, MachineLocal: h.MachineLocal}
+			}
+			it, err := s.svc.AddComment(ctx, c.actor, pr, row.ID, ci)
 			if err != nil {
 				return nil, nil, s.toolError(c.lang, "add_comment", err)
 			}
 			notice := s.usageNotice(ctx, c.lang, c.actor, pr, it, false)
-			return result(withNotice(i18n.T(c.lang, "server.api.issue.comment_added", "id", it.Item.ID), notice),
-				map[string]any{"issue": toIssueJSON(it), "seq": len(it.Row.Doc.Comments), "usage_notice": notice}), nil, nil
+			data := map[string]any{"issue": toIssueJSON(it), "seq": len(it.Row.Doc.Comments), "usage_notice": notice}
+			text := i18n.T(c.lang, "server.api.issue.comment_added", "id", it.Item.ID)
+			if it.SecretNotice != "" { // 秘密の検査に当たったまま保存した注記（comment.reject_secret が切）。本文の行と data の両方に載せる
+				text = withNotice(text, it.SecretNotice)
+				data["secret_notice"] = it.SecretNotice
+			}
+			return result(withNotice(text, notice), data), nil, nil
 		})
 
 	addTool(srv, lang, &mcp.Tool{Name: "set_status", Description: i18n.T(lang, "server.mcp.tool.set_status"), Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive}},
@@ -727,6 +743,9 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			}
 			if res.EvidenceNotice != "" {
 				data["evidence_notice"] = res.EvidenceNotice
+			}
+			if res.SecretNotice != "" { // 本文の行は statusMessages が足す（REST の messages と同じ）
+				data["secret_notice"] = res.SecretNotice
 			}
 			// 下位の最後の 1 件を閉じたら要件の検証と close を促す（REST の messages と同じ行）
 			text := strings.Join(withClosable(c.lang, statusMessages(c.lang, res), data, s.closedRequirements(ctx, pr, res)), "\n")
@@ -836,7 +855,10 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				return itemsJSON(pr, rows, set.List(domain.Filter{Status: st}, "priority", false))
 			}
 			inProgress, top := byStatus("In Progress"), itemsJSON(pr, rows, ready[:min(limit, len(ready))])
-			markOtherSession(ctx, c.lang, s.db, pr.ID, c.actor, inProgress) // 別のセッションが着手したものに印
+			markOtherSession(ctx, c.lang, s.db, pr.ID, c.actor, inProgress)             // 別のセッションが着手したものに印
+			if err := s.markDigests(ctx, c.lang, pr, c.actor, inProgress); err != nil { // 最新のセッション要約
+				return nil, nil, s.toolError(c.lang, "project_summary", err)
+			}
 			// 3 層の見出し（DESIGN.md §9-3-7。② ③ の行は以前の CLI の summary と同じ文言）
 			inReview, fb, cnt, err := s.loopLayers(ctx, c.lang, pr, rows, byStatus("In Review"), counts(set), limit)
 			if err != nil {
@@ -855,6 +877,9 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				ipText += "\n" + n
 			}
 			if n := crossPathNote(c.lang, inProgress); n != "" {
+				ipText += "\n" + n
+			}
+			if n := digestNotes(c.lang, inProgress); n != "" { // 別のセッションが書いた要約だけ
 				ipText += "\n" + n
 			}
 			text := fmt.Sprintf("%s\n%s\n%s\n\n%s\n%s\n\n%s%s\n%s\n%s",

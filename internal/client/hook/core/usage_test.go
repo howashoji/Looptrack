@@ -497,6 +497,33 @@ func TestUsageDebugCopilotMissHint(t *testing.T) {
 	}
 }
 
+// TestUsageDebugCodexCompressedRollouts は、読めない圧縮済みの rollout（.jsonl.zst）の件数をデバッグ表示に出すこと。
+// 対照として、圧縮済みが無いスレッドでは出さない。
+func TestUsageDebugCodexCompressedRollouts(t *testing.T) {
+	home := t.TempDir()
+	const tid = "0199aaaa-bbbb-cccc-dddd-eeeeffff0002"
+	zst := filepath.Join(home, ".codex", "sessions", "2026", "09", "17", "rollout-2026-09-17T10-00-00-"+tid+".jsonl.zst")
+	if err := os.MkdirAll(filepath.Dir(zst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(zst, []byte("synthetic-not-zstd"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	vars := env.FromMap(map[string]string{"HOME": home, "LOOPTRACK_USAGE_DEBUG": "1", "LOOPTRACK_LANG": "ja"})
+	run := func(sid string) string {
+		var buf bytes.Buffer
+		c := &Call{Env: (&Env{Vars: &vars, Sleep: func(time.Duration) {}}).withDefaults(), Stderr: &buf}
+		c.work(context.Background(), usageJob{usagePlan: usagePlan{Trigger: "stop"}, Client: usagesnap.ClientCodex, SessionID: sid, CWD: home})
+		return buf.String()
+	}
+	if out := run(tid); !strings.Contains(out, "圧縮された Codex の rollout（.jsonl.zst）1 件は読めない") {
+		t.Errorf("圧縮済みの件数が出ない: %q", out)
+	}
+	if out := run("0199aaaa-bbbb-cccc-dddd-eeeeffff0003"); strings.Contains(out, ".jsonl.zst") {
+		t.Errorf("圧縮済みが無いスレッドで出た: %q", out)
+	}
+}
+
 // TestUsagePlanAllEventWritingTools は、issue_events を書く MCP のツール（usage.ToolOps）を付与の hook が
 // Claude Code・Copilot のどちらの名前の形でも拾い、書く kind と同じ op で送ること。
 // 対照として、読むだけのツール（get_issue・verify_issue）と台帳だけを書くツール（add_usage_ledger）は拾わないことを同じテストで見る。

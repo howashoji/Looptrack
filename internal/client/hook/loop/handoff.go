@@ -6,8 +6,8 @@ package loop
 // CLI の close / status <ID> Done|Canceled（--help / -h は除く）・MCP の set_status で Done / Canceled を検知したら、
 // <状態>/handoff-pending.d/<session_id> に「時刻<TAB>イベント」を 1 行足して、引き継ぎの更新を促す。
 // 2 段目（Stop）: 積まれたマーカーより引き継ぎが古ければ差し戻す。新しければマーカーを畳む。鮮度の判定（LOOPTRACK_LOOP_HANDOFF_BACKEND）は
-// file（既定。LOOPTRACK_LOOP_HANDOFF_FILE）・auto-memory（~/.claude/projects/<パス>/memory/MEMORY.md）・command（LOOPTRACK_LOOP_HANDOFF_CHECK_CMD を
-// bash -c で実行。0 = 新しい / 1 = 古い / それ以外 = 判定できない）。
+// file（既定。LOOPTRACK_LOOP_HANDOFF_FILE）・auto-memory（<CLAUDE_CONFIG_DIR か ~/.claude>/projects/<パス>/memory/MEMORY.md）・command（LOOPTRACK_LOOP_HANDOFF_CHECK_CMD を
+// bash -c で実行。0 = 新しい / 1 = 古い / それ以外 = 判定できない）・issue（着手中のイシューのセッション要約。handoffdigest.go）。
 //
 // bash 版との違い: シェルのツールは名前（Bash・bash・run_in_terminal）に加えて種類（hookio.KindBash）でも見分ける。ツールの結果は
 // Copilot CLI の camelCase の toolResult も読む。git diff-tree は git を起動する。
@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/howashoji/looptrack/internal/client/agentdirs"
 	"github.com/howashoji/looptrack/internal/client/hook/hookcmd"
 	"github.com/howashoji/looptrack/internal/hookio"
 	"github.com/howashoji/looptrack/internal/i18n"
@@ -333,6 +334,9 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 	msg := i18n.T(lang, "loop.handoff.detected", "event", strings.Join(shown, i18n.T(lang, "loop.handoff.event.sep")))
 	// 印で判定するときは、実物の行をここで渡す（AI は自分のセッション ID を知らないので、文面で説明するだけでは書けない）
 	backend := trimSpace(e.env("LOOPTRACK_LOOP_HANDOFF_BACKEND"))
+	if backend == "issue" { // 引き継ぎはイシューのセッション要約で判定する（送るコマンドをここで示す）
+		msg += "\n" + i18n.T(lang, "loop.handoff.digest.detected")
+	}
 	if (backend == "" || backend == "file") && handoffWriterMode(e) == writerSession {
 		if sid := sessionFile(ev); sid != "" {
 			msg += "\n" + i18n.T(lang, "loop.handoff.mark.howto", "mark", writerMark(sid))
@@ -560,8 +564,6 @@ func handoffEvent(lang i18n.Lang, fields []string) string {
 	return strings.Join(fields, " ")
 }
 
-var nonAlnum = regexp.MustCompile(`[^A-Za-z0-9]`)
-
 // blockedPath は Copilot で差し戻した記録（差し戻したときのマーカーの中身の写し）のパス。
 func blockedPath(ev hookio.Event, state string) string {
 	if sid := sessionFile(ev); sid != "" {
@@ -627,18 +629,30 @@ func stopHandoffFreshness(ctx context.Context, ev hookio.Event, e *Env) (hookio.
 	}
 	var fresh bool
 	var where string
-	var byMark bool // 印で判定したか（差し戻しの文に印の行を添えるかの判断に使う）
+	var byMark bool   // 印で判定したか（差し戻しの文に印の行を添えるかの判断に使う）
+	var notice string // 止めずに知らせる注意（要約の判定でサーバに届かない・判定できないとき）
+	keep := false     // 通すがマーカーを畳まない（backend issue でサーバに届かなかったとき）
+	decided := true   // backend が判定したか（false = 判定できない・判定しない。ルールが無ければ従来どおり何もせずに通す）
 	switch backend {
+	case "issue":
+		// イシューのセッション要約で判定する（handoffdigest.go。届かなければ止めずに注意だけ出す）
+		d := checkDigests(ctx, ev, e, r, pendMT)
+		fresh, notice, keep = d.fresh, d.notice, d.keep
+		if !fresh {
+			where = d.where(lang)
+		}
 	case "command":
 		cmd := e.env("LOOPTRACK_LOOP_HANDOFF_CHECK_CMD")
 		if cmd == "" {
-			return hookio.Result{}, nil
+			decided = false
+			break
 		}
 		c, cancel := context.WithTimeout(ctx, 8*time.Second)
 		_, rc, err := e.run(c, r, []string{"LOOPTRACK_LOOP_HANDOFF_PENDING=" + pend}, "bash", "-c", cmd)
 		cancel()
 		if err != nil || (rc != 0 && rc != 1) {
-			return hookio.Result{}, nil
+			decided = false
+			break
 		}
 		fresh = rc == 0
 		where = i18n.T(lang, "loop.handoff.where.command")
@@ -676,12 +690,57 @@ func stopHandoffFreshness(ctx context.Context, ev hookio.Event, e *Env) (hookio.
 			where = i18n.T(lang, "loop.handoff.where.missing", "path", targets[0])
 		}
 	default:
-		return hookio.Result{}, nil // 知らないバックエンドは判定しない
+		decided = false // 知らないバックエンドは判定しない
+	}
+
+	// プロジェクト別ルール session.digest_required が入なら、backend に関わらず要約の判定も行う（両方が通って「新しい」）。
+	// backend issue は同じ判定そのものなので重ねない。ルールが切・分からないときは nil（backend の判定だけ）。
+	// backend の判定を先に済ませ、summary は hook の持ち時間の残りの中でだけ取る（ruleDigests）。先に固定の時間で取ると、
+	// command の判定（8 秒まで）と合わせて持ち時間（9 秒）を越え、backend が差し戻すはずの Stop まで黙って通っていた。
+	// 差し戻すときも残りがあれば取る（差し戻しは 1 回だけなので、要約の理由も同じ 1 回に並べる）。
+	var rule *digestCheck
+	if backend != "issue" {
+		d, ok, unchecked := ruleDigests(ctx, ev, e, r, pendMT)
+		if ok {
+			rule = &d
+		}
+		// ルールを確かめられなかった（残りが足りない・打ち切った）ことは、通すときだけ知らせる。
+		// 差し戻すときは backend の文面のまま（ルールの側は fail-open、backend の判定は落とさない）
+		if unchecked != "" && (!decided || fresh) {
+			notice = unchecked
+		}
+	}
+
+	switch {
+	case !decided && (rule == nil || rule.fresh):
+		if notice != "" { // ルールを確かめられなかった。マーカーには従来どおり触れない
+			return hookio.Result{SystemMessage: notice, Kind: "handoff: digest unchecked"}, nil
+		}
+		return hookio.Result{}, nil // 従来どおり、マーカーに触れずに通す
+	case !decided: // backend は判定しないが、ルールの要約が足りない
+		fresh, where, notice = false, rule.where(lang), rule.notice
+	case rule != nil:
+		if !rule.fresh {
+			if fresh {
+				where = rule.where(lang)
+			} else {
+				where += "\n\n" + rule.where(lang)
+			}
+			fresh = false
+		}
+		if notice == "" {
+			notice = rule.notice
+		}
 	}
 
 	if fresh {
-		_ = os.Remove(pend)
-		_ = os.Remove(blocked)
+		if !keep {
+			_ = os.Remove(pend)
+			_ = os.Remove(blocked)
+		}
+		if notice != "" {
+			return hookio.Result{SystemMessage: notice, Kind: "handoff: digest unchecked"}, nil
+		}
 		return hookio.Result{}, nil
 	}
 	if ev.Agent == hookio.Copilot {
@@ -715,6 +774,9 @@ func stopHandoffFreshness(ctx context.Context, ev hookio.Event, e *Env) (hookio.
 		}
 	}
 	// LOOPTRACK_LOOP_NO_BLOCK=1（--no-block）のときは hookio.Render が systemMessage に回す
+	if notice != "" { // 判定できなかったイシューがあれば、差し戻しの文の末尾に添える
+		reason += "\n\n" + notice
+	}
 	return hookio.Result{Block: reason, Kind: "handoff: stale"}, nil
 }
 
@@ -888,10 +950,14 @@ func handoffTargets(ev hookio.Event, e *Env, backend, r string) []string {
 	if home == "" {
 		home, _ = os.UserHomeDir()
 	}
+	projects := agentdirs.ClaudeProjectsDir(e.env, home)
+	if projects == "" { // HOME も CLAUDE_CONFIG_DIR も決められない環境。以前と同じく相対の形にする（実在しないので「ありません」と出る）
+		projects = filepath.Join(agentdirs.ClaudeDirName, "projects")
+	}
 	var out []string
 	seen := map[string]bool{}
 	for _, d := range []string{memoriesRoot(ev, e), r} {
-		p := filepath.Join(home, ".claude", "projects", nonAlnum.ReplaceAllString(realpath(d), "-"), "memory", "MEMORY.md")
+		p := filepath.Join(projects, agentdirs.ClaudeSlug(realpath(d)), "memory", "MEMORY.md")
 		if seen[p] {
 			continue
 		}

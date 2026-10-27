@@ -3,9 +3,9 @@
 //
 // サーバ側の集計（internal/usage）と名前が重ならないよう usagesnap とした。設計は docs/server/DESIGN.md §9-5・§5-1。
 //
-//   - claude-code … ~/.claude/projects/<slug>/<session>.jsonl の assistant 行の usage（同じ message.id の複数行は 1 回。
+//   - claude-code … <CLAUDE_CONFIG_DIR か ~/.claude>/projects/<slug>/<session>.jsonl の assistant 行の usage（同じ message.id の複数行は 1 回。
 //     サブエージェントは <session>/subagents/*.jsonl）
-//   - codex       … ~/.codex/sessions/年/月/日/rollout-*.jsonl の token_count（同じスレッドの分割ファイルを古い順に足す・
+//   - codex       … <CODEX_HOME か ~/.codex>/sessions/年/月/日/rollout-*.jsonl の token_count（同じスレッドの分割ファイルを古い順に足す・
 //     複製を二度数えない）。人の指示は旧形式 user_message と新形式 item_completed（UserMessage）の両方
 //   - copilot     … OpenTelemetry のファイル出力（JSON Lines）の chat / invoke_agent
 //

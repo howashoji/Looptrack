@@ -1,0 +1,17 @@
+# attachment-get/purged
+$ issue attachment get 11
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 添付 11（notes.txt）の本体は管理者が消去しました
+
+#### requests (1)
+GET /im/api/v1/attachments/11
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

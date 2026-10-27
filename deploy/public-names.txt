@@ -1,0 +1,14 @@
+# 公開物に残してよい公開名の正本。deploy/public-scan.sh・internal/docscheck/guide_test.go・
+# private/deploy/publish-public.sh の 3 つが、この一覧だけを読んで例外を決める。
+# 1 行に「種別 正規表現」を書く（拡張正規表現。Go の regexp でも grep -E / sed -E でも同じ意味になる形だけを使う）。
+#   name  公開リポジトリ・イメージ・配布元の識別子。末尾は必ず looptrack（テストが確かめる）。かっこは使わない
+#   end   name の直後に許す文字の組。英数字・_・- と、後ろに英数字が続く . は別の名前の一部なので例外にしない
+#   site  利用者ガイドのサイト。末尾の / で名前を締めているので、後ろの文字は見ない
+# このファイル自身は、公開名を書くのが仕事なので public-scan.sh の語の検査から外している。
+name api\.github\.com/repos/howashoji/looptrack
+name raw\.githubusercontent\.com/howashoji/looptrack
+name github\.com/howashoji/looptrack
+name ghcr\.io/howashoji/looptrack
+name net\.howashoji\.looptrack
+end ([^A-Za-z0-9_.-]|\.([^A-Za-z0-9]|$)|$)
+site howashoji\.github\.io/[Ll]ooptrack/

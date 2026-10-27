@@ -61,6 +61,9 @@ const (
 	// attachContainerDir はチームのサーバ（compose）の添付の本体の置き場（コンテナの中。ホストの <dir>/data/attachments）。
 	// compose.yaml の environment の LOOPTRACK_ATTACH_DIR に書く。保存先が MySQL でも同じ
 	attachContainerDir = "/data/attachments"
+	// transcriptContainerDir は会話記録の本体の置き場（コンテナの中。ホストの <dir>/data/transcripts）。添付の置き場とは別の
+	// ディレクトリにする（入れ子だと会話記録が使えない。service.BlobRootsNested）。compose.yaml の LOOPTRACK_TRANSCRIPT_DIR に書く
+	transcriptContainerDir = "/data/transcripts"
 )
 
 var (

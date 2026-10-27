@@ -1,0 +1,25 @@
+# session-transcript/help
+$ session transcript -h
+
+#### exit 0
+
+#### stdout
+usage: looptrack session transcript [-h] {push,pull,list,purge} ...
+
+会話記録を自分の別の端末へ運ぶ（取り込みは常に fork）
+
+positional arguments:
+  {push,pull,list,purge}
+    push                 会話記録を送る（前回の続きだけ）。手で打つ push は LOOPTRACK_SESSION_TRANSCRIPTS を要らない（hook の自動送信だけが見る）
+    pull                 会話記録をこの端末の AI の置き場に新しいセッション ID で置き、fork の再開のコマンドを表示する（AI は起動しない）
+    list                 自分の会話記録の一覧
+    purge                自分の会話記録の本体を消す（取り消せない）
+
+options:
+  -h, --help             show this help message and exit
+
+#### stderr
+
+#### requests (0)
+
+#### files (0)

@@ -23,6 +23,324 @@ Nothing yet.
 
 まだありません。
 
+## [1.1.0-rc.1] - 2026-10-27
+
+First release candidate for 1.1.0. It is published as a pre-release, so
+`v1.0.2` stays the Latest release on GitHub Releases.
+The changes below are relative to `v1.0.2`. The main addition is working on
+one project from several machines: an AI session leaves a session digest on
+the issue it holds, and a project can let you carry the raw transcript to
+another machine of your own. Comments that look like they carry a credential
+are now rejected by default. The app migrates its database when the new
+version first starts; read "Moving from 1.0.2" before you update.
+
+### Added
+
+- **Session digests.** A comment whose first line starts with `セッション要約:`
+  or `Session digest:` is a session digest: a short record an AI session
+  leaves on the issue it holds (what was asked, what was decided, where it
+  stopped) so that a session on another machine can pick the work up. The
+  server checks the header (a machine label, then `branch:`, `head:` and
+  `ai:` within the first 8 lines), rewrites the machine-specific paths the
+  client reports in `path_hints` to `./`, `~` and `<machine-local>`, caps the
+  body at 16 KiB, and rejects a body that looks like it carries a credential
+  (422 `comment_secret`, naming only the line and the rule). The desktop app's built-in server applies the same rule to REST, MCP
+  (`add_comment`) and the bundled CLI. A
+  digest cannot ride on a status change (422 `digest_on_status`). Comments
+  without the lead word are untouched.
+- **`looptrack issue attachment get <attachment ID> [--out PATH]`** downloads an
+  attachment. It verifies the bytes against the SHA-256 the server records,
+  never overwrites an existing file, uses only the last path component of the
+  name the server sends, and refuses a purged attachment with exit code 1.
+
+- **`looptrack session digest <ID> [-|<file>]` and `looptrack session pull <ID>`.**
+  `digest` posts a session digest as a comment: it fills in the header lines
+  the body lacks (the lead word with a machine label from
+  `LOOPTRACK_MACHINE_LABEL` or the host name, `branch:`, `head:` and `ai:`),
+  sends the machine-specific paths as `path_hints`, and on a rejection prints
+  only the line number and the rule. `pull` writes the latest digests of an
+  issue to `.claude/.looptrack-work/<ID>-digest.md` and prints them.
+- **`summary` and `next` carry the latest digest of each issue in progress**
+  (`latest_digest`: excerpt, machine label, age, session, and whether it came
+  from another session). The CLI, the SessionStart hook and MCP
+  `project_summary` / `next` show the digests written by other sessions, so a
+  terminal on another machine starts with the context the last one left.
+
+- **Handoff backend `issue`** (loop kit, `LOOPTRACK_LOOP_HANDOFF_BACKEND=issue`).
+  The Stop guard checks that every issue this session holds In Progress has a
+  session digest written by this session after the last completion marker; if
+  not, it sends the turn back once, naming the command
+  `looptrack session digest <ID> -`. When the server cannot be reached it
+  prints a notice and lets the turn end (fail-open). The summary response now
+  tells each In Progress item whether it was started by the requesting
+  session (`own_session`).
+- **Project rule `session.digest_required`** (default off). When on, the Stop
+  guard requires a fresh digest whatever handoff backend is configured. The
+  server does not reject anything for this rule; the hook reads the value from
+  the summary response (`session_digest_required`), after the backend's own
+  check and only within the time the hook has left.
+
+- **`looptrack issue attach` looks inside archives.** A gzip, zip or tar
+  file (including `.tar.gz` / `.tgz`, two layers at most) is expanded in
+  memory and every text member gets the same secret check as a plain file;
+  one hit stops the whole attach and names the archive, the member, the line
+  and the rule, never the value. Expansion is capped (64 MiB of expanded
+  bytes, 10,000 members); an archive over the cap, a deeper nesting, or a
+  broken or encrypted archive is not sent either. Other binary formats are
+  still sent unchecked, and the guide says so.
+- **Transcript discovery honours `CLAUDE_CONFIG_DIR` and `CODEX_HOME`**
+  (token measurement, the auto-memory handoff backend and the path hints of
+  session digests).
+
+- **Groundwork for transferring raw AI transcripts between machines**
+  (DESIGN §2-5 / §9-8). Migration 0009 adds the per-user transcript store
+  tables (`transcripts`, `transcript_chunks`, `transcript_purges`,
+  append-only; `deploy/grants.sql` gains their SELECT/INSERT lines) and the
+  settings `transcript_max_chunk_bytes` / `transcript_max_user_bytes` /
+  `transcript_retention_days` (defaults 32 MiB, 2 GiB, 90 days). The project
+  rule `session.transcripts` (default off) is recognised and listed by
+  `guide`. Token measurement counts Codex rollouts that Codex compressed to
+  `.jsonl.zst` and says it did not read them instead of ignoring them silently.
+  Migration 0010 adds `transcript_locks` (one row per user). An append now
+  renames and fsyncs the body before its transaction opens, and no longer
+  locks the `users` row, so its write transaction is shorter. The desktop
+  app's SQLite database still runs one write transaction at a time; the
+  per-user lock row matters only on a MySQL server.
+  Removing a body (a purge, `purge-transcripts`, `repair-transcripts
+  --apply`, or the cleanup after a rejected append) no longer races an append
+  of the same content in another process (for example `purge-transcripts`
+  run beside the desktop app): an append leaves a marker in the store's
+  `.tmp` from placing the body until its record commits, and removal moves
+  the body aside, then puts it back if it finds such a marker or a new
+  reference. An append must now record its chunk within 10 minutes of placing
+  the body; past that it fails without recording.
+  `repair-transcripts --apply` also picks up what an interrupted removal or
+  append left in `.tmp`: a body moved aside goes back to its path if that
+  path is free and its content matches (then the usual orphan rules apply),
+  otherwise it is dropped (only a body moved aside more than an hour ago, so
+  a removal still running elsewhere is left alone), and markers older than an
+  hour are deleted; the counts appear on one line of the output. If such a
+  check puts back a body that a purge is removing, the purge reports it as a
+  body it could not remove instead of silently keeping it. `purge-transcripts` now finishes
+  the body it is removing when interrupted (Ctrl-C, SIGTERM) and then stops.
+
+- **Transcript store directory and `looptrack repair-transcripts`.** The
+  server resolves the per-user transcript store's disk root from
+  `LOOPTRACK_TRANSCRIPT_DIR`, then `$STATE_DIRECTORY/transcripts`, then the
+  directory next to a SQLite database, and keeps it apart from the
+  attachments root (a nested configuration disables the transcript API and
+  leaves attachments working). `install.sh` writes the variable to `.env`,
+  `setup`'s compose file mounts it, and the desktop app places it beside its
+  data. `repair-transcripts` reports (or with `--apply` removes) unreferenced
+  bodies the way `repair-attachments` does; neither command touches the other
+  store's bodies.
+
+- **Transcript store API and admin screen** (the server side of carrying raw
+  AI transcripts between machines). Six routes under
+  `/api/v1`: register a transcript, append chunks (append-only, `If-Match`
+  sequence, `X-Looptrack-Transcript-*` headers, gzip bodies, per-value secret
+  check and fail-closed on unreadable lines), list, get, stream a chunk body
+  (sandboxed, `Content-Disposition: attachment`) and purge. Only the owner can
+  see a transcript; everyone else, project admins included, gets 404.
+  Registering and appending need the project rule `session.transcripts` on
+  (reading and purging work with it off). `/admin/transcripts` shows the three
+  limits (editable) and per-user usage without any transcript content.
+  Housekeeping purges the content of transcripts whose last chunk is older
+  than `transcript_retention_days`.
+
+- **`looptrack session transcript push | list | purge | pull`.** `push`
+  finds the current Claude Code or Codex transcript (the main file, subagent
+  files and tool results), rewrites machine-specific paths to reversible
+  placeholders, masks credential-shaped values per string, re-reads every
+  line as JSON and sends the result to the per-user store in append-only
+  chunks; it remembers what it sent and continues from there next time, and
+  `--dry-run` prints counts only. `pull` restores a transcript on another
+  machine under a NEW session id (so you fork, never append to the original),
+  refuses a transcript whose original id already exists locally or whose OS
+  family differs, and prints the resume command (`claude --resume <path>
+  --fork-session` / `codex fork <id>`) without running it. Codex placement
+  still needs checking on a real machine.
+- **The transcript hook.** `looptrack issue init` wires a hook on Stop and
+  SessionEnd for Claude Code and Codex (not Copilot) that sends the current
+  transcript the same way `session transcript push` does. It sends only when
+  both the project rule `session.transcripts` and the per-machine
+  `LOOPTRACK_SESSION_TRANSCRIPTS=1` are on, at most once per 10 minutes on
+  Stop (`LOOPTRACK_TRANSCRIPT_THROTTLE_MIN`), in a detached child so the turn
+  is never held. A transcript the server refuses as a secret or that cannot
+  be read is recorded once and not retried by the hook; a manual push still
+  works. The SessionStart summary says whether sending is on, which setting
+  is missing, or what the last failure was. `looptrack issue init
+  --no-transcript` leaves the hook out.
+- **`looptrack purge-transcripts --user <login> [--transcript <id>] --reason <text> --yes`**
+  is the operator's way to delete another user's transcripts (the admin page
+  has no purge button). Without `--yes` it only reports how many would be
+  purged and their size.
+
+### Docs
+
+- The user guide (AI agents → working from several machines) and the kit's
+  working discipline now describe how to work on one project from several
+  machines: one terminal is one issue and one branch, push before switching,
+  never resume the same conversation in two places (fork instead), and which
+  vendor features show one chat on several devices.
+- The user guide gains a "Session digests" section (AI agents → working from
+  several machines) and the rule's row in the server admin pages; the loop
+  kit's `session-handoff` skill carries the digest procedure.
+- The user guide gains a "Carrying the raw transcript" section (AI agents →
+  working from several machines: what the client rewrites and masks, how to
+  push, pull and fork, the hook, and the limits), and the server admin pages
+  gain the transcript settings, the per-user usage page and the operator's
+  `purge-transcripts`.
+
+### Changed
+
+- **Comments are checked for secrets** (project rule `comment.reject_secret`,
+  default on). A comment whose text looks like it carries a credential (the
+  same rules as verify output: `token=`, `Bearer …`, private keys and the
+  like) is rejected with 422 `comment_secret` on every path (REST, MCP, CLI,
+  the web form and the comment of a status change), naming only the line and
+  the rule. A project that turns the rule off stores the comment and returns
+  a notice instead. Session digests are rejected whatever the rule says. The
+  check may fire on prose that merely mentions such a word; replace the value
+  with `***` and send again.
+- `next` with a comment that is rejected (a secret, or a digest on a status
+  change) now returns that 422 instead of silently starting nothing.
+
+### Fixed
+
+- A session digest posted after a `フィードバック:` / `Feedback:` comment no
+  longer counts as a response: the feedback stays in "pending feedback" in
+  `summary` and `list --has-feedback` until a person or a plain comment
+  answers it. The lead words the store matches now come from one list in the
+  domain package.
+- **`looptrack gates --help` and `-h` print the usage and exit.** An unknown
+  argument that starts with `-` is now an error (exit code 2). Before, `--help`
+  went to make as a stage name, make read it as one of its own options, and
+  gates reported every stage green.
+- The hook `pre-tool-subagent-model` also looks for agent definitions under
+  `agents/` in `CLAUDE_CONFIG_DIR` (falling back to `~/.claude`), so a type
+  whose definition there carries `model:` is no longer stopped.
+- **`session transcript push` rewrites more fields of Codex rollouts.** The
+  absolute paths in fields found in real rollouts are now rewritten and
+  restored on the importing machine: the new form of the writable roots (the
+  `entries` of `file_system_sandbox_policy` and `permission_profile`),
+  `workspace_roots`, the `input` of `custom_tool_call`, `item.command` and the
+  keys of `item.changes`, among others. When the keys of `changes` could
+  collide on the importing machine, they are left as they are.
+- **MCP `setup` on the desktop app (local mode) no longer shows the login
+  step**, because the bundled CLI connects without a token. When the app has
+  no `looptrack` to hand out, the fetch step asks you to choose "Make the CLI
+  available" from the tray menu instead of asking an administrator to
+  distribute it.
+- **Removing an attachment body no longer races another process placing the
+  same body (for example `repair-attachments` run beside the desktop
+  app).** The orphan cleanup of `repair-attachments --apply` and an admin
+  purge now remove bodies the same guarded way as transcripts: an attach
+  leaves a marker in the store's `.tmp` from placing its body until its record
+  commits, and removal puts the body back if it finds such a marker or a new
+  reference. `repair-attachments` also counts what an interrupted removal left
+  in `.tmp`; with `--apply` it puts such a body back or drops it, and deletes
+  markers older than an hour. An attach now places its body before its
+  transaction and must record it within 10 minutes; past that it fails
+  without recording.
+- **On Windows, the Codex transcript search no longer picks an older rollout
+  of the same thread.** Windows records modification times coarsely, so two
+  rollouts written one after the other can share one. The search then took
+  whichever the listing gave first, which could be the older rollout. It now
+  picks the one whose name carries the later time. This affects token
+  measurement and `session transcript push`.
+- **Dependencies with known vulnerabilities are updated.** excelize, which
+  builds the `.xlsx` files of the issue export and the token usage report,
+  moves to v2.11.1-0.20260915055537-22f76f9acb94, the version that fixes
+  GO-2026-6688 and GO-2026-6684. It is an untagged version (a Go
+  pseudo-version). golang.org/x/net, which excelize uses, moves to v0.60.0.
+- **`looptrack --help` lists every subcommand that exists.** The list was
+  missing `session transcript`, `grants check`,
+  `project rename|archive|unarchive` and `project guide set|show|clear`. Both
+  the Japanese and the English text are fixed.
+
+### Moving from 1.0.2
+
+- Update the app as a whole, as usual. When the new version first starts,
+  it copies `looptrack.db` into the `backups` folder of the data folder and
+  then applies migrations 0009 and 0010 (the transcript store tables).
+- After that, the 1.0.2 app doesn't start on the database. To go back,
+  restore the newest copy in `backups` ("Update" in the desktop pages of the
+  user guide).
+- If a project turns on `session.transcripts`, the transcripts you send are
+  kept in the `transcripts` folder of the data folder. Copy it along with
+  `looptrack.db` and `attachments` when you back up.
+- Comments are now checked for secrets by default. A project that wants the
+  old behavior sets `"comment": {"reject_secret": false}`; such a comment is
+  then stored with a notice.
+- A project set up with the `looptrack issue init` of 1.0.2 or earlier has no
+  wiring for the transcript hook (Stop and SessionEnd of Claude Code and
+  Codex). Replacing `looptrack` alone doesn't add it, and neither the summary
+  nor the server's notice tells you. To send transcripts automatically, run
+  `looptrack issue init --project <slug> --url <server URL> --agent <agent>`
+  once more in each project with the new `looptrack`. Session digests and a
+  manual `session transcript push` work without it.
+
+---
+
+1.1.0 のリリース候補の 1 つ目です。プレリリースとして公開するので、GitHub Releases の Latest は `v1.0.2` のままです。下の変更は `v1.0.2` からの差分です。中心は 1 つのプロジェクトを複数の端末で進める機能です。AI のセッションは持っているイシューにセッション要約を残せます。プロジェクトで有効にすれば、会話記録そのものを自分の別の端末へ運べます。資格情報らしい文字列を含むコメントは、既定で拒否するようになりました。新しい版は最初の起動で DB を移行するので、更新の前に「1.0.2 から上げるとき」を読んでください。
+
+### 追加
+
+- **セッション要約。** 先頭が `セッション要約:` か `Session digest:` のコメントはセッション要約として扱います。AI のセッションが、持っているイシューに残す短い記録（頼まれたこと・決めたこと・どこまで進んだか）で、別の端末のセッションが続きから取れるようにするものです。サーバは見出し（端末のラベルと、8 行目までの `branch:`・`head:`・`ai:`）を確かめ、クライアントが `path_hints` で伝えた端末固有のパスを `./`・`~`・`<machine-local>` に書き換え、本文を 16 KiB に制限し、資格情報らしい文字列を含む本文を拒否します（422 `comment_secret`。理由には行番号と規則の語だけを出します）。デスクトップ版に内蔵のサーバでも、REST・MCP（`add_comment`）・同梱の CLI のどれから送っても同じです。状態変更のコメントには載せられません（422 `digest_on_status`）。印の無いコメントには手を加えません。
+- **`looptrack issue attachment get <添付ID> [--out PATH]`** で添付を手元に落とせます。サーバが記録した SHA-256 と照合し、既にあるファイルは上書きせず、サーバが送る名前は最後の要素だけを使い、消去済みの添付は終了コード 1 で断ります。
+
+- **`looptrack session digest <ID> [-|<ファイル>]` と `looptrack session pull <ID>`。** `digest` はセッション要約をコメントとして送ります。本文に無い見出しの行（印と端末のラベル。ラベルは `LOOPTRACK_MACHINE_LABEL` かホスト名。`branch:`・`head:`・`ai:`）を埋め、端末固有のパスを `path_hints` で伝え、拒否されたときは行番号と規則の語だけを出します。`pull` はイシューの最新の要約を `.claude/.looptrack-work/<ID>-digest.md` に書いて表示します。
+- **`summary` と `next` が、着手中のイシューごとに最新の要約を載せます**（`latest_digest`: 抜粋・端末のラベル・経過・セッション・別のセッションのものか）。CLI・SessionStart の hook・MCP の `project_summary` / `next` は別のセッションが書いた要約を表示するので、別の端末のターミナルは前の端末が残した文脈から始められます。
+
+- **引き継ぎの backend `issue`**（loop kit・`LOOPTRACK_LOOP_HANDOFF_BACKEND=issue`）。Stop のガードが、このセッションが In Progress にしているイシューのすべてに、最後の完了の印より新しい自分の要約があるかを確かめます。無ければ 1 回だけ差し戻し、`looptrack session digest <ID> -` のコマンドを示します。サーバに届かないときは注記を出して通します（fail-open）。summary の応答は、In Progress の各項目に、要求したセッションが着手したものかを `own_session` で示すようになりました。
+- **プロジェクト別ルール `session.digest_required`**（既定 off）。on にすると、引き継ぎの backend に関わらず Stop のガードが新鮮な要約を求めます。サーバはこのルールで何も拒否しません。hook は値を summary の応答（`session_digest_required`）から読みます。読むのは backend 自身の判定の後で、hook に残った時間の範囲だけです。
+
+- **`looptrack issue attach` が書庫の中を見ます。** gzip・zip・tar（`.tar.gz` / `.tgz` を含む。入れ子は 2 段まで）をメモリ内で展開し、テキストの要素にふつうのファイルと同じ秘密の検査を当てます。1 件でも当たれば添付全体を止め、書庫・要素・行・規則だけを示します（値は出しません）。展開には上限（展開後 64 MiB・要素 10,000）があり、超えた書庫・深い入れ子・壊れた書庫や暗号化された書庫も送りません。ほかのバイナリ形式はこれまでどおり検査せずに送ります（ガイドに明記）。
+- **会話記録の探索が `CLAUDE_CONFIG_DIR` と `CODEX_HOME` を見ます**（トークンの計測・auto-memory の引き継ぎの backend・セッション要約の path_hints）。
+
+- **会話記録を端末間で運ぶ機能の下準備**（DESIGN §2-5 / §9-8）。マイグレーション 0009 で利用者ごとの会話記録の置き場の表（`transcripts`・`transcript_chunks`・`transcript_purges`。追記専用。`deploy/grants.sql` に SELECT / INSERT の行）と設定 `transcript_max_chunk_bytes` / `transcript_max_user_bytes` / `transcript_retention_days`（既定 32 MiB・2 GiB・90 日）を足しました。プロジェクト別ルール `session.transcripts`（既定 off）を認識し `guide` に載せます。トークンの計測は、Codex が `.jsonl.zst` に圧縮した rollout を黙って無視せず、読まなかった件数を知らせます。
+  マイグレーション 0010 で `transcript_locks`（1 利用者 1 行）を足しました。追記は本体の rename と fsync をトランザクションの前に済ませ、`users` の行を握らなくなったので、書き込みのトランザクションが短くなります。デスクトップ版の SQLite はこれまでどおり書き込みのトランザクションを 1 つずつ実行します。利用者ごとのロックの行が効くのは MySQL のサーバだけです。本体を消す処理（消去・`purge-transcripts`・`repair-transcripts --apply`・拒まれた追記の片付け）は、別のプロセス（たとえばデスクトップ版の隣で動かす `purge-transcripts`）で同じ内容を追記している途中の本体を消さなくなりました。追記は本体を置いてから記録を確定するまで置き場の `.tmp` に印を置き、消す側は本体を脇へ外してから、その印か新しい参照があれば本体を戻します。追記は本体を置いてから 10 分以内に記録を確定しなければならず、越えたら記録せずに失敗します。`repair-transcripts --apply` は、途中で止まった削除や追記が `.tmp` に残したものも拾います。外したまま残った本体は、本体のパスが空いていて中身が合えば戻し（その後はふつうの規則で扱う）、そうでなければ捨て（外して 1 時間を過ぎたものだけ。ほかで動いている削除には触れない）、1 時間より古い印を消します。消去の途中の本体をこの検査が戻したときは、消去は黙って残さず、消せなかった本体として知らせます。件数は出力の 1 行に出ます。`purge-transcripts` は割り込み（Ctrl-C・SIGTERM）を受けると、消している途中の本体を片付けてから止まります。
+
+- **会話記録の置き場と `looptrack repair-transcripts`。** サーバは利用者ごとの会話記録の置き場を `LOOPTRACK_TRANSCRIPT_DIR` → `$STATE_DIRECTORY/transcripts` → SQLite の DB の隣、の順で決め、添付の置き場とは分けます（入れ子の設定では会話記録の API だけが使えなくなり、添付は動きます）。`install.sh` は `.env` にこの変数を書き、`setup` の compose は volume を付け、デスクトップ版はデータの隣に置きます。`repair-transcripts` は `repair-attachments` と同じ形で、どこからも指されない本体を報告（`--apply` で削除）します。どちらのコマンドも相手の置き場の本体には触りません。
+
+- **会話記録の置き場の API と管理者の画面**（会話記録を端末間で運ぶ機能のサーバ側）。`/api/v1` の下に 6 経路: 登録・チャンクの追記（追記専用。`If-Match` の連番・`X-Looptrack-Transcript-*` ヘッダ・gzip の本文・値ごとの秘密の検査・読めない行は送らせない）・一覧・取得・チャンクの本体のストリーム（sandbox・`Content-Disposition: attachment`）・消去。会話記録は持ち主だけが読め、プロジェクトの管理者を含む他の利用者には 404。登録と追記はプロジェクト別ルール `session.transcripts` が on のときだけ使えます（読み出しと消去は off でもできます）。`/admin/transcripts` は上限 3 つ（変更可）と利用者ごとの使用量を、会話の中身を出さずに示します。定期処理が、最後の送信から `transcript_retention_days` を過ぎた記録の本体を消します。
+
+- **`looptrack session transcript push | list | purge | pull`。** `push` は現在の Claude Code / Codex の会話記録（本体・サブエージェント・ツールの結果）を見つけ、端末固有のパスを可逆なプレースホルダに書き換え、資格情報らしい値を文字列ごとにマスクし、全行を JSON として読み直してから、利用者ごとの置き場へ追記専用のチャンクで送ります。送った位置を覚えて次回は続きから送り、`--dry-run` は件数だけを出します。`pull` は別の端末で会話記録を**新しいセッション ID**の下に復元し（必ず fork する。元の記録には追記しない）、元の ID が手元にある記録や OS の系統が違う記録は拒み、再開のコマンド（`claude --resume <パス> --fork-session` / `codex fork <id>`）を表示するだけで実行しません。Codex の置き方は実機での確認が残っています。
+- **会話記録を自動で送る hook。** `looptrack issue init` が Claude Code と Codex（Copilot は対象外）の Stop と SessionEnd に、現在の会話記録を `session transcript push` と同じやり方で送る hook を配線します。送るのは、プロジェクト別ルール `session.transcripts` と端末ごとの `LOOPTRACK_SESSION_TRANSCRIPTS=1` がどちらも入のときだけです。Stop では 10 分に 1 回まで（`LOOPTRACK_TRANSCRIPT_THROTTLE_MIN`）、送るのは切り離した子プロセスなのでターンを止めません。サーバが秘密として拒んだ記録と読めない記録は失敗として 1 回だけ記録し、hook は送り直しません（手で打つ push はこれまでどおり使えます）。SessionStart の要約に、自動送信が入か・どの設定が足りないか・最後の失敗が出ます。`looptrack issue init --no-transcript` で配線ごと外せます。
+- **`looptrack purge-transcripts --user <login> [--transcript <id>] --reason <理由> --yes`。** 運用者がほかの利用者の会話記録を消す唯一の経路です（管理者の画面に消去のボタンはありません）。`--yes` が無いときは、消える件数と大きさを出すだけで何も変えません。
+
+### 文書
+
+- 利用者ガイド（AI エージェント → 複数の端末で使う）と kit の作業規律に、複数の端末で 1 つのプロジェクトを進めるときの決まりを書きました。1 端末 1 イシュー 1 ブランチ、切り替える前に push、同じ会話を 2 か所で再開しない（続けるなら fork）、1 つの会話を複数の端末で見るためのベンダーの仕組み、です。
+- 利用者ガイドに「セッション要約」の節（AI エージェント → 複数の端末で使う）と、管理者のページのルールの行を足しました。loop kit の skill `session-handoff` に要約の手順を書きました。
+- 利用者ガイドに「会話記録をそのまま運ぶ」の節（AI エージェント → 複数の端末で使う。クライアントが書き換えてマスクするもの・push と pull と fork・hook・限界）を、管理者のページに会話記録の設定と利用者ごとの使用量の画面、運用者の `purge-transcripts` を足しました。
+
+### 変更
+
+- **コメントに秘密の検査がかかります**（プロジェクト別ルール `comment.reject_secret`。既定は入）。資格情報らしい文字列（verify の出力と同じ規則: `token=`・`Bearer …`・秘密鍵など）を含むコメントは、どの経路（REST・MCP・CLI・Web のフォーム・状態変更のコメント）でも 422 `comment_secret` で拒否され、理由には行番号と規則の語だけが出ます。ルールを切ったプロジェクトでは保存して注記を返します。セッション要約はルールに関わらず拒否します。語を含むだけの散文にも当たることがあるので、値を `***` に替えて送り直してください。
+- 拒否されるコメント（秘密、または状態変更に載せた要約）を付けた `next` は、黙って何も始めずに終わる代わりに、その 422 を返すようになりました。
+
+### 修正
+
+- `フィードバック:` のコメントの後にセッション要約が付いても、応答とは数えません。人かふつうのコメントが応えるまで、`summary` の「外からの反応」と `list --has-feedback` に残ります。store が照合する先頭語は domain の 1 つの一覧から作るようになりました。
+- **`looptrack gates --help` と `-h` は使い方を出して終わります。** `-` で始まる未知の引数はエラーにします（終了コード 2）。以前は `--help` を段の名前として make に渡していました。make はそれを自分の選択肢と読むので、gates は「全段グリーン」と出していました。
+- hook `pre-tool-subagent-model` はエージェントの定義を `CLAUDE_CONFIG_DIR` の下の `agents/` でも探します（無ければ `~/.claude`）。そこに `model:` を書いた定義の型は止めません。
+- **`session transcript push` が書き換える Codex の rollout の欄を増やしました。** 実際の rollout で見つかった欄の絶対パスも書き換え、取り込む端末で戻します。対象は新しい形の書き込める根（`file_system_sandbox_policy` と `permission_profile` の `entries`）・`workspace_roots`・`custom_tool_call` の `input`・`item.command`・`item.changes` のキーなどです。`changes` のキーが取り込む端末で重なりうるときは、キーを元のまま残します。
+- **デスクトップ版（ローカルモード）の MCP の `setup` が login の手順を出さなくなりました。** 同梱の CLI はトークンなしでつながるからです。配る looptrack がアプリに無いときの取得の手順は、管理者への依頼ではなくトレイのメニューの「CLI を使えるようにする」を選ぶ案内になります。
+- **添付の本体を消す処理が別のプロセス（たとえばデスクトップ版の隣で動かす `repair-attachments`）で同じ本体を置いている途中の添付の本体を消さなくなりました。** 対象は `repair-attachments --apply` の孤児の片付けと管理者の消去で、会話記録と同じ手順で消します。添付は本体を置いてから記録を確定するまで置き場の `.tmp` に印を置き、消す側はその印か新しい参照を見つけたら本体を戻します。`repair-attachments` は途中で止まった削除が `.tmp` に残した本体も数えます。`--apply` を付ければそれを戻すか捨てて 1 時間より古い印も消します。添付は本体をトランザクションの前に置くようにしました。置いてから 10 分以内に記録を確定できなければ、記録せずに失敗します。
+- **Windows で、Codex の会話記録の探索が同じスレッドの古い rollout を選ばなくなりました。** Windows はファイルの更新時刻の刻みが粗く、続けて書いた 2 つの rollout の更新時刻がそろうことがあります。そのとき探索は一覧で先に出たほうを取り、古い rollout を返すことがありました。いまは名前の時刻が新しいほうを選びます。効くのはトークンの計測と `session transcript push` です。
+- **脆弱性が見つかった依存を上げました。** 課題管理表とトークンの集計の xlsx を作る excelize を、GO-2026-6688 と GO-2026-6684 が直った v2.11.1-0.20260915055537-22f76f9acb94 にしました。この版はタグの無い版（Go の擬似版）です。excelize が使う golang.org/x/net は v0.60.0 に上げています。
+- **`looptrack --help` の一覧に実装のサブコマンドがすべて載ります。** `session transcript`・`grants check`・`project rename|archive|unarchive`・`project guide set|show|clear` が抜けていたので足しました。日本語と英語の両方を直しています。
+
+### 1.0.2 から上げるとき
+
+- いつもどおりアプリごと更新します。新しい版は最初の起動で `looptrack.db` をデータのフォルダの `backups` フォルダへ写し、それからマイグレーション 0009 と 0010（会話記録の置き場の表）を適用します。
+- その後は 1.0.2 のアプリはこの DB では起動しません。戻すときは `backups` の最も新しい控えを戻します（利用者ガイドのデスクトップ版の「更新」）。
+- プロジェクトが `session.transcripts` を入れると、送った会話記録はデータのフォルダの `transcripts` フォルダに置かれます。バックアップでは `looptrack.db` と `attachments` と一緒にこのフォルダも写してください。
+- コメントには既定で秘密の検査がかかります。これまでの動きのままにしたいプロジェクトは `"comment": {"reject_secret": false}` を設定します。当たったコメントは注記つきで保存されます。
+- 1.0.2 以前の `looptrack issue init` で入れたプロジェクトには、会話記録を自動で送る hook（Claude Code と Codex の Stop・SessionEnd）の配線がありません。`looptrack` を置き換えるだけでは配線は増えず、summary もサーバの案内もそれを知らせません。自動で送るなら、新しい `looptrack` で `looptrack issue init --project <slug> --url <サーバの URL> --agent <AI>` を各プロジェクトでもう一度実行してください。セッション要約と手で打つ `session transcript push` は配線が無くても使えます。
+
 ## [1.0.2] - 2026-10-06
 
 1.0.2 is a stable release. The changes below are relative to `v1.0.1`.
@@ -861,7 +1179,8 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定からチャットだけで AI エージェントをつなぐ方法。
 - 新しいガイド「更新」。デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.1.0-rc.1...HEAD
+[1.1.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0-rc.1
 [1.0.2]: https://github.com/howashoji/looptrack/releases/tag/v1.0.2
 [1.0.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1
 [1.0.1-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1-rc.1

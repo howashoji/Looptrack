@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/client/cli"
+	"github.com/howashoji/looptrack/internal/client/session"
 	"github.com/howashoji/looptrack/internal/hookio"
 )
 
@@ -34,8 +35,12 @@ func Summary(ctx context.Context, c *Call, ev hookio.Event) (hookio.Result, erro
 		// 導入済みをサーバへ知らせる。配線に --agent が無い（推測した）ときは知らせない（CLI の --agent なしと同じ）
 		args = append(args, "--agent", string(ev.Agent))
 	}
+	// 要求に付けるセッション ID は 明示の LOOPTRACK_SESSION_ID → hook の入力の session_id → AI の環境変数 の順
+	// （hook の環境には AI の環境変数が渡らないことがあり、そのままでは X-Looptrack-Session が付かず、
+	// 別のセッションの要約と「別のセッションが着手しています」の注記を出せない）
+	vars := session.WithHookSession(*c.Vars, rawString(ev.Raw, "session_id", "sessionId"))
 	var out bytes.Buffer
-	if code := cli.Main(args, cli.IO{Stdin: strings.NewReader(""), Stdout: &out, Stderr: io.Discard}, *c.Vars); code != 0 {
+	if code := cli.Main(args, cli.IO{Stdin: strings.NewReader(""), Stdout: &out, Stderr: io.Discard}, vars); code != 0 {
 		return hookio.Result{}, nil // 以前の CLI も失敗したときは（--hook-json では）出力を捨てた
 	}
 	return hookio.Result{Context: strings.TrimSpace(out.String())}, nil

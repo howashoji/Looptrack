@@ -4,15 +4,21 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/howashoji/looptrack/internal/client/agentdirs"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
 )
 
 // claudeFindTranscript はセッション ID から会話記録を探す（プロジェクトのスラッグの規則に依存しないよう glob で引く）。
+// 置き場は CLAUDE_CONFIG_DIR/projects（無ければ ~/.claude/projects。agentdirs の 1 か所で決める）。
 func claudeFindTranscript(sessionID string, o Options) string {
 	if sessionID == "" {
 		return ""
 	}
-	return newest(globPaths(o.expandUser(fmt.Sprintf("~/.claude/projects/*/%s.jsonl", sessionID))))
+	root := agentdirs.ClaudeProjectsDir(o.Env.Get, o.home())
+	if root == "" {
+		return ""
+	}
+	return newest(globPaths(joinPath(root, "*", fmt.Sprintf("%s.jsonl", sessionID))))
 }
 
 // newest は更新時刻が最も新しいもの（同じ時刻は先のもの）。

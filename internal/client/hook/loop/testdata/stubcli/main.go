@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 type rule struct {
@@ -22,6 +23,8 @@ type rule struct {
 	Out  string `json:"out"`  // 標準出力に出す 1 行（空なら何も出さない）
 	Err  string `json:"err"`  // 標準エラーに出す 1 行
 	Exit int    `json:"exit"` // 終了コード
+	// SleepMS は応答する前に待つミリ秒（遅いサーバの模擬）
+	SleepMS int `json:"sleep_ms,omitempty"`
 }
 
 func main() {
@@ -50,6 +53,9 @@ func main() {
 			if os.Getenv(k) != v {
 				continue
 			}
+		}
+		if r.SleepMS > 0 {
+			time.Sleep(time.Duration(r.SleepMS) * time.Millisecond)
 		}
 		if r.Out != "" {
 			fmt.Println(r.Out)

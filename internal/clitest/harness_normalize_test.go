@@ -24,6 +24,9 @@ type Normalizer struct {
 	Hostname string    // os.Hostname() → JSON の host・client_name の中で $HOST
 	Start    time.Time // 実行の開始。Start〜End（前後 2 分の余裕）の時刻を $NOW にする
 	End      time.Time
+	// ProjectKey は偽 API の URL とプロジェクトの鍵（usagesnap.ProjectKey。偽 API のポートで変わる）→ $PROJECTKEY
+	// （会話記録の状態のファイルと、覚えたルールのファイルの名前に入る）
+	ProjectKey string
 }
 
 var (
@@ -41,11 +44,14 @@ var (
 	reCompact = regexp.MustCompile(`\b\d{8}-\d{6}\b`)          // 20260918-120000（init の控えのディレクトリ名）
 	reZone    = regexp.MustCompile(`[+-]\d{2}:?\d{2}$`)
 	reZone4   = regexp.MustCompile(`([+-]\d{2})(\d{2})$`)
+
+	reNonAlnum        = regexp.MustCompile(`[^A-Za-z0-9]`)
+	reTranscriptNonce = regexp.MustCompile(`\{\{LT:[0-9a-f]{12}:`)
 )
 
 // Text は出力・ファイルの本文を正規化する。規則（この順）:
 //  1. 改行 CRLF → LF
-//  2. 試す looptrack の実行ファイルのパス → $LOOPTRACK、一時ディレクトリのパス → $TMP（長いものから）、このリポジトリのパス → $REPO（一時ディレクトリからの相対パス → $REPO_REL）
+//  2. 試す looptrack の実行ファイルのパス → $LOOPTRACK、一時ディレクトリのパス → $TMP（長いものから。JSON で \\ を逃がした形も）、このリポジトリのパス → $REPO（一時ディレクトリからの相対パス → $REPO_REL）
 //  3. 偽 API の URL → $API
 //  4. ほかの 127.0.0.1 のポート（login --browser の戻り先）→ 127.0.0.1:$PORT（URL エンコードされた %3A も）
 //  5. OAuth の state=・code_challenge=・code_verifier= の値（16 文字以上）→ $STATE・$PKCE_CHALLENGE・$PKCE_VERIFIER
@@ -65,10 +71,26 @@ func (n *Normalizer) Text(s string) string {
 	paths := append([]string(nil), n.Paths...)
 	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) > len(paths[j]) })
 	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		// JSON の文字列の中では \ が \\ に逃がされる（Windows の一時ディレクトリ）。逃がした形も $TMP にする
+		if esc := strings.ReplaceAll(p, `\`, `\\`); esc != p {
+			s = strings.ReplaceAll(s, esc, "$TMP")
+		}
+		s = strings.ReplaceAll(s, p, "$TMP")
+	}
+	// Claude Code の記録のディレクトリの名前（一時ディレクトリの realpath の英数字以外を - にした slug）→ $TMPSLUG
+	for _, p := range paths {
 		if p != "" {
-			s = strings.ReplaceAll(s, p, "$TMP")
+			s = strings.ReplaceAll(s, reNonAlnum.ReplaceAllString(p, "-"), "$TMPSLUG")
 		}
 	}
+	if n.ProjectKey != "" {
+		s = strings.ReplaceAll(s, n.ProjectKey, "$PROJECTKEY")
+	}
+	// 会話記録のプレースホルダの印（チャンクごとの乱数 12 桁）
+	s = reTranscriptNonce.ReplaceAllString(s, "{{LT:$$NONCE:")
 	if n.Repo != "" {
 		s = strings.ReplaceAll(s, n.Repo, "$REPO")
 		// Windows の相対パスはドライブ名を含まない（..\..\a\repo）。ドライブ名を除いた形も $REPO にする
@@ -224,6 +246,8 @@ func (n *Normalizer) keyed(key, s string) string {
 		}
 	case "state":
 		return "$STATE"
+	case "origin_os": // 会話記録を送った端末の OS（runtime.GOOS。記録する機械で変わる）
+		return "$GOOS"
 	case "code_challenge":
 		return "$PKCE_CHALLENGE"
 	case "code_verifier":

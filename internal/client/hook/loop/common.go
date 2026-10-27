@@ -16,6 +16,8 @@ import (
 )
 
 // execRun は os/exec でコマンドを起動する（Runner の既定）。
+// 戻りの err は、起動できなかったとき・シグナルで止められたとき（終了コードは -1）・打ち切ったときに nil でない。
+// シグナルを err で返すのは、理由（"signal: killed" など）を注意に出せるようにするため。
 func execRun(ctx context.Context, c Command) ([]byte, int, error) {
 	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
 	cmd.Dir = c.Dir
@@ -24,7 +26,7 @@ func execRun(ctx context.Context, c Command) ([]byte, int, error) {
 	}
 	out, err := cmd.Output()
 	var ee *exec.ExitError
-	if errors.As(err, &ee) && ctx.Err() == nil {
+	if errors.As(err, &ee) && ctx.Err() == nil && ee.ExitCode() >= 0 {
 		return out, ee.ExitCode(), nil
 	}
 	if err != nil {

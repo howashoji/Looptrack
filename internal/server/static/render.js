@@ -331,9 +331,11 @@ export function statusForm(opt) {
 // commentForm は詳細ドロワーのコメントの追記フォーム。canEdit でなければ空文字（viewer には添付の操作も出さない）。
 // 添付はファイルの選択・ドラッグ&ドロップ・クリップボードの画像の貼り付けで「送る前の一覧」（pending）に積み、
 // 送信のときに 1 つずつ添付の REST へ送ってから、返った ID をコメントに付ける。本文が空なら添付だけを送る。
+// notice は直前の追記の応答が載せた注記（秘密らしい文字列を拒まずに保存した。止めずに知らせるもの）。空なら出さない。
 export function commentForm(opt) {
-  const { canEdit, it, t, pending } = opt || {};
+  const { canEdit, it, t, pending, notice } = opt || {};
   if (!canEdit || !it) return "";
+  const note = notice ? '<p class="form-notice" role="status">' + esc(notice) + "</p>" : "";
   return '<form class="issue-form" data-action="comment" data-id="' + attr(it.id) + '">'
     + "<label>" + esc(tx(t, "comment_label")) + '<textarea name="text" rows="3"></textarea></label>'
     + '<div class="att-drop" data-attach-drop>'
@@ -341,7 +343,7 @@ export function commentForm(opt) {
     + '<span class="att-hint">' + esc(tx(t, "att_hint")) + "</span></div>"
     + '<ul class="att-pending" data-attach-pending>' + pendingList(pending, t) + "</ul>"
     + '<p class="att-status" role="status" hidden></p>'
-    + formError
+    + formError + note
     + '<div class="actions"><button type="submit">' + esc(tx(t, "comment_submit")) + "</button></div></form>";
 }
 
@@ -442,7 +444,8 @@ export async function sendComment(opt) {
   const data = await r.json().catch(() => null);
   if (r.status === 401) return { ok: false, login: true };
   if (!r.ok) return { ok: false, error: apiErrorMessage(r.status, data, t) };
-  return { ok: true };
+  // secret_notice は、秘密らしい文字列を拒まずに保存したプロジェクト（comment.reject_secret が切）の注記。フォームの下に出す
+  return { ok: true, notice: data && typeof data.secret_notice === "string" ? data.secret_notice : "" };
 }
 
 // pastedName は貼り付けた画像の名前を決める。ブラウザが付ける名前が無い・汎用の「image.png」のときだけ、日時の名前に替える

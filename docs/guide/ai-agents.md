@@ -119,6 +119,277 @@ Here are the MCP tools:
 With MCP only, the agent runs the verify commands one by one in its local shell and sends the results with `report_verify`.
 Those records carry a "self-reported via MCP" mark. That's how people tell them apart from CLI records.
 
+## Working from several machines
+
+You can work on one project from two machines (at home and at work, say) with your agents.
+What no vendor lets you do is carry on **one conversation** on two machines at the same time: you can only take turns, or fork it.
+So split the work by issue and branch, not by conversation.
+
+### The rules
+
+1. **One machine, one issue, one branch.** If one issue needs work on both machines, split it into child issues.
+2. **Push before you switch machines.** Uncommitted changes and local notes (the handoff file, the agent's memory) stay on the machine where they were written.
+3. **The machine taking over declares the start again** with `looptrack issue status <ID> "In Progress"`, and the machine handing over puts the issue back to Todo first. The start moves to the session that declared it last, with no confirmation. From then on, `next` in the other session skips that issue and notes that another session is working on it.
+4. **Never run `looptrack issue next` from a shell you type into by hand.** A shell with no AI session id treats every In Progress issue of yours as its own.
+5. **Never resume the same conversation in two places at once. To continue somewhere else, fork it.**
+
+```bash
+claude --resume <session-id> --fork-session   # Claude Code
+codex fork <session-id>                        # Codex
+```
+
+A plain `claude --resume <session-id>` appends to the original transcript file even when you run it from another directory, so the two places end up mixed in one transcript.
+The official page says the same: "If you resume the same session in two terminals without forking, messages from both interleave into one transcript" (<https://code.claude.com/docs/en/sessions>).
+A fork gets a new session id and leaves the original as it was (`--fork-session`: <https://code.claude.com/docs/en/cli-reference>; `codex fork`: <https://developers.openai.com/codex/cli/reference>).
+Even after a fork, absolute paths that appear in the conversation are reused as they were. In a measured case, the first edit after continuing in another checkout changed the original checkout.
+So give the agent the path of the checkout you continue in, in your first message.
+
+The behaviour in 3 to 5 was measured on 2026-10-25 with Claude Code 2.1.310 and a disposable Looptrack server.
+
+### What the vendors offer
+
+These let you watch and steer one conversation from several devices. In every one of them, the work runs in **one place**.
+
+| Agent | Feature | Where the work runs | Official page |
+| -- | -- | -- | -- |
+| Claude Code | `claude --cloud "<task>"` starts a cloud session | A cloud VM. It clones your branch from GitHub, so push first | <https://code.claude.com/docs/en/claude-code-on-the-web> |
+| Claude Code | `claude --teleport` pulls a cloud session into your terminal | Your terminal, on its own copy. New work there does not appear in the cloud session | <https://code.claude.com/docs/en/claude-code-on-the-web> |
+| Claude Code | Remote Control: `claude --remote-control` (or `--rc`), or `/remote-control` in a running session | Your machine. A phone or a browser only steers it | <https://code.claude.com/docs/en/remote-control> |
+| Codex | Cloud tasks (`codex cloud`) | A Codex cloud environment. You apply the result to your local repository | <https://developers.openai.com/codex/cli/reference> |
+| Codex | Remote connections | The machine that runs the Codex app server | <https://developers.openai.com/codex/remote-connections> |
+
+Neither vendor documents a way to sync local transcripts between machines (checked on 2026-10-25).
+Claude Code states that the transcript format "is internal to Claude Code and changes between versions" (<https://code.claude.com/docs/en/sessions>).
+Copying transcripts between machines by hand is not a supported way to continue a conversation.
+
+### A shortcut: the same absolute path
+
+When both machines run the same OS under the same user name, put the checkout at the same absolute path on both (for example `/Users/<name>/src/<project>`).
+Paths written into handoff notes, issue comments and conversations then stay valid on either machine.
+With a different OS or a different user name, the home directory differs and the shortcut does not work.
+Put the real directory at that path. A symlink there does not help: Claude Code names its project directory and records the working directory from the real path (measured with Claude Code 2.1.310).
+Links (symlinks, Windows junctions) also behave differently from one OS to another, so do not rely on them.
+
+### Session digests
+
+When you switch machines, leave a **session digest**, written by the agent, on the issue. The transcript itself can be carried too ([Carrying the raw transcript](#carrying-the-raw-transcript)), but a digest is usually enough.
+The digest is kept on the issue as a comment with a marker at its start, and it shows up in SessionStart and in `next` for a session on the other machine.
+The digest stays on the server, and the project's members read it. So never write the value of a credential into it.
+**Never read the contents of a credential, never display them, never copy them anywhere else.**
+
+#### What to write
+
+- The gist of the user's instructions
+- What was decided, and why
+- What was tried and dropped
+- Where the work stopped
+- The next step
+
+The branch and the HEAD SHA go into the header, so there is no need to repeat them in the body.
+The body is limited to 16 KiB (16,384 bytes). Keep to what the next session needs to resume, not the whole history.
+
+#### Sending one
+
+Send it with `looptrack session digest <ID> -`. The body is read from standard input (leaving out the `-` does the same; give a file path and that file is read instead).
+
+```bash
+looptrack session digest DEMO-0004 - <<'EOF'
+Instructions: add a show-password toggle
+Decided: icon at the right of the field (as in search)
+Dropped: a checkbox below (breaks the e2e selectors)
+Stopped at: icon shown; e2e not run yet
+Next: get e2e passing, then close
+EOF
+```
+
+When the body does not start with the marker, the CLI puts these four header lines and a blank line in front of it.
+
+```text
+Session digest: home-mac
+branch: feat/login-toggle
+head: 3f2c1a9d0b7e4c6a8f1e2d3c4b5a69788796a5b4
+ai: claude-code
+```
+
+- The marker is in the user's language (`Session digest:` in English, `セッション要約:` in Japanese), followed by the machine label.
+- The machine label is the value of `LOOPTRACK_MACHINE_LABEL`. Without it, the part of the host name before the first `.` is used.
+- `branch:` is `git rev-parse --abbrev-ref HEAD` in the working directory (`HEAD` when not on a branch), and `head:` is `git rev-parse HEAD`.
+  When they cannot be worked out (outside a git working tree, say), nothing is sent. Write them into the header by hand and send it again.
+- `ai:` is the kind of agent, worked out from environment variables (`claude-code`, `codex`, `copilot`, or `other` when unknown).
+- To write the header yourself, put the marker and the machine label on line 1, and one line each of `branch:`, `head:` and `ai:` by line 8. The CLI adds only the lines that are missing and never rewrites a line you wrote.
+- Machine paths inside the body are replaced before it is saved: the root of the git working tree becomes `./`, the home directory becomes `~`, and places only that machine has, such as where the agent keeps its transcripts, become `<machine-local>`. The agent's transcript directories follow `CLAUDE_CONFIG_DIR` and `CODEX_HOME` when they are set. To add more such places, list them in `LOOPTRACK_MACHINE_LOCAL`, separated the way the OS separates `PATH`.
+- A digest cannot go into `close --comment` or `status --comment` (it is refused, and the status does not change either). Send it with `session digest` first, then change the status.
+
+#### When it hits a secret
+
+The server refuses a body that matches the shape of a value (`token: …`, `Bearer …`, a private key and the like). No comment is left.
+The reason names only the line number and the rule, never the value.
+
+```text
+Error: DEMO-0004: line 3 of the session digest holds something that looks like a secret (token: …), so it was not saved. Replace the value with *** and send it again (for example token=***). Prose such as a quotation of the discipline text matches too, so reword it or replace the word with ***
+```
+
+- Replace the value on that line with `***` and send it again (`token: ***`).
+- Prose such as a quotation of the discipline text matches too. Reword it in that case.
+
+#### Reading it on the other machine
+
+A digest written by another session is shown like this: the first eight non-empty lines after the marker line (up to 400 characters), indented.
+
+```text
+Note: the latest session digest on DEMO-0004 was written by another session (home-mac, 2h ago):
+  branch: feat/login-toggle
+  head: 3f2c1a9d0b7e4c6a8f1e2d3c4b5a69788796a5b4
+  ai: claude-code
+  Instructions: add a show-password toggle
+  Decided: icon at the right of the field (as in search)
+  Dropped: a checkbox below (breaks the e2e selectors)
+  Stopped at: icon shown; e2e not run yet
+  Next: get e2e passing, then close
+```
+
+- SessionStart (`looptrack issue summary`) shows the latest digest of each In Progress issue.
+- `next` shows the latest digest of the issue it starts. When the machine handing over has put the issue back to Todo, its digest comes into view with `next` on the machine taking over.
+- Only digests written by another session are shown. A digest your own session wrote is not.
+- Take out the full text with `looptrack session pull <ID>`. It writes the newest three (change it with `--limit N`) to `.claude/.looptrack-work/<ID>-digest.md` and prints them to standard output too. The file is overwritten each time. With no digest, it says so and writes no file.
+
+#### Catching a forgotten digest (loop)
+
+With loop installed, the handoff freshness guard (Stop) can judge by digests. Set the environment variable `LOOPTRACK_LOOP_HANDOFF_BACKEND=issue`.
+
+- After finishing work (a commit, a close and the like), if an issue this session has in progress lacks a digest of its own newer than that work, Stop is sent back once. It names the command to send, `looptrack session digest <ID> -`, for each issue.
+- When the server cannot be reached, nothing is stopped. One notice is shown and the turn goes through; the next Stop after the connection is back checks again.
+- An issue this session cannot be said to have started (one started from the web or from a shell you type into by hand, for example) is not judged; a notice names it.
+
+To make digests required for a project, turn on the project rule `session.digest_required`.
+In such a project the same check is added whatever the handoff backend (`LOOPTRACK_LOOP_HANDOFF_BACKEND`), and Stop goes through only when both pass.
+The server does not refuse status changes. `looptrack project rules set` replaces the whole set of rules, so write the other rules into the same file ([Administration](server/admin.md#setting-project-rules)).
+
+```json
+{
+  "session": { "digest_required": true }
+}
+```
+
+### Carrying the raw transcript
+
+When you want to read a whole earlier conversation again on another machine, or give the agent its earlier context as it was, you can carry the transcript itself to another machine of yours.
+Most of the time the session digest above is enough. A digest is an issue comment the project's members read; a transcript is a raw record only you can see.
+On the machine that imports it, you always continue by forking. The same conversation is never continued in two places.
+
+#### What it needs
+
+- The project rule `session.transcripts` must be on (it is off by default; see [Administration](server/admin.md#setting-project-rules)). In a project where it is off, registering a transcript and adding to one are both refused.
+- The sending machine and the importing machine must be in the same OS family (Windows and Windows, or macOS and Linux). A transcript from the other family cannot be imported.
+- The agents covered are Claude Code and Codex. Importing a Codex transcript (where it is placed, and whether `codex fork` finds it) has not been checked on a real machine yet.
+- On the importing machine, log in as the same user who sent it. Only the person who sent a transcript can read it.
+
+#### Sending
+
+```bash
+looptrack session transcript push --dry-run   # show the counts only, send nothing
+looptrack session transcript push             # send the current session's transcript (from the second time on, only what follows)
+```
+
+- Run inside an agent session (from the agent's Bash tool, say), it sends the current session's transcript. From a shell you type into by hand, give the session id as an argument (`push <session-id> --agent claude-code`).
+- It goes to the current project. The sending machine remembers how far it has sent, and the next push sends only what follows.
+- A `push` you type by hand does not look at `LOOPTRACK_SESSION_TRANSCRIPTS`: typing it is the owner's consent. With the rule on, it sends.
+- For Claude Code it carries the main file, the subagent transcripts and the tool-result files; for Codex, the rollouts of the same thread. Other files (Claude Code's `workflows/`, Codex's compressed `.jsonl.zst` and the like) are not carried.
+
+The `--dry-run` output is counts only. It never shows a value or the content of a line.
+
+```text
+dry-run (nothing is sent): claude-code session 5f0c2a9e-7b1d-4c3e-9a8f-2d6b1e0c4a7f
+Files: to send 31, not carried 7, rewritten at the source 0
+Lines: 2104, chunks: 31, unfinished line (sent next time): 0 bytes
+Paths rewritten: 4120
+Masked values: 0
+Absolute paths left unrewritten: structural fields 0, prose 41, keys 0
+Not carried: 5f0c2a9e-7b1d-4c3e-9a8f-2d6b1e0c4a7f/workflows (workflows, 7)
+```
+
+#### What is rewritten and what is not
+
+- **Paths in structural fields** (`cwd`, `file_path` and `path` in a tool's input, Bash's `command`, the executable path at the start of a hook's command line and the like) are rewritten. This machine's git working tree root, the agent's transcript and settings directories and the home directory are replaced with markers (placeholders) before sending, and the importing machine turns them back into its own paths. The original absolute paths never reach the server.
+- **Credential-shaped values** (`token=…`, `Bearer …`, private keys and the like) are masked to `***`, string value by string value.
+- **Prose is not rewritten**: the agent's replies, tool output, the contents of files it read, and the text of system reminders. Only structural fields, picked by key name, are rewritten.
+  Paths left in prose are the sending machine's, so `pull` shows how many there are as a note. In your first message after the fork, give the agent the path of the checkout you continue in (as in rule 5 above).
+- The transcript format is internal to each agent and changes between versions. When `push` notes "absolute paths left unrewritten in structural fields", the format has probably changed, and after a fork they may point at the old root.
+
+#### When it cannot be sent
+
+If a file has any of the following, `push` sends nothing, prints the reason for each file as counts only, and exits with code 1. It never shows a value or the content of a line.
+
+- A line that cannot be read as JSON (including one that became unreadable after rewriting and masking)
+- A secret-looking string in a key (a JSON name)
+- A single line over the per-chunk limit (32MiB by default)
+
+When a file became shorter or changed after it was sent, its continuation is not sent; the count is reported and the exit code is 1.
+Run `purge` and push again to send it from the start.
+
+#### Importing
+
+Run it inside the git working tree you continue in. `list` shows the transcript ids (by default only those of the current project; `--all-projects` for all).
+
+```bash
+looptrack session transcript list
+looptrack session transcript pull 42
+```
+
+```text
+Placed transcript 42 (files: 31): /home/u/.claude/projects/-home-u-proj/c81d4e2a-3f6b-4a9c-8e1d-7b2f0a5c9d3e.jsonl
+Note: absolute paths of the sending machine remaining in prose (AI replies, tool output and the like, which are never rewritten): 41
+Resume (fork): claude --resume /home/u/.claude/projects/-home-u-proj/c81d4e2a-3f6b-4a9c-8e1d-7b2f0a5c9d3e.jsonl --fork-session
+Do not open it with a plain claude --resume <id> (Claude Code) or codex resume (Codex): that appends to the imported copy. Always use the fork command
+```
+
+- **`pull` places it under a new session id.** The copy never takes the original conversation's id. Open it with the fork command it shows. The CLI does not start the agent.
+- **Never resume the original id on two machines.** Opening the copy with a plain `claude --resume` (`codex resume`) appends to the imported copy.
+- Running `pull` on the same transcript again finds the same copy in the same place and changes nothing. It shows an "already in place (nothing changed)" line and the resume command.
+- For Codex it shows `codex fork <new-id>`. Run it at the root of the working tree.
+- `--print-resume` prints only the resume command, one line, to standard output (the placing is the same). `--out <directory>` writes into that directory instead of where the agent looks (it is for reading the contents, and shows no resume command).
+
+It stops without placing anything when:
+
+- this machine already has a transcript with the original session id (it is the machine that sent it, or the conversation is already here)
+- the sending machine is in the other OS family (within the same family, Linux and macOS, it places the copy after a note)
+- the transcript has been purged
+- a copy is already under another working tree, or a copy with different content is already in the same place (it shows only where)
+- it was run outside a git working tree
+
+#### Purging
+
+```bash
+looptrack session transcript purge 42 --reason "no longer needed"
+```
+
+This deletes the content. It cannot be undone. Running `push` on the same conversation after a purge sends it again from the start.
+
+#### Who can see it and who cannot
+
+- Through the API, the CLI and the web, **only the person who sent it** can read it. Project administrators cannot see it, and neither can server administrators (users with the role admin): to them it is as if it did not exist.
+- **Transcripts are not encrypted. The server operator can read their contents** (anyone who can read the server's disk, database or backups). The stored content is plain JSONL, after masking and path rewriting.
+- A transcript holds the contents of the files the agent read (source code, `CLAUDE.md`, command output) as they were. Sending it puts them on the server.
+- Masking catches only what matches fixed rules. A secret no rule matches (a value with no set shape, customer information) stays as it is.
+- A purge deletes the content files. The metadata (relative file paths, sizes, sha256, counts, times) stays. Content that went into a backup stays until it is deleted on the backup's side.
+- The content is deleted automatically 90 days (by default) after the last push. Each user may store up to 2GiB in total by default, and a push beyond that is refused. An administrator can change both.
+
+The best protection is never letting a credential's value into the conversation.
+**Never read the contents of a credential, never display them, never copy them anywhere else.**
+
+#### Sending automatically (hook)
+
+`looptrack issue init` wires a hook that sends transcripts to Stop and SessionEnd for Claude Code and Codex (not for Copilot). To leave it out, use `looptrack issue init --no-transcript`.
+
+- It sends only when both the project rule `session.transcripts` and the per-machine environment variable `LOOPTRACK_SESSION_TRANSCRIPTS=1` (off by default) are on.
+- At Stop it sends nothing until 10 minutes have passed since the last attempt (change the interval with `LOOPTRACK_TRANSCRIPT_THROTTLE_MIN`). SessionEnd is not thinned out.
+- The sending runs in a detached child process, and the hook returns at once. It never holds up the turn.
+- At the start of a session (the SessionStart summary, which init also wires), these lines appear. When the rule is off or not known yet, the first two do not appear.
+  - Both on: one line starting "Automatic transcript sending: on"
+  - The rule on but no `LOOPTRACK_SESSION_TRANSCRIPTS=1`: one line pointing to that setting
+  - Not being sent: one line with the last failure, or one with the unsent count. It appears at every session start until a send succeeds
+- A transcript that could not be sent because of unreadable lines or a secret in a key is recorded as a failure once and not retried automatically. A `looptrack session transcript push` typed by hand still works as before.
+
 ## Installing through MCP only (the setup tool)
 
 A machine with neither the CLI nor hooks is fine. You can install starting from just an MCP connection.

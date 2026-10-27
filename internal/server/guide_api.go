@@ -118,6 +118,10 @@ type nextJSON struct {
 	UsageNotice string `json:"usage_notice,omitempty"`
 	// AcceptanceNotice は started のとき、受け入れ条件が雛形のままなら載る注意（service.StatusResult と同じ文面）
 	AcceptanceNotice string `json:"acceptance_notice,omitempty"`
+	// SecretNotice は started のとき、同時のコメントが秘密の検査に当たったまま保存した注記（service.StatusResult と同じ文面）
+	SecretNotice string `json:"secret_notice,omitempty"`
+	// LatestDigest は返すイシューの最新のセッション要約（無ければ出さない。文面には別のセッションのものだけを出す・DESIGN.md §9-7）
+	LatestDigest *latestDigestJSON `json:"latest_digest,omitempty"`
 }
 
 func refOf(set *domain.Set, id string) relatedRefJSON {
@@ -215,6 +219,10 @@ func nextView(lang i18n.Lang, res *service.NextResult) nextJSON {
 		out.AcceptanceNotice = res.AcceptanceNotice
 		b.WriteString(res.AcceptanceNotice + "\n")
 	}
+	if res.SecretNotice != "" { // 同じ位置に出す（comment.reject_secret を切にしたプロジェクトだけ）
+		out.SecretNotice = res.SecretNotice
+		b.WriteString(res.SecretNotice + "\n")
+	}
 	if len(out.Others) > 0 {
 		b.WriteString(i18n.T(lang, "server.api.next.others", "ids", strings.Join(out.Others, ", ")) + "\n")
 	}
@@ -222,6 +230,10 @@ func nextView(lang i18n.Lang, res *service.NextResult) nextJSON {
 	writeOtherSessions(lang, &b, out.OtherSessions)
 	writeCrossPath(lang, &b, out.CrossPathSessions)
 	writeSkipped(lang, &b, out.Skipped)
+	out.LatestDigest = latestDigestView(lang, res.LatestDigest)
+	if n := digestOtherNote(lang, id, out.LatestDigest); n != "" { // 別のセッションが書いた要約だけ（着手の直後に目に入る位置）
+		b.WriteString("\n" + n + "\n")
+	}
 	b.WriteString("\n" + i18n.T(lang, "server.api.next.related_heading") + "\n")
 	line := func(label string, refs []relatedRefJSON) {
 		if len(refs) == 0 {

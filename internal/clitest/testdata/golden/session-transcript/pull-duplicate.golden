@@ -1,0 +1,24 @@
+# session-transcript/pull-duplicate
+$ session transcript pull 7
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 会話記録 7 と同じセッションの記録がこの端末にあるので置きません（送った端末か、既に同じ会話があります）: $TMP/home/.claude/projects/-elsewhere/00000000-0000-4000-8000-0000000000f1.jsonl
+
+#### requests (1)
+GET /im/api/v1/transcripts/7
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (4)
+home/.claude/projects/-elsewhere/00000000-0000-4000-8000-0000000000f1.jsonl (0644)
+    {}
+ws/.git/HEAD (0644)
+    ref: refs/heads/feature/x
+ws/.git/objects/.keep (0644)
+ws/.git/refs/heads/feature/x (0644)
+    0123456789abcdef0123456789abcdef01234567

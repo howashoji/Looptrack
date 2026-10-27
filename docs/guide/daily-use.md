@@ -160,11 +160,14 @@ looptrack issue attach DEMO-0004 screenshot.png report.html   # attach and print
 looptrack issue comment DEMO-0004 "Fixed the screen" --attach after.png
 looptrack issue verify DEMO-0004 --attach-output              # put the full, untruncated output on the verify record
 looptrack issue verify DEMO-0004 --attach coverage.html       # put other files on the record too (repeatable)
+looptrack issue attachment get 12 --out ./evidence/           # save an attachment's body here (never overwrites an existing file)
 ```
 
 - An agent can't send a file through the MCP tools. It sends it with the CLI's `issue attach` and passes the IDs that come back in `attachments` of `report_verify` or `add_comment`. The guide and the MCP instructions tell the agent to do exactly that.
+- `issue attachment get <attachment ID>` saves the body to the file's own name in the current directory, or to `--out` (an existing directory gets the attachment's name inside it). It never overwrites an existing file, and it checks the saved bytes against the sha256 the server recorded and saves nothing if they differ. A purged attachment prints the reason and exits with 1.
 - In the browser, the comment box takes a file three ways: pick it, drag and drop it, or paste a screenshot. The drawer lists the attachments, and images show right there.
 - If a text file holds something that looks like a secret (the shape of a token or a password), the CLI stops without sending any of the files. The server can't mask what's inside.
+- gzip (`.gz`, `.tgz`), zip and tar are expanded in memory by the CLI, and every file inside gets the same check. The reason it stops names the archive, the path inside it and the line. Archives are expanded two deep (a `.tar.gz`, a `.gz` inside a zip and the like). The limits per attachment are 64 MiB expanded in total and 10,000 files inside; an archive over a limit, a broken one that can't be read, or one nested deeper can't be checked, so the CLI doesn't send it. Other binary files (images, PDF, xz, bzip2, 7z and the like) are sent without their contents being checked. To attach compressed text, use one of those three formats, or attach the text as it is.
 - Attachments can't be deleted. If you attached a secret by mistake, ask an administrator to purge the file ([Administration](server/admin.md#attachment-limits-and-purging)).
 - By default the limits are 20MiB per file and 1GiB per project.
 
@@ -188,10 +191,14 @@ What a comment means comes from its leading keyword.
 | `Decision:` (`判断:`) | the agent, recording a person's answer | the answer to an In Review item is an approval or instruction | `Decision: This wording is fine. Mark it Done` |
 | `Changes requested:` (`差し戻し:`) | the agent, recording a person's answer | the answer asks for rework | `Changes requested: Put the button top right and match the existing colour` |
 | `Feedback:` (`フィードバック:`) | the agent, recording what it was told | a participant or tester reacted | `Feedback: Tester A (18 Sep, while saving) could not find the save button` |
+| `Session digest:` (`セッション要約:`) | the agent (sent with `looptrack session digest`) | before switching machines, or at a break in the work | `Session digest: home-mac` (the CLI adds the header lines) |
 
 - Put the keyword at the very start, with no leading spaces or line breaks. Case doesn't matter for the English keywords. The Japanese keywords also accept a full-width colon (`：`).
 - On `判断:`, move the issue to Done (`close --comment "判断: …"`). On `差し戻し:`, move it to Todo (`status <ID> Todo --comment "差し戻し: …"`).
 - A `フィードバック:` comment counts as answered once a comment without a keyword, or a status change, follows it.
+- A `Session digest:` comment hands the context of the work to a session on another machine, and does not count as an answer to `フィードバック:`. How to write and read one is in [Working from several machines](ai-agents.md#session-digests).
+- `looptrack session transcript`, which carries the transcript itself to another machine of yours, leaves no comment. How to use it is in [Carrying the raw transcript](ai-agents.md#carrying-the-raw-transcript).
+- A comment that looks like it carries a credential (`token=`, `Bearer …`, a private key and the like) is refused with 422 `comment_secret`, whichever way it is sent. The reason names only the line number and the rule. Replace the value with `***` and send it again. This is the project rule `comment.reject_secret`, on by default ([Administration](server/admin.md#setting-project-rules)).
 - Don't save it all up and write only the conclusion at the end. Write the cause when you find it, and the history survives even if the work stops half-way.
 
 ```bash
@@ -199,6 +206,12 @@ looptrack issue comment DEMO-0004 "Cause: the date conversion ignored the time z
 looptrack issue status DEMO-0004 "In Review" --comment "Please decide: two wordings prepared, A or B?"
 looptrack issue close DEMO-0004 --comment "判断: A approved. All three acceptance criteria checked"
 looptrack issue status DEMO-0004 Todo --comment "差し戻し: Use B, and match the existing button colour"
+looptrack session digest DEMO-0004 digest.md   # send a session digest (- reads standard input)
+looptrack session pull DEMO-0004               # write the latest digests to .claude/.looptrack-work/DEMO-0004-digest.md
+looptrack session transcript push              # send the current session's transcript to your own store (--dry-run: counts only)
+looptrack session transcript list              # list your transcripts
+looptrack session transcript pull 42           # place it on another machine under a new session id and show the fork command
+looptrack session transcript purge 42          # purge a transcript's content (cannot be undone)
 ```
 
 ## Assignees

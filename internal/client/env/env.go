@@ -22,6 +22,13 @@ const (
 	Token     = "TOKEN"      // アクセストークン（無ければ資格情報のファイル）
 	Timeout   = "TIMEOUT"    // API の待ち時間（秒。既定 30）
 	SessionID = "SESSION_ID" // AI のセッション ID の明示（X-Looptrack-Session）
+	// MachineLocal はセッション要約の本文で <machine-local> に置き換える置き場（OS のパスの区切りで複数。pathhint）
+	MachineLocal = "MACHINE_LOCAL"
+	// MachineLabel はセッション要約の 1 行目に書く端末のラベル（無ければホスト名。looptrack session digest）
+	MachineLabel = "MACHINE_LABEL"
+	// SessionTranscripts は会話記録を hook で自動で送る、端末ごとのオプトイン（"1" で入。既定は切。DESIGN.md §9-8）。
+	// 手で打つ looptrack session transcript push は見ない（打つこと自体が本人の同意なので）
+	SessionTranscripts = "SESSION_TRANSCRIPTS"
 )
 
 // Env は環境変数の参照。ゼロ値は何も無い環境。

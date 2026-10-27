@@ -160,11 +160,14 @@ looptrack issue attach DEMO-0004 screenshot.png report.html   # 添付して、�
 looptrack issue comment DEMO-0004 "画面を直した" --attach after.png
 looptrack issue verify DEMO-0004 --attach-output              # 切る前の出力の全文を verify の記録に付ける
 looptrack issue verify DEMO-0004 --attach coverage.html       # ほかのファイルも記録に付ける（繰り返せる）
+looptrack issue attachment get 12 --out ./evidence/           # 添付の本体を手元に保存する（既にあるファイルは上書きしない）
 ```
 
 - AI は MCP のツールではファイルを送れません。CLI の `issue attach` で送って返った ID を `report_verify` か `add_comment` の `attachments` に渡します。guide と MCP の案内文が AI にこの手順を指示します。
+- `issue attachment get <添付ID>` は、本体を添付のファイル名で作業ディレクトリに保存します。`--out` で保存先を指定することもできます（既存のディレクトリなら、その中に添付の名前で保存します）。既にあるファイルは上書きしません。保存するバイト列はサーバが記録した sha256 と照らし、違えば何も保存しません。消去済みの添付は理由を出して終了コード 1 になります。
 - ブラウザではコメントの欄でファイルを選ぶ・ドラッグ&ドロップする・スクリーンショットを貼り付けるの 3 通りで添付できます。ドロワーに添付の一覧が出て画像はその場で見られます。
 - テキストのファイルに秘密らしいもの（トークンやパスワードの形）があると、CLI は 1 件も送らずに止まります。サーバでは中身を隠せないからです。
+- gzip（`.gz`・`.tgz`）・zip・tar は、CLI がメモリの中で展開し、中のファイルごとに同じ検査をします。止めた理由には書庫の名前・中のパス・行を出します。展開するのは 2 重まで（`.tar.gz`、zip の中の `.gz` など）です。上限は 1 つの添付につき展開後の合計 64 MiB・中のファイル 10,000 個で、上限を超えた書庫・壊れて読めない書庫・それより深い書庫は、検査できないので送りません。そのほかのバイナリ（画像・PDF・xz・bzip2・7z など）は中を検査せずに送ります。テキストを圧縮して添付するときは、この 3 つの形式を使うか、テキストのまま添付してください。
 - 添付は消せません。秘密を誤って添付したときは管理者に本体の消去を頼んでください（[管理者の手引き](server/admin.md#添付の上限と消去)）。
 - 上限の既定は 1 ファイル 20MiB、1 プロジェクト 1GiB です。
 
@@ -188,10 +191,14 @@ looptrack issue verify DEMO-0004 --attach coverage.html       # ほかのファ�
 | `判断:` | 人の返答を AI が残す | In Review への返答が了承・指示のとき | `判断: この文言で良い。Done にする` |
 | `差し戻し:` | 人の返答を AI が残す | In Review への返答がやり直しのとき | `差し戻し: ボタンは右上に。色は既存に合わせる` |
 | `フィードバック:` | 聞いた反応を AI が残す | 参加者・テスターの反応を聞いたとき | `フィードバック: テスター A（9/18・保存の操作で）保存ボタンが見つからない` |
+| `セッション要約:` | AI（`looptrack session digest` で送る） | 端末を交代する前・作業の区切り | `セッション要約: home-mac`（見出しの行は CLI が足す） |
 
 - 先頭の語の前には空白も改行も置きません。全角のコロン（`：`）でも同じに扱います。
 - `判断:` なら Done（`close --comment "判断: …"`）へ動かします。`差し戻し:` のときの行き先は Todo（`status <ID> Todo --comment "差し戻し: …"`）です。
 - `フィードバック:` の後に、先頭の語の無いコメントか状態の変更が付けば「応答済み」です。
+- `セッション要約:` は別の端末のセッションに作業の文脈を渡すためのもので、`フィードバック:` への応答には数えません。書き方と読み方は[複数の端末で使う](ai-agents.md#セッション要約)にあります。
+- 会話記録そのものを自分の別の端末へ運ぶ `looptrack session transcript` は、コメントを残しません。使い方は[会話記録をそのまま運ぶ](ai-agents.md#会話記録をそのまま運ぶ)にあります。
+- 資格情報らしい文字列（`token=`・`Bearer …`・秘密鍵など）を含むコメントは、どの経路で送っても 422 `comment_secret` で拒否されます。理由に出るのは行番号と規則の語だけです。値を `***` に替えて送り直してください。これはプロジェクト別ルール `comment.reject_secret` の働きで、既定で入です（[管理者の手引き](server/admin.md#プロジェクト別ルールの設定)）。
 - 結論だけを後からまとめて書くのはやめておきましょう。原因が分かった時点で書いておけば、途中で止まっても経緯が残ります。
 
 ```bash
@@ -199,6 +206,12 @@ looptrack issue comment DEMO-0004 "原因: 日付の変換で時差を見てい�
 looptrack issue status DEMO-0004 "In Review" --comment "判断してほしい点: 文言を 2 案用意した。A と B のどちらにするか"
 looptrack issue close DEMO-0004 --comment "判断: A 案で了承。受け入れ条件 3 件を確認済み"
 looptrack issue status DEMO-0004 Todo --comment "差し戻し: B 案にする。ボタンの色も既存に合わせる"
+looptrack session digest DEMO-0004 digest.md   # セッション要約を送る（- なら標準入力）
+looptrack session pull DEMO-0004               # 最新の要約を .claude/.looptrack-work/DEMO-0004-digest.md に書き出す
+looptrack session transcript push              # 今のセッションの会話記録を自分の置き場へ送る（--dry-run は件数だけ）
+looptrack session transcript list              # 自分の会話記録の一覧
+looptrack session transcript pull 42           # 別の端末で新しいセッション ID で置き、fork の再開のコマンドを出す
+looptrack session transcript purge 42          # 会話記録の本体を消す（取り消せない）
 ```
 
 ## 担当者

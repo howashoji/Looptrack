@@ -44,6 +44,7 @@ install.sh での順番は下の「保存先に MySQL を選ぶとき」を見�
 | `LOOPTRACK_TOTP_ISSUER` | `Looptrack` | TOTP の発行者名（認証アプリに表示される名前）。登録済みの認証アプリの表示を保つときは以前の名前を設定する |
 | `LOOPTRACK_COOKIE_SECURE`・`LOOPTRACK_TRUSTED_PROXIES` | `true`・`127.0.0.1/32,::1/128,172.16.0.0/12` | https 前提の Cookie・`X-Real-IP` を信用する接続元 |
 | `LOOPTRACK_ATTACH_DIR` | `$STATE_DIRECTORY/attachments`、無ければ SQLite の DB の隣の `attachments` | 添付の本体の置き場。どれにも当たらなければ添付だけが使えない（下の「添付の置き場とバックアップ」） |
+| `LOOPTRACK_TRANSCRIPT_DIR` | `$STATE_DIRECTORY/transcripts`、無ければ SQLite の DB の隣の `transcripts` | 会話記録の本体の置き場。どれにも当たらないか添付の置き場と入れ子なら会話記録だけが使えない（下の「会話記録の置き場」） |
 
 CLI（`looptrack issue`）の接続先は `LOOPTRACK_API_URL` か `init --url` / `login --url` で決まります。
 どれも無いときは手元のローカルモードのアドレス `http://127.0.0.1:8090/looptrack` が既定です。
@@ -502,7 +503,7 @@ README の 1 行は一時 HTTP サーバに置いた `raw/deploy/install.sh` と
 ## 添付の置き場とバックアップ
 
 イシューに添付するテストのエビデンスのファイルは、本体をディスクに置きます。メタデータは DB に置きます。設計は DESIGN.md §2-4 にあります。
-**バックアップは DB と添付の 2 系統になります。** DB のダンプだけでは本体は戻りません。
+**バックアップは DB・添付・会話記録の 3 系統になります。** DB のダンプだけでは本体は戻りません（会話記録は下の「会話記録の置き場」）。
 
 ### 置き場
 
@@ -541,9 +542,40 @@ README の 1 行は一時 HTTP サーバに置いた `raw/deploy/install.sh` と
 
   以前の SQLite の compose.yaml は `./data:/data` を持っているので 3 番目の決め方で `/data/attachments` に決まり、足さなくても使えます。
 
+### 会話記録の置き場
+
+会話記録（AI の生の会話記録を別の端末へ運ぶもの。設計は DESIGN.md §2-5）の本体も、添付と同じ形でディスクに置きます。
+**置き場は添付とは別のディレクトリにします。** 添付の整合の検査（`repair-attachments --apply`）は添付から指されない本体を消すので、
+同じ場所に置くと会話記録の本体を消してしまうからです（逆も同じ）。決まる順は添付と同じで、名前だけが違います。
+
+1. 環境変数 `LOOPTRACK_TRANSCRIPT_DIR`
+2. `$STATE_DIRECTORY/transcripts`
+3. SQLite の DB と同じディレクトリの `transcripts`
+
+| 動かし方 | 置き場 | 誰が決めるか |
+| -- | -- | -- |
+| systemd（install.sh） | `/var/lib/looptrack/transcripts` | install.sh が `.env` に `LOOPTRACK_TRANSCRIPT_DIR` を足し、`looptrack` の持ち物（0750）で作る（添付と同じく、入れるときと `--upgrade` のたび。既に行があれば触らない） |
+| compose（setup） | `<dir>/data/transcripts`（コンテナの `/data/transcripts`） | setup の compose.yaml が `environment` に `LOOPTRACK_TRANSCRIPT_DIR: /data/transcripts` を書く |
+| デスクトップ版 | データの置き場（`DataDir`）の `transcripts` | デスクトップ版 |
+
+- どれにも当たらないときと、**会話記録の置き場と添付の置き場の一方がもう一方の中にある**（同じ場所を含む）ときは、
+  サーバは起動したまま会話記録だけが使えません（API は「置き場が設定されていない」と返します）。入れ子のときは起動時のログに
+  `transcripts disabled` の 1 行が両方のパスとともに出ます。`LOOPTRACK_TRANSCRIPT_DIR` を添付の置き場の外に直してください。
+- 以前の setup が書いた MySQL の compose.yaml には `LOOPTRACK_TRANSCRIPT_DIR` がありません。使うときは上の添付の足し方と同じ
+  `services.looptrack` の `environment` に `LOOPTRACK_TRANSCRIPT_DIR: /data/transcripts` を足して作り直します（`./data:/data` も要ります）。
+  SQLite の compose.yaml は 3 番目の決め方で `/data/transcripts` に決まります。
+- DB と置き場の食い違いは `looptrack repair-transcripts` が `repair-attachments` と同じ形で調べます（引数なしは報告だけ。
+  `--apply` はどこからも指されない本体を消し、書かれて 1 時間以内のものは残す）。置き場が添付と入れ子なら何もせずに止まります。
+  どちらの検査も、消す直前に添付と会話記録の両方の表を引き直し、どちらかから指されている本体は消しません。
+- 利用者の会話記録を運用者が消すのは `looptrack purge-transcripts --user <login> [--transcript <id>] --reason <理由> --yes` です
+  （サーバを置くマシンで、`LOOPTRACK_DSN` と置き場の環境変数は `serve` と同じものを使います）。`--yes` が無いときは消す対象の
+  会話記録の数・消去していないチャンクの数・バイト数を示すだけで何も変えません。`--yes` では理由（`--reason`）が必須で、
+  本体のファイルが無くなり、`transcript_purges` に cause `operator` の行が残ります（題名・ファイル名・セッション ID は出力に出しません）。
+  利用者が居ない・会話記録が 1 つも無いときは理由を添えて終了コード 1 で終わります。管理者の画面（`/admin/transcripts`）にこの操作は置きません。
+
 ### バックアップ
 
-**DB を先に取ってから添付を取ります。** サーバは本体を置いてからメタデータを入れるので、この順なら DB の控えが指す本体は添付の控えに必ずあります。
+**DB を先に取ってから添付と会話記録を取ります。** サーバは本体を置いてからメタデータを入れるので、この順なら DB の控えが指す本体は添付の控えに必ずあります。
 逆の順だと間に添付された分は DB の控えにだけ残ります。その分の本体はありません。
 
 - DB: 今までどおり。SQLite は止めて写すか `sqlite3 <DB> ".backup <控え>"`、MySQL は `mysqldump` などで取ります。
@@ -553,18 +585,27 @@ README の 1 行は一時 HTTP サーバに置いた `raw/deploy/install.sh` と
   sudo rsync -a --delete /var/lib/looptrack/attachments/ /backup/looptrack/attachments/
   ```
 
+- 会話記録: 同じく置き場をディレクトリごと写します。持ち主の消去と保持期間の切れで本体が消えるので、`--delete` で控えからも消します。
+
+  ```bash
+  sudo rsync -a --delete /var/lib/looptrack/transcripts/ /backup/looptrack/transcripts/
+  ```
+
+  会話記録はマスクとパスの書き換えの後の平文です。控えを読める人は中身を読めます（DESIGN.md §2-5「見える人と見えない人」）。
+
   `--delete` は、管理者が消去した本体を控えからも消すために付けます。消去は秘密を誤って添付したときの逃げ道です。
   日付ごとに残している古い控えには消去した本体が残ります。消去したら古い控えからも同じ sha256 のファイルを消してください。
 
 `looptrack export` も添付の本体と目録（`<slug>/attachments.json`）を書き出し、`looptrack verify-files --root <書き出し先>` で本体のバイトが目録の SHA-256 と一致するかを確かめられます。
-`looptrack import` は添付を運ばないので、書き出しは控えの代わりになりません。控えは上の 2 系統で取ります。
+`looptrack import` は添付を運ばないので、書き出しは控えの代わりになりません。会話記録は書き出しにも入りません。控えは上の 3 系統で取ります。
 
-戻すときは DB と添付の両方を戻し、`looptrack repair-attachments` で食い違いを確かめます。
+戻すときは DB・添付・会話記録を戻し、`looptrack repair-attachments` と `looptrack repair-transcripts` で食い違いを確かめます。
 管理のサブコマンドなので、上の「動かし方」の管理コマンドの形で動かします（systemd なら `.env` を読んで `looptrack` の利用者で、compose なら `docker compose run --rm --no-deps looptrack repair-attachments`）。
 置き場の決め方はサーバと同じです。
 
 - 引数なし: 本体の欠け（DB にあって置き場に無い）と、どこからも指されない本体を報告するだけ。何も変えません。
 - `--apply`: どこからも指されない本体を消します。書かれて 1 時間以内のものは添付の途中かもしれないので残す。本体の欠けは直せません（控えから戻します）。
+- どちらも先に `.tmp` を見て、途中で止まった削除が外したまま残した本体と古い印を数えます。`--apply` なら本体を元のパスへ戻すか捨て、古い印を消します。
 
 ### `--upgrade` の控えに添付を入れない理由
 
@@ -590,6 +631,10 @@ install.sh の `--upgrade` は SQLite なら止めた状態で DB を `backup-<�
           client_max_body_size 20m;   # 添付の 1 ファイルの上限に合わせる
       }
   ```
+
+- **会話記録**を使うなら、本文の上限を会話記録の 1 チャンクの上限（既定 32MiB・管理者の画面で変えられる）より少し大きくします（既定なら `client_max_body_size 33m;`）。
+  チャンクの本文は gzip ですが、上限は伸ばした後の大きさで決まり、圧縮の効かない中身なら gzip の後もほぼ同じ大きさです（サーバは上限に gzip の増分の余裕を足した大きさまで受け取ります）。
+  CLI はサーバが返す 413（`transcript_too_large`）を受けたときだけチャンクを小さくして送り直します。プロキシが返す 413 では送り直さずに失敗します。
 
 - Caddy: 本文の上限は `request_body` の `max_size` で付けます。付けるなら 1 ファイルの上限より小さくしないでください。
 

@@ -35,7 +35,7 @@ If anything is unmerged or undeployed, measure that too — how many commits sit
 
 ### 2. Read the existing handoff
 
-Read it from the location given in the "Backends" section below.
+Read it from the location given in the "Backends" section below. With the issue backend, `looptrack session pull <ID>` reads the issue's recent digests.
 
 ### 3. Update the handoff (in place with one session; `append` with parallel sessions)
 
@@ -136,6 +136,35 @@ Once you update the handoff, the hook clears the markers itself at the next Stop
 - For example: make it a convention that the handoff body always carries `master=<short sha>`, and have the check command compare it against the sha the mainline has reached
   (leave commits that only sync memory out of that tip, and compare against the mainline rather than HEAD so that merely sitting on a working branch is not a mismatch).
 - Update through the memory tool's "update", replacing the one latest entry; do not line entries up with "add".
+
+### issue — session digests on the issues (one project worked on from several machines)
+
+- The handoff: for each issue this session has In Progress, send a **session digest** with `looptrack session digest <ID> -`
+  (the body comes on standard input; the CLI adds the leading mark and the `branch:`, `head:` and `ai:` header lines). The digest stays on the issue
+  as a marked comment and shows up in the SessionStart and `next` of the same user's sessions on other machines. `.claude/memories/` never leaves its machine,
+  so pick this backend when the work moves between machines.
+- What to write: the same as the table above (where things stand, finished work, paused work and the next single step, open questions). The branch and HEAD
+  are in the header, so there is no need to repeat them in the body.
+- Never read, display, or put into version control a credential (a token, a password, a private key, a TOTP secret, a value from `.env`).
+  The digest stays on the server as a comment and the project's members read it. The server rejects a body that matches the shape of a value (the reason
+  names only the line number and the rule's word). When that happens, replace the value with `***` or reword it, and send it again.
+- Freshness: the handoff is current when every issue this session started (`own_session` in summary) has a latest digest written by this session that is newer
+  than the markers of the finished events. If even one is missing, Stop is sent back once and the command to send is shown for each issue.
+  When no issue is in progress (after a close, say), nothing is judged.
+- When the server cannot be reached or is slow, nothing is stopped: one notice is shown, the Stop goes through, and the markers are kept (the next Stop after
+  reconnecting checks again). An issue this session cannot be shown to have started (started on the web or from a shell typed into by hand, or started
+  through CLI and MCP, which cannot be compared) is not judged; a notice says so.
+- In a project where the project rule `session.digest_required` is on, the same digest check is added on top of the file, auto-memory and command backends
+  (Stop is sent back until both are satisfied).
+
+```bash
+looptrack session digest ABC-0123 - <<'EOF'
+Where things stand: …
+Finished: …
+Paused: … (next step: …)
+Open: …
+EOF
+```
 
 ## What not to do
 

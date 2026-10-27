@@ -228,6 +228,9 @@ func DescribeRules(lang i18n.Lang, raw json.RawMessage) []Rule {
 			Require  bool     `json:"require_on_close"`
 			Case     string   `json:"case_pattern"`
 			Prompts  bool     `json:"send_prompts"`
+			Digest   bool     `json:"digest_required"`
+			Trans    bool     `json:"transcripts"`
+			Secret   *bool    `json:"reject_secret"`
 		}
 		_ = json.Unmarshal(m[name], &v)
 		st := strings.Join(v.Statuses, " / ")
@@ -284,6 +287,25 @@ func DescribeRules(lang i18n.Lang, raw json.RawMessage) []Rule {
 				st = "Done"
 			}
 			d = i18n.T(lang, "guide.rule.acceptance", "statuses", st)
+		case "session": // セッション要約の必須化（§9-7「引き継ぎの鮮度ガード」。判定は kit/loop の Stop hook）
+			var parts []string
+			if v.Digest {
+				parts = append(parts, i18n.T(lang, "guide.rule.session.digest_required"))
+			}
+			if v.Trans { // 会話記録の保存（§2-5・§9-8）
+				parts = append(parts, i18n.T(lang, "guide.rule.session.transcripts"))
+			}
+			if len(parts) == 0 {
+				d = rawDesc()
+				break
+			}
+			d = strings.Join(parts, i18n.T(lang, "guide.rule.sep"))
+		case "comment": // コメントの秘密の検査（§9-1。判定は service の prepareComment。未設定は入）
+			if v.Secret != nil && !*v.Secret {
+				d = i18n.T(lang, "guide.rule.comment.reject_secret_off")
+				break
+			}
+			d = i18n.T(lang, "guide.rule.comment.reject_secret")
 		default:
 			d = rawDesc()
 		}

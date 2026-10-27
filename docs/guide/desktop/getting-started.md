@@ -85,7 +85,7 @@ You can still open the connection settings any time, from the tray's "Open the c
 1. Open your agent (Claude Code, Codex, GitHub Copilot, …) in the repository you want to track issues for.
 2. From the tray menu, choose "Copy AI connection settings". You can also choose "Open the connection settings page" and copy the same thing from the browser.
 3. Paste it into a prompt along with what you want. For example, write "Add this MCP connection, then set up issue management for this repository" and paste the copied block below that sentence.
-4. Approve what the agent proposes as it goes: adding the MCP connection, then the install command it gets back from the `setup` tool. [Agent-specific notes](../ai-agents.md) walks through exactly what happens at each step, under "Installing through MCP only". You won't type any of it yourself. (Signing in only comes up if you point the connection at a server other people share, not at this local app.)
+4. Approve what the agent proposes as it goes: adding the MCP connection, then the install command it gets back from the `setup` tool. [Agent-specific notes](../ai-agents.md) walks through exactly what happens at each step, under "Installing through MCP only". You won't type any of it yourself. (Signing in only comes up if you point the connection at a server other people share, not at this local app.) If you haven't made the CLI available yet, the agent asks you to choose "Make the CLI available" from the tray menu. Choose it, then let the agent carry on.
 5. Restart the agent when it asks you to, and approve its hooks.
 
 From here on, it's all prompts.

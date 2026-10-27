@@ -107,6 +107,9 @@ func (c *Ctx) summaryBody(v *Values) error {
 	if x, ok := res.Get("feedback"); ok { // 3 層の要約に対応したサーバ
 		data.Set("feedback", x)
 	}
+	if x, ok := res.Get("session_digest_required"); ok { // プロジェクト別ルール session.digest_required（引き継ぎの鮮度ガードが --json で読む）
+		data.Set("session_digest_required", x)
+	}
 	if truthy(res, "requirements_ready_total") { // 下位がすべて完了した要件
 		data.Set("requirements_ready", orList(res, "requirements_ready"))
 		data.Set("requirements_ready_total", get(res, "requirements_ready_total", nil))
@@ -118,6 +121,9 @@ func (c *Ctx) summaryBody(v *Values) error {
 	slug, _ := c.Project()
 	if local := localUsageFailure(c.Env, slug); local != nil { // この PC のフックの送信の失敗（サーバには届いていない）
 		data.Set("usage_send_failure", local)
+	}
+	if tr := localTranscriptState(c.Env, slug); tr != nil { // 会話記録の自動送信の鍵と、この PC の hook の失敗（DESIGN.md §9-8）
+		data.Set("transcript_send", tr)
 	}
 	if agent := v.Str("agent"); agent != "" {
 		// SessionStart のフックとして動いている = フックが承認されて動いている証拠。導入済みをサーバへ知らせる
@@ -167,6 +173,9 @@ func (c *Ctx) printSummary(data *jsonorder.Object, limit int64) error {
 			if note := crossPathNote(c.Lang, objects(s.rows)); note != "" {
 				c.Println(note)
 			}
+			if note := digestOtherNotes(c.Lang, objects(s.rows)); note != "" {
+				c.Println(note)
+			}
 		} else {
 			c.Println(i18n.T(c.Lang, "cli.none"))
 		}
@@ -199,6 +208,9 @@ func (c *Ctx) printSummary(data *jsonorder.Object, limit int64) error {
 		}
 	}
 	if line := usageFailureText(c.Lang, asObject(get(data, "usage_send_failure", nil)), loc); line != "" {
+		c.Println(line)
+	}
+	for _, line := range transcriptStateText(c.Lang, asObject(get(data, "transcript_send", nil)), loc) {
 		c.Println(line)
 	}
 	if err := c.printUsageRequests(objects(get(data, "usage_requests", nil)), loc); err != nil {
@@ -327,6 +339,28 @@ func noteIDs(lang i18n.Lang, items []*jsonorder.Object, flag string) []string {
 	return ids
 }
 
+// digestOtherNotes は、別のセッションが書いた最新のセッション要約の注記（対象が無ければ空。DESIGN.md §9-7）。
+// 要約は summary の in_progress のイシューごとに latest_digest として届く。出すのは other_session が true のものだけで
+// （同じセッションの要約・比べられないものは出さない）、見出しの行（端末のラベル・経過）と字下げした抜粋を並べる。
+func digestOtherNotes(lang i18n.Lang, items []*jsonorder.Object) string {
+	var lines []string
+	for _, it := range items {
+		d := asObject(get(it, "latest_digest", nil))
+		if !truthy(d, "other_session") {
+			continue
+		}
+		lines = append(lines, i18n.T(lang, "cli.summary.digest_other", "id", getStr(it, "id", ""),
+			"label", getStr(d, "machine_label", ""), "age", getStr(d, "age", "")))
+		for _, l := range strings.Split(getStr(d, "excerpt", ""), "\n") {
+			if l != "" { // 空行は字下げしない（行末に空白を残さない。サーバの digestOtherNote と同じ形）
+				l = "  " + l
+			}
+			lines = append(lines, l)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 // otherSessionNote は「別のセッションが着手中」の注記（対象が無ければ空）。
 // 同じ作業ツリーで複数の AI のセッションが動くとき、着手済みのものを取りに行かせないために出す。
 // 経過時間も添えるので、長く動いていないもの（渡したまま放置されたもの）にも気づける。
@@ -386,6 +420,87 @@ func usageFailureText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) s
 	}
 	return i18n.TN(lang, "cli.summary.usage_send_failed", int(spooled), "at", localTimeIn(getStr(o, "at", ""), loc), "reason", why,
 		"count", intOf(get(o, "count", int64(0))), "spooled", spooled)
+}
+
+// localTranscriptState は会話記録の自動送信（DESIGN.md §9-8「hook」）の、この PC での状態。auto は 2 つの鍵の組み合わせ
+// （on: 端末のオプトインと覚えたルールの両方が入・opt_in_off: ルールは入だが端末のオプトインが切。ルールが切か、覚えていなければ載せない）。
+// 失敗と退避の件数は usagesnap の transcript-failure.json と transcript-spool（このプロジェクトの分）。出すものが無ければ nil。
+func localTranscriptState(e env.Env, project string) *jsonorder.Object {
+	dir := usagesnap.StateDir(e)
+	f := usagesnap.ReadTranscriptFailure(dir)
+	spooled := len(usagesnap.SpoolFiles(usagesnap.TranscriptSpoolDir(dir, e.Value(env.APIURL), project)))
+	rule, _, known := usagesnap.TranscriptsRule(usagesnap.Options{Env: env.Overlay(e, map[string]string{env.Name(env.Project): project})})
+	auto := ""
+	if known && rule {
+		auto = "opt_in_off"
+		if usagesnap.TranscriptsOptIn(e) {
+			auto = "on"
+		}
+	}
+	if auto == "" && f == nil && spooled == 0 {
+		return nil
+	}
+	o := jsonorder.NewObject()
+	if auto != "" {
+		o.Set("auto", auto)
+	}
+	if f != nil || spooled > 0 {
+		o.Set("spooled", spooled)
+	}
+	if f != nil {
+		o.Set("reason", f.Reason).Set("at", f.At.UTC().Format(time.RFC3339)).Set("count", f.Count)
+		if f.Status != 0 {
+			o.Set("status", f.Status)
+		}
+		if f.Files != 0 {
+			o.Set("files", f.Files)
+		}
+	}
+	return o
+}
+
+// transcriptStateText は localTranscriptState の行（鍵の状態の 1 行と、送れていないときの 1 行。無ければ空）。
+func transcriptStateText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) []string {
+	if o == nil || len(o.Keys()) == 0 {
+		return nil
+	}
+	var lines []string
+	optIn := env.Name(env.SessionTranscripts)
+	switch getStr(o, "auto", "") {
+	case "on":
+		lines = append(lines, i18n.T(lang, "cli.summary.transcript_auto_on", "env", optIn))
+	case "opt_in_off":
+		lines = append(lines, i18n.T(lang, "cli.summary.transcript_auto_opt_in_off", "env", optIn))
+	}
+	spooled := intOf(get(o, "spooled", int64(0)))
+	reason := getStr(o, "reason", "")
+	switch {
+	case reason != "":
+		var why string
+		switch reason {
+		case usagesnap.FailUnreachable:
+			why = i18n.T(lang, "cli.summary.usage_fail.unreachable")
+		case usagesnap.FailNoToken:
+			why = i18n.T(lang, "cli.summary.transcript_fail.no_token")
+		case usagesnap.FailRejected:
+			why = i18n.T(lang, "cli.summary.transcript_fail.rejected", "status", intOf(get(o, "status", int64(0))))
+		case usagesnap.FailSpool:
+			why = i18n.T(lang, "cli.summary.transcript_fail.spool_failed")
+		case usagesnap.FailClient:
+			why = i18n.T(lang, "cli.summary.transcript_fail.client_error")
+		case usagesnap.FailTranscriptRejected:
+			why = i18n.T(lang, "cli.summary.transcript_fail.converted", "files", intOf(get(o, "files", int64(0))))
+		case usagesnap.FailTranscriptRewritten:
+			why = i18n.T(lang, "cli.summary.transcript_fail.rewritten")
+		default:
+			why = reason // 新しい版が書いた知らないキーはそのまま出す
+		}
+		lines = append(lines, i18n.TN(lang, "cli.summary.transcript_send_failed", int(spooled), "at", localTimeIn(getStr(o, "at", ""), loc),
+			"reason", why, "count", intOf(get(o, "count", int64(0))), "spooled", spooled))
+	case spooled > 0:
+		lines = append(lines, i18n.TN(lang, "cli.summary.transcript_spooled", int(spooled), "count", spooled))
+	}
+	return lines
 }
 
 // lookPathFn・executableFn は PATH の探し方と実行中の looptrack の場所（テストで差し替える）。

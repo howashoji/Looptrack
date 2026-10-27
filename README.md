@@ -91,6 +91,12 @@ What you get out of the box:
   point it at the server. Codex and Copilot are wired from the same manifest.
 - Token accounting. Consumption is attributed to sessions, agents, stages and
   issues, and comes out as a PDF report (see [Token reports](#token-reports)).
+- Working from several machines. Before you switch machines, the agent leaves
+  a session digest on the issue it holds (`looptrack session digest`), and the
+  session on the other machine starts from it. A project can also turn on
+  carrying the raw transcript to your other machine, where it opens as a fork
+  and nothing is appended to the original (`looptrack session transcript`). See
+  [Working from several machines](docs/guide/ai-agents.md#working-from-several-machines).
 
 ## Getting started
 
@@ -248,6 +254,10 @@ stable release exists does it go to the highest version including release
 candidates. To match the version you run, open
 `https://howashoji.github.io/Looptrack/<version>/`. For example, `v1.0.1/` is
 version 1.0.1. Add `ja/` after the version for Japanese.
+The site root and `latest/` follow your browser's language, so a browser that
+prefers Japanese over English lands on the Japanese page. A language you pick
+from the language menu is remembered and wins over the browser's setting. Links
+to a specific version open in the language of the link.
 In the web UI, "Guide" in the user menu opens the pages for the version the
 server runs.
 
@@ -285,6 +295,7 @@ Skills are different. A skill can't be picked at run time, so
 | `https://example.com/looptrack/account` | Account settings: issue and revoke access tokens, change password |
 | `https://example.com/looptrack/admin/users` | User administration (administrators) |
 | `https://example.com/looptrack/admin/attachments` | Attachment limits, usage and purging (administrators) |
+| `https://example.com/looptrack/admin/transcripts` | Transcript limits and per-user usage, without any content (administrators) |
 | `https://example.com/looptrack/api/v1/` | REST API (bearer token) |
 | `https://example.com/looptrack/mcp` | Remote MCP (OAuth 2.1 or a token) |
 
@@ -303,6 +314,10 @@ The public URL and the `/looptrack` prefix are both configurable.
   database, so back up the attachment directory as well and take the database
   first. `looptrack export` writes the attachments too, but `looptrack import`
   doesn't carry them. See "添付の置き場とバックアップ" in
+  [DEPLOY.md](docs/server/DEPLOY.md).
+- Transcripts carried between machines are kept on disk as well, in a
+  directory of their own. Copy it after the database too. `looptrack export`
+  doesn't write them. See "会話記録の置き場" in
   [DEPLOY.md](docs/server/DEPLOY.md).
 
 ### On the screen

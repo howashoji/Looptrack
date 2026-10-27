@@ -1,0 +1,20 @@
+# attachment-get/ok
+$ issue attachment get 11
+
+#### exit 0
+
+#### stdout
+添付 11 を保存しました: $TMP/ws/notes.txt（13 バイト・sha256 f066565636b17966854ea7c3a494a90788758362da427f35a124480368d4eb9f はサーバの記録と一致）
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/attachments/11
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (1)
+ws/notes.txt (0644)
+    PASS
+    ok  pkg

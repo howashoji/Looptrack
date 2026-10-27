@@ -56,6 +56,12 @@ func Failf(format string, a ...any) error { return &Fail{fmt.Sprintf(format, a..
 
 // Main は `looptrack issue` の入口。args は issue の後ろの引数。終了コードを返す。
 func Main(args []string, stdio IO, e env.Env) int {
+	return runGroup("looptrack issue", IssueCommand, args, stdio, e)
+}
+
+// runGroup はサブコマンドの群（issue・session）に共通の入口。引数を tree で読み、葉の Run を動かして終了コードを返す
+// （誤りは「エラー: …」で 1、引数の誤りは usage で 2、-h は 0）。
+func runGroup(prog string, tree func(i18n.Lang) *Command, args []string, stdio IO, e env.Env) int {
 	lang := i18n.FromEnv(func(k string) string { return e.Get(k) })
 	root := e.Get("CLAUDE_PROJECT_DIR")
 	if root == "" {
@@ -69,8 +75,8 @@ func Main(args []string, stdio IO, e env.Env) int {
 	fixLocalZone(e)
 	api.SetRoot(root)
 	ctx := &Ctx{IO: stdio, Env: e, Root: root, Args: args, Lang: lang}
-	cmd := IssueCommand(lang)
-	vals, leaf, err := Parse(cmd, "looptrack issue", args)
+	cmd := tree(lang)
+	vals, leaf, err := Parse(cmd, prog, args)
 	if err != nil {
 		var ue *UsageError
 		var hr *helpRequested

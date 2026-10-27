@@ -32,7 +32,7 @@ These sections apply to both editions.
 | 1 | [Concepts](concepts.md) | What loop engineering is, and why the issue is the source of truth |
 | 2 | [Where Looptrack fits](where-it-fits.md) | Which feature serves which of the three loops |
 | 3 | [Daily use](daily-use.md) | Your first loop, filing issues, acceptance criteria, verify commands, comment types, assignees, the display language |
-| 4 | [Agent-specific notes](ai-agents.md) | Claude Code, Codex, GitHub Copilot, and other agents |
+| 4 | [Agent-specific notes](ai-agents.md) | Claude Code, Codex, GitHub Copilot, and other agents, and working from several machines (session digests, carrying the raw transcript) |
 | 5 | [FAQ / Troubleshooting](faq.md) | Common messages and what to do about them |
 | 6 | [Token reports](token-report.md) | What token usage is recorded and what is not, how it is attributed to issues, and how to make the PDF report and record it in the ledger |
 

@@ -8,6 +8,7 @@ Here's what gets recorded, how it's added up, and how a report comes together.
 
 Your machine sends a **snapshot**: the conversation's running total at one moment.
 The server actually knows nothing about tokens on its own. Only the agent's conversation record on your machine has them, so `looptrack` reads that record (Claude Code: `~/.claude/projects/…`, Codex: `~/.codex/sessions/…`) and sends the figures.
+If you moved the agent's directory with `CLAUDE_CONFIG_DIR` or `CODEX_HOME`, `looptrack` looks there instead (`<CLAUDE_CONFIG_DIR>/projects/…`, `<CODEX_HOME>/sessions/…`).
 
 A snapshot carries:
 

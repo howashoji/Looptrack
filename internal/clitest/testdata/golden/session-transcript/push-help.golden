@@ -1,0 +1,24 @@
+# session-transcript/push-help
+$ session transcript push -h
+
+#### exit 0
+
+#### stdout
+usage: looptrack session transcript push [-h] [--current] [--agent {claude-code,codex}] [--dry-run] [SESSION_ID]
+
+会話記録を送る（前回の続きだけ）。手で打つ push は LOOPTRACK_SESSION_TRANSCRIPTS を要らない（hook の自動送信だけが見る）
+
+positional arguments:
+  SESSION_ID             Claude Code のセッション ID か Codex のスレッド ID
+
+options:
+  -h, --help             show this help message and exit
+  --current              今のセッション（X-Looptrack-Session と同じ決め方。セッション ID を省略したときの既定）
+  --agent {claude-code,codex} AI の種類（省略すると環境から決め、決まらなければ Claude Code → Codex の順に探す）
+  --dry-run              送らずに件数（ファイル・行・チャンク・書き換え・マスク・書き換えなかった絶対パス・運ばないファイル）だけを出す
+
+#### stderr
+
+#### requests (0)
+
+#### files (0)

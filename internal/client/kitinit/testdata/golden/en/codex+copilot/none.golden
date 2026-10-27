@@ -12,7 +12,7 @@ Install set: core only. loop is not installed (--loop installs it).
   create     .github/hooks/looptrack.json
   create     AGENTS.md
   create     .claude/.looptrack-kit.json
-verify: checked 8 wiring(s), looptrack dev（headless・test）
+verify: checked 10 wiring(s), looptrack dev（headless・test）
 Next:
   1. Trust the Codex hooks (see "Trusting hooks" below; run /hooks in the codex terminal)
   2. Copilot: start a new chat (VS Code) or a new session (Copilot CLI, trusting this folder) so the hooks in .github/hooks/looptrack.json are loaded
@@ -116,6 +116,11 @@ GitHub Copilot setup (VS Code agent mode and Copilot CLI. Copilot CLI was checke
                 "type": "command",
                 "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
                 "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
+                "timeout": 10
               }
             ]
           }
@@ -126,6 +131,11 @@ GitHub Copilot setup (VS Code agent mode and Copilot CLI. Copilot CLI was checke
               {
                 "type": "command",
                 "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
                 "timeout": 10
               }
             ]

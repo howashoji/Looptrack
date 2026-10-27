@@ -1,0 +1,32 @@
+# session-transcript/pull
+$ session transcript pull 7
+
+#### exit 0
+
+#### stdout
+会話記録 7 を置きました（ファイル 1）: $TMP/home/.claude/projects/$TMPSLUG-ws/93655595-bf42-4dd0-9d95-433d6b918412.jsonl
+再開（fork）: claude --resume $TMP/home/.claude/projects/$TMPSLUG-ws/93655595-bf42-4dd0-9d95-433d6b918412.jsonl --fork-session
+
+#### stderr
+注意: 本文（AI の返答・ツールの出力など）に送った端末の絶対パスが 1 個残っています（書き換えない欄）
+plain の claude --resume <id>（Claude Code）や codex resume（Codex）では開かないでください。取り込んだ写しに追記されます。必ず fork のコマンドを使ってください
+
+#### requests (2)
+GET /im/api/v1/transcripts/7
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+GET /im/api/v1/transcripts/7/chunks/1
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (4)
+home/.claude/projects/$TMPSLUG-ws/93655595-bf42-4dd0-9d95-433d6b918412.jsonl (0600)
+    {"type":"user","sessionId":"93655595-bf42-4dd0-9d95-433d6b918412","cwd":"$TMP/ws","message":{"role":"user","content":"x.go を直して"}}
+    {"type":"assistant","sessionId":"93655595-bf42-4dd0-9d95-433d6b918412","cwd":"$TMP/ws","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Edit","input":{"file_path":"$TMP/ws/x.go"}}]}}
+ws/.git/HEAD (0644)
+    ref: refs/heads/feature/x
+ws/.git/objects/.keep (0644)
+ws/.git/refs/heads/feature/x (0644)
+    0123456789abcdef0123456789abcdef01234567

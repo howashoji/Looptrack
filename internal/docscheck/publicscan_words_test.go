@@ -154,7 +154,7 @@ func wordsPtr(s string) *string { return &s }
 //
 // 公開名（リポジトリ・イメージ・識別子）は、社名を含んでいても公開してよいので、検査の前に行から取り除く。
 // 前方一致で取り除くと、looptrack-internal のように公開名で始まる別の名前まで、社名の部分ごと消えてしまう。
-// そうなると社内固有の語に当たらず、黙って通る。だから公開名の直後が英数字・_・- のときは例外にしない。
+// そうなると社内固有の語に当たらず、黙って通る。だから公開名の直後が英数字・_・- のとき（と、. の後に英数字が続くとき）は例外にしない。
 // 一覧の語に、公開名の中に現れる社名を使うのは、取り除かれる側を直接通すため。
 func TestPublicScanPublicNameBoundary(t *testing.T) {
 	requirePublicScanTools(t)
@@ -172,10 +172,11 @@ func TestPublicScanPublicNameBoundary(t *testing.T) {
 		"net." + co + ".looptrack-x",
 		"https://api.github.com/repos/" + co + "/looptrack_old",
 		"https://raw.githubusercontent.com/" + co + "/looptrack2/main/install.sh",
+		"net." + co + ".looptrack.internal",
+		"https://github.com/" + co + "/looptrack.git",
 	}
 	passed := []string{
 		"https://github.com/" + co + "/looptrack/",
-		"https://github.com/" + co + "/looptrack.git",
 		"ghcr.io/" + co + "/looptrack:1.0.2",
 		"net." + co + ".looptrack",
 		"\"github.com/" + co + "/looptrack\"",

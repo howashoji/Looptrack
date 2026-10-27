@@ -15,6 +15,11 @@
     {"name": "判断（全角）", "content": "判断：了承", "kind": "decision"},
     {"name": "差し戻し", "content": "差し戻し: 見出しを直す", "kind": "sendback"},
     {"name": "判断の途中", "content": "判断材料: …", "kind": ""},
+    {"name": "セッション要約", "content": "セッション要約: home-mac\nbranch: main", "kind": "digest"},
+    {"name": "セッション要約（全角）", "content": "セッション要約：home-mac", "kind": "digest"},
+    {"name": "セッション要約の前に空白", "content": " セッション要約: home-mac", "kind": ""},
+    {"name": "セッション要約の途中", "content": "セッション要約案: …", "kind": ""},
+    {"name": "要約だけ", "content": "要約: …", "kind": ""},
     {"name": "空", "content": "", "kind": ""}
   ],
   "_en": "英語の別名（DESIGN.md §9-6）。Go だけが読む（Python の issue.py は機能凍結で別名を足さない）。lead_en・excerpt_en は leadword_test.go、sequences_en は internal/server/loops_test.go（MySQL と SQLite の両方）",
@@ -37,7 +42,13 @@
     {"name": "Changes requested", "content": "Changes requested: fix the heading", "kind": "sendback"},
     {"name": "CHANGES REQUESTED（大文字）", "content": "CHANGES REQUESTED: x", "kind": "sendback"},
     {"name": "Changes requested の空白が 2 つ", "content": "Changes  requested: x", "kind": ""},
-    {"name": "Changes だけ", "content": "Changes: x", "kind": ""}
+    {"name": "Changes だけ", "content": "Changes: x", "kind": ""},
+    {"name": "Session digest", "content": "Session digest: work-pc\nbranch: main", "kind": "digest"},
+    {"name": "SESSION DIGEST（大文字）", "content": "SESSION DIGEST:work-pc", "kind": "digest"},
+    {"name": "Session digest の全角コロンは認めない", "content": "Session digest：work-pc", "kind": ""},
+    {"name": "Session digest の空白が 2 つ", "content": "Session  digest: x", "kind": ""},
+    {"name": "Session だけ", "content": "Session: x", "kind": ""},
+    {"name": "Session digests", "content": "Session digests: x", "kind": ""}
   ],
   "excerpt_en": [
     {"name": "英語の先頭語を除く", "content": "Feedback:  tester A\nsave button\n\nnot found", "n": 80, "out": "tester A save button not found"},

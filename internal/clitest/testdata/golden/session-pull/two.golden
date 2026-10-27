@@ -1,0 +1,58 @@
+# session-pull/two
+$ session pull DEMO-0001
+
+#### exit 0
+
+#### stdout
+# DEMO-0001 のセッション要約（新しい順・2 件）
+
+## 2024-05-03 09:00（コメント #4）
+
+Session digest: laptop-b
+branch: feature/x
+head: 89abcdef
+ai: codex
+
+Where things stand: ~/notes/plan.md is the plan.
+
+## 2024-05-02 12:00（コメント #2）
+
+セッション要約: desk-a
+branch: feature/x
+head: 0123abc
+ai: claude-code
+
+現在地: ./internal/client/cli/session.go を足した。
+
+#### stderr
+書き出し: .claude/.looptrack-work/DEMO-0001-digest.md
+
+#### requests (1)
+GET /im/api/v1/issues/DEMO-0001?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (2)
+ws/.claude/.looptrack-work/.gitignore (0644)
+    *
+ws/.claude/.looptrack-work/DEMO-0001-digest.md (0644)
+    # DEMO-0001 のセッション要約（新しい順・2 件）
+
+    ## 2024-05-03 09:00（コメント #4）
+
+    Session digest: laptop-b
+    branch: feature/x
+    head: 89abcdef
+    ai: codex
+
+    Where things stand: ~/notes/plan.md is the plan.
+
+    ## 2024-05-02 12:00（コメント #2）
+
+    セッション要約: desk-a
+    branch: feature/x
+    head: 0123abc
+    ai: claude-code
+
+    現在地: ./internal/client/cli/session.go を足した。

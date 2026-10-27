@@ -1,7 +1,11 @@
 package server
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -151,5 +155,63 @@ func TestAttachCommentCLI(t *testing.T) {
 	}
 	if strings.Contains(string(raw), "attachments") {
 		t.Errorf("添付なしのコメントに attachments: %s", raw)
+	}
+}
+
+// issue attachment get と実サーバの往復。非 ASCII のファイル名（Content-Disposition の RFC 2231 の形）でも保存名が戻り、
+// 保存したファイルの sha256 が一覧の sha256 と一致する。消去済みは終了コード 1 で、何も保存しない。
+func TestAttachmentGetCLI(t *testing.T) {
+	a := newAttachAPIEnv(t)
+	src := filepath.Join(t.TempDir(), "画面.png")
+	data := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR")
+	if err := os.WriteFile(src, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run := issueCLI(t, a.env, a.pr.Slug, a.ed.token, "LOOPTRACK_USAGE=0", "LOOPTRACK_LANG=ja")
+	r := run("attach", a.issue, src, "--json")
+	var out struct {
+		Attachments []attachmentJSON `json:"attachments"`
+	}
+	if r.code != 0 || json.Unmarshal([]byte(r.stdout), &out) != nil || len(out.Attachments) != 1 {
+		t.Fatalf("attach: exit %d %s%s", r.code, r.stdout, r.stderr)
+	}
+	at := out.Attachments[0]
+	id := strconv.FormatInt(at.ID, 10)
+	var list struct {
+		Attachments []attachmentJSON `json:"attachments"`
+	}
+	a.viewer.json(200, "GET", "/issues/"+a.issue+"/attachments", nil, &list)
+	if len(list.Attachments) != 1 || list.Attachments[0].SHA256 == "" {
+		t.Fatalf("一覧: %+v", list.Attachments)
+	}
+
+	get := issueCLI(t, a.env, a.pr.Slug, a.viewer.token, "LOOPTRACK_USAGE=0", "LOOPTRACK_LANG=ja")
+	dir := t.TempDir()
+	if r := get("attachment", "get", id, "--out", dir); r.code != 0 {
+		t.Fatalf("attachment get: exit %d %s%s", r.code, r.stdout, r.stderr)
+	}
+	saved, err := os.ReadFile(filepath.Join(dir, "画面.png")) // 保存名は Content-Disposition の filename
+	if err != nil {
+		t.Fatalf("添付の名前で保存されていない: %v", err)
+	}
+	sum := sha256.Sum256(saved)
+	if hex.EncodeToString(sum[:]) != list.Attachments[0].SHA256 || !bytes.Equal(saved, data) {
+		t.Errorf("保存した本体の sha256 %x が一覧の sha256 %s と一致しない", sum, list.Attachments[0].SHA256)
+	}
+	// 既にあるファイルは上書きしない
+	if r := get("attachment", "get", id, "--out", dir); r.code != 1 || !strings.Contains(r.stderr, "上書きしません") {
+		t.Errorf("2 回目: exit %d %s%s", r.code, r.stdout, r.stderr)
+	}
+
+	// 消去済み
+	code, _, b := a.raw(a.admin, "POST", "/attachments/"+id+"/purge", []byte(`{"reason":"誤って添付"}`), -1, "Content-Type", "application/json")
+	if code != http.StatusOK {
+		t.Fatalf("消去: %d %s", code, b)
+	}
+	dir2 := t.TempDir()
+	r = get("attachment", "get", id, "--out", dir2)
+	entries, _ := os.ReadDir(dir2)
+	if r.code != 1 || !strings.Contains(r.stderr, "消去しました") || len(entries) != 0 {
+		t.Errorf("消去済み: exit %d %s%s・保存されたもの %d 件", r.code, r.stdout, r.stderr, len(entries))
 	}
 }

@@ -28,6 +28,30 @@ type Rules struct {
 	Verify      *VerifyRule      `json:"verify,omitempty"`
 	// Acceptance は受け入れ条件の記入の必須化（acceptance.go）。
 	Acceptance *AcceptanceRule `json:"acceptance,omitempty"`
+	// Session はセッション要約（DESIGN.md §9-7）の扱い。
+	Session *SessionRule `json:"session,omitempty"`
+	// Comment はコメントの本文の扱い（秘密の検査。DESIGN.md §9-1）。
+	Comment *CommentRule `json:"comment,omitempty"`
+}
+
+// CommentRule はコメントの本文の扱い。RejectSecret は、セッション要約でないコメント（状態の変更と同時のコメントを含む）の
+// 本文が秘密の検査（FindSecret）に当たったときに拒むか。未設定（nil）は入（拒む）で、ルールを何も設定していない
+// プロジェクトにも効く。false にしたプロジェクトでは保存して、応答に注記（行番号と規則の語）を付ける。
+// セッション要約はこのルールに関わらず拒む（要約は AI が書くもので値を要しない。DESIGN.md §9-7）。
+type CommentRule struct {
+	RejectSecret *bool `json:"reject_secret,omitempty"`
+}
+
+// SessionRule はセッション要約の必須化（DESIGN.md §9-7「引き継ぎの鮮度ガード」）。DigestRequired が true なら、
+// kit/loop の Stop hook（stop-handoff-freshness）が、引き継ぎの backend（LOOPTRACK_LOOP_HANDOFF_BACKEND）に関わらず
+// 「このセッションが着手中のイシューに、作業の完了より新しい自分の要約があるか」も確かめる（backend issue と同じ判定）。
+// サーバは状態の変更を拒まない（判定は hook。値は summary の応答 session_digest_required で hook に届く）。既定は false。
+//
+// Transcripts が true なら、利用者が会話記録をこのプロジェクトのサーバに置ける（DESIGN.md §2-5・§9-8）。既定は false で、
+// 切のプロジェクトへの登録は 422 で拒む。hook の自動送信には、利用者の端末ごとのオプトイン（LOOPTRACK_SESSION_TRANSCRIPTS）も要る。
+type SessionRule struct {
+	DigestRequired bool `json:"digest_required"`
+	Transcripts    bool `json:"transcripts"`
 }
 
 // VerifyRule は検証コマンドの記録の必須化（DESIGN.md §9-3-4）。RequireOnClose が true なら、
@@ -201,6 +225,25 @@ func (r *Rules) CasePattern() *regexp.Regexp {
 		return nil
 	}
 	return r.Usage.caseRe
+}
+
+// DigestRequired はセッション要約を必須にするプロジェクトか（session.digest_required）。未設定なら false。
+func (r *Rules) DigestRequired() bool {
+	return r != nil && r.Session != nil && r.Session.DigestRequired
+}
+
+// TranscriptsEnabled は会話記録の保存を許すプロジェクトか（session.transcripts）。未設定なら false。
+func (r *Rules) TranscriptsEnabled() bool {
+	return r != nil && r.Session != nil && r.Session.Transcripts
+}
+
+// RejectCommentSecret は、秘密の検査に当たるコメントを拒むプロジェクトか（comment.reject_secret）。未設定は入。
+// nil のルール（何も設定していないプロジェクト）でも true を返す。
+func (r *Rules) RejectCommentSecret() bool {
+	if r == nil || r.Comment == nil || r.Comment.RejectSecret == nil {
+		return true
+	}
+	return *r.Comment.RejectSecret
 }
 
 // SendPrompts は指示文の作業名を送ってよいプロジェクトか（usage.send_prompts）。未設定なら false。

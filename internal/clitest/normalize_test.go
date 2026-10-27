@@ -19,6 +19,8 @@ func testNormalizer() *Normalizer {
 		Hostname: "build-mac.local",
 		Start:    start,
 		End:      start.Add(3 * time.Second),
+		// ProjectKey は usagesnap.ProjectKey の形（16 進 32 桁）
+		ProjectKey: "0123456789abcdef0123456789abcdef",
 	}
 }
 
@@ -38,6 +40,10 @@ func TestNormalizeText(t *testing.T) {
 		{"ほかの 127.0.0.1 のポート", "http://127.0.0.1:61234/callback", "http://127.0.0.1:$PORT/callback"},
 		{"ほかのポート（エンコード）", "http%3A%2F%2F127.0.0.1%3A61234%2Fcallback", "http%3A%2F%2F127.0.0.1%3A$PORT%2Fcallback"},
 		{"state", "&state=Zq0_x-9abcdefghijklmnop&scope=im", "&state=$STATE&scope=im"},
+		{"会話記録の印", `"cwd":"{{LT:0123456789ab:ROOT0}}"`, `"cwd":"{{LT:$NONCE:ROOT0}}"`},
+		{"会話記録の印の形でないものは変えない", `{{LT:0123:ROOT0}}`, `{{LT:0123:ROOT0}}`},
+		{"一時ディレクトリの slug", "projects/-private-var-folders-ab-T-TestX-001-ws/a.jsonl", "projects/$TMPSLUG-ws/a.jsonl"},
+		{"プロジェクトの鍵", "transcript-push/0123456789abcdef0123456789abcdef/x.json", "transcript-push/$PROJECTKEY/x.json"},
 		{"短い state は乱数と見なさない", "state=open", "state=open"},
 		{"PKCE", "code_challenge=abcdefghijklmnopqrstuvwxyz012345&code_verifier=ABCDEFGHIJKLMNOPQRSTUVWXYZ-_0123",
 			"code_challenge=$PKCE_CHALLENGE&code_verifier=$PKCE_VERIFIER"},
@@ -164,5 +170,41 @@ func TestOSLooseRunningBin(t *testing.T) {
 	}
 	if got := osLooseFor("windows", `& 'C:\x\looptrack.exe' doctor`); got != `& 'C:/x/looptrack.exe' doctor` {
 		t.Errorf("試す looptrack 以外の & '<パス>' を書き換えた: %q", got)
+	}
+}
+
+// TestNormalizeWindowsJSONPaths は、Windows の一時ディレクトリ（\ 区切り）が JSON の文字列の中で \\ に逃がされていても
+// $TMP になり、golden（POSIX の $TMP/home）と同じに比べられることを確かめる。macOS でも Windows の形の入力で試す。
+// 対照: 一時ディレクトリの外のパスは変えない・逃がしていない形もこれまでどおり $TMP になる。
+func TestNormalizeWindowsJSONPaths(t *testing.T) {
+	norm := func(dir string) *Normalizer { return &Normalizer{Paths: []string{dir}} }
+	a, b := norm(`D:\imtest-tmp\TestX1\001`), norm(`D:\imtest-tmp\TestX1\002`)
+	bodyA := `{"path_hints": {"home": "D:\\imtest-tmp\\TestX1\\001\\home", "roots": ["D:\\imtest-tmp\\TestX1\\001\\ws"]}}`
+	bodyB := `{"path_hints": {"home": "D:\\imtest-tmp\\TestX1\\002\\home", "roots": ["D:\\imtest-tmp\\TestX1\\002\\ws"]}}`
+	want := `{"path_hints": {"home": "$TMP\\home", "roots": ["$TMP\\ws"]}}`
+	if got := a.Text(bodyA); got != want {
+		t.Errorf("逃がした形:\n got %s\nwant %s", got, want)
+	}
+	// 実行ごとに一時ディレクトリが違っても、同じ本文に正規化される（session digest と issue comment の比較）
+	if ga, gb := a.Text(bodyA), b.Text(bodyB); ga != gb {
+		t.Errorf("一時ディレクトリの違いが残る:\n%s\n%s", ga, gb)
+	}
+	// JSON の整形を通した後も、Windows の比較では golden の $TMP/home と同じになる
+	got, ok := a.JSON([]byte(bodyA))
+	if !ok {
+		t.Fatal("前提が崩れています: JSON として読めない")
+	}
+	golden, _ := a.JSON([]byte(`{"path_hints": {"home": "$TMP/home", "roots": ["$TMP/ws"]}}`))
+	if w, g := osLooseFor("windows", golden), osLooseFor("windows", got); w != g {
+		t.Errorf("golden と同じに比べられない:\n golden %s\n got    %s", w, g)
+	}
+	if osLooseFor("darwin", got) == osLooseFor("darwin", golden) {
+		t.Error("前提が崩れています: Windows 以外でも同じに比べられた（Windows の側の検査が空振りしている）")
+	}
+	if got := a.Text(`"D:\\imtest-tmp\\TestY\\home"`); got != `"D:\\imtest-tmp\\TestY\\home"` {
+		t.Errorf("一時ディレクトリの外を書き換えた: %s", got)
+	}
+	if got := a.Text(`保存: D:\imtest-tmp\TestX1\001\ws\out.xlsx`); got != `保存: $TMP\ws\out.xlsx` {
+		t.Errorf("逃がしていない形: %s", got)
 	}
 }

@@ -171,6 +171,11 @@ func (s *Service) Next(ctx context.Context, a Actor, p store.Project, opt NextOp
 	if len(plan.Commands) > 0 {
 		res.Verify = plan
 	}
+	digests, err := s.LatestDigests(ctx, a, p, []string{res.Issue.Item.ID})
+	if err != nil {
+		return nil, err
+	}
+	res.LatestDigest = digests[res.Issue.Item.ID]
 	return res, nil
 }
 

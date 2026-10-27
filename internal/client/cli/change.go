@@ -6,13 +6,16 @@ package cli
 
 import (
 	"errors"
+	"os"
 	"regexp"
 	"strings"
 
 	"github.com/howashoji/looptrack/internal/client/api"
 	"github.com/howashoji/looptrack/internal/client/dashstdin"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/client/pathhint"
 	"github.com/howashoji/looptrack/internal/client/textenc"
+	"github.com/howashoji/looptrack/internal/domain"
 	"github.com/howashoji/looptrack/internal/i18n"
 )
 
@@ -150,13 +153,27 @@ func cmdComment(c *Ctx, v *Values) error {
 	if err != nil {
 		return err
 	}
+	return c.postComment(cl, path, v.Str("id"), text, files)
+}
+
+// postComment はコメントを送り、応答の文面（「コメント追記: <ID>」）を出してトークン情報を付ける。
+// issue comment と session digest が同じこの経路を通る（送る本文のキー・path_hints の添え方が同じなので、
+// 同じ本文なら保存される本文もバイト一致する）。
+func (c *Ctx) postComment(cl *api.Client, path, id, text string, files []attachFile) error {
 	body := jsonorder.NewObject().Set("text", text)
 	if len(files) > 0 {
-		ids, _, err := c.uploadAttachments(cl, v.Str("id"), files, false)
+		ids, _, err := c.uploadAttachments(cl, id, files, false)
 		if err != nil {
 			return err
 		}
 		body.Set("attachments", ids)
+	}
+	// セッション要約なら、本文の端末のパスをサーバに置き換えさせる手がかりを添える（置き換えはサーバの 1 か所。
+	// 要約でないコメントには添えない（古いサーバは知らないキーを拒む））
+	if domain.LeadWord(text) == domain.LeadDigest {
+		if h := c.pathHints(); !h.Empty() {
+			body.Set("path_hints", h.Object())
+		}
 	}
 	res, err := c.send(cl, "POST", path, body)
 	if err != nil {
@@ -167,11 +184,29 @@ func cmdComment(c *Ctx, v *Values) error {
 		return err
 	}
 	c.Println(msg)
-	id, err := mustStr(res, "issue", "id")
+	// 秘密の検査に当たったまま保存した注記（プロジェクト別ルール comment.reject_secret が切のときだけサーバが付ける。
+	// 状態の変更は同じ注記を messages の行で返すので、出し方をそろえて標準出力に出す）
+	if n, ok := res.Get("secret_notice"); ok && jsonorder.Truthy(n) {
+		c.Println(jsonorder.Str(n))
+	}
+	issueID, err := mustStr(res, "issue", "id")
 	if err != nil {
 		return err
 	}
-	return c.afterChange(res, id, "comment")
+	return c.afterChange(res, issueID, "comment")
+}
+
+// pathHints はセッション要約に添える手がかり（作業ディレクトリとプロジェクトのディレクトリの git のルート・HOME・
+// 端末にしか無い置き場）。集め方は pathhint.Collect の 1 か所。
+func (c *Ctx) pathHints() pathhint.Hints {
+	var dirs []string
+	if wd, err := os.Getwd(); err == nil {
+		dirs = append(dirs, wd)
+	}
+	if c.Root != "" {
+		dirs = append(dirs, c.Root)
+	}
+	return pathhint.Collect(c.Env, dirs, nil)
 }
 
 // cmdStatus は状態を変える。

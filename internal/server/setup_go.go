@@ -35,6 +35,10 @@ type goSetup struct {
 	lang    i18n.Lang        // 手順の文面の言語
 	os      string           // darwin / linux / windows / posix（OS 不明で Windows 向けが無い）/ ""（不明）
 	missing string           // 取得の手順を出せない理由（その OS 向けの looptrack を配っていない）。空なら出せる
+	// local はローカルモード（デスクトップ版）のサーバ。looptrack はアプリに同梱で、トレイの「CLI を使えるようにする」で
+	// 置ける。CLI はトークンなしで通る（api.Client.LocalMode が /healthz の名乗りを見て Authorization を付けずに呼び、
+	// サーバの localAPI は Authorization を見ない）ので、login の手順は出さない。
+	local bool
 }
 
 // goSetupOf は setup の引数（cli・os）と User-Agent から手順の材料を作る。引数の誤りは利用者向けのエラー。
@@ -55,7 +59,7 @@ func (s *Server) goSetupOf(lang i18n.Lang, in setupIn, ua string, bins []distBin
 	if goos == "" {
 		goos = osOfUserAgent(ua)
 	}
-	g := &goSetup{bins: bins, lang: lang, os: goos}
+	g := &goSetup{bins: bins, lang: lang, os: goos, local: s.cfg.LocalMode}
 	if !g.posixOK() && !g.winOK() {
 		g.missing = i18n.T(lang, "server.mcp.setup.dist.missing")
 		if goos != "" {
@@ -287,6 +291,9 @@ func goInitCommand(bin, agent, slug, base, dist string) string {
 // （正本には loop を問わない: needLoopAsk）。
 func (g *goSetup) fetchStep(lang i18n.Lang, agent, slug, base, dist, loopFlag, note string, self bool) setupStepJSON {
 	if self {
+		if g.missing != "" && g.local {
+			return setupStepJSON{Who: "human", Title: i18n.T(lang, "server.mcp.setup.step.fetch_manual_local_self_repo", "menu", i18n.T(lang, "desktop.menu.install_cli"))}
+		}
 		if g.missing != "" {
 			return setupStepJSON{Who: "human", Title: i18n.T(lang, "server.mcp.setup.step.fetch_manual_self_repo", "reason", g.missing)}
 		}
@@ -297,6 +304,11 @@ func (g *goSetup) fetchStep(lang i18n.Lang, agent, slug, base, dist, loopFlag, n
 			return g.posixFetch("")
 		})
 		return g.step("ai", i18n.T(lang, "server.mcp.setup.step.fetch_self_repo"), c, w)
+	}
+	if g.missing != "" && g.local {
+		// ローカルモード（デスクトップ版）: 配る管理者はいない。looptrack はアプリに同梱なので、トレイのメニューで置いてもらう
+		return setupStepJSON{Who: "human", Title: i18n.T(lang, "server.mcp.setup.step.fetch_manual_local", "menu", i18n.T(lang, "desktop.menu.install_cli"),
+			"command", fmt.Sprintf("looptrack issue init --project %s --url %s --agent %s%s", slug, base, agent, loopFlag))}
 	}
 	if g.missing != "" {
 		return setupStepJSON{Who: "human", Title: i18n.T(lang, "server.mcp.setup.step.fetch_manual", "reason", g.missing,
@@ -339,14 +351,18 @@ func (g *goSetup) baseSteps(lang i18n.Lang, agent, slug, base, dist string, st i
 	// 説明文の中のコマンドも置いた looptrack の絶対パスで書く（サーバ版の利用者の端末に PATH の looptrack は無い）
 	pc, pw := g.run("issue login --url " + base)
 	dc, dw := g.run("doctor")
-	login := g.step("ai", i18n.T(lang, "server.mcp.setup.step.login", "check", joinOS(lang, cc, cw), "url", base,
-		"paste", joinOS(lang, pc, pw)), lc, lw)
 	confirm := setupStepJSON{Who: "ai", Title: i18n.T(lang, "server.mcp.setup.step.confirm", "doctor", joinOS(lang, dc, dw))}
+	// ローカルモードは CLI がトークンなしで通るので、login の手順を出さない（goSetup.local）
+	login := []setupStepJSON{g.step("ai", i18n.T(lang, "server.mcp.setup.step.login", "check", joinOS(lang, cc, cw), "url", base,
+		"paste", joinOS(lang, pc, pw)), lc, lw)}
+	if g.local {
+		login = nil
+	}
 	switch st.State {
 	case "current":
 		return []setupStepJSON{{Who: "ai", Title: i18n.T(lang, "server.mcp.setup.step.current")}}
 	case "no_hook":
-		return []setupStepJSON{login, {Who: "human", Title: approveStep(lang, agent)}, confirm}
+		return append(login, setupStepJSON{Who: "human", Title: approveStep(lang, agent)}, confirm)
 	case "stale":
 		if st.ClientOS != "" {
 			return g.staleSteps(lang, agent, slug, base, dist, st.SelfRepo)
@@ -356,14 +372,15 @@ func (g *goSetup) baseSteps(lang i18n.Lang, agent, slug, base, dist string, st i
 	if agent == agentOther {
 		ic, iw := g.run("issue installed --agent other")
 		ic, iw = envPrefixSimple(ic, base, slug, g.os == "windows"), envPrefixSimple(iw, base, slug, true)
-		return []setupStepJSON{
+		steps := []setupStepJSON{
 			g.fetchStep(lang, agent, slug, base, dist, "", "", st.SelfRepo),
 			{Who: "ai", Title: i18n.T(lang, "server.mcp.setup.step.other_wire")},
-			login,
-			g.step("ai", i18n.T(lang, "server.mcp.setup.step.other_installed"), ic, iw),
 		}
+		steps = append(steps, login...)
+		return append(steps, g.step("ai", i18n.T(lang, "server.mcp.setup.step.other_installed"), ic, iw))
 	}
-	return []setupStepJSON{g.fetchStep(lang, agent, slug, base, dist, "", "", st.SelfRepo), login, {Who: "human", Title: approveStep(lang, agent)}, confirm}
+	steps := append([]setupStepJSON{g.fetchStep(lang, agent, slug, base, dist, "", "", st.SelfRepo)}, login...)
+	return append(steps, setupStepJSON{Who: "human", Title: approveStep(lang, agent)}, confirm)
 }
 
 func joinOS(lang i18n.Lang, posix, win string) string {
