@@ -369,6 +369,8 @@
   "cli.summary.transcript_send_failed_one": "The hook on this machine is failing to send conversation transcripts (last failure {at}, {count} in a row, {reason}). The {spooled} unsent one is sent the next time a send succeeds",
   "cli.summary.transcript_spooled": "There are {count} unsent conversation transcripts on this machine (sent the next time a send succeeds)",
   "cli.summary.transcript_spooled_one": "There is {count} unsent conversation transcript on this machine (sent the next time a send succeeds)",
+  "cli.summary.transcript_unwired": "Note: both keys for automatic transcript sending are on, but the {agents} settings have no hook that sends it (looptrack hook transcript on Stop and SessionEnd), so nothing is sent. With the user's approval, run {cmd} to wire it",
+  "cli.summary.transcript_unwired.self_repo": "Note: both keys for automatic transcript sending are on, but the {agents} settings have no hook that sends it (looptrack hook transcript on Stop and SessionEnd), so nothing is sent. Do not run init: this is looptrack itself, the source of truth for the kit. To send, add looptrack hook transcript --agent <AI> to Stop and SessionEnd in the settings file by hand",
   "cli.summary.usage_fail.client_error": "the credentials cannot be read",
   "cli.summary.usage_fail.no_token": "not logged in; they are resent after looptrack issue login",
   "cli.summary.usage_fail.rejected": "rejected by the server (HTTP {status}); rejected ones are not resent. Check the operations missing token usage with looptrack issue usage missing and attach it with looptrack issue usage attach <ID>",

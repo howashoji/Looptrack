@@ -3434,6 +3434,9 @@ MCP には経路を足しません（MCP はファイルを運ばない。AI に
 - **Claude Code**: `<設定の置き場>/projects/<現在の git のルートの realpath から作った slug>/` の下に、`<新しい ID>.jsonl` と `<新しい ID>/subagents/…`・`<新しい ID>/tool-results/…` を置きます
   （slug の作り方は `handoffTargets` と同じ「realpath の英数字以外を `-` に」で、`agentdirs.ClaudeSlug` を共有する。実測で realpath から作られると確かめた）。
   表示するのは `claude --resume <置いた本体の絶対パス> --fork-session` です。
+  Windows でパスが `'` を含むときだけは、パスの代わりに `claude --resume <新しい ID> --fork-session` を表示します。利用者名が `O'Brien` のホームがこれに当たります。
+  PowerShell は `'` を 2 つ重ねて書き、Git Bash は `'"'"'` と書きます。だから 1 つの引用では両方に貼れません。UUID の形の ID なら引用が要りません。
+  `--resume` に ID を渡すと設定の置き場の `projects/` の下から探し、どの cwd から実行しても見つかります（実測: Claude Code 2.1.310・使い捨ての `CLAUDE_CONFIG_DIR`）。
 - **Codex（要実測）**: `<CODEX_HOME>/sessions/<年>/<月>/<日>/` に置きます（日付は名前から）。名前の中のスレッド ID だけを新しい ID にし（`history_base` がたどる別のスレッドの rollout は元の名前のまま）、
   表示するのは `codex fork <新しい ID>` と、作業ツリーのルートで実行する旨です。
   ソースでは、スレッド ID からの探索は SQLite の状態 DB を先に引き、無ければ `sessions/` の下をファイル名で歩いて見つけ、見つけた行を DB に入れ直します（read-repair）。
@@ -3471,6 +3474,10 @@ kit core の hook `looptrack hook transcript` を Stop と SessionEnd に配線�
 - SessionStart は鍵の状態も 1 行出します: 覚えたルールが入で端末のオプトインも入なら「自動送信: 入」、ルールは入でオプトインが切なら `LOOPTRACK_SESSION_TRANSCRIPTS=1` で入れられる旨。
   ルールが切・覚えていない・失敗も退避も無いときは何も出しません（以前の版のこの節は「成功・未設定のときは何も出さない」でしたが、自動で送っていることと送れることを本人が知れるよう、
   鍵の行を足しました。`summary --json` の `transcript_send`）。
+- 鍵が両方とも入でも、送る hook（Stop・SessionEnd の `looptrack hook transcript`）が配線に無ければ、「自動送信: 入」の代わりに init のやり直しを案内します（`transcript_send` の `unwired` と `rewire`）。
+  この hook を配線しない版の init で入れたプロジェクトは、CLI だけを上げてもこの形になります。導入が古いかの判定は CLI の版と kit/core の控えで見るので、配線の欠けは拾えません。
+  見るのは `.claude/settings.json`・`.claude/settings.local.json`（Claude Code）と `.codex/hooks.json`（Codex）で、looptrack の hook が 1 つも無い AI は数えません。SessionStart から呼ばれたときは、その AI の設定だけを見ます。
+  鍵のどちらかが切なら配線は見ません。hook は配線があっても送らないためです。鍵が両方とも入の利用者が `init --no-transcript` で配線を外した場合は、外したことが控えに残らないので、この案内が出ます。
 - 変換で送れなかった（読めない行・キーの秘密・長すぎる行）ときと、サーバの値ごとの検査が拒んだ（422 `transcript_secret`・`transcript_unreadable`）ときは、退避せずに失敗として残します（同じ記録は何度試しても同じ結果になるため）。記録するのは止めたファイルの数だけで、
   `<looptrack の置き場>/transcript-rejected/<鍵>/<agent>-<セッション ID>.json` に印を置き、そのセッションは自動では試し直しません（失敗も 1 回だけ記録する。印は 7 日で捨てる。手で打つ `push` は印を見ない）。
 

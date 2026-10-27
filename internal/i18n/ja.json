@@ -369,6 +369,8 @@
   "cli.summary.transcript_send_failed_one": "この PC のフックが会話記録を送れていません（最後の失敗 {at}・続けて {count} 回・{reason}）。未送信 {spooled} 件は、次に送れたときに送ります",
   "cli.summary.transcript_spooled": "この PC に未送信の会話記録が {count} 件あります（次に送れたときに送ります）",
   "cli.summary.transcript_spooled_one": "この PC に未送信の会話記録が {count} 件あります（次に送れたときに送ります）",
+  "cli.summary.transcript_unwired": "※ 会話記録の自動送信の鍵は両方とも入ですが、{agents} の設定に送る hook（Stop・SessionEnd の looptrack hook transcript）がありません。このままでは何も送られません。利用者の承認を得て {cmd} を実行すると配線されます",
+  "cli.summary.transcript_unwired.self_repo": "※ 会話記録の自動送信の鍵は両方とも入ですが、{agents} の設定に送る hook（Stop・SessionEnd の looptrack hook transcript）がありません。このままでは何も送られません。ここは kit の正本の looptrack 自身なので init はしません。送るなら設定ファイルの Stop と SessionEnd に looptrack hook transcript --agent <AI> を手で足します",
   "cli.summary.usage_fail.client_error": "資格情報を読めない",
   "cli.summary.usage_fail.no_token": "ログインしていない。looptrack issue login の後に再送します",
   "cli.summary.usage_fail.rejected": "サーバが拒否（HTTP {status}）。拒否された分は再送しません。付いていない操作は looptrack issue usage missing で確かめ、looptrack issue usage attach <ID> で付けてください",

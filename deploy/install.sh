@@ -909,7 +909,7 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_buffering off;                 # MCP の応答を溜めない
         proxy_read_timeout 300s;
-        client_max_body_size 20m;            # 添付の 1 ファイルの上限（既定 20MiB）より小さくしない
+        client_max_body_size 33m;            # 会話記録の 1 チャンクの上限（既定 32MiB）より大きく。添付の 1 ファイルの上限（既定 20MiB）より小さくしない
     }
 }
 

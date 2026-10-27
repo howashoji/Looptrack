@@ -346,6 +346,7 @@ Do not open it with a plain claude --resume <id> (Claude Code) or codex resume (
 - **`pull` places it under a new session id.** The copy never takes the original conversation's id. Open it with the fork command it shows. The CLI does not start the agent.
 - **Never resume the original id on two machines.** Opening the copy with a plain `claude --resume` (`codex resume`) appends to the imported copy.
 - Running `pull` on the same transcript again finds the same copy in the same place and changes nothing. It shows an "already in place (nothing changed)" line and the resume command.
+- On Windows, when the path contains `'` (a user name such as `O'Brien`), it shows `claude --resume <new-id> --fork-session` with the new id instead of the path. That line pastes as-is into both PowerShell and Git Bash.
 - For Codex it shows `codex fork <new-id>`. Run it at the root of the working tree.
 - `--print-resume` prints only the resume command, one line, to standard output (the placing is the same). `--out <directory>` writes into that directory instead of where the agent looks (it is for reading the contents, and shows no resume command).
 

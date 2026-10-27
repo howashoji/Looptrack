@@ -18,6 +18,7 @@
 //     loop の PreToolUse・DESIGN.md）でずれていないこと。実物を読み取って 1 つの宣言表と突き合わせる
 //   - shellvar_test.go: シェルスクリプト（*.sh）で、波かっこの無い変数展開の直後に ASCII 以外の文字が無いこと
 //     （macOS の bash はその先頭のバイトを変数名の続きとして読む。Linux では再現しないので、字面で見る）
+//   - nginx_body_limit_test.go: install.sh と DEPLOY.md の nginx の例の client_max_body_size と、DEPLOY.md の Caddy の例の max_size が、会話記録のチャンクの既定の上限より大きいこと
 //   - doclist_test.go: この一覧と、実在する *_test.go が一致すること
 //   - i18n_docref_test.go: 対訳表（internal/i18n/{ja,en}.json）が案内する docs/guide/ の節が実物にあること
 //   - designref_test.go: サーバの設計書（docs/server/DESIGN.md）の節番号の参照（「§」+ 番号。直後に「」の名前があればその名前も）が、

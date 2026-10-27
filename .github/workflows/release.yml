@@ -348,14 +348,19 @@ jobs:
         with:
           name: desktop-windows-${{ matrix.arch }}-${{ needs.meta.outputs.version }}
           path: zip
+      # 待ちを持つ段には段ごとの上限を付ける。段が止まってもジョブの上限（30 分）で取り消されずにその段が失敗し、
+      # 後ろの「失敗したらインストーラのログを残す」（if: failure()）が走る。成功時の所要は全段で amd64 が約 1 分・arm64 が約 2 分
       - name: Inno Setup 7.1.0 を入れる（SHA-256 を照合して無人で）
         shell: pwsh
+        timeout-minutes: 5
         run: |
+          . ./deploy/release/bounded_wait.ps1
           $exe = Join-Path $env:RUNNER_TEMP 'innosetup.exe'
           Invoke-WebRequest -Uri $env:INNO_URL -OutFile $exe -UseBasicParsing
           $got = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
           if ($got -ne $env:INNO_SHA256) { throw "Inno Setup の SHA-256 が違います: $got" }
-          $p = Start-Process -FilePath $exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait -PassThru
+          Write-Stage 'Inno Setup を無人で入れる'
+          $p = Invoke-Bounded -FilePath $exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Seconds 180 -What 'Inno Setup のインストーラ'
           if ($p.ExitCode -ne 0) { throw "Inno Setup を入れられません（$($p.ExitCode)）" }
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 7\ISCC.exe'
           if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 7\ISCC.exe' }
@@ -374,14 +379,19 @@ jobs:
       # desktop_smoke.sh と同じ検査の Windows 版）。
       - name: smoke test（zip を展開した場所からそのまま起動する）
         shell: pwsh
+        timeout-minutes: 5
         run: pwsh -File deploy/release/desktop_smoke.ps1 -Exe stage\Looptrack\Looptrack.exe
       - name: インストーラ（desktop.sh windows-installer）
         shell: bash
+        timeout-minutes: 10
         run: bash deploy/release/desktop.sh windows-installer "$VERSION" "$ARCH" stage out
       - name: smoke test（導入 → 起動中の上書き → 無人の上書きでの起動し直し → アンインストール）
         shell: pwsh
+        timeout-minutes: 10
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
+          # 外のプロセスは Invoke-Bounded で上限つきで待つ（超えたら待っていたプロセスと子孫の一覧を出して throw する）
+          . ./deploy/release/bounded_wait.ps1
           $setup = (Get-ChildItem out\*_setup.exe)[0].FullName
           $app   = Join-Path $env:LOCALAPPDATA 'Programs\Looptrack Desktop'
           $data  = Join-Path $env:LOCALAPPDATA 'Looptrack'
@@ -392,15 +402,15 @@ jobs:
           $setupArgs = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/TASKS=startup,cli',
                     "/LOG=$env:RUNNER_TEMP\install.log")
 
-          Write-Host '--- サイレント導入（選択肢は両方 on）'
-          $p = Start-Process -FilePath $setup -ArgumentList $setupArgs -Wait -PassThru
+          Write-Stage 'サイレント導入（選択肢は両方 on）'
+          $p = Invoke-Bounded -FilePath $setup -ArgumentList $setupArgs -Seconds 120 -What 'インストーラ（サイレント導入）'
           if ($p.ExitCode -ne 0) { throw "インストーラが $($p.ExitCode) で終わりました" }
           foreach ($f in @('Looptrack.exe','cli\looptrack.exe','NOTICE.txt','OFL-BIZUDGothic.txt')) {
             if (-not (Test-Path (Join-Path $app $f))) { throw "$f がありません（$app）" }
           }
           if (-not (Test-Path $unKey)) { throw "HKCU の Uninstall キーがありません: $unKey" }
           if (-not (Test-Path $lnk)) { throw "スタートメニューの .lnk がありません: $lnk" }
-          Write-Host '--- 同梱の CLI と、選択肢で置いた CLI の写し'
+          Write-Stage '同梱の CLI と、選択肢で置いた CLI の写し'
           & (Join-Path $app 'cli\looptrack.exe') version
           if ($LASTEXITCODE -ne 0) { throw "同梱の CLI が動きません（$LASTEXITCODE）" }
           if (-not (Test-Path $cli)) { throw "CLI の写しがありません: $cli" }
@@ -410,7 +420,7 @@ jobs:
           if (-not $run) { throw 'ログイン時の起動（HKCU の Run の値）が登録されていません' }
           Write-Host "Run の値: $run"
 
-          Write-Host '--- 起動してから上書き（更新）'
+          Write-Stage '起動してから上書き（更新）'
           $proc = Start-Process -FilePath (Join-Path $app 'Looptrack.exe') `
             -ArgumentList 'desktop','--background','--no-tray' -PassThru
           $up = $false
@@ -422,7 +432,7 @@ jobs:
           if (-not $up) { throw 'デスクトップ版が起動しません' }
           if (-not (Test-Path (Join-Path $data 'looptrack.db'))) { throw 'データの置き場に DB がありません' }
           'smoke' | Out-File -FilePath (Join-Path $data 'smoke.txt') -Encoding utf8
-          $p = Start-Process -FilePath $setup -ArgumentList $setupArgs -Wait -PassThru
+          $p = Invoke-Bounded -FilePath $setup -ArgumentList $setupArgs -Seconds 120 -What 'インストーラ（起動中の上書き）'
           if ($p.ExitCode -ne 0) { throw "起動中の上書きが $($p.ExitCode) で終わりました" }
           Wait-Process -Id $proc.Id -Timeout 60 -ErrorAction SilentlyContinue
           $proc.Refresh()
@@ -435,13 +445,10 @@ jobs:
           # /TASKS は付けない（前回の選択肢を引き継ぐ）。/RELAUNCH=1 で Looptrack.iss の DeinitializeSetup が起動し直す
           $updateArgs = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/RELAUNCH=1')
           $statePath = Join-Path $data 'desktop.json'
-          # setup.exe の本体だけを待つ。Start-Process -Wait は子孫のプロセスの終了まで待つので、DeinitializeSetup が起こした
-          # Looptrack.exe が動き続けると止まる。Handle を先に取らないと、終わった後に ExitCode を読めないことがある
-          function Invoke-Setup([string[]]$SetupArgs) {
-            $sp = Start-Process -FilePath $setup -ArgumentList $SetupArgs -PassThru
-            $null = $sp.Handle
-            $sp.WaitForExit()
-            return $sp
+          # setup.exe の本体だけを待つ（Invoke-Bounded）。Start-Process -Wait は子孫のプロセスの終了まで待つので、
+          # DeinitializeSetup が起こした Looptrack.exe が動き続けると止まる
+          function Invoke-Setup([string[]]$SetupArgs, [string]$What) {
+            return Invoke-Bounded -FilePath $setup -ArgumentList $SetupArgs -Seconds 120 -What $What
           }
           function Wait-Status([int]$OldPid) {
             for ($i = 0; $i -lt 60; $i++) {
@@ -455,11 +462,11 @@ jobs:
             return 0
           }
 
-          Write-Host '--- 無人の上書きで起動し直す（成功の経路）'
+          Write-Stage '無人の上書きで起動し直す（成功の経路）'
           $proc = Start-Process -FilePath (Join-Path $app 'Looptrack.exe') `
             -ArgumentList 'desktop','--background','--no-tray' -PassThru
           if ((Wait-Status 0) -ne $proc.Id) { throw 'デスクトップ版が起動しません（無人の上書きの前）' }
-          $p = Invoke-Setup ($updateArgs + "/LOG=$env:RUNNER_TEMP\update.log")
+          $p = Invoke-Setup ($updateArgs + "/LOG=$env:RUNNER_TEMP\update.log") 'インストーラ（無人の上書き）'
           if ($p.ExitCode -ne 0) { throw "無人の上書きが $($p.ExitCode) で終わりました" }
           Wait-Process -Id $proc.Id -Timeout 60 -ErrorAction SilentlyContinue
           $proc.Refresh()
@@ -473,13 +480,13 @@ jobs:
           if (-not (Test-Path $cli)) { throw "無人の上書きで CLI の写しが消えました: $cli" }
           if (-not (Test-Path (Join-Path $data 'smoke.txt'))) { throw '無人の上書きでデータが消えました' }
 
-          Write-Host '--- 無人の上書きが失敗しても起動し直す（NOTICE.txt を共有なしで開いたまま上書きさせる）'
+          Write-Stage '無人の上書きが失敗しても起動し直す（NOTICE.txt を共有なしで開いたまま上書きさせる）'
           # NOTICE.txt は CloseApplicationsFilter（*.exe,*.dll,*.chm）の外なので、Restart Manager はこの pwsh を閉じない。
           # Inno はファイルを置き換えられずに中止して元に戻し、DeinitializeSetup が前の版を起動し直す
           $notice = Join-Path $app 'NOTICE.txt'
           $held = [System.IO.File]::Open($notice, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
           try {
-            $p = Invoke-Setup ($updateArgs + "/LOG=$env:RUNNER_TEMP\update-fail.log")
+            $p = Invoke-Setup ($updateArgs + "/LOG=$env:RUNNER_TEMP\update-fail.log") 'インストーラ（失敗させる無人の上書き）'
           } finally {
             $held.Close()
           }
@@ -497,10 +504,12 @@ jobs:
           & $cli desktop --quit
           if ($LASTEXITCODE -ne 0) { throw "起動し直したインスタンスを止められません（$LASTEXITCODE）" }
 
-          Write-Host '--- アンインストール（データは残り、Run の値と CLI の写しは消える）'
+          Write-Stage 'アンインストール（データは残り、Run の値と CLI の写しは消える）'
           $uninst = (Get-ItemProperty -Path $unKey).UninstallString.Trim('"')
-          Start-Process -FilePath $uninst -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait | Out-Null
-          # unins000.exe は自分を消すために子プロセスに引き継いで先に終わるので、消えるまで待つ
+          # unins000.exe は自分を消すために子プロセスに引き継いで先に終わるので、子孫が終わるまで待ち（-WaitDescendants）、
+          # そのうえでファイルが消えるまで待つ
+          $p = Invoke-Bounded -FilePath $uninst -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Seconds 120 -What 'アンインストーラ' -WaitDescendants
+          Write-Host "アンインストーラの終了コード: $($p.ExitCode)"
           for ($i = 0; $i -lt 60; $i++) {
             if (-not (Test-Path (Join-Path $app 'Looptrack.exe'))) { break }
             Start-Sleep -Seconds 1

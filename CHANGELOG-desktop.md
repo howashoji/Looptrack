@@ -23,6 +23,40 @@ Nothing yet.
 
 まだありません。
 
+## [1.1.0] - 2026-10-27
+
+1.1.0 is a stable release. The changes below are relative to `v1.1.0-rc.1`,
+and no migrations were added after it. If you update from `v1.0.2`, read the
+section for 1.1.0-rc.1 as well, starting with "Moving from 1.0.2". Unlike the
+release candidate, 1.1.0 becomes the Latest release on GitHub Releases, and an
+app on 1.0.2 offers it as an update. An app on 1.1.0-rc.1 offers it too, and
+after that update it follows stable releases only.
+
+### Fixed
+
+- On Windows, when the path of the placed transcript contains `'` (a home
+  directory such as `C:\Users\O'Brien`), the resume command that
+  `looptrack session transcript pull` prints for Claude Code now passes the
+  new session ID instead of the path: `claude --resume <ID> --fork-session`.
+  No single quoting of that path works in both PowerShell and Git Bash, and an
+  ID needs no quoting. Other paths and other OSes print the same command as
+  before.
+- A project that turned transcript sending on but has no Stop / SessionEnd
+  hook wired for it is now told so. This happens to a project set up with
+  `looptrack issue init` from 1.0.2 or earlier when only the CLI was
+  replaced. Where `issue summary` and the summary injected at SessionStart
+  used to say that sending was on, they now ask you to run
+  `looptrack issue init` again.
+
+---
+
+1.1.0 は正式版です。下の変更は `v1.1.0-rc.1` からの差分で、rc.1 の後に足したマイグレーションはありません。`v1.0.2` から上げるなら 1.1.0-rc.1 の節も読み、まず「1.0.2 から上げるとき」を確かめてください。候補版との違いは GitHub Releases の Latest になることです。1.0.2 と 1.1.0-rc.1 のアプリはこの版を更新として知らせ、この更新の後は正式版だけを追います。
+
+### 修正
+
+- Windows で置いた会話記録のパスに `'` を含むとき（`C:\Users\O'Brien` のようなホーム）は、`looptrack session transcript pull` が出す Claude Code の再開のコマンドで、パスの代わりに新しいセッション ID を渡します（`claude --resume <ID> --fork-session`）。そのパスは 1 つの引用で PowerShell と Git Bash の両方を満たせません。ID なら引用が要りません。ほかのパスとほかの OS では出力は変わりません。
+- 会話記録の自動送信を入れたのに Stop・SessionEnd の hook が配線されていないプロジェクトに、そのことを知らせるようにしました。1.0.2 以前の `looptrack issue init` で入れたまま CLI だけを置き換えるとこの状態になります。`issue summary` と SessionStart で注入する要約は、これまで「自動送信: 入」と出していた行で `looptrack issue init` のやり直しを案内します。
+
 ## [1.1.0-rc.1] - 2026-10-27
 
 First release candidate for 1.1.0. It is published as a pre-release, so
