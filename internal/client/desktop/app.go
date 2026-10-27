@@ -417,7 +417,7 @@ func (a *App) Logf(format string, args ...any) {
 // serveOptions は画面のサーバ（localserve）に渡す設定を組む（primary が使う。版が渡ることを確かめるために切り出した）。
 func (o *Options) serveOptions(paths Paths, ln net.Listener, logger *slog.Logger, upd *updates) localserve.Options {
 	return localserve.Options{
-		DBPath: paths.DB(), AttachDir: paths.Attachments(), Listener: ln, BasePath: BasePath, Logger: logger, UpdateNotice: upd.current, UpdateStopInTray: upd.tray.Load,
+		DBPath: paths.DB(), AttachDir: paths.Attachments(), TranscriptDir: paths.Transcripts(), Listener: ln, BasePath: BasePath, Logger: logger, UpdateNotice: upd.current, UpdateStopInTray: upd.tray.Load,
 		UpdateApplier: &bannerApplier{u: upd}, Version: o.Version,
 	}
 }

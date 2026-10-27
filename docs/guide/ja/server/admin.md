@@ -121,6 +121,9 @@ looptrack project rules clear demo
 | `verify.require_on_close` | 「## 検証コマンド」節のあるイシューは、今の本文に対する直近の `verify` が全件成功でないと Done にできません |
 | `usage.require_on_close` | AI が Done / Canceled にするとき、その会話のトークン情報が無いと拒否します。CLI は拒否されると自動で付けてやり直します |
 | `verify.require_evidence` | 既定で入。「## 検証コマンド」節のあるイシューは、今の本文に対する直近の `verify` の記録に添付が無いと Done にできません。`false` にすると拒否の代わりに注意だけになる（[日々の使い方](../daily-use.md#添付エビデンス)） |
+| `session.digest_required` | 既定は切。入にすると、ループ kit の Stop hook が、引き継ぎの backend に関わらず、このセッションが着手中のイシューに完了より新しいセッション要約（`looptrack session digest <ID> -` で送る）が無いと、セッションを終わらせません。サーバ自体はこのルールで何も拒否しません。値は summary の応答の `session_digest_required` で hook に届きます |
+| `session.transcripts` | 既定は切。入にすると、利用者が AI との会話記録をこのプロジェクトのサーバに置けます（`looptrack session transcript push`）。切のときは記録の登録と追記を拒否します（送った記録の読み出しと消去はできます）。hook が自動で送るには、利用者の端末ごとの `LOOPTRACK_SESSION_TRANSCRIPTS=1` も要ります。置いた記録を読めるのは持ち主だけです。値は、会話記録の登録とチャンクの追記の応答の `transcripts_enabled` でクライアントに届きます |
+| `comment.reject_secret` | 既定で入。コメント（状態の変更と同時のコメントを含む）の本文に秘密らしい文字列（`token=…`・`Bearer …` など）があると拒否します。示すのは行番号と規則の語だけで、値は出しません。`false` にすると拒否の代わりに、保存して注記を返します。セッション要約はこのルールに関わらず拒否します |
 
 知らないキーや綴りの誤りは登録の時点で拒否されます。
 `--override "理由"` で上書きした記録はサーバに残ります。
@@ -138,7 +141,7 @@ looptrack project rules clear demo
 
 ### 置き場とバックアップ
 
-本体はサーバのディスクに、記録は DB に置きます。**バックアップは DB と添付の置き場の 2 系統**で、DB を先に取ります。
+本体はサーバのディスクに、記録は DB に置きます。**バックアップは DB・添付の置き場・会話記録の置き場の 3 系統**で、DB を先に取ります（会話記録の置き場は下の「会話記録の置き場」）。
 
 | 動かし方 | 添付の置き場 |
 | -- | -- |
@@ -146,8 +149,34 @@ looptrack project rules clear demo
 | `looptrack setup` の compose | `<dir>/data/attachments`（保存先が MySQL でも同じ） |
 
 install.sh の `--upgrade` が取る DB の控えに添付は入りません。
-`looptrack export` は添付の本体と目録も書き出し、`looptrack verify-files` で本体が目録と一致するかを確かめられます。それでも `looptrack import` は添付を運ばないので、控えは 2 系統で取ってください。
+`looptrack export` は添付の本体と目録も書き出し、`looptrack verify-files` で本体が目録と一致するかを確かめられます。それでも `looptrack import` は添付を運ばないので、控えは 3 系統で取ってください。
 控えの取り方・戻し方と、DB と置き場の食い違いを調べる `looptrack repair-attachments` は運用者向けの [DEPLOY.md の「添付の置き場とバックアップ」](../../../server/DEPLOY.md)にあります。
+
+## 会話記録の上限と使用量
+
+利用者は、AI との会話記録を自分の別の端末へ運べます（[会話記録をそのまま運ぶ](../ai-agents.md#会話記録をそのまま運ぶ)）。使えるのは、プロジェクト別ルール `session.transcripts` が入のプロジェクトだけです。
+管理者の画面の「会話記録の管理」（`<サーバの URL>/admin/transcripts`。ヘッダの右端の利用者メニューから開けます）では、上限と保持期間を変え、利用者ごとの使用量を確かめられます。
+
+- 上限は 1 チャンク（伸ばした後の大きさ。既定 32MiB）と 1 利用者（消去していない分の合計。既定 2GiB）の 2 つです。保持期間は最後の送信からの日数（既定 90 日。0 は無期限）です。どれも全利用者に共通で、上限は MiB、保持期間は日で入力します。
+- 変えた値は、再起動しなくても次の送信から効きます。保持期間は 1 時間ごとの定期の処理が見て、過ぎた会話の本体を消します。変更は、変更前後の値と操作した人つきで記録に残ります。
+- 使用量の表に出るのは、利用者ごとの会話の数と使用量（上限に対する割合）だけです。会話の中身・題名・ファイル名・セッション ID は出しません。管理者でも、画面と API からは会話記録を読めません。
+- 画面に消去の操作はありません。本体を消すのは、持ち主（`looptrack session transcript purge`）・保持期間の切れ・運用者（下の `looptrack purge-transcripts`）です。
+- 1 チャンクの上限を上げたら、前段のプロキシの本文の上限も合わせて上げてください（運用者向けの [DEPLOY.md の「前段のプロキシの上限」](../../../server/DEPLOY.md)）。
+
+### 会話記録の置き場
+
+本体はサーバのディスクに、記録は DB に置きます。置き場は添付とは別のディレクトリです。
+
+| 動かし方 | 会話記録の置き場 |
+| -- | -- |
+| install.sh（systemd） | `/var/lib/looptrack/transcripts` |
+| `looptrack setup` の compose | `<dir>/data/transcripts` |
+
+- 置き場は環境変数 `LOOPTRACK_TRANSCRIPT_DIR` で変えられます。会話記録の置き場と添付の置き場の一方がもう一方の中にある（同じ場所を含む）と、会話記録だけが使えなくなり、この画面に注意が出ます。
+- 本体はマスクとパスの書き換えの後の平文で、暗号化しません。置き場とその控えを読める人は、中身を読めます。
+- 控えは DB を先に取り、添付と会話記録の置き場を後から写します。消去した本体は、控えからも消してください。
+- DB と置き場の食い違いは、運用者が `looptrack repair-transcripts` で調べます（引数なしは報告だけ。`--apply` はどこからも指されない本体を消します）。控えの取り方と合わせて、運用者向けの [DEPLOY.md の「添付の置き場とバックアップ」](../../../server/DEPLOY.md)にあります。
+- ほかの利用者の会話記録を運用者が消す方法は、`looptrack purge-transcripts --user <login> [--transcript <id>] --reason <理由> --yes` だけです（管理者の画面には消去の操作がありません）。`--yes` が無いときは、消す対象の数と大きさを示すだけで何も変えません。`--yes` を付けると本体を消し、消去を cause `operator` として記録に残します。
 
 ## トークンレポート
 

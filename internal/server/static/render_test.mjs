@@ -399,7 +399,7 @@ test("コメントの送信: 本文も添付も無ければ要求 0 件でエラ
   // 対照 1: 本文だけ → コメントの要求 1 件（添付の ID は付けない）
   {
     const { f, calls } = fakeFetch();
-    assert.deepEqual(await sendComment(sendOpt(f, " 記録 ")), { ok: true });
+    assert.deepEqual(await sendComment(sendOpt(f, " 記録 ")), { ok: true, notice: "" });
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, "/im/api/v1/issues/IM-0001/comments");
     assert.deepEqual(JSON.parse(calls[0].init.body), { text: "記録" });
@@ -502,4 +502,20 @@ test("countText は Go の i18n.TN と同じく、_one を持つ文面を n=1 �
     assert.equal(countText(j, key, 1, {}), withN(j[key], 1), key + " の n=1（日本語は件数に関わらず同じ文面）");
     assert.equal(countText(j, key, 2, {}), withN(j[key], 2), key + " の n=2（日本語は件数に関わらず同じ文面）");
   }
+});
+
+test("コメントの追記: 応答の secret_notice（秘密らしい文字列を拒まずに保存した注記）を返し、フォームの下に出す", async () => {
+  const note = "注意: DEMO-0001 のコメントの 2 行目に秘密らしい文字列（Bearer …）があります <b>";
+  const f = async () => ({ ok: true, status: 201, json: async () => ({ secret_notice: note }) });
+  assert.deepEqual(await sendComment(sendOpt(f, "記録")), { ok: true, notice: note });
+  const it = { id: "DEMO-0001", status: "Todo" };
+  const html = commentForm({ canEdit: true, it, t: JA, notice: note });
+  assert.match(html, /<p class="form-notice" role="status">注意: DEMO-0001 .*&lt;b&gt;<\/p>/);   // 値は esc を通す
+  assert.doesNotMatch(commentForm({ canEdit: true, it, t: JA }), /form-notice/);   // 対照: 注記が無ければ枠も出さない
+  // 拒否（422）はサーバの文面をそのまま返す（フォームの下に form-error として出す）
+  const msg = "DEMO-0001: コメントの 2 行目に秘密らしい文字列（Bearer …）があるので、保存しませんでした";
+  const g = async () => ({ ok: false, status: 422, json: async () => ({ error: { code: "comment_secret", message: msg } }) });
+  const res = await sendComment(sendOpt(g, "記録"));
+  assert.equal(res.ok, false);
+  assert.match(res.error, /保存しませんでした/);
 });

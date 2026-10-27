@@ -49,10 +49,53 @@ type issueJSON struct {
 	// OtherSession は「別のセッションがこのイシューを In Progress にした」印（summary の in_progress だけに付ける）。
 	// 同じ作業ツリーで複数の AI のセッションが動くとき、着手済みのものを取りに行かせないため。
 	OtherSession bool `json:"other_session,omitempty"`
+	// OwnSession は「要求のセッションがこのイシューを In Progress にした」印（other_session の裏。比べられて同じときだけ付ける）。
+	// 引き継ぎの鮮度ガード（backend issue）が「このセッションが着手中のイシュー」を選ぶのに使う。付かない項目は
+	// 別のセッションか、比べられない（着手のセッション ID が分からない・経路が違う）もの
+	OwnSession bool `json:"own_session,omitempty"`
 	// StartedAgo は In Progress にしてから経った時間（"3時間" の形。同上）。長いものは放置の目印になる
 	StartedAgo string `json:"started_ago,omitempty"`
 	// FeedbackPending は未応答のフィードバックの件数（has_feedback の一覧だけに付ける）
 	FeedbackPending int `json:"feedback_pending,omitempty"`
+	// LatestDigest は最新のセッション要約（summary の in_progress だけに付ける。要約が無ければ出さない・DESIGN.md §9-7）
+	LatestDigest *latestDigestJSON `json:"latest_digest,omitempty"`
+}
+
+// latestDigestJSON は最新のセッション要約（service.LatestDigest）の応答の形（summary と next で共通）。
+type latestDigestJSON struct {
+	Excerpt      string `json:"excerpt"`
+	MachineLabel string `json:"machine_label"`
+	CreatedAt    string `json:"created_at"` // RFC 3339（UTC）
+	// Age は作成からの経過（started_ago と同じ形。要求の言語）
+	Age       string `json:"age"`
+	SessionID string `json:"session_id"`
+	// OtherSession は要求のセッション（X-Looptrack-Session）と比べられるときだけ出す（true = 別のセッション）
+	OtherSession *bool `json:"other_session,omitempty"`
+}
+
+// latestDigestView は service.LatestDigest を応答の形にする（nil なら nil）。
+func latestDigestView(lang i18n.Lang, d *service.LatestDigest) *latestDigestJSON {
+	if d == nil {
+		return nil
+	}
+	return &latestDigestJSON{Excerpt: d.Excerpt, MachineLabel: d.MachineLabel, CreatedAt: d.CreatedAt.UTC().Format(time.RFC3339),
+		Age: reviewAge(lang, time.Since(d.CreatedAt)), SessionID: d.SessionID, OtherSession: d.OtherSession}
+}
+
+// digestOtherNote は、別のセッションが書いた最新の要約の注記（見出しの行と、字下げした抜粋。別のセッションのものでなければ空）。
+// summary（REST の文面は CLI が作る。MCP）と next の文面で共通。
+func digestOtherNote(lang i18n.Lang, id string, d *latestDigestJSON) string {
+	if d == nil || d.OtherSession == nil || !*d.OtherSession {
+		return ""
+	}
+	lines := []string{i18n.T(lang, "server.api.issue.digest_other", "id", id, "label", d.MachineLabel, "age", d.Age)}
+	for _, l := range strings.Split(d.Excerpt, "\n") {
+		if l != "" { // 空行は字下げしない（行末に空白を残さない）
+			l = "  " + l
+		}
+		lines = append(lines, l)
+	}
+	return strings.Join(lines, "\n")
 }
 
 type commentJSON struct {
@@ -158,11 +201,12 @@ func (s *Server) serviceError(w http.ResponseWriter, r *http.Request, err error)
 	}
 	var body struct {
 		Error struct {
-			Code        string           `json:"code"`
-			Message     string           `json:"message"`
-			Rule        string           `json:"rule,omitempty"`
-			Overridable bool             `json:"overridable,omitempty"`
-			Current     *issueDetailJSON `json:"current,omitempty"`
+			Code        string `json:"code"`
+			Message     string `json:"message"`
+			Rule        string `json:"rule,omitempty"`
+			Overridable bool   `json:"overridable,omitempty"`
+			// Current は今の値: 版の衝突ではイシューの全文（issueDetailJSON）、会話記録の連番の衝突（transcript_seq）では今の seq（数）
+			Current any `json:"current,omitempty"`
 		} `json:"error"`
 	}
 	// 文面は要求ごとの言語で作る（se.Message は日本語。i18n.Text が Unwrap の先の ID から訳す）。
@@ -170,6 +214,8 @@ func (s *Server) serviceError(w http.ResponseWriter, r *http.Request, err error)
 	if se.Current != nil {
 		cur := toDetailJSON(se.Current)
 		body.Error.Current = &cur
+	} else if se.CurrentSeq != nil {
+		body.Error.Current = *se.CurrentSeq
 	}
 	writeJSON(w, status, body)
 }
@@ -431,6 +477,8 @@ func markOtherSession(ctx context.Context, lang i18n.Lang, db *sql.DB, projectID
 		switch {
 		case service.ComparableSessions(me.SessionID, sess) && sess != me.SessionID:
 			items[i].OtherSession = true
+		case service.ComparableSessions(me.SessionID, sess): // 比べられて同じ（このセッションが着手した）
+			items[i].OwnSession = true
 		case service.CrossPath(me.SessionID, sess): // 比べられない（CLI と MCP）。判定できないことを示す
 			items[i].CrossPathSession = true
 		}
@@ -438,6 +486,33 @@ func markOtherSession(ctx context.Context, lang i18n.Lang, db *sql.DB, projectID
 			items[i].StartedAgo = reviewAge(lang, time.Since(x.At))
 		}
 	}
+}
+
+// markDigests は進行中のイシューに最新のセッション要約を付ける（service.LatestDigests。要約が無いものには付けない）。
+func (s *Server) markDigests(ctx context.Context, lang i18n.Lang, pr store.Project, me service.Actor, items []issueJSON) error {
+	ids := make([]string, 0, len(items))
+	for _, it := range items {
+		ids = append(ids, it.ID)
+	}
+	ds, err := s.svc.LatestDigests(ctx, me, pr, ids)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		items[i].LatestDigest = latestDigestView(lang, ds[items[i].ID])
+	}
+	return nil
+}
+
+// digestNotes は items のうち別のセッションの要約を持つものの注記を並べる（無ければ空）。
+func digestNotes(lang i18n.Lang, items []issueJSON) string {
+	var notes []string
+	for _, it := range items {
+		if n := digestOtherNote(lang, it.ID, it.LatestDigest); n != "" {
+			notes = append(notes, n)
+		}
+	}
+	return strings.Join(notes, "\n")
 }
 
 // otherSessionNote は「別のセッションが着手中」の注記（対象が無ければ空）。
@@ -663,6 +738,10 @@ func (s *Server) apiSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	inProgress := byStatus("In Progress")
 	markOtherSession(r.Context(), reqLang(r), s.db, pr.ID, actor(r), inProgress)
+	if err := s.markDigests(r.Context(), reqLang(r), pr, actor(r), inProgress); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"usage_missing": map[string]any{"count": missing.Missing, "issues": missing.Issues, "days": missing.Days,
 			"command": missing.Command, "message": usageMissingText(reqLang(r), missing)},
@@ -679,6 +758,9 @@ func (s *Server) apiSummary(w http.ResponseWriter, r *http.Request) {
 		"usage_requests":           requests,
 		// timezone は時刻の時間帯（IANA 名）。応答の時刻を描く CLI がこれで描く（台帳・レポートと同じ形）。
 		"timezone": s.svc.Loc.String(),
+		// session_digest_required はプロジェクト別ルール session.digest_required（既定 false）。引き継ぎの鮮度ガード（Stop hook）が
+		// この応答 1 本で、着手中のイシューの要約と一緒に読む（ルールのためだけに別の要求を足さない。DESIGN.md §9-7）
+		"session_digest_required": service.SessionDigestRequired(pr),
 	})
 }
 
@@ -760,6 +842,9 @@ type commentRequest struct {
 	Text *string `json:"text"`
 	// Attachments はコメントに付ける、そのイシューの添付の ID（POST …/attachments の応答の id）。省略できる
 	Attachments []int64 `json:"attachments"`
+	// PathHints はセッション要約の本文の端末のパスを置き換える手がかり（DESIGN.md §9-7。roots・home・machine_local）。
+	// 省略できる。セッション要約でないコメントでは見ない
+	PathHints *service.PathHints `json:"path_hints"`
 }
 
 func (s *Server) apiComment(w http.ResponseWriter, r *http.Request) {
@@ -776,13 +861,16 @@ func (s *Server) apiComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a := actor(r)
-	it, err := s.svc.CommentAttach(r.Context(), a, pr, row.ID, *req.Text, req.Attachments)
+	it, err := s.svc.AddComment(r.Context(), a, pr, row.ID, service.CommentInput{Text: *req.Text, Attachments: req.Attachments, PathHints: req.PathHints})
 	if err != nil {
 		s.serviceError(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", etag(it.Row.Version))
 	body := map[string]any{"issue": toIssueJSON(it), "seq": len(it.Row.Doc.Comments), "message": i18n.T(reqLang(r), "server.api.issue.comment_added", "id", it.Item.ID)}
+	if it.SecretNotice != "" { // 秘密の検査に当たったまま保存した注記（comment.reject_secret を切にしたプロジェクト。CLI と Web が出す）
+		body["secret_notice"] = it.SecretNotice
+	}
 	if n := s.usageNotice(r.Context(), reqLang(r), a, pr, it, false); n != "" {
 		body["usage_notice"] = n
 	}
@@ -823,6 +911,9 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	if res.EvidenceNotice != "" { // エビデンスの無い Done の注意（verify.require_evidence を切にしたプロジェクト）。Web は上と同じ位置に出す
 		body["evidence_notice"] = res.EvidenceNotice
+	}
+	if res.SecretNotice != "" { // 同時のコメントが秘密の検査に当たったまま保存した注記（comment.reject_secret が切）。Web は上と同じ位置に出す
+		body["secret_notice"] = res.SecretNotice
 	}
 	// 下位の最後の 1 件を閉じたら要件の検証と close を促す。messages に入れるので古い CLI でも表示される
 	body["messages"] = withClosable(reqLang(r), statusMessages(reqLang(r), res), body, s.closedRequirements(r.Context(), pr, res))
@@ -908,6 +999,10 @@ func statusMessages(lang i18n.Lang, res *service.StatusResult) []string {
 	// エビデンスの無い Done の注意（service が判定。同じく REST の messages と MCP の本文で同じ行）
 	if res.EvidenceNotice != "" {
 		messages = append(messages, res.EvidenceNotice)
+	}
+	// 同時のコメントが秘密の検査に当たったまま保存した注記（comment.reject_secret が切。service が判定）
+	if res.SecretNotice != "" {
+		messages = append(messages, res.SecretNotice)
 	}
 	return messages
 }

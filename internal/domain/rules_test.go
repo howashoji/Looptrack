@@ -310,6 +310,9 @@ func TestExampleCoversAllRules(t *testing.T) {
 	if v := loadRules(t, "example"); !v.Verify.RequireOnClose || !v.Usage.RequireOnClose {
 		t.Error("example.json の require_on_close が立っていない")
 	}
+	if v := loadRules(t, "example"); !v.DigestRequired() || !v.TranscriptsEnabled() {
+		t.Error("example.json の session の digest_required・transcripts が立っていない")
+	}
 }
 
 // usage.send_prompts（指示文の作業名を送ってよいか）。既定は送らない。
@@ -441,5 +444,104 @@ func TestCheckEvidence(t *testing.T) {
 				t.Errorf("%s: %v %v %q", name, o, v, n)
 			}
 		}
+	}
+}
+
+// session.digest_required（セッション要約の必須化）: 既定は false、入にできる、知らない下位のキーは拒否する。
+func TestParseRulesSessionDigestRequired(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		want bool
+	}{
+		{``, false},
+		{`{}`, false},
+		{`{"session":{}}`, false},
+		{`{"session":{"digest_required":false}}`, false},
+		{`{"session":{"digest_required":true}}`, true},
+	} {
+		r, err := ParseRules([]byte(tc.raw))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.raw, err)
+		}
+		if got := r.DigestRequired(); got != tc.want {
+			t.Errorf("%s: DigestRequired() = %v（%v のはず）", tc.raw, got, tc.want)
+		}
+	}
+	// 綴り間違いはルールを黙って無効にしないよう拒否する（対照: 正しい綴りは上で通る）
+	if _, err := ParseRules([]byte(`{"session":{"digest_require":true}}`)); err == nil {
+		t.Errorf("知らない下位のキーを受け入れた")
+	}
+}
+
+// session.transcripts（会話記録の保存を許すか）: 既定は false、入にできる、digest_required とは独立、知らない下位のキーは拒否する。
+func TestParseRulesSessionTranscripts(t *testing.T) {
+	var none *Rules
+	if none.TranscriptsEnabled() {
+		t.Error("ルールなしは許さない（既定は切）")
+	}
+	for _, tc := range []struct {
+		raw        string
+		want       bool
+		wantDigest bool
+	}{
+		{``, false, false},
+		{`{}`, false, false},
+		{`{"session":{}}`, false, false},
+		{`{"session":{"digest_required":true}}`, false, true},
+		{`{"session":{"transcripts":false}}`, false, false},
+		{`{"session":{"transcripts":true}}`, true, false},
+		{`{"session":{"digest_required":true,"transcripts":true}}`, true, true},
+	} {
+		r, err := ParseRules([]byte(tc.raw))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.raw, err)
+		}
+		if got := r.TranscriptsEnabled(); got != tc.want {
+			t.Errorf("%s: TranscriptsEnabled() = %v（%v のはず）", tc.raw, got, tc.want)
+		}
+		if got := r.DigestRequired(); got != tc.wantDigest {
+			t.Errorf("%s: DigestRequired() = %v（%v のはず。transcripts と独立）", tc.raw, got, tc.wantDigest)
+		}
+	}
+	// 綴り間違い・型違いはルールを黙って無効にしないよう拒否する（対照: 正しい綴りは上で通る）
+	for _, raw := range []string{`{"session":{"transcript":true}}`, `{"session":{"transcripts":"yes"}}`} {
+		if _, err := ParseRules([]byte(raw)); err == nil {
+			t.Errorf("%s を受け入れた（綴り違い・型違いは拒否する）", raw)
+		}
+	}
+}
+
+// comment.reject_secret（秘密の検査に当たるコメントを拒むか）: 未設定は入（ルールなしでも入）、false で切にできる、
+// 真偽値でない値と知らない下位のキーは拒否する。
+func TestParseRulesCommentRejectSecret(t *testing.T) {
+	var none *Rules
+	if !none.RejectCommentSecret() {
+		t.Error("ルールなしは拒む（既定は入）")
+	}
+	for _, tc := range []struct {
+		raw  string
+		want bool
+	}{
+		{`{}`, true},
+		{`{"session":{"digest_required":true}}`, true},
+		{`{"comment":{}}`, true},
+		{`{"comment":{"reject_secret":true}}`, true},
+		{`{"comment":{"reject_secret":false}}`, false},
+	} {
+		r, err := ParseRules([]byte(tc.raw))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.raw, err)
+		}
+		if got := r.RejectCommentSecret(); got != tc.want {
+			t.Errorf("%s: RejectCommentSecret() = %v（%v のはず）", tc.raw, got, tc.want)
+		}
+	}
+	for _, raw := range []string{`{"comment":{"reject_secrets":false}}`, `{"comment":{"reject_secret":"no"}}`} {
+		if _, err := ParseRules([]byte(raw)); err == nil {
+			t.Errorf("%s を受け入れた（綴り違い・型違いは拒否する）", raw)
+		}
+	}
+	if v := loadRules(t, "example"); !v.RejectCommentSecret() {
+		t.Error("example.json の comment.reject_secret が入でない")
 	}
 }

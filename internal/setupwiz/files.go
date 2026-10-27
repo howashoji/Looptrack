@@ -63,9 +63,10 @@ func renderCompose(p *Plan, now time.Time, lang i18n.Lang) string {
     environment:
       GOMEMLIMIT: 64MiB
       LOOPTRACK_ATTACH_DIR: %s
+      LOOPTRACK_TRANSCRIPT_DIR: %s
     ports:
       - "127.0.0.1:%s:%s"
-`, attachContainerDir, port, port)
+`, attachContainerDir, transcriptContainerDir, port, port)
 	if p.Store == StoreSQLite {
 		writeComment(&b, "    ", i18n.T(lang, "files.compose.sqlite"))
 	}

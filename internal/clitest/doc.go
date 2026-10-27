@@ -12,7 +12,10 @@
 //   - golden: 終了コード・stdout・stderr・要求の列・書いたファイル（ws と home の中）を正規化（Normalizer）して
 //     1 つのテキストにし、testdata/golden/<ケース名>.golden と比べる。
 //   - 正規化: 試す looptrack の実行ファイル → $LOOPTRACK、一時パス → $TMP、偽 API の URL → $API、ほかの 127.0.0.1 のポート → $PORT、実行中の現在時刻 → $NOW、
-//     経過時間 → $SEC、ホスト名 → $HOST、乱数（OAuth の state・PKCE）→ $STATE / $PKCE_*、配布物のハッシュ → $SHA256。
+//     経過時間 → $SEC、ホスト名 → $HOST、乱数（OAuth の state・PKCE）→ $STATE / $PKCE_*、配布物のハッシュ → $SHA256、
+//     会話記録のプレースホルダの印（チャンクごとの乱数）→ $NONCE、一時ディレクトリの Claude Code の slug → $TMPSLUG、
+//     偽 API の URL とプロジェクトの鍵（usagesnap.ProjectKey）→ $PROJECTKEY、JSON の origin_os → $GOOS。
+//     gzip の本文（会話記録のチャンク）は伸ばした中身を記録する。
 //     クエリ・フォーム・JSON の本文と書いたファイルの JSON はキーの順をそろえる（意味の無い順序の違いを落とす）。
 //     規則そのもののテストは normalize_test.go。
 //

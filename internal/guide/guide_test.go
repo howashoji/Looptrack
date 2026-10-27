@@ -211,3 +211,60 @@ func TestComposeNextReadingNoBareInit(t *testing.T) {
 		}
 	}
 }
+
+// session.digest_required が JSON のままでなく文で出ること（日英。切なら設定のまま）。
+func TestDescribeRulesSessionDigest(t *testing.T) {
+	for _, tc := range []struct {
+		lang i18n.Lang
+		raw  string
+		want []string
+	}{
+		{i18n.JA, `{"session":{"digest_required":true}}`, []string{"完了より新しい自分のセッション要約が無ければ", "looptrack session digest <ID> -", "backend に関わらず"}},
+		{i18n.EN, `{"session":{"digest_required":true}}`, []string{"session digest of its own newer than that work", "looptrack session digest <ID> -", "whatever the handoff backend"}},
+		{i18n.JA, `{"session":{"digest_required":false}}`, []string{"設定: "}},
+		{i18n.JA, `{"session":{"transcripts":false}}`, []string{"設定: "}},
+		{i18n.JA, `{"session":{"transcripts":true}}`, []string{"会話記録", "looptrack session transcript push", "LOOPTRACK_SESSION_TRANSCRIPTS=1"}},
+		{i18n.EN, `{"session":{"transcripts":true}}`, []string{"conversation transcripts", "looptrack session transcript push", "LOOPTRACK_SESSION_TRANSCRIPTS=1"}},
+		// 両方入なら 1 件の説明に両方の文が出る
+		{i18n.EN, `{"session":{"digest_required":true,"transcripts":true}}`, []string{"session digest of its own newer than that work", "conversation transcripts"}},
+	} {
+		rules := DescribeRules(tc.lang, json.RawMessage(tc.raw))
+		if len(rules) != 1 || rules[0].Name != "session" {
+			t.Fatalf("%s: 規則が 1 件でない: %+v", tc.raw, rules)
+		}
+		for _, w := range tc.want {
+			if !strings.Contains(rules[0].Description, w) {
+				t.Errorf("%s（%v）: %q を含まない: %s", tc.raw, tc.lang, w, rules[0].Description)
+			}
+		}
+	}
+}
+
+// comment.reject_secret が文で出ること（日英。未設定・true は拒否の文、false は注記の文）。
+func TestDescribeRulesCommentSecret(t *testing.T) {
+	for _, tc := range []struct {
+		lang i18n.Lang
+		raw  string
+		want []string
+		not  string
+	}{
+		{i18n.JA, `{"comment":{}}`, []string{"秘密らしい文字列", "拒否される", "`***`"}, "拒否せずに保存"},
+		{i18n.JA, `{"comment":{"reject_secret":true}}`, []string{"秘密らしい文字列", "拒否される"}, "拒否せずに保存"},
+		{i18n.JA, `{"comment":{"reject_secret":false}}`, []string{"拒否せずに保存", "注記"}, "設定: "},
+		{i18n.EN, `{"comment":{"reject_secret":true}}`, []string{"looks like a secret", "is rejected", "`***`"}, "saved instead"},
+		{i18n.EN, `{"comment":{"reject_secret":false}}`, []string{"saved instead of rejected", "note"}, "Setting: "},
+	} {
+		rules := DescribeRules(tc.lang, json.RawMessage(tc.raw))
+		if len(rules) != 1 || rules[0].Name != "comment" {
+			t.Fatalf("%s: 規則が 1 件でない: %+v", tc.raw, rules)
+		}
+		for _, w := range tc.want {
+			if !strings.Contains(rules[0].Description, w) {
+				t.Errorf("%s（%v）: %q を含まない: %s", tc.raw, tc.lang, w, rules[0].Description)
+			}
+		}
+		if strings.Contains(rules[0].Description, tc.not) {
+			t.Errorf("%s（%v）: %q を含む: %s", tc.raw, tc.lang, tc.not, rules[0].Description)
+		}
+	}
+}

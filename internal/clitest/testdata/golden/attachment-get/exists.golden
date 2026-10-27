@@ -1,0 +1,19 @@
+# attachment-get/exists
+$ issue attachment get 11
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: $TMP/ws/notes.txt が既にあります（上書きしません）。--out で別のパスを指定するか、先に消してください
+
+#### requests (1)
+GET /im/api/v1/attachments/11
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (1)
+ws/notes.txt (0644)
+    手元で書いた内容

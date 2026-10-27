@@ -1,3 +1,5 @@
 {
-  "overrides": {}
+  "overrides": {
+    "v1.0.1": "guide/v1.0.1"
+  }
 }

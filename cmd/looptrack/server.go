@@ -4,16 +4,21 @@
 //	looptrack serve [--env-file <path>]   HTTP サーバ（既定 /looptrack。LOOPTRACK_BASE_PATH）を起動する
 //	looptrack user|member|token …         利用者・権限・アクセストークンの管理
 //	looptrack settings two-factor …       二段階認証の必須 / 任意（settings.go）
-//	looptrack project create|list          プロジェクトの作成・一覧（ADD-PROJECT.md）
+//	looptrack project create|list|rename|archive|unarchive
+//	                                      プロジェクトの作成・一覧・表示名の変更・アーカイブ・アーカイブの解除（ADD-PROJECT.md）
 //	looptrack project rules set|show|clear プロジェクト別ルール
+//	looptrack project guide set|show|clear プロジェクトの運用文書（AI が guide で読む）
 //	looptrack migrate [--check]           DB スキーマを最新にする（接続先は環境変数 LOOPTRACK_DSN）。--check は未適用を示すだけ
-//	looptrack grants print|apply          MySQL のアプリ用の利用者に最小権限（deploy/grants.sql）を与える（grants.go）
+//	looptrack grants print|apply|check    MySQL のアプリ用の利用者に最小権限（deploy/grants.sql）を与える（grants.go）
 //	looptrack import --root <dir> [slug…] 旧形式（Markdown）を DB に取り込む（プロジェクト単位で置き換え）
 //	looptrack verify --root <dir> [slug…] DB から再生成したファイルが旧形式とバイト一致するか確認する
 //	looptrack export --out <dir> [slug…]  DB を旧形式で書き出す（移行時の確認・一時出力用）
 //	looptrack verify-files --root <dir>   Markdown の往復一致を検査する（DB 不要）
 //	looptrack repair-lists [--apply] [slug…] 空白区切りで 1 要素に入った ID を分割する（repair.go）
 //	looptrack repair-attachments [--apply]   添付の DB と置き場の食い違いを報告する（--apply でどこからも指されない本体を消す。repair_attachments.go）
+//	looptrack repair-transcripts [--apply]   会話記録の DB と置き場の食い違いを報告する（同じ形。repair_transcripts.go）
+//	looptrack purge-transcripts --user <login> [--transcript <id>] [--reason <text>] [--yes]
+//	                                         利用者の会話記録の本体を消す運用者の操作（--yes が無ければ対象の数と大きさを示すだけ。purge_transcripts.go）
 package main
 
 import (
@@ -52,6 +57,8 @@ var serverCommands = map[string]func(args []string) int{
 	"verify-files":       verifyFiles,
 	"repair-lists":       repairListsCmd,
 	"repair-attachments": repairAttachmentsCmd,
+	"repair-transcripts": repairTranscriptsCmd,
+	"purge-transcripts":  purgeTranscriptsCmd,
 }
 
 // serverUsage は looptrack -h の「サーバの操作」の節。

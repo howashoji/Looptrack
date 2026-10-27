@@ -231,7 +231,7 @@ func TestHousekeepingKeepsPersistentSessions(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	housekeepOnce(ctx, e.app, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	housekeepOnce(ctx, e.app, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
 	for i, r := range rows {
 		var n int
 		if err := e.db.QueryRow("SELECT COUNT(*) FROM web_sessions WHERE id_hash = ?", auth.HashToken(strings.Repeat(string(rune('a'+i)), 8))).Scan(&n); err != nil {

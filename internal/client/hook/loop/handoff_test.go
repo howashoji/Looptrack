@@ -294,6 +294,39 @@ func TestHandoff(t *testing.T) {
 			want: wantQuiet},
 	}}.run(t)
 
+	// 既定の置き場は CLAUDE_CONFIG_DIR で変わる（auto-memory の MEMORY.md も <CLAUDE_CONFIG_DIR>/projects/… を見る）
+	encPath := func(s *sandbox) string { return regexp.MustCompile(`[^A-Za-z0-9]`).ReplaceAllString(R(s), "-") }
+	cfgStop := func(sid string, withCfg bool) func(*sandbox) call {
+		return func(s *sandbox) call {
+			m := map[string]string{"HOME": s.p("home"), "CLAUDE_PROJECT_DIR": R(s), "LOOPTRACK_LOOP_HANDOFF_BACKEND": "auto-memory"}
+			if withCfg {
+				m["CLAUDE_CONFIG_DIR"] = s.p("cfg")
+			}
+			return call{hook: "stop-handoff-freshness", env: m, input: `{"session_id":"` + sid + `"}`}
+		}
+	}
+	scenario{name: "2 段目: auto-memory は CLAUDE_CONFIG_DIR の下を見る", setup: setup, steps: []step{
+		{name: "CLAUDE_CONFIG_DIR を設定すると、その下の MEMORY.md の更新で通す",
+			do: func(s *sandbox) {
+				p := s.p("cfg", "projects", encPath(s), "memory", "MEMORY.md")
+				s.write(p, "")
+				s.touch(p, newTime)
+				putMarker("c1")(s)
+			},
+			mk: cfgStop("c1", true), want: wantQuiet},
+		{name: "設定ありでは ~/.claude 側の MEMORY.md だけが新しくても通さない（対照: 設定なしでは通る）",
+			do: func(s *sandbox) {
+				s.write(s.p("cfg", "projects", encPath(s), "memory", "MEMORY.md"), "")
+				s.touch(s.p("cfg", "projects", encPath(s), "memory", "MEMORY.md"), oldTime)
+				p := s.p("home", ".claude", "projects", encPath(s), "memory", "MEMORY.md")
+				s.write(p, "")
+				s.touch(p, newTime)
+				putMarker("c2")(s)
+			},
+			mk: cfgStop("c2", true), want: wantStop("BLOCK")},
+		{name: "設定なしなら ~/.claude 側を見て通す", do: putMarker("c3"), mk: cfgStop("c3", false), want: wantQuiet},
+	}}.run(t)
+
 	cmdStop := func(sid, cmd string, env ...string) func(*sandbox) call {
 		return func(s *sandbox) call {
 			m := map[string]string{"CLAUDE_PROJECT_DIR": R(s), "LOOPTRACK_LOOP_HANDOFF_BACKEND": "command", "LOOPTRACK_LOOP_HANDOFF_CHECK_CMD": cmd}

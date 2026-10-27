@@ -956,6 +956,9 @@ func setupStepsOf(lang i18n.Lang, agent, slug, base, dist string, st installStat
 	switch {
 	case st.State == "no_hook":
 		at = 1 // login の後・承認の前
+		if g.local {
+			at = 0 // ローカルモードには login の手順が無い（baseSteps）。承認の前
+		}
 	case st.State != "current":
 		// missing・stale: 取得と init の手順（steps[0]）を、答えの旗を付けた取得 + init の 1 つに置き換える
 		// （loop の手順を別に挟むと init が 2 回続く）
@@ -1053,7 +1056,9 @@ func (s *Server) composeSetupFor(ctx context.Context, lang i18n.Lang, base strin
 	b.WriteString("\n")
 	writeSetupClient(&b, lang, client, agent)
 	fmt.Fprintf(&b, "%s\n", i18n.T(lang, "server.mcp.setup.text.state", "message", st.Message))
-	if g.missing != "" {
+	if g.missing != "" && g.local {
+		fmt.Fprintf(&b, "%s\n", i18n.T(lang, "server.mcp.setup.text.cli_local", "menu", i18n.T(lang, "desktop.menu.install_cli")))
+	} else if g.missing != "" {
 		fmt.Fprintf(&b, "%s\n", i18n.T(lang, "server.mcp.setup.text.cli_missing", "reason", g.missing))
 	} else {
 		fmt.Fprintf(&b, "%s\n", i18n.T(lang, "server.mcp.setup.text.cli", "place", g.placeText()))

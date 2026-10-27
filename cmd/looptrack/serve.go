@@ -40,6 +40,8 @@ import (
 //	LOOPTRACK_DIST_DIR         looptrack の配布ディレクトリ（dist.sh の成果物と SHA256SUMS。GET /api/v1/dist の binaries）
 //	LOOPTRACK_ATTACH_DIR       添付の本体の置き場（無ければ $STATE_DIRECTORY/attachments → SQLite の DB の隣の attachments。
 //	                    どれも無ければ添付だけが使えない。service.AttachDirFromEnv）
+//	LOOPTRACK_TRANSCRIPT_DIR   会話記録の本体の置き場（無ければ $STATE_DIRECTORY/transcripts → SQLite の DB の隣の transcripts。
+//	                    どれも無いか添付の置き場と入れ子なら会話記録だけが使えない。service.TranscriptDirFromEnv）
 //	LOOPTRACK_CLIENT_MIN_VERSION 対応する looptrack の最低の版（これより古い導入に【配布スクリプトの更新】を出す。空なら判定しない）
 //	LOOPTRACK_UPDATE_CHECK     off で新しい版を確認しない（既定は起動時と 24 時間ごとに GitHub Releases を確かめ、新しい版を
 //	                    起動時のログ・管理者の帯・doctor で知らせる。LOOPTRACK_UPDATE_CHANNEL・LOOPTRACK_UPDATE_URL も効く。serve_update.go）
@@ -94,7 +96,7 @@ func serve() int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	go server.Housekeeping(ctx, db, logger)
+	go server.Housekeeping(ctx, db, logger, h.Service())
 	go updates.run(ctx)
 
 	errc := make(chan error, 1)
@@ -122,16 +124,17 @@ func serve() int {
 func serveConfig(logger *slog.Logger) (server.Config, string, error) {
 	local := envBool("LOOPTRACK_LOCAL_MODE", false)
 	cfg := server.Config{
-		BasePath:     envOr("LOOPTRACK_BASE_PATH", defaultBasePath),
-		CookieSecure: envBool("LOOPTRACK_COOKIE_SECURE", !local),
-		PublicURL:    os.Getenv("LOOPTRACK_PUBLIC_URL"),
-		Issuer:       strings.TrimSpace(os.Getenv("LOOPTRACK_TOTP_ISSUER")),
-		DistDir:      os.Getenv("LOOPTRACK_DIST_DIR"),
-		DistOff:      envSetEmpty("LOOPTRACK_DIST_DIR"),
-		AttachDir:    service.AttachDirFromEnv(os.Getenv),
-		Version:      version,
-		Logger:       logger,
-		LocalMode:    local,
+		BasePath:      envOr("LOOPTRACK_BASE_PATH", defaultBasePath),
+		CookieSecure:  envBool("LOOPTRACK_COOKIE_SECURE", !local),
+		PublicURL:     os.Getenv("LOOPTRACK_PUBLIC_URL"),
+		Issuer:        strings.TrimSpace(os.Getenv("LOOPTRACK_TOTP_ISSUER")),
+		DistDir:       os.Getenv("LOOPTRACK_DIST_DIR"),
+		DistOff:       envSetEmpty("LOOPTRACK_DIST_DIR"),
+		AttachDir:     service.AttachDirFromEnv(os.Getenv),
+		TranscriptDir: service.TranscriptDirFromEnv(os.Getenv),
+		Version:       version,
+		Logger:        logger,
+		LocalMode:     local,
 	}
 	addr := envOr("LOOPTRACK_LISTEN", ":8090")
 	proxies := envOr("LOOPTRACK_TRUSTED_PROXIES", "127.0.0.1/32,::1/128,172.16.0.0/12")

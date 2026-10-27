@@ -236,6 +236,8 @@ type Options struct {
 	UpdateApplier server.UpdateApplier
 	// AttachDir は添付の本体の置き場（server.Config.AttachDir）。空なら DB と同じディレクトリの attachments
 	AttachDir string
+	// TranscriptDir は会話記録の本体の置き場（server.Config.TranscriptDir）。空なら DB と同じディレクトリの transcripts
+	TranscriptDir string
 	// Version は動いている looptrack の版（server.Config.Version）。利用者メニューの「ガイド」の行き先を決める
 	Version string
 }
@@ -261,6 +263,7 @@ func serverConfig(o Options, box *auth.Box) server.Config {
 		UpdateStopInTray: o.UpdateStopInTray,
 		UpdateApplier:    o.UpdateApplier,
 		AttachDir:        o.AttachDir,
+		TranscriptDir:    o.TranscriptDir,
 		Version:          o.Version,
 	}
 }
@@ -279,6 +282,9 @@ func Start(ctx context.Context, o Options) (*Instance, error) {
 	}
 	if o.AttachDir == "" {
 		o.AttachDir = filepath.Join(filepath.Dir(o.DBPath), service.AttachDirName)
+	}
+	if o.TranscriptDir == "" {
+		o.TranscriptDir = filepath.Join(filepath.Dir(o.DBPath), service.TranscriptDirName)
 	}
 	if err := server.CheckLocalListen(o.Listener.Addr().String()); err != nil {
 		return nil, err
@@ -319,7 +325,7 @@ func Start(ctx context.Context, o Options) (*Instance, error) {
 		MaxHeaderBytes:    1 << 16,
 	}
 	hkCtx, stopHK := context.WithCancel(context.Background())
-	go server.Housekeeping(hkCtx, db, o.Logger)
+	go server.Housekeeping(hkCtx, db, o.Logger, h.Service())
 	inst := &Instance{DB: db, BasePath: o.BasePath, srv: srv, done: make(chan error, 1), stopHK: stopHK}
 	go func() {
 		o.Logger.Info("listening", "addr", o.Listener.Addr().String(), "base", o.BasePath, "local_mode", true)

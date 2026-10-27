@@ -230,7 +230,7 @@ func writePrivate(path string, data []byte) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := replaceFile(tmp, path); err != nil {
 		return err
 	}
 	ok = true

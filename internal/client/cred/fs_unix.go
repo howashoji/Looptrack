@@ -43,3 +43,6 @@ func lockFile(path string) (func(), error) {
 		f.Close()
 	}, nil
 }
+
+// replaceFile は tmp で path を置き換える（開いているファイルも rename で置き換えられる）。
+func replaceFile(tmp, path string) error { return os.Rename(tmp, path) }

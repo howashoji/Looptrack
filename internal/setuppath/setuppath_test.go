@@ -89,7 +89,8 @@ func TestPosixAddsPathOnce(t *testing.T) {
 					}
 					dir := filepath.Join(home, ".local", "bin")
 					// UTF-8 のロケールで流す（macOS の bash 3.2 は、このときだけ変数名に続く全角の文字を名前の一部として読む）
-					env := []string{"HOME=" + home, "XDG_CONFIG_HOME=" + filepath.Join(home, "xdg"), "LANG=en_US.UTF-8", "LC_ALL=en_US.UTF-8"}
+					loc := utf8Locale()
+					env := []string{"HOME=" + home, "XDG_CONFIG_HOME=" + filepath.Join(home, "xdg"), "LANG=" + loc, "LC_ALL=" + loc}
 					if tc.zdotdir {
 						env = append(env, "ZDOTDIR="+filepath.Join(home, "zdot"))
 					}
@@ -239,6 +240,36 @@ func TestPosixCommandLeavesNothing(t *testing.T) {
 	if got := run(`D="$HOME/.local/bin" && ` + PosixBody(i18n.JA)); !strings.HasSuffix(got, "|fn]\n") || strings.HasPrefix(got, "left=[|") {
 		t.Errorf("前提が崩れています: 包まない形でも残らない（検査が空振りしている）: %q", got)
 	}
+}
+
+// utf8Locale は、このマシンに在る UTF-8 のロケールの名前を返す。無いロケールを LC_ALL に渡すと bash が
+// setlocale の警告を stderr に出し、「何も出さない」ことを確かめる検査が落ちる。macOS は en_US.UTF-8 が必ず在る。
+// Linux は locale -a から選び、UTF-8 が 1 つも無ければ C を返す（この癖は macOS の bash 3.2 だけのものなので検査は成り立つ）。
+func utf8Locale() string {
+	if runtime.GOOS == "darwin" {
+		return "en_US.UTF-8"
+	}
+	out, err := exec.Command("locale", "-a").Output()
+	if err != nil {
+		return "C"
+	}
+	var first string
+	for _, l := range strings.Fields(string(out)) {
+		n := strings.ToLower(strings.ReplaceAll(l, "-", ""))
+		if !strings.HasSuffix(n, ".utf8") {
+			continue
+		}
+		if n == "c.utf8" || n == "en_us.utf8" {
+			return l
+		}
+		if first == "" {
+			first = l
+		}
+	}
+	if first != "" {
+		return first
+	}
+	return "C"
 }
 
 func contains(list []string, s string) bool {

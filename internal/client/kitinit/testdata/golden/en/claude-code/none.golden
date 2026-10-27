@@ -13,7 +13,7 @@ Install set: core only. loop is not installed (--loop installs it).
   create     .claude/skills/token-report/SKILL.md
   create     .gitignore
   create     .claude/.looptrack-kit.json
-verify: checked 8 wiring(s), looptrack dev（headless・test）
+verify: checked 10 wiring(s), looptrack dev（headless・test）
 Next:
   1. Restart Claude Code (to pick up env and the hooks). If it asks you to confirm hooks or settings, read them and approve (the desktop app loads them without asking).
   2. No token yet: run looptrack issue login --browser --url http://127.0.0.1:9/im and log in and approve in the browser it opens (the AI may run this; it waits up to 5 minutes, so set the command timeout longer than 5 minutes. Without a browser, issue a token at http://127.0.0.1:9/im/account and paste it into login --url http://127.0.0.1:9/im).
@@ -107,6 +107,11 @@ Next:
                 "type": "command",
                 "command": "looptrack hook usage --agent claude-code",
                 "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook transcript --agent claude-code",
+                "timeout": 10
               }
             ]
           }
@@ -117,6 +122,11 @@ Next:
               {
                 "type": "command",
                 "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook transcript --agent claude-code",
                 "timeout": 10
               }
             ]

@@ -1,0 +1,17 @@
+# session-transcript/pull-no-root
+$ session transcript pull 7
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: この端末で git の作業ツリーのルートが見つからないので、会話記録 7 を戻せません。取り込む作業ツリーの中で実行してください
+
+#### requests (1)
+GET /im/api/v1/transcripts/7
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -107,6 +107,10 @@ looptrack issue ready
 引き取りたいなら、先に一声かけて、相手が降りてから着手します。添えてある経過時間が長いものは、渡したまま放置されている可能性もある。そのときも、まず確かめてから。`next` も同じ判断をするので、別のセッションが着手したものは選びません。なお、セッション ID を送らない経路（画面・Copilot の VS Code）では、この注記は出ません。
 `guide` の中身は MCP の `guide` ツールと同じです（設計は [server/DESIGN.md](server/DESIGN.md)）。
 
+進行中の一覧には別のセッションが残した最新のセッション要約の抜粋も付きます（端末のラベルと経過時間つき）。
+別の端末から作業を引き継ぐときは、`looptrack session pull <ID>` で要約を `.claude/.looptrack-work/<ID>-digest.md` に書き出して読みます。
+端末を替える前や作業の区切りには、`looptrack session digest <ID> -` で要約を残してください。書き方は利用者ガイドの[セッション要約](guide/ja/ai-agents.md#セッション要約)にあります。
+
 ### ループ運用（next → 作業 → 検証 → close）
 
 ```bash
@@ -278,6 +282,7 @@ looptrack issue ready                       # 着手可能なものだけ
 looptrack issue list --assignee me          # 自分が担当のものだけ（ready / export も --assignee）
 looptrack issue list --has-feedback         # 未応答のフィードバック（先頭「フィードバック:」のコメント）があるもの。クローズ済みも含む
 looptrack issue verify EX-0142 --last      # 直近の verify の記録（コマンドごとの出力の末尾つき）
+looptrack issue attachment get 12 --out ./evidence/   # 添付（ID は issue attach や issue show が出す数）の本体を手元に保存する。既にあるファイルは上書きしない
 looptrack issue index                       # ステータス別一覧（標準出力）
 looptrack issue matrix                      # 要件→設計→実装→テストの対応表と警告（標準出力）
 looptrack issue list --type bug --json      # hook・スクリプトからは --json（list / ready / show）
@@ -311,6 +316,7 @@ looptrack issue usage report --request 3 --json > r.json    # 依頼 #3 の期�
 | `summary` の見出し | API モードでは 3 層（`══ ① いまの周（AI の作業） ══`・`══ ② 人の判断待ち（…） ══`・`══ ③ 外からの反応（…） ══`）。該当が無い層も見出しと「該当なし」を出す（3 層に対応していない古いサーバでは従来の「進行中・レビュー待ち・着手可能」） |
 | トークン計測 | `new` / `push` / `comment` / `status` / `close` / `next`（着手したとき）/ `verify`（と担当が変わった `assign`）の直後に、コーディング AI の会話記録から「会話の累計」をサーバへ送る。AI の下でない（人がターミナルから打った）ときは送らない。失敗しても操作は成功する。`LOOPTRACK_USAGE=0` で切れる。指示文（作業名）は既定で送らず、プロジェクト別ルール `usage.send_prompts: true` のプロジェクトだけ送る（利用者は `LOOPTRACK_USAGE_SEND_PROMPTS=0` で止められる）。手動で付けるときは `usage attach <ID>`。レポートの集計は `usage report`、作ったレポートの記録は `usage ledger add`。設計は [server/DESIGN.md](server/DESIGN.md) |
 | トークン情報の付与漏れ | 送れなかったときだけ標準エラーに `looptrack issue usage attach <ID>` を示す 1 行が出る → **そのコマンドを実行する**。`summary`（SessionStart）の末尾にも同じコマンドが並ぶので、示されたイシューごとに実行して回収する（自分の AI 操作・直近 7 日。人がターミナルから打った操作は数えない）。**目印は文面ではなくこのコマンド**（文面は利用者の言語で変わるので、特定の言い回しで探さない） |
+| コメントの秘密の検査（プロジェクト別ルール `comment.reject_secret`。既定は入） | 資格情報らしい文字列（`token=`・`Bearer …`・秘密鍵など）を含むコメントは、どの経路でも 422 `comment_secret` で拒否される。理由には行番号と規則の語だけが出る。値を `***` に替えて送り直す。ルールを切ったプロジェクトでは保存して注記を返す。セッション要約はルールに関わらず拒否される |
 | クローズ時の必須化（プロジェクト別ルール `usage.require_on_close`） | その会話のトークン情報がイシューに 1 件も無いまま Done / Canceled にすると拒否される。CLI は拒否されたら自動で `usage attach` してから 1 回だけやり直すので、通常は意識しなくてよい。会話記録が無く付けられないときは拒否のメッセージが出る（利用者の指示があるときだけ `--override "理由"`）。ルールが無いプロジェクトでは警告だけ |
 
 上の表の「対訳表 `…`」は、その文面の出どころ（Looptrack 本体の `internal/i18n/{ja,en}.json` の ID）を示しています。
@@ -554,6 +560,7 @@ OTel のファイルは追記され続けます。大きくなったら古いも
 | イシュー | サーバ（`looptrack issue`） | **これからやること・やっていること**。1 課題 1 件・状態遷移あり |
 | 引き継ぎ | `.claude/memories/handoff.md` / `MEMORY.md` | **セッションをまたぐ現在地**。どのイシューがどこまで進んだかの要約 |
 | 決定・学び | `.claude/memories/decision-*` / `caveat-*` | 決定理由・再発防止 |
+| セッション要約 | サーバ（`looptrack session digest`） | **別の端末のセッションへ渡す文脈**。頼まれたこと・決めたこと・どこまで進んだか。先頭の印で始まるコメントとして残る |
 
 イシュー本文に引き継ぎは書かない。引き継ぎにも、イシューの細かい経過は書かない。この線引きです。
 

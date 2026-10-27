@@ -13,17 +13,22 @@
 //   <SITE_BASE><版>/      英語（docs/guide 直下）
 //   <SITE_BASE><版>/ja/   日本語（docs/guide/ja）
 //   <SITE_BASE>latest/    最新の正式版（rc でない版のうち semver で最大）の同じパスへ転送するページ。
-//                         正式版が 1 つも無いときだけ、rc を含めて最大の版へ転送する
+//                         正式版が 1 つも無いときだけ、rc を含めて最大の版へ転送する。
+//                         英語のパスは、言語のメニューで選んだ言語かブラウザの言語が日本語なら ja/ の同じページへ転送する
+//                         （site/lib/lang.mjs）。JavaScript が無いときは英語のまま
 //   <SITE_BASE>           latest/ へ転送するページ
 //   404.html              無いページの案内。版をまたいで移った先にページが無いときに、その版の先頭へ案内する。
 //                         版の付かないパスは latest/ の同じパスへ転送する
 //   THIRD-PARTY-NOTICES.txt  配る JS と CSS に入った npm の包みのライセンスの全文（各版のフッタからリンクする）
+//   social-preview.png・icon.png  全版で共有する画像（site/brand/ から写す。先頭のページ・og:image・ヘッダが指す）
 import { spawn } from 'node:child_process'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { collectNotices, expandWithDependencies, packageRootOf, packagesBundledInside, packagesFromBundleList, renderNotices } from './lib/notices.mjs'
 import { VERSION_TAG_RE, loadOverrides, parseVersion, siteDir, sortNewestFirst } from './lib/versions.mjs'
+import { BRAND_FILES, DESCRIPTION, SITE_ORIGIN, brandDir, openGraphTags } from './lib/brand.mjs'
+import { redirectScript } from './lib/lang.mjs'
 
 function fail(msg) {
   console.error(`build.mjs: ${msg}`)
@@ -137,7 +142,14 @@ const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&l
 // script の中に置く JSON。</script> で閉じられないよう < を逃がす。
 const scriptJson = (v) => JSON.stringify(v).replace(/</g, '\\u003c')
 
-function redirectPage(target) {
+// 転送と案内のページにも、版のページと同じ Open Graph を入れる。サイトの直下や latest/ のリンクが張られたとき、
+// SNS の取得は転送をたどらずにこのページの head だけを読むことがあるため。
+const headTags = (tags) => tags.map(([tag, attrs]) => `<${tag}${Object.entries(attrs).map(([k, v]) => ` ${k}="${escapeHtml(v)}"`).join('')}>`).join('\n')
+const openGraphHead = ({ lang, url }) =>
+  headTags(openGraphTags({ siteBase, lang, title: 'Looptrack', description: DESCRIPTION[lang], url: url ? `${SITE_ORIGIN}${url}` : null }))
+
+// jaTarget は、日本語のページがあるときのその行き先。言語を決めるのは script だけで、JavaScript が無ければ target へ移る。
+function redirectPage(target, lang = 'en', jaTarget = null) {
   const t = escapeHtml(target)
   return `<!doctype html>
 <html lang="en">
@@ -147,7 +159,8 @@ function redirectPage(target) {
 <title>Looptrack</title>
 <link rel="canonical" href="${t}">
 <meta http-equiv="refresh" content="0; url=${t}">
-<script>location.replace(${scriptJson(target)} + location.search + location.hash)</script>
+${openGraphHead({ lang, url: target })}
+<script>${redirectScript(target, jaTarget)}</script>
 </head>
 <body><p><a href="${t}">${t}</a></p></body>
 </html>
@@ -163,6 +176,7 @@ function notFoundPage() {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Not found | Looptrack</title>
+${openGraphHead({ lang: 'en', url: null })}
 <style>
 body { margin: 0; padding: 64px 16px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #213547; background: #fff; text-align: center; }
 @media (prefers-color-scheme: dark) { body { color: #dfdfd6; background: #1b1b1f; } a { color: #a8b1ff; } }
@@ -217,6 +231,10 @@ p { line-height: 1.7; }
 
 const vitepressBin = path.join(siteDir, 'node_modules', 'vitepress', 'bin', 'vitepress.js')
 if (!fs.existsSync(vitepressBin)) fail(`VitePress がありません。先に site/ で npm ci を実行してください: ${vitepressBin}`)
+// 画像が欠けたまま全版を作ると、どのページも切れた画像を指すので、生成を始める前に止める。
+for (const f of BRAND_FILES) {
+  if (!fs.existsSync(path.join(brandDir, f))) fail(`共有の画像がありません: ${path.join(brandDir, f)}`)
+}
 
 // 一時ディレクトリは site/.work の下に作る。ページは Vue の部品として組まれ、vue などを置き場から上へたどって探すので、
 // site/node_modules の外（OS の一時ディレクトリ）に置くと解決できない。
@@ -271,10 +289,12 @@ try {
     const page = rel === 'index.html' ? '' : rel.endsWith('/index.html') ? rel.slice(0, -'index.html'.length) : rel
     const dest = path.join(out, 'latest', rel)
     fs.mkdirSync(path.dirname(dest), { recursive: true })
-    fs.writeFileSync(dest, redirectPage(`${siteBase}${latest}/${page}`))
+    const ja = !rel.startsWith('ja/') && fs.existsSync(path.join(latestDir, 'ja', rel)) ? `${siteBase}${latest}/ja/${page}` : null
+    fs.writeFileSync(dest, redirectPage(`${siteBase}${latest}/${page}`, rel.startsWith('ja/') ? 'ja' : 'en', ja))
   }
   fs.writeFileSync(path.join(out, 'index.html'), redirectPage(`${siteBase}latest/`))
   fs.writeFileSync(path.join(out, '404.html'), notFoundPage())
+  for (const f of BRAND_FILES) fs.copyFileSync(path.join(brandDir, f), path.join(out, f))
   for (const inner of packagesFromBundleList(packageRoots, siteDir)) bundledInside.add(inner)
   const direct = new Set([...packageRoots, ...bundledInside])
   const expanded = expandWithDependencies(direct, siteDir)

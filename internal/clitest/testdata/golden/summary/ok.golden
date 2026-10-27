@@ -8,6 +8,11 @@ $ issue summary
 ── 進行中（In Progress） ──
 ID        TYPE        STATUS      PRI BLOCKED  ASSIGNEE     TITLE
 DEMO-0001 task        In Progress P1  -        alice        ログイン画面を作る
+※ DEMO-0001 の最新のセッション要約は別のセッションが書いたものです（home-mac・3時間前）:
+  branch: feature/login
+  head: ce768dc
+  ai: claude-code
+  次の一手: 画面のテストを足す
 
 ── 着手可能（ready・上位 1 / 全 1 件） ──
 ID        TYPE        STATUS      PRI BLOCKED   TITLE

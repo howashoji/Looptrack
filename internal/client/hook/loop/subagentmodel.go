@@ -11,7 +11,7 @@ package loop
 //   - サブエージェントの起動でないツール
 //   - tool_input.model が指定されている（空文字は未指定として扱う）
 //   - subagent_type が fork（モデルは親を継ぐ）
-//   - subagent_type の定義ファイル（作業ディレクトリの .claude/agents/<名>.md か ~/.claude/agents/<名>.md）の
+//   - subagent_type の定義ファイル（作業ディレクトリの .claude/agents/<名>.md か、設定のディレクトリの agents/<名>.md）の
 //     frontmatter に model: があるとき（その型は既に固定のモデルを持つ）
 //   - 例外の環境変数 LOOPTRACK_LOOP_SUBAGENT_MODEL_ALLOW（空白区切りの subagent_type 名。"*" は全部を外す）
 //
@@ -30,6 +30,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/howashoji/looptrack/internal/client/agentdirs"
 	"github.com/howashoji/looptrack/internal/hookio"
 	"github.com/howashoji/looptrack/internal/i18n"
 )
@@ -67,7 +68,7 @@ func PreToolSubagentModel(ctx context.Context, ev hookio.Event) (hookio.Result, 
 }
 
 // subagentDefHasModel は subagent_type の定義ファイル（作業ディレクトリの .claude/agents/<名>.md か
-// ~/.claude/agents/<名>.md）の frontmatter に model: があるか（読めなければ false。サーバへは出ない）。
+// Claude Code の設定のディレクトリの agents/<名>.md。CLAUDE_CONFIG_DIR が無ければ ~/.claude）の frontmatter に model: があるか（読めなければ false。サーバへは出ない）。
 func subagentDefHasModel(ev hookio.Event, e *Env, subagentType string) bool {
 	cwd := ev.CWD
 	if cwd == "" {
@@ -78,11 +79,16 @@ func subagentDefHasModel(ev hookio.Event, e *Env, subagentType string) bool {
 		home, _ = os.UserHomeDir()
 	}
 	name := subagentType + ".md"
-	for _, dir := range []string{cwd, home} {
-		if dir == "" {
-			continue
-		}
-		if frontmatterHasModel(filepath.Join(dir, ".claude", "agents", name)) {
+	// 作業ディレクトリの .claude と、Claude Code の設定のディレクトリ（CLAUDE_CONFIG_DIR があればそれ、無ければ ~/.claude）
+	var dirs []string
+	if cwd != "" {
+		dirs = append(dirs, filepath.Join(cwd, agentdirs.ClaudeDirName, "agents"))
+	}
+	if cfg := agentdirs.ClaudeConfigDir(e.env, home); cfg != "" {
+		dirs = append(dirs, filepath.Join(cfg, "agents"))
+	}
+	for _, dir := range dirs {
+		if frontmatterHasModel(filepath.Join(dir, name)) {
 			return true
 		}
 	}

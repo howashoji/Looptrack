@@ -34,7 +34,7 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
   作成         .codex/hooks.json
       --- /dev/null
       +++ b/.codex/hooks.json
-      @@ -0,0 +1,114 @@
+      @@ -0,0 +1,124 @@
       +{
       +  "hooks": {
       +    "SessionStart": [
@@ -99,6 +99,11 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
       +          },
       +          {
       +            "type": "command",
+      +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
       +            "command": "looptrack hook stop-handoff-freshness --agent codex --no-block",
       +            "timeout": 10
       +          },
@@ -116,6 +121,11 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
       +          {
       +            "type": "command",
       +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
       +            "timeout": 10
       +          }
       +        ]
@@ -159,7 +169,7 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
   作成         AGENTS.md
       --- /dev/null
       +++ b/AGENTS.md
-      @@ -0,0 +1,293 @@
+      @@ -0,0 +1,299 @@
       +<!-- looptrack:begin（looptrack issue init が管理する節。直すときは looptrack issue init を再実行する） -->
       +## 課題管理（イシュー管理サーバ）
       +

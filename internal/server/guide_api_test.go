@@ -37,12 +37,14 @@ func TestGuide(t *testing.T) {
 		"受け入れ条件のチェックボックスに",
 		"Done / Canceled にするとき、その会話のトークン情報", "ブランチ名から /CASE-\\d+/ で案件を決める", "「## 検証コマンド」節を持つイシューを Done にするとき",
 		"「## 受け入れ条件」節を持つイシューを Done にするとき",
+		"完了より新しい自分のセッション要約が無ければ、引き継ぎの鮮度ガード（Stop hook）が 1 回差し戻す",
+		"の本文に秘密らしい文字列（`token=…`・`Bearer …`・秘密鍵など）があれば拒否される", "（`comment`）",
 		"## 3. このプロジェクトの運用文書", "（未登録。管理者が `looptrack project guide set ex <ファイル>` で登録する"} {
 		if !strings.Contains(g.Markdown, want) {
 			t.Errorf("guide に %q が無い:\n%s", want, g.Markdown)
 		}
 	}
-	if len(g.Rules) != 7 || g.Doc != "" { // 例は全 7 種のルールを持つ
+	if len(g.Rules) != 9 || g.Doc != "" { // 例は全 9 種のルールを持つ
 		t.Errorf("rules=%v doc=%q", g.Rules, g.Doc)
 	}
 

@@ -1,0 +1,19 @@
+# session-transcript/list
+$ session transcript list
+
+#### exit 0
+
+#### stdout
+ID  agent  セッション  端末  プロジェクト  チャンク  ファイル  バイト  最後に送った時刻
+7  claude-code  00000000-0000-4000-8000-0000000000f1  desk-a  demo  2  2  512  2026-10-25T01:00:00Z
+5  codex  019a0000-0000-7000-8000-0000000000d1  -  demo  0  0  0  -  （消去済み）
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/transcripts?project=demo
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -214,7 +214,12 @@ func SetAttachLimitTx(ctx context.Context, tx Queryer, name string, value int64,
 	if value <= 0 {
 		return "", false, i18n.Errorf("store.err.attach_limit.invalid", "value", value)
 	}
-	v := strconv.FormatInt(value, 10)
+	return setSettingValueTx(ctx, tx, name, strconv.FormatInt(value, 10), ch)
+}
+
+// setSettingValueTx は system_settings の name を v にし、変更を setting_changes に 1 行記録する（同じ値なら何もしない）。
+// 値の検査は呼び出し元が済ませる（添付の上限・会話記録の上限で共有する）。old は変更前の値（空は未設定）。
+func setSettingValueTx(ctx context.Context, tx Queryer, name, v string, ch SettingChange) (old string, changed bool, err error) {
 	err = tx.QueryRowContext(ctx, "SELECT value FROM system_settings WHERE name = ? FOR UPDATE", name).Scan(&old)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", false, err

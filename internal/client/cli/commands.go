@@ -124,10 +124,16 @@ func IssueCommand(lang i18n.Lang) *Command {
 				{Name: "text", Help: i18n.T(lang, "cli.arg.comment.text")},
 				attachArg(lang),
 			}},
-			{Name: "attach", Help: i18n.T(lang, "cli.cmd.attach"), Run: cmdAttach, Args: []*Arg{
+			{Name: "attach", Help: i18n.T(lang, "cli.cmd.attach"), Description: attachDescription(lang), Run: cmdAttach, Args: []*Arg{
 				{Name: "id"},
 				{Name: "files", Nargs: "+", Metavar: "FILE", Help: i18n.T(lang, "cli.arg.attach.files")},
 				jsonArg(lang),
+			}},
+			{Name: "attachment", Help: i18n.T(lang, "cli.cmd.attachment"), SubDest: "attachment_action", Subs: []*Command{
+				{Name: "get", Help: i18n.T(lang, "cli.cmd.attachment.get"), Run: cmdAttachmentGet, Args: []*Arg{
+					{Name: "id", Metavar: "ATTACHMENT_ID", Help: i18n.T(lang, "cli.arg.attachment.get.id")},
+					{Name: "--out", Metavar: "PATH", Help: i18n.T(lang, "cli.arg.attachment.get.out")},
+				}},
 			}},
 			{Name: "status", Help: i18n.T(lang, "cli.cmd.status"), Run: cmdStatus, Args: []*Arg{
 				{Name: "id"},
@@ -210,6 +216,7 @@ func IssueCommand(lang i18n.Lang) *Command {
 				{Name: "--no-usage", Dest: "no_usage", Kind: Bool, Help: i18n.T(lang, "cli.arg.init.no_usage")},
 				{Name: "--no-summary", Dest: "no_summary", Kind: Bool, Help: i18n.T(lang, "cli.arg.init.no_summary")},
 				{Name: "--no-session-bind", Dest: "no_session_bind", Kind: Bool, Help: i18n.T(lang, "cli.arg.init.no_session_bind")},
+				{Name: "--no-transcript", Dest: "no_transcript", Kind: Bool, Help: i18n.T(lang, "cli.arg.init.no_transcript")},
 				{Name: "--no-skill", Dest: "no_skill", Kind: Bool, Help: i18n.T(lang, "cli.arg.init.no_skill")},
 				{Name: "--loop", Kind: Bool, Help: i18n.T(lang, "cli.arg.init.loop")},
 				{Name: "--no-loop", Dest: "no_loop", Kind: Bool, Help: i18n.T(lang, "cli.arg.init.no_loop")},

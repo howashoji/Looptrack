@@ -121,6 +121,9 @@ looptrack project rules clear demo
 | `verify.require_on_close` | An issue with a verify-commands section cannot be marked Done unless the latest `verify` against the current body passed completely |
 | `usage.require_on_close` | When an agent marks an issue Done or Canceled, refuse if there is no token info from that conversation. The CLI attaches it automatically and retries once |
 | `verify.require_evidence` | On by default. An issue with a verify-commands section can't be marked Done unless the latest `verify` record for the current body carries an attachment. Set it to `false` and you get a note instead of a rejection ([Daily use](../daily-use.md#attachments-evidence)) |
+| `session.digest_required` | Off by default. When on, the Stop hook of the loop kit requires, whatever the handoff backend, that an In Progress issue held by the session has a session digest newer than the finished work (send one with `looptrack session digest <ID> -`) before the session may end. The server itself rejects nothing for this rule; the value reaches the hook through the `session_digest_required` key of the summary response |
+| `session.transcripts` | Off by default. When on, users may store their conversation transcripts with an AI on this project's server (`looptrack session transcript push`); when off, registering a transcript and adding to one are rejected (reading and purging what was sent still work). For the hook to send them automatically, the user must also set `LOOPTRACK_SESSION_TRANSCRIPTS=1` on that machine. Only the owner can read a stored transcript. The value reaches the client as `transcripts_enabled` in the responses of registering a transcript and adding a chunk |
+| `comment.reject_secret` | On by default. A comment (including the comment that comes with a status change) whose text holds something that looks like a secret (`token=…`, `Bearer …` and the like) is rejected; only the line number and the matching rule are shown, never the value. Set it to `false` to save the comment and return a note instead. A session digest is rejected whatever this rule says |
 
 Unknown keys and misspellings are rejected at registration.
 Every override (`--override "reason"`) is recorded on the server.
@@ -138,7 +141,7 @@ How people attach files is in [Daily use](../daily-use.md#attachments-evidence).
 
 ### Where attachments live and backups
 
-The files go on the server's disk and their records go in the database. **Backups come in two parts, the database and the attachment directory**, and you take the database first.
+The files go on the server's disk and their records go in the database. **Backups come in three parts, the database, the attachment directory and the transcript directory**, and you take the database first (the transcript directory is under "Where transcripts live" below).
 
 | How it runs | Attachment directory |
 | -- | -- |
@@ -146,8 +149,34 @@ The files go on the server's disk and their records go in the database. **Backup
 | compose from `looptrack setup` | `<dir>/data/attachments` (the same with MySQL as the store) |
 
 The database backup that install.sh's `--upgrade` takes doesn't include attachments.
-`looptrack export` writes the attachment files and a manifest too, and `looptrack verify-files` checks that the files match the manifest. Still, `looptrack import` doesn't carry attachments, so take backups in the two parts.
+`looptrack export` writes the attachment files and a manifest too, and `looptrack verify-files` checks that the files match the manifest. Still, `looptrack import` doesn't carry attachments, so take backups in the three parts.
 How to take and restore backups, and `looptrack repair-attachments`, which finds where the database and the directory disagree, are in ["Where attachments live and backups" in DEPLOY.md](../../server/DEPLOY.md), written for operators.
+
+## Transcript limits and usage
+
+Users can carry their conversation transcripts with an AI to another machine of theirs ([Carrying the raw transcript](../ai-agents.md#carrying-the-raw-transcript)). It works only in a project where the project rule `session.transcripts` is on.
+On the admin screen's "Transcript management" page (`<server URL>/admin/transcripts`, opened from "Transcripts" in the user menu at the right end of the header) you change the limits and the retention, and see how much each user uses.
+
+- There are two limits, per chunk (the uncompressed size; 32MiB by default) and per user (the total that isn't purged; 2GiB by default). The retention is a number of days since the last upload (90 by default; 0 for no limit). All of them are shared by every user; you enter the limits in MiB and the retention in days.
+- A new value takes effect from the next upload, with no restart. The retention is applied by the hourly housekeeping, which deletes the content of conversations past it. Each change is recorded with the old and new values and who made it.
+- The usage table shows only the number of transcripts and the space used (and its share of the limit) per user. It never shows their contents, titles, file names or session ids. Administrators cannot read transcripts through the screens or the API either.
+- The page has no purge button. Transcript content is deleted by its owner (`looptrack session transcript purge`), when the retention runs out, and by an operator (`looptrack purge-transcripts` below).
+- When you raise the per-chunk limit, raise the body limit of the proxy in front too (["Proxy limits in front" in DEPLOY.md](../../server/DEPLOY.md), written for operators).
+
+### Where transcripts live
+
+The content goes on the server's disk and the records go in the database. The directory is separate from the attachment directory.
+
+| How it runs | Transcript directory |
+| -- | -- |
+| install.sh (systemd) | `/var/lib/looptrack/transcripts` |
+| compose from `looptrack setup` | `<dir>/data/transcripts` |
+
+- The environment variable `LOOPTRACK_TRANSCRIPT_DIR` changes the directory. When the transcript directory and the attachment directory are one inside the other (or the same), only transcripts stop working, and this page shows a warning.
+- The content is plain text after masking and path rewriting, and is not encrypted. Anyone who can read the directory or its backups can read the contents.
+- For backups, take the database first, then copy the attachment and transcript directories. Delete purged content from the backups too.
+- Operators find where the database and the directory disagree with `looptrack repair-transcripts` (with no arguments it only reports; `--apply` deletes content nothing points at). This and taking backups are in ["Where attachments live and backups" in DEPLOY.md](../../server/DEPLOY.md), written for operators.
+- The only way an operator deletes another user's transcripts is `looptrack purge-transcripts --user <login> [--transcript <id>] --reason <text> --yes` (the admin screen has no purge button). Without `--yes` it only shows how many would be purged and their size, and changes nothing. With `--yes` it deletes the content and records the purge with cause `operator`.
 
 ## Token reports
 

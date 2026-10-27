@@ -2,7 +2,11 @@ package store
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/howashoji/looptrack/internal/domain"
 )
 
 // 3 層のループの ②③（DESIGN.md §9-3-6・§9-3-7）。どちらもプロジェクト単位で 1 クエリ。
@@ -18,8 +22,9 @@ type PendingFeedback struct {
 }
 
 // PendingFeedbacks はプロジェクトの未応答のフィードバックを古い順に返す（クローズ済みのイシューも含む）。
-// 応答済み = それより後（seq が大きい）に先頭語が「フィードバック」でないコメントがある、または
-// それより後（at > created_at）に状態変更がある。コメントは editor 以上しか書けないので役割は引かない。
+// 応答済み = それより後（seq が大きい）に先頭語が「フィードバック」でも「セッション要約」でもないコメントがある、または
+// それより後（at > created_at）に状態変更がある。セッション要約（DESIGN.md §9-7）は hook が自動で付けうる記録で、
+// 人の応答ではないので数えない。コメントは editor 以上しか書けないので役割は引かない。
 // 取り込み分（created_at が NULL）は対象外。LIKE の照合順序は utf8mb4_bin（テーブルの既定）。
 // 先頭語の規則は domain.LeadWord と同じ（先頭の空白は許さない）。英語の別名「Feedback:」（大小を問わない・DESIGN.md §9-6）も含める。
 func PendingFeedbacks(ctx context.Context, q execQuerier, projectID int64) ([]PendingFeedback, error) {
@@ -28,10 +33,11 @@ func PendingFeedbacks(ctx context.Context, q execQuerier, projectID int64) ([]Pe
   JOIN issues i ON i.id = c.issue_id
  WHERE i.project_id = ?
    AND c.created_at IS NOT NULL
-   AND `+feedbackLead("c")+`
+   AND `+leadCond("c", domain.LeadFeedback)+`
    AND NOT EXISTS (SELECT 1 FROM comments r
                     WHERE r.issue_id = c.issue_id AND r.seq > c.seq
-                      AND NOT `+feedbackLead("r")+`)
+                      AND NOT `+leadCond("r", domain.LeadFeedback)+`
+                      AND NOT `+leadCond("r", domain.LeadDigest)+`)
    AND NOT EXISTS (SELECT 1 FROM issue_events e
                     WHERE e.issue_id = c.issue_id AND e.kind = 'status' AND e.at > c.created_at)
  ORDER BY c.created_at, c.issue_id, c.seq`, projectID)
@@ -50,15 +56,25 @@ func PendingFeedbacks(ctx context.Context, q execQuerier, projectID int64) ([]Pe
 	return out, rows.Err()
 }
 
-// feedbackLead は列 <alias>.content の先頭語が「フィードバック」かの SQL の条件（domain.LeadWord の LeadFeedback と同じ）。
+// leadCond は列 <alias>.content の先頭語の種別が kind かの SQL の条件（domain.LeadWord と同じ判定）。
+// 綴りは domain.LeadWordSpellings から取り、ここには写さない（先頭語の一覧は domain に 1 か所だけ）。
 //   - 日本語: LIKE で前方一致（MySQL は utf8mb4_bin、SQLite は case_sensitive_like で、どちらも大小を区別する）
-//   - 英語（Feedback:・大小を問わない）: 先頭 9 文字を LOWER / UPPER の両方で比べる。MySQL の LOWER は Unicode で畳み、
+//   - 英語（大小を問わない）: 先頭の同じ長さを LOWER / UPPER の両方で比べる。MySQL の LOWER は Unicode で畳み、
 //     K（U+212A ケルビン記号）も k にする。SQLite の LOWER は ASCII だけ。UPPER でも一致を求めると、両方で ASCII の
-//     「feedback:」の大小違いだけが残る（K の UPPER は K のまま）。LEFT は SQLite では substr に書き換わる（sqlite.go）
-func feedbackLead(alias string) string {
-	head := "LEFT(" + alias + ".content, 9)"
-	return "(" + alias + ".content LIKE 'フィードバック:%' OR " + alias + ".content LIKE 'フィードバック：%' OR " +
-		"(LOWER(" + head + ") = 'feedback:' AND UPPER(" + head + ") = 'FEEDBACK:'))"
+//     綴りの大小違いだけが残る（K の UPPER は K のまま）。LEFT は SQLite では substr に書き換わる（sqlite.go）
+//
+// 綴りは固定の語（引用符も LIKE のワイルドカードも含まない）なので、SQL の文字列に直接書く。
+func leadCond(alias string, kind string) string {
+	ja, en := domain.LeadWordSpellings(kind)
+	var conds []string
+	for _, p := range ja {
+		conds = append(conds, alias+".content LIKE '"+p+"%'")
+	}
+	for _, p := range en {
+		head := "LEFT(" + alias + ".content, " + strconv.Itoa(len(p)) + ")"
+		conds = append(conds, "(LOWER("+head+") = '"+p+"' AND UPPER("+head+") = '"+strings.ToUpper(p)+"')")
+	}
+	return "(" + strings.Join(conds, " OR ") + ")"
 }
 
 // ReviewSince はプロジェクトの In Review のイシューごとに、最後に In Review になった時刻を返す

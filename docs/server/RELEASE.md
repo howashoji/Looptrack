@@ -414,6 +414,8 @@ README・利用者ガイド・`install.sh`・`setup` のどれかを変えたと
 
 利用者ガイド（`docs/guide`）は GitHub Pages の静的サイトとしても配っています。URL は `https://howashoji.github.io/Looptrack/` です。
 版ごとに `<版>/`（英語）と `<版>/ja/`（日本語）のページがあり、`latest/` は最新の正式版の同じページへ転送します。
+サイトの直下と `latest/` の英語のパスは言語のメニューで選んだ言語かブラウザの言語が日本語なら `ja/` の同じページへ転送します。
+判定は `site/lib/lang.mjs` に 1 か所で置き、JavaScript が無いときは英語のままです。版のページへの直接のアクセスは振り分けません。
 最新の正式版はプレリリースでない版のうち semver で最大のものです。正式版が 1 つも無いときだけ、プレリリースを含めて最大の版へ転送します。
 サイトに載るのは公開リポジトリのタグのうち `vX.Y.Z` と `vX.Y.Z-rc.N` の形のものすべてで、プレリリースの版も含みます。
 Web 画面の利用者メニューの「ガイド」は、サーバの版のページを開きます。
@@ -430,6 +432,7 @@ pages.yml は `site` への push と手動の起動で動きます。ジョブ�
 
 ```
 (cd site && npm ci)
+node --test site/lib/lang.test.mjs
 node site/build.mjs <公開リポジトリのチェックアウト> /tmp/guide-site
 ```
 

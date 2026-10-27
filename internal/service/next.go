@@ -68,6 +68,10 @@ type NextResult struct {
 	Verify            *VerifyPlan // 検証コマンド（節が無ければ nil。verify.go の Next が添える）
 	// AcceptanceNotice は started のとき、受け入れ条件が雛形のままなら載る注意（StatusResult と同じ）
 	AcceptanceNotice string
+	// SecretNotice は started のとき、同時のコメントが秘密の検査に当たったまま保存した注記（comment.reject_secret が切。StatusResult と同じ）
+	SecretNotice string
+	// LatestDigest は返すイシューの最新のセッション要約（無ければ nil。verify.go の Next が添える・digest_latest.go）
+	LatestDigest *LatestDigest
 }
 
 // maxNextCandidates は 1 回の next で判定する候補の上限（ルールで見送り続けるときの打ち切り）。
@@ -195,6 +199,10 @@ func (s *Service) next(ctx context.Context, a Actor, p store.Project, opt NextOp
 		st, err := s.setStatus(ctx, a, p, id, "In Progress", opt.Comment, opt.OverrideReason, cur.Status, opt.Assignee)
 		if err != nil {
 			var se *Error
+			if errors.As(err, &se) && (se.Code == "comment_secret" || se.Code == "digest_on_status") {
+				// 拒まれたのは候補ではなく同時のコメント（prepareComment）。次の候補でも同じ理由で拒まれるので、見送らずに返す
+				return nil, err
+			}
 			if errors.As(err, &se) && (se.Kind == Conflict || se.Kind == Rejected) {
 				// 判定の後に他の操作が先に着手した・状態が変わった。次の候補へ
 				res.Skipped = append(res.Skipped, NextSkip{ID: it.ID, Rule: se.Rule, Reason: i18n.Text(a.Lang, se)})
@@ -205,7 +213,7 @@ func (s *Service) next(ctx context.Context, a Actor, p store.Project, opt NextOp
 		if res.Issue, err = s.Detail(ctx, p, id); err != nil {
 			return nil, err
 		}
-		res.Action, res.From, res.AcceptanceNotice = "started", st.From, st.AcceptanceNotice
+		res.Action, res.From, res.AcceptanceNotice, res.SecretNotice = "started", st.From, st.AcceptanceNotice, st.SecretNotice
 		return res, nil
 	}
 	if firstViolation != nil {

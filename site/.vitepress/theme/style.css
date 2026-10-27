@@ -1,6 +1,7 @@
 .lt-version {
   display: flex;
   align-items: center;
+  margin-left: 12px;
   margin-right: 12px;
 }
 
@@ -22,4 +23,29 @@
 .lt-mermaid svg {
   max-width: 100%;
   height: auto;
+}
+
+/* ヘッダのタイトルの横のアイコン。既定のテーマの logo と同じ大きさと間隔にそろえる。 */
+.lt-logo {
+  height: var(--vp-nav-logo-height);
+  width: auto;
+  margin-right: 8px;
+}
+
+/* 先頭のページの上部の画像。画像の背景は白なので、暗い配色では縁と角の丸みで面として区切る。 */
+.lt-hero {
+  margin: 0 0 32px;
+}
+
+.lt-hero img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+}
+
+.dark .lt-hero img {
+  border-color: var(--vp-c-gray-3);
 }

@@ -447,6 +447,12 @@ func (c *Call) work(ctx context.Context, job usageJob) {
 	}
 	o := usagesnap.Options{WithSegments: job.Trigger != "issue_op", Env: *c.Vars, Now: c.Now}
 	payload, err := usagesnap.Collect(job.Client, job.TranscriptPath, job.SessionID, job.CWD, o)
+	if job.Client == usagesnap.ClientCodex {
+		// 圧縮済みの rollout は読まない（累計に入らない）。件数を debug に残す
+		if n := len(usagesnap.CodexUnreadRollouts(job.TranscriptPath, job.SessionID, o)); n > 0 {
+			c.debug("%s", i18n.TN(c.lang(), "core.usage.debug.codex_compressed", n, "count", n))
+		}
+	}
 	if err != nil || payload == nil {
 		if job.Client == usagesnap.ClientCopilot {
 			// Copilot は OTel の置き場の外に書くと読めない（出力先が hook に渡らない）。探した結果と置き場を案内する

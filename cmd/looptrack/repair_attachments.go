@@ -18,6 +18,8 @@ import (
 //	looptrack repair-attachments           本体の欠けと、どこからも指されない本体を報告するだけ（dry-run・既定。何も変えない）
 //	looptrack repair-attachments --apply   どこからも指されない本体を消す（本体の欠けは直さない。書かれて service.OrphanGrace 以内の本体は消さない）
 //
+// 本体を調べる前に、途中で止まった削除が .tmp に外したまま残した本体と古い印を数える（--apply なら戻すか捨てる）。
+//
 // 置き場は looptrack serve と同じ決め方（service.AttachDirFromEnv）。install.sh の --upgrade の控えから DB だけを戻すと、
 // 戻した後の添付の本体が「どこからも指されない本体」として残る。
 func repairAttachmentsCmd(args []string) int {
@@ -43,10 +45,21 @@ func repairAttachmentsCmd(args []string) int {
 	return 0
 }
 
-// repairAttachments は置き場 dir と DB を突き合わせて w に報告し、apply ならどこからも指されない本体を消す。
+// repairAttachments は置き場 dir と DB を突き合わせて w に報告し、apply なら外したまま残った本体を片付け、どこからも指されない本体を消す。
 func repairAttachments(ctx context.Context, db *sql.DB, dir string, lang i18n.Lang, w io.Writer, apply bool) error {
 	svc := service.New(db, nil)
 	svc.AttachDir = dir
+	left, err := svc.RecoverAttachmentLeftovers(ctx, apply)
+	if err != nil {
+		return err
+	}
+	switch {
+	case left.Asides == 0 && left.StaleMarks == 0:
+	case apply:
+		fmt.Fprintln(w, i18n.T(lang, "cmd.repair_attachments.leftovers_applied", "asides", left.Asides, "restored", left.Restored, "dropped", left.Dropped, "marks", left.StaleMarks))
+	default:
+		fmt.Fprintln(w, i18n.T(lang, "cmd.repair_attachments.leftovers_dry_run", "asides", left.Asides, "marks", left.StaleMarks))
+	}
 	c, err := svc.CheckAttachments(ctx)
 	if err != nil {
 		return err

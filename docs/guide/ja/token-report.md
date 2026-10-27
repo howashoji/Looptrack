@@ -8,6 +8,7 @@ Looptrack はコーディング AI が使ったトークンを記録してイシ
 
 手元から送るのは**スナップショット**、つまりある時点の「会話の累計」1 件です。
 実はサーバ自身はトークンのことを何も知りません。値があるのは手元にある AI の会話記録の中だけなので、`looptrack` がその記録（Claude Code は `~/.claude/projects/…`、Codex は `~/.codex/sessions/…`）を読んで数値を送ります。
+AI の置き場を `CLAUDE_CONFIG_DIR` や `CODEX_HOME` で変えているなら、`looptrack` はそちら（`<CLAUDE_CONFIG_DIR>/projects/…`・`<CODEX_HOME>/sessions/…`）を読みます。
 
 スナップショットに入るのは次のものです。
 

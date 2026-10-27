@@ -1,0 +1,22 @@
+# session-transcript/purge-not-found
+$ session transcript purge 8
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 会話記録が見つかりません: 8
+
+#### requests (1)
+POST /im/api/v1/transcripts/8/purge
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "reason": ""
+    }
+
+#### files (0)

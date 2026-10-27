@@ -106,6 +106,42 @@ func TestPreToolSubagentModelDefinitionFile(t *testing.T) {
 		}}.run(t)
 }
 
+// TestPreToolSubagentModelConfigDir は、定義ファイルの置き場が CLAUDE_CONFIG_DIR に従うこと
+// （無ければ ~/.claude。作業ディレクトリの .claude/agents はどちらでも見る）。
+func TestPreToolSubagentModelConfigDir(t *testing.T) {
+	mk := func(subagentType string, extraEnv ...string) func(*sandbox) call {
+		return func(s *sandbox) call {
+			env := map[string]string{"HOME": s.p("home")}
+			for i := 0; i+1 < len(extraEnv); i += 2 {
+				env[extraEnv[i]] = strings.ReplaceAll(extraEnv[i+1], "{R}", s.root)
+			}
+			return call{hook: "pre-tool-subagent-model", env: env,
+				input: jsonInput(map[string]any{"session_id": "s1", "cwd": s.root, "hook_event_name": "PreToolUse",
+					"tool_name": "Agent", "tool_input": map[string]any{"description": "テスト", "prompt": "調べて",
+						"subagent_type": subagentType}})}
+		}
+	}
+	cfgEnv := []string{"CLAUDE_CONFIG_DIR", "{R}/cfg"}
+	def := "---\nmodel: opus\n---\n\n本文\n"
+	scenario{name: "CLAUDE_CONFIG_DIR の下の agents/<名>.md を見る",
+		setup: func(s *sandbox) { s.mkdir("home") },
+		steps: []step{
+			{name: "CLAUDE_CONFIG_DIR あり: その下の agents に model: がある",
+				do: func(s *sandbox) { s.write(s.p("cfg", "agents", "cfgtype.md"), def) },
+				mk: mk("cfgtype", cfgEnv...), want: wantQuiet},
+			{name: "CLAUDE_CONFIG_DIR なし: 同じ型は見つからず止める（対照）",
+				mk: mk("cfgtype"), want: wantDeny},
+			{name: "CLAUDE_CONFIG_DIR なし: ~/.claude/agents を見る",
+				do: func(s *sandbox) { s.write(s.p("home", ".claude", "agents", "hometype.md"), def) },
+				mk: mk("hometype"), want: wantQuiet},
+			{name: "CLAUDE_CONFIG_DIR あり: ~/.claude/agents は見ない（設定のディレクトリが移っている）",
+				mk: mk("hometype", cfgEnv...), want: wantDeny},
+			{name: "対照: CLAUDE_CONFIG_DIR があっても作業ディレクトリの .claude/agents は従来どおり見る",
+				do: func(s *sandbox) { s.write(s.p(".claude", "agents", "cwdtype.md"), def) },
+				mk: mk("cwdtype", cfgEnv...), want: wantQuiet},
+		}}.run(t)
+}
+
 // TestPreToolSubagentModelWorksOutsideProject は、looptrack を導入していないディレクトリ
 // （プロジェクトの設定・LOOPTRACK_API_URL・LOOPTRACK_PROJECT・サーバへの接続が無い場所）でも
 // 同じ判定で動くこと。判定はツールの入力・環境変数・ローカルのファイルだけを見て、サーバへは出ない。

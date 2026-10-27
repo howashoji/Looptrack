@@ -10,7 +10,7 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
   作成         .codex/hooks.json
       --- /dev/null
       +++ b/.codex/hooks.json
-      @@ -0,0 +1,49 @@
+      @@ -0,0 +1,59 @@
       +{
       +  "hooks": {
       +    "SessionStart": [
@@ -43,6 +43,11 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
       +            "type": "command",
       +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
       +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
+      +            "timeout": 10
       +          }
       +        ]
       +      }
@@ -53,6 +58,11 @@ kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
       +          {
       +            "type": "command",
       +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+      +            "timeout": 10
+      +          },
+      +          {
+      +            "type": "command",
+      +            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
       +            "timeout": 10
       +          }
       +        ]

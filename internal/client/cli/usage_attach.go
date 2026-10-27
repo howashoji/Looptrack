@@ -63,9 +63,16 @@ func (c *Ctx) usageAttach(issueID, op, trigger string, quiet bool) (*jsonorder.O
 	if err != nil {
 		return fail(err)
 	}
-	payload, err := usagesnap.Collect("", "", "", cwd, opts)
+	client, transcript, sessionID := usagesnap.Detect(cwd, opts)
+	payload, err := usagesnap.Collect(client, transcript, sessionID, cwd, opts)
 	if err != nil {
 		return fail(err)
+	}
+	if client == "" || client == usagesnap.ClientCodex {
+		// 圧縮済みの rollout は読まない（累計に入らない）。黙って見落とさないよう、件数を知らせる
+		if n := len(usagesnap.CodexUnreadRollouts(transcript, sessionID, opts)); n > 0 && (!quiet || debug) {
+			fmt.Fprintln(c.Stderr, i18n.TN(c.Lang, "cli.usage.codex_compressed", n, "count", n))
+		}
 	}
 	if payload == nil {
 		if debug {

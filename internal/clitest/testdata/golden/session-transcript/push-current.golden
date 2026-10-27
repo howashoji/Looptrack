@@ -1,0 +1,95 @@
+# session-transcript/push-current
+$ session transcript push --current
+env CLAUDE_CODE_SESSION_ID=00000000-0000-4000-8000-0000000000f1
+env LOOPTRACK_MACHINE_LABEL=desk-a
+
+#### exit 0
+
+#### stdout
+会話記録 #7（claude-code・00000000-0000-4000-8000-0000000000f1）に送りました: チャンク 2・ファイル 2・行 4
+書き換えたパス: 0
+マスクした値: 1（password=… 1）
+書き換えなかった絶対パス: 構造の欄 0・本文 0・キー 0
+
+#### stderr
+
+#### requests (3)
+POST /im/api/v1/projects/demo/transcripts
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: 00000000-0000-4000-8000-0000000000f1
+  body:
+    {
+      "agent": "claude-code",
+      "agent_version": "2.1.0",
+      "machine_label": "desk-a",
+      "origin_os": "$GOOS",
+      "vendor_session_id": "00000000-0000-4000-8000-0000000000f1"
+    }
+POST /im/api/v1/transcripts/7/chunks
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/octet-stream
+  If-Match: "0"
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: 00000000-0000-4000-8000-0000000000f1
+  X-Looptrack-Transcript-File: 00000000-0000-4000-8000-0000000000f1.jsonl
+  X-Looptrack-Transcript-Length: 533
+  X-Looptrack-Transcript-Nonce: $NONCE
+  X-Looptrack-Transcript-Offset: 0
+  X-Looptrack-Transcript-Placeholders: []
+  X-Looptrack-Transcript-Stats: {"lines":3,"changed_lines":1,"rewritten":0,"masked":{"password=***":1},"masked_lines":1,"unrewritten_structural":0,"unrewritten_prose":0,"unrewritten_keys":0}
+  body:
+    (gzip を伸ばした中身)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","version":"2.1.0","message":{"role":"user","content":"x.go を直して"}}
+    {"type":"assistant","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Edit","input":{"file_path":"/srv/x/x.go"}}]}}
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"user","content":"設定は password=*** にある"}}
+POST /im/api/v1/transcripts/7/chunks
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/octet-stream
+  If-Match: "1"
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  X-Looptrack-Session: 00000000-0000-4000-8000-0000000000f1
+  X-Looptrack-Transcript-File: 00000000-0000-4000-8000-0000000000f1%2Fsubagents%2Fagent-a1.jsonl
+  X-Looptrack-Transcript-Length: 149
+  X-Looptrack-Transcript-Nonce: $NONCE
+  X-Looptrack-Transcript-Offset: 0
+  X-Looptrack-Transcript-Placeholders: []
+  X-Looptrack-Transcript-Stats: {"lines":1,"changed_lines":0,"rewritten":0,"masked_lines":0,"unrewritten_structural":0,"unrewritten_prose":0,"unrewritten_keys":0}
+  body:
+    (gzip を伸ばした中身)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","isSidechain":true,"cwd":"/srv/x","message":{"role":"user","content":"調べて"}}
+
+#### files (7)
+home/.claude/projects/-proj/00000000-0000-4000-8000-0000000000f1.jsonl (0644)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","version":"2.1.0","message":{"role":"user","content":"x.go を直して"}}
+    {"type":"assistant","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Edit","input":{"file_path":"/srv/x/x.go"}}]}}
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"user","content":"設定は password=Synthetic0Value9 にある"}}
+home/.claude/projects/-proj/00000000-0000-4000-8000-0000000000f1/subagents/agent-a1.jsonl (0644)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","isSidechain":true,"cwd":"/srv/x","message":{"role":"user","content":"調べて"}}
+home/.config/looptrack/session-transcripts/$PROJECTKEY (0644)
+    1
+    (末尾に改行なし)
+home/.config/looptrack/transcript-push/$PROJECTKEY/claude-code-00000000-0000-4000-8000-0000000000f1.json (0600)
+    {
+      "sent": {
+        "00000000-0000-4000-8000-0000000000f1.jsonl": {
+          "length": 533,
+          "tail_sha256": "72f6f3457c4a57fb073d473b9cf892af6b268971c97815056c3cbdb260e90aef"
+        },
+        "00000000-0000-4000-8000-0000000000f1/subagents/agent-a1.jsonl": {
+          "length": 149,
+          "tail_sha256": "235cf08d1f778c5a24c2be803581331a642240c66f3077779df9f4ecbaddd5a2"
+        }
+      },
+      "transcript_id": 7,
+      "version": 1
+    }
+ws/.git/HEAD (0644)
+    ref: refs/heads/feature/x
+ws/.git/objects/.keep (0644)
+ws/.git/refs/heads/feature/x (0644)
+    0123456789abcdef0123456789abcdef01234567

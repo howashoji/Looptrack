@@ -1,0 +1,23 @@
+# session-transcript/pull-help
+$ session transcript pull -h
+
+#### exit 0
+
+#### stdout
+usage: looptrack session transcript pull [-h] [--print-resume] [--out DIR] TRANSCRIPT_ID
+
+会話記録をこの端末の AI の置き場に新しいセッション ID で置き、fork の再開のコマンドを表示する（AI は起動しない）
+
+positional arguments:
+  TRANSCRIPT_ID          会話記録の ID（session transcript list で見る）
+
+options:
+  -h, --help             show this help message and exit
+  --print-resume         標準出力に再開のコマンドの 1 行だけを出す（置くのは同じ。ほかの表示は標準エラーへ）
+  --out DIR              AI の置き場ではなく DIR に書き出す（中身を見るため。再開のコマンドは出さない）
+
+#### stderr
+
+#### requests (0)
+
+#### files (0)

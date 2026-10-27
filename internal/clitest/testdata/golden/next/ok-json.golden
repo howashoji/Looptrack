@@ -26,7 +26,15 @@ $ issue next --type bug,task --comment 着手します --assignee me --override 
     "version": 3,
     "file_name": "DEMO-0002-x.md"
   },
-  "text": "着手: DEMO-0002 保存でエラーになる（Todo → In Progress）\n\n## 内容\n\n保存でエラーになる。\n\n## 受け入れ条件\n\n- [ ] 保存できる\n"
+  "latest_digest": {
+    "excerpt": "branch: feature/login\nhead: ce768dc\nai: claude-code\n次の一手: 画面のテストを足す",
+    "machine_label": "home-mac",
+    "created_at": "2024-05-02T01:00:00Z",
+    "age": "3時間",
+    "session_id": "other-session",
+    "other_session": true
+  },
+  "text": "着手: DEMO-0002 保存でエラーになる（Todo → In Progress）\n\n※ DEMO-0002 の最新のセッション要約は別のセッションが書いたものです（home-mac・3時間前）:\n  branch: feature/login\n  head: ce768dc\n  ai: claude-code\n  次の一手: 画面のテストを足す\n\n## 内容\n\n保存でエラーになる。\n\n## 受け入れ条件\n\n- [ ] 保存できる\n"
 }
 
 #### stderr

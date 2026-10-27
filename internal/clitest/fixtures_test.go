@@ -127,12 +127,16 @@ func attachRes(id int, filename, mediaType string, size int) string {
 
 const verifyPosted = `{"issue":` + `{"id":"DEMO-0001"}` + `,"seq":2,"ok":true,"passed":2,"failed":0,"message":"verify を記録: DEMO-0001（2/2 成功）"}`
 
+// 最新のセッション要約（summary の in_progress と next の latest_digest）。別のセッションが書いたもの
+const digestOther = `{"excerpt":"branch: feature/login\nhead: ce768dc\nai: claude-code\n次の一手: 画面のテストを足す","machine_label":"home-mac",` +
+	`"created_at":"2024-05-02T01:00:00Z","age":"3時間","session_id":"other-session","other_session":true}`
+
 // summary（GET /projects/{slug}/summary）
 var summaryRes = `{"counts":{"open":3,"open_bugs":1,"ready":1,"in_progress":1,"in_review":1},` +
 	`"feedback":{"count":2,"issue_count":1,"issues":[{"id":"DEMO-0003","first_at":"2024-05-02T01:00:00Z","pending":2,"excerpt":"ボタンが小さい"}]},` +
-	`"in_progress":[` + item1 + `],` +
+	`"in_progress":[` + strings.TrimSuffix(item1, "}") + `,"latest_digest":` + digestOther + `}],` +
 	`"in_review":[` + strings.TrimSuffix(item3, "}") + `,"review_age":"3 日","review_stale":true,"verify_self_reported":true}],` +
-	`"ready":[` + item2 + `],"ready_total":1,` +
+	`"ready":[` + item2 + `],"ready_total":1,"session_digest_required":true,` +
 	`"requirements_ready":[{"requirement":{"id":"DEMO-0003","title":"認証の要件"},"done":2,"canceled":1,"command":"looptrack issue close DEMO-0003"}],"requirements_ready_total":1,` +
 	`"usage_missing":{"count":1,"issues":["DEMO-0001"],"days":7,"command":"looptrack issue usage attach DEMO-0001","message":"トークン情報の未付与 1 件（DEMO-0001）。looptrack issue usage attach DEMO-0001 で付けてください"},` +
 	`"usage_requests":[{"id":7,"created_at":"2024-05-03T00:00:00Z","requested_by":"carol","period":"2024-04-01〜2024-04-30","target":"demo","note":"月次\n報告","command":"looptrack issue usage report --request 7 --json"}]}`
@@ -151,7 +155,8 @@ const meRes = `{"login":"alice","name":"Alice","role":"admin"}`
 const guideMD = "# 使い方とルール\n\n## 共通規則\n\n- 作業はイシューから始める\n\n## プロジェクト別ルール（demo）\n\n- verify: 有効\n"
 const guideJSON = `{"project":"demo","common":"作業はイシューから始める","rules":{"verify":{"require_on_close":true}},"docs":[]}`
 
-var nextStarted = `{"action":"started","issue":` + item2 + `,"text":"着手: DEMO-0002 保存でエラーになる（Todo → In Progress）\n\n## 内容\n\n保存でエラーになる。\n\n## 受け入れ条件\n\n- [ ] 保存できる\n"}`
+var nextStarted = `{"action":"started","issue":` + item2 + `,"latest_digest":` + digestOther + `,"text":"着手: DEMO-0002 保存でエラーになる（Todo → In Progress）\n\n` +
+	`※ DEMO-0002 の最新のセッション要約は別のセッションが書いたものです（home-mac・3時間前）:\n  branch: feature/login\n  head: ce768dc\n  ai: claude-code\n  次の一手: 画面のテストを足す\n\n## 内容\n\n保存でエラーになる。\n\n## 受け入れ条件\n\n- [ ] 保存できる\n"}`
 var nextDry = `{"action":"dry_run","issue":` + item2 + `,"text":"次に着手するもの（--dry-run。状態は変えていません）: DEMO-0002 保存でエラーになる"}`
 
 const usageShow = `{"issue":"DEMO-0001","total_tokens":123456,"stage_count":2,"inconsistent":1,` +

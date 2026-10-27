@@ -5,6 +5,7 @@ package cred
 import (
 	"errors"
 	"os"
+	"time"
 
 	"golang.org/x/sys/windows"
 
@@ -57,4 +58,25 @@ func lockFile(path string) (func(), error) {
 		windows.UnlockFileEx(h, 0, 1, 0, ol)
 		f.Close()
 	}, nil
+}
+
+// replaceRetryFor は置き換えを試し直す時間の上限。
+var replaceRetryFor = 2 * time.Second
+
+// replaceFile は tmp で path を置き換える。Windows は削除の共有なしで開かれているファイルを置き換えられず、
+// ERROR_ACCESS_DENIED か ERROR_SHARING_VIOLATION を返す。資格情報はロックを取らずに読まれる（更新の途中に
+// ほかの要求が読む）ので、読み手が閉じるまで上限つきで試し直す。上限を超えたら最後のエラーを返す。
+func replaceFile(tmp, path string) error {
+	deadline := time.Now().Add(replaceRetryFor)
+	wait := time.Millisecond
+	for {
+		err := os.Rename(tmp, path)
+		if err == nil || !(errors.Is(err, windows.ERROR_ACCESS_DENIED) || errors.Is(err, windows.ERROR_SHARING_VIOLATION)) || time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(wait)
+		if wait < 50*time.Millisecond {
+			wait *= 2
+		}
+	}
 }

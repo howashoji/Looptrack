@@ -1,0 +1,19 @@
+# session-transcript/push-not-found
+$ session transcript push 00000000-0000-4000-8000-0000000000f1
+env LOOPTRACK_MACHINE_LABEL=desk-a
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 会話記録が見つかりません（セッション 00000000-0000-4000-8000-0000000000f1）
+
+#### requests (0)
+
+#### files (3)
+ws/.git/HEAD (0644)
+    ref: refs/heads/feature/x
+ws/.git/objects/.keep (0644)
+ws/.git/refs/heads/feature/x (0644)
+    0123456789abcdef0123456789abcdef01234567

@@ -20,3 +20,6 @@ func checkPrivate(path string) error {
 func mkdirPrivate(dir string) error { return os.MkdirAll(dir, 0o700) }
 
 func lockFile(string) (func(), error) { return func() {}, nil }
+
+// replaceFile は tmp で path を置き換える（開いているファイルも rename で置き換えられる）。
+func replaceFile(tmp, path string) error { return os.Rename(tmp, path) }

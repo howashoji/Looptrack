@@ -85,6 +85,7 @@ func specs() []spec {
 				r("POST", pIssue1+"/comments", created(commentRes))}},
 		{name: "attach", args: []string{"attach", "DEMO-0001", "shot.png", "notes.txt"}, json: true, seeds: attachSeeds, routes: []Route{
 			r("POST", pIssue1+"/attachments", created(attachRes(11, "shot.png", "image/png", 12)), created(attachRes(12, "notes.txt", "text/plain; charset=utf-8", 12)))}},
+		{name: "attachment-get", args: []string{"attachment", "get", "11"}, routes: []Route{r("GET", pAtt11, attNotesRes)}},
 		{name: "status", args: []string{"status", "DEMO-0002", "In Progress", "--comment", "着手", "--override", "急ぎ", "--assignee", "me"},
 			routes: []Route{r("POST", pIssue2+"/status", ok(statusRes))}},
 		{name: "close", args: []string{"close", "DEMO-0001", "--comment", "検証: go test が通った"}, routes: []Route{r("POST", pIssue1+"/status", ok(closeRes))}},
@@ -170,7 +171,10 @@ func generated() []Case {
 }
 
 func allCases() []Case {
-	out := append(append(append(generated(), special()...), initCases()...), usageCases()...)
+	out := append(append(append(append(append(generated(), special()...), initCases()...), usageCases()...), attachmentGetCases()...), sessionCases()...)
+	out = append(out, commentSecretCases()...)
+	out = append(out, transcriptCases()...)
+	out = append(out, transcriptPullCases()...)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }

@@ -49,6 +49,9 @@ Only you can read them.
 The files you attach to issues go in the `attachments` folder inside the data folder ([Daily use](../daily-use.md#attachments-evidence)).
 The database only holds their names and sizes, so copy the `attachments` folder along with the rest when you back up.
 
+If a project turns on carrying transcripts (`session.transcripts`), the transcripts you send go in the `transcripts` folder inside the data folder ([Carrying the raw transcript](../ai-agents.md#carrying-the-raw-transcript)).
+Copy that folder too when you back up.
+
 The `backups` folder inside the data folder holds copies of `looptrack.db` (`looptrack.db.20260926T010203Z`; the time is in UTC). The app takes them by itself, before a new version changes the database format.
 It takes one only when the new version actually has changes to apply to an existing database. It keeps the two newest and deletes older ones.
 Like the database, only you can read them. They're what you use to go back to the previous version ([Update](updating.md#update)).

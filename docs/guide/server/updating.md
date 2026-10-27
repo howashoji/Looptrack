@@ -82,6 +82,10 @@ looptrack issue init --project <slug> --url <server URL> --agent <agent>
 The "[Update the distributed files]" notice does not show this command directly. Have the agent call the setup tool, and you get a single download-and-init command with `--url` (the download is skipped when the `looptrack` in place matches the distributed one). A command from the notice, run in a terminal with neither `--url` nor `LOOPTRACK_API_URL`, would point at your local mode instead.
 Once you've updated, the next session start reports to the server again and the notice goes away.
 
+A project set up with the `init` of 1.0.2 or earlier has no wiring for the hook that sends transcripts automatically (Stop and SessionEnd of Claude Code and Codex).
+Replacing `looptrack` alone doesn't add it, and neither the summary nor the server's notice tells you it's missing.
+To send transcripts automatically, run the `init` above once more in each project with the new `looptrack`. Session digests and a manual `session transcript push` work without the wiring.
+
 ## Server
 
 By default, the server isn't updated automatically. An administrator replaces it (you're told about new versions; see "New-version notices and automatic replacement" below).
@@ -156,6 +160,20 @@ docker compose up -d
 
 Under systemd (`--service systemd`), the order is the same.
 Stop the service, replace the binary, run `looptrack migrate` with the settings from `.env` loaded, then start it.
+
+With MySQL and an application user on the minimum grants, a version that adds tables needs two more steps.
+The migration has to run with a connection that can create tables, so set `LOOPTRACK_DSN` to such a connection for that one command.
+After it, run `looptrack grants check`. If it ends with exit code 3, grant what is missing with `looptrack grants apply`, which asks for the administrative credentials on the terminal, then start the server.
+With compose, replace the `migrate` line above with the following. Write the connection as the container sees it, and pass the value through the environment, not on the command line.
+
+```bash
+read -rs LOOPTRACK_DSN && export LOOPTRACK_DSN   # type the connection that can create tables (not echoed, not in history)
+docker compose run --rm --no-deps -e LOOPTRACK_DSN looptrack migrate
+unset LOOPTRACK_DSN
+docker compose run --rm --no-deps looptrack grants check   # exit code 3: run the next line
+docker compose run --rm --no-deps looptrack grants apply   # asks for the administrative credentials on the terminal
+docker compose up -d
+```
 
 ### The looptrack you distribute to users
 

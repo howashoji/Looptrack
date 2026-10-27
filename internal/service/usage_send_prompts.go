@@ -40,6 +40,20 @@ func rulesMap(raw []byte) (map[string]json.RawMessage, error) {
 	return m, nil
 }
 
+// SessionDigestRequired はプロジェクトのルールがセッション要約を必須にしているか（session.digest_required）。
+// 読めないルールは false（必須にしない側。summary を落とさないため。壊れた設定は状態の変更が rulesOf で知らせる）。
+func SessionDigestRequired(p store.Project) bool {
+	r, err := domain.ParseRules(p.Rules)
+	return err == nil && r.DigestRequired()
+}
+
+// SessionTranscriptsEnabled はプロジェクトのルールが会話記録の保存を許しているか（session.transcripts）。
+// 読めないルールは false（保存を許さない側。壊れた設定は状態の変更が rulesOf で知らせる）。
+func SessionTranscriptsEnabled(p store.Project) bool {
+	r, err := domain.ParseRules(p.Rules)
+	return err == nil && r.TranscriptsEnabled()
+}
+
 // UsageSendPromptsEnabled はプロジェクトのルールが指示文の作業名の送信を許すか。
 func UsageSendPromptsEnabled(p store.Project) bool {
 	r, err := domain.ParseRules(p.Rules)
