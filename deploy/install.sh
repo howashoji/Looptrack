@@ -55,6 +55,7 @@ STATE=$CONF_DIR/install.conf           # インストールが最後まで終わ
 BIN=/usr/local/bin/looptrack
 DATA_DIR=/var/lib/looptrack            # systemd のデータ（SQLite）
 ATTACH_SYS=$DATA_DIR/attachments       # systemd の添付の本体の置き場（.env の LOOPTRACK_ATTACH_DIR。add_attach_env）
+TRANSCRIPT_SYS=$DATA_DIR/transcripts   # systemd の会話記録の本体の置き場（.env の LOOPTRACK_TRANSCRIPT_DIR。add_transcript_env）
 UNIT=/etc/systemd/system/looptrack.service
 SVC_USER=looptrack
 COMPOSE_DIR_DEFAULT=/opt/looptrack
@@ -618,6 +619,23 @@ add_attach_env() {
   say "  $envf に LOOPTRACK_ATTACH_DIR='$ATTACH_SYS' を足しました"
 }
 
+# add_transcript_env — systemd のサーバの .env に LOOPTRACK_TRANSCRIPT_DIR を足し、置き場を作る（add_attach_env と同じ形。
+# 添付の置き場とは別のディレクトリにする。同じ場所や入れ子だと、片方の整合の検査がもう片方の本体を消すので、サーバは会話記録を使えなくする）
+add_transcript_env() {
+  [ "$METHOD" = systemd ] || return 0
+  envf="$DIR/.env"
+  if [ -f "$envf" ] && grep -q '^LOOPTRACK_TRANSCRIPT_DIR=' "$envf"; then
+    return 0
+  fi
+  mkdir -p "$TRANSCRIPT_SYS"
+  chown "$SVC_USER:$SVC_USER" "$TRANSCRIPT_SYS"
+  chmod 0750 "$TRANSCRIPT_SYS"
+  if [ -s "$envf" ] && [ -n "$(tail -c 1 "$envf")" ]; then printf '\n' >>"$envf"; fi
+  printf '%s\n' "# install.sh が足した: 会話記録の本体の置き場（添付とは別。DB・添付とは別にバックアップを取る。docs/server/DEPLOY.md の「会話記録の置き場」）" \
+    "LOOPTRACK_TRANSCRIPT_DIR='$TRANSCRIPT_SYS'" >>"$envf"
+  say "  $envf に LOOPTRACK_TRANSCRIPT_DIR='$TRANSCRIPT_SYS' を足しました"
+}
+
 # warn_compose_attach — 以前の setup が書いた MySQL の compose.yaml には添付の置き場が無い（read_only で、書ける volume も無い）。
 # compose.yaml はこのスクリプトでは書き換えないので、足し方を示すだけにする（サーバは起動し、添付だけが使えない）。
 # SQLite の compose.yaml は ./data を /data に入れているので、serve が DB の隣（/data/attachments）に決める
@@ -1131,6 +1149,7 @@ install_systemd() {
   run_setup "$@"
   sync_dist # クライアントに配る looptrack（.env に LOOPTRACK_DIST_DIR を足す。setup が .env を書いた後）
   add_attach_env # 添付の置き場（.env に LOOPTRACK_ATTACH_DIR を足す）
+  add_transcript_env # 会話記録の置き場（.env に LOOPTRACK_TRANSCRIPT_DIR を足す）
   fix_owner_systemd
   step "systemd の unit"
   write_unit
@@ -1854,6 +1873,7 @@ upgrade() {
     # 起動する新しい版が起動時に配布物を確かめるので、起動の前に置く（無人の更新が戻すときは rollback_dist で前の版の配布に戻す）
     add_dist_env
     add_attach_env # 添付の置き場（以前の install.sh で入れたサーバの .env には無い）
+    add_transcript_env # 会話記録の置き場（同じく）
     commit_dist
     step "起動"
     systemctl daemon-reload || die "systemctl daemon-reload に失敗しました（上の出力）。新しい版 $NEW_VERSION を起動していません"

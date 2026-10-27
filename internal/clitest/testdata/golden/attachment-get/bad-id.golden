@@ -1,0 +1,13 @@
+# attachment-get/bad-id
+$ issue attachment get abc
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 添付の ID は正の整数で指定してください: abc
+
+#### requests (0)
+
+#### files (0)

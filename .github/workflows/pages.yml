@@ -50,6 +50,8 @@ jobs:
       - name: npm ci
         working-directory: site
         run: npm ci --no-audit --no-fund
+      - name: 言語の振り分けの検査
+        run: node --test site/lib/lang.test.mjs
       - name: build
         run: node site/build.mjs . "$RUNNER_TEMP/site"
       - uses: actions/upload-pages-artifact@v5

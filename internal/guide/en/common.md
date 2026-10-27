@@ -60,7 +60,7 @@ If "outside feedback" in `summary` has unanswered items, put them to the user be
 
 ### What cannot be changed, and what not to do
 
-- Comments are append-only. The body and the fields of a closed issue (Done / Canceled) cannot be edited (to reopen the subject, file a new issue and refer to it in the body).
+- Comments are append-only. The body and the fields of a closed issue (Done / Canceled) cannot be edited (to reopen the subject, file a new issue and refer to it in the body). A comment whose text holds something that looks like a secret (`token=…`, `Bearer …` and the like) is rejected by default (the per-project rule `comment.reject_secret`). Never write the value; replace it with `***` and send it again.
 - When a per-project rule rejects something, **do what the message tells you to do next**. Do not get around it through another path (MCP, edit and so on). Override (`--override "reason"`) only on the user's explicit instruction.
 - Never write an access token into the conversation, a commit, an issue or a log. Log in with `looptrack issue login --browser` (the AI runs it with the user's approval, and the user themselves logs in and approves in the browser that opens; the token never appears in the conversation, and it is refreshed automatically from then on). On a machine with no browser, the user issues the token and pastes it into `login --url` themselves.
 - Never paste production data into an issue body (mask it, or write only the ID).

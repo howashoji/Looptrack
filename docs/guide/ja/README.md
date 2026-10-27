@@ -32,7 +32,7 @@ Looptrack にはデスクトップ版とサーバ版があります。違うの�
 | 1 | [概念](concepts.md) | ループエンジニアリングとは何か・なぜイシューを正本にするのか |
 | 2 | [本システムの位置](where-it-fits.md) | 3 層のループのどこに、どの機能が当たるか |
 | 3 | [日々の使い方](daily-use.md) | 最初の 1 周・起票・受け入れ条件・検証コマンド・コメントの型・担当者・表示の言語 |
-| 4 | [AI ごとの手引き](ai-agents.md) | Claude Code・Codex・GitHub Copilot・その他の AI |
+| 4 | [AI ごとの手引き](ai-agents.md) | Claude Code・Codex・GitHub Copilot・その他の AI・複数の端末で使う（セッション要約・会話記録をそのまま運ぶ） |
 | 5 | [FAQ / トラブルシュート](faq.md) | よくある表示とその対処 |
 | 6 | [トークンレポート](token-report.md) | 何が記録され何が送られないか・イシューへの帰属・PDF のレポートの作り方と台帳 |
 

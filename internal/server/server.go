@@ -75,6 +75,10 @@ type Config struct {
 	// AttachDir は添付の本体の置き場（service.Service.AttachDir。looptrack serve は service.AttachDirFromEnv、デスクトップ版は
 	// DataDir/attachments）。空なら添付の操作だけが「置き場が設定されていない」で失敗し、サーバはそのまま動く
 	AttachDir string
+	// TranscriptDir は会話記録の本体の置き場（service.Service.TranscriptDir。looptrack serve は service.TranscriptDirFromEnv、
+	// デスクトップ版は DataDir/transcripts）。空か、AttachDir と入れ子なら会話記録だけが「置き場が設定されていない」になる
+	// （入れ子は起動時にログに残す。片方の整合の検査がもう片方の本体を消さないように）
+	TranscriptDir string
 }
 
 // UpdateApplier は新しい版への置き換えを画面の帯から始める部品（デスクトップ版の App が満たす。手順はトレイの
@@ -225,6 +229,12 @@ func New(cfg Config, db *sql.DB) (*Server, error) {
 	s := &Server{cfg: cfg, db: db, tmpl: tmpl, mux: http.NewServeMux(), svc: service.New(db, cfg.Now), hashSlot: make(chan struct{}, 2),
 		binds: newSessionBinds(cfg.Now)}
 	s.svc.AttachDir = cfg.AttachDir
+	s.svc.TranscriptDir = cfg.TranscriptDir
+	if service.BlobRootsNested(cfg.AttachDir, cfg.TranscriptDir) {
+		cfg.Logger.Warn("transcripts disabled: the transcript directory and the attachment directory lie one inside the other",
+			"transcript_dir", cfg.TranscriptDir, "attach_dir", cfg.AttachDir)
+		s.svc.TranscriptDir = ""
+	}
 	srv = s
 	s.routes()
 	return s, nil
@@ -297,6 +307,13 @@ func (s *Server) routes() {
 	api.HandleFunc("GET "+b+"/api/v1/issues/{id}/attachments", s.apiListAttachments)
 	api.HandleFunc("GET "+b+"/api/v1/attachments/{id}", s.apiGetAttachment)
 	api.HandleFunc("POST "+b+"/api/v1/attachments/{id}/purge", s.apiPurgeAttachment) // 本体の消去（管理者だけ）
+	// 会話記録（持ち主だけ。transcripts_api.go）。追記の経路だけ本文の上限と締切が違う
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/transcripts", s.apiRegisterTranscript)
+	api.HandleFunc("POST "+b+"/api/v1/transcripts/{id}/chunks", s.apiAppendTranscriptChunk)
+	api.HandleFunc("GET "+b+"/api/v1/transcripts", s.apiListTranscripts)
+	api.HandleFunc("GET "+b+"/api/v1/transcripts/{id}", s.apiGetTranscript)
+	api.HandleFunc("GET "+b+"/api/v1/transcripts/{id}/chunks/{seq}", s.apiGetTranscriptChunk)
+	api.HandleFunc("POST "+b+"/api/v1/transcripts/{id}/purge", s.apiPurgeTranscript)
 	// MCP の呼び出しを会話に結ぶ合鍵（PreToolUse の hook が送る・session_binds.go）
 	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/session-binds", s.apiPostSessionBind)
 	api.HandleFunc("GET "+b+"/api/v1/activity", s.apiActivity)
@@ -347,6 +364,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+b+"/admin/attachments", s.adminForbidden(s.adminAttachmentsPage)) // 添付の上限・使用量・消去（管理者以外は 403）
 	s.mux.HandleFunc("POST "+b+"/admin/attachments/limits", s.adminForbidden(s.adminAttachmentLimits))
 	s.mux.HandleFunc("POST "+b+"/admin/attachments/{id}/purge", s.adminForbidden(s.adminAttachmentPurge))
+	s.mux.HandleFunc("GET "+b+"/admin/transcripts", s.adminForbidden(s.adminTranscriptsPage)) // 会話記録の上限・保持日数・利用者ごとの使用量（管理者以外は 403）
+	s.mux.HandleFunc("POST "+b+"/admin/transcripts/limits", s.adminForbidden(s.adminTranscriptLimits))
 	s.mux.HandleFunc("GET "+b+"/admin/projects", s.admin(s.adminProjectsPage))   // プロジェクト管理
 	s.mux.HandleFunc("POST "+b+"/admin/projects", s.admin(s.adminCreateProject)) // プロジェクトの作成
 	s.mux.HandleFunc("POST "+b+"/admin/projects/{slug}/member", s.admin(s.adminProjectMember))
@@ -380,7 +399,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, s.cfg.BasePath+"/static/") && r.URL.Path != s.cfg.BasePath+"/favicon.ico" {
 		h.Set("Cache-Control", "no-store")
 	}
-	if s.attachmentPath(r.URL.Path) { // 認証の誤り（401）を含め、添付の経路のどの応答にも付ける（attachments_api.go）
+	if s.attachmentPath(r.URL.Path) || s.transcriptPath(r.URL.Path) { // 認証の誤り（401）を含め、添付と会話記録の経路のどの応答にも付ける（attachments_api.go・transcripts_api.go）
 		h.Set("Content-Security-Policy", attachCSP)
 	}
 	// ローカルモードの Host・Origin の検査と、管理者 0 人のときの「セットアップ未完了」

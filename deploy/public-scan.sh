@@ -210,9 +210,13 @@ names_skip="$names_skip"'|^\./migrations/|^\./internal/store/testdata/legacy/'
 # 公開名の例外。名前の後ろが英数字・_・- のときは別の名前の一部なので例外にしない
 # （looptrack-internal や looptrackops の社名の部分まで消すと、社内固有の語に当たらず通ってしまう）。
 # サイトの URL は末尾の / で名前を締めているので、後ろの文字は見ない。
-allow='api\.github\.com/repos/howashoji/looptrack|raw\.githubusercontent\.com/howashoji/looptrack|github\.com/howashoji/looptrack|ghcr\.io/howashoji/looptrack|net\.howashoji\.looptrack'
-allow_end='([^A-Za-z0-9_-]|$)'
-allow_site='howashoji\.github\.io/[Ll]ooptrack/'
+# 公開名の正本は public-names.txt（internal/docscheck と private/deploy/publish-public.sh も同じ一覧を読む）
+names_file="$(dirname "$0")/public-names.txt"
+[ -r "$names_file" ] || { echo "public-scan: 公開名の一覧を読めません: $names_file" >&2; exit 2; }
+allow=$(awk '$1 == "name" { print $2 }' "$names_file" | paste -sd'|' -)
+allow_site=$(awk '$1 == "site" { print $2 }' "$names_file" | paste -sd'|' -)
+allow_end=$(awk '$1 == "end" { print $2 }' "$names_file")
+[ -n "$allow" ] && [ -n "$allow_site" ] && [ -n "$allow_end" ] || { echo "public-scan: 公開名の一覧に name・end・site がありません: $names_file" >&2; exit 2; }
 allow_line='配布元|[Cc]opyright|Developer ID'
 # 生成物だけの残骸の説明（利用者ガイド）。例として __pycache__ を挙げるのは Python の名残ではない
 allow_line="$allow_line"'|生成物だけの残骸'
@@ -222,13 +226,13 @@ scan() { # $1: 区分名 $2: パターン $3: 調べないパスの前置き（�
   # 旧名は大文字小文字が決まっている（環境変数は大文字・ファイル名は小文字）。区別しないと DB のユーザー名
   # im_app・DB 名 im_test などを IM_… と読んでしまう。
   if [ "$case" = case ]; then gi=""; gq=""; fi
-  # このファイル自身（語の一覧を持つ）は調べない
-  hits=$(cd "$work" && grep -rnIE $gi --exclude=public-scan.sh -- "$pat" . 2>/dev/null |
+  # このファイル自身（語の一覧を持つ）と公開名の一覧は調べない
+  hits=$(cd "$work" && grep -rnIE $gi --exclude=public-scan.sh --exclude=public-names.txt -- "$pat" . 2>/dev/null |
     grep -vE -- "$allow_line" |
     { if [ -n "$skip" ]; then grep -vE -- "$skip" || true; else cat; fi; } |
     while IFS= read -r line; do
       body=${line#*:*:}
-      stripped=$(printf '%s' "$body" | sed -E -e "s#($allow)$allow_end#\\2#g" -e "s#$allow_site##g")
+      stripped=$(printf '%s' "$body" | PN_ALLOW="$allow" PN_END="$allow_end" PN_SITE="$allow_site" perl -pe 's/(?:$ENV{PN_ALLOW})(?=$ENV{PN_END})//g; s/$ENV{PN_SITE}//g')
       if printf '%s' "$stripped" | grep -qE $gq -- "$pat"; then printf '%s\n' "${line#./}"; fi
     done || true)
   local n=0 files=0

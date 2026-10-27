@@ -36,6 +36,13 @@
   "verify": {
     "require_on_close": true
   },
+  "session": {
+    "digest_required": true,
+    "transcripts": true
+  },
+  "comment": {
+    "reject_secret": true
+  },
   "acceptance": {
     "require_on_close": true,
     "statuses": [

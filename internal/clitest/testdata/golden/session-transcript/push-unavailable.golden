@@ -1,0 +1,38 @@
+# session-transcript/push-unavailable
+$ session transcript push 00000000-0000-4000-8000-0000000000f1
+env LOOPTRACK_MACHINE_LABEL=desk-a
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 会話記録の置き場が設定されていないため、会話記録は使えません（サーバの LOOPTRACK_TRANSCRIPT_DIR を、添付の置き場の外に設定してください）
+
+#### requests (1)
+POST /im/api/v1/projects/demo/transcripts
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "agent": "claude-code",
+      "agent_version": "2.1.0",
+      "machine_label": "desk-a",
+      "origin_os": "$GOOS",
+      "vendor_session_id": "00000000-0000-4000-8000-0000000000f1"
+    }
+
+#### files (5)
+home/.claude/projects/-proj/00000000-0000-4000-8000-0000000000f1.jsonl (0644)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","version":"2.1.0","message":{"role":"user","content":"x.go を直して"}}
+    {"type":"assistant","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Edit","input":{"file_path":"/srv/x/x.go"}}]}}
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"user","content":"設定は password=Synthetic0Value9 にある"}}
+home/.claude/projects/-proj/00000000-0000-4000-8000-0000000000f1/subagents/agent-a1.jsonl (0644)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","isSidechain":true,"cwd":"/srv/x","message":{"role":"user","content":"調べて"}}
+ws/.git/HEAD (0644)
+    ref: refs/heads/feature/x
+ws/.git/objects/.keep (0644)
+ws/.git/refs/heads/feature/x (0644)
+    0123456789abcdef0123456789abcdef01234567

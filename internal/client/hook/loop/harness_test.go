@@ -457,6 +457,8 @@ type stubRule struct {
 	Out  string `json:"out"`  // 標準出力に出す 1 行
 	Err  string `json:"err"`  // 標準エラーに出す 1 行
 	Exit int    `json:"exit"` // 終了コード
+	// SleepMS は応答する前に待つミリ秒（遅いサーバの模擬。hook の持ち時間の検査に使う）
+	SleepMS int `json:"sleep_ms,omitempty"`
 }
 
 // stubCLI はイシューの CLI のスタブを置き、そのパス（LOOPTRACK_LOOP_ISSUE_CLI に渡すもの）を返す。
@@ -474,7 +476,16 @@ func stubCLI(s *sandbox, name string, rules ...stubRule) string {
 	if err != nil {
 		s.t.Fatal(err)
 	}
-	if err := os.WriteFile(p, b, 0o755); err != nil {
+	// 同じパスに置き直すときも、上書きせずに別の名前に書いてから rename で差し替える（中身は同じでも i-node を新しくする）。
+	// macOS は実行したことのある実行ファイルを同じ場所で書き換えると、その後の起動を署名の不一致として SIGKILL で
+	// 止めることがある。実測（2026-10）で、上書きしてすぐ起動するのを 12 本並べて 200 回ずつ繰り返すと 2400 回中 436 回が
+	// 終了コード 137 になり、rename で差し替えると同じ条件で 2400 回中 0 回だった。シナリオは手順ごとに同じ名前で stubCLI を呼ぶので、
+	// 上書きだと go test ./... の負荷の下で hook の起動が止められ、要約の判定が fail-open の注意に化けていた。
+	tmp := p + ".new"
+	if err := os.WriteFile(tmp, b, 0o755); err != nil {
+		s.t.Fatal(err)
+	}
+	if err := os.Rename(tmp, p); err != nil {
 		s.t.Fatal(err)
 	}
 	j, err := json.Marshal(rules)

@@ -40,10 +40,14 @@ func Gates(ctx context.Context, args []string, stdout io.Writer, env *Env) int {
 	if dir == "" {
 		dir = "."
 	}
+	lang := e.lang()
 	var stages []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
+		case a == "-h" || a == "--help":
+			io.WriteString(stdout, i18n.T(lang, "loop.gates.usage")+"\n")
+			return 0
 		case a == "-C":
 			dir = "."
 			if i+1 < len(args) && args[i+1] != "" {
@@ -52,6 +56,10 @@ func Gates(ctx context.Context, args []string, stdout io.Writer, env *Env) int {
 			i++
 		case strings.HasPrefix(a, "-C"):
 			dir = a[2:]
+		case strings.HasPrefix(a, "-"):
+			// 段の名前は "-" で始まらない。未知の選択肢を段として make に渡すと、make が選択肢と読んで偽の緑になる
+			io.WriteString(stdout, i18n.T(lang, "loop.gates.bad_flag", "arg", a)+"\n")
+			return 2
 		default:
 			stages = append(stages, a)
 		}
@@ -68,7 +76,6 @@ func Gates(ctx context.Context, args []string, stdout io.Writer, env *Env) int {
 	}
 	logDir := dir + "/.gates"
 	shown := strings.TrimPrefix(dir, root+"/")
-	lang := e.lang()
 	// 文面は対訳表から来る（% を含むことがある）ので、書式ではなくそのまま書き出す
 	out := func(s string) { io.WriteString(stdout, s) }
 

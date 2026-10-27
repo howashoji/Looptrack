@@ -337,7 +337,8 @@ function openIssue(id) {
     + '<section class="atts"><h3>' + esc(t("att_h3")) + '</h3><div id="attList">'
     + (attachCache.has(it.id) ? attachmentList(attachCache.get(it.id), TEXT) : '<p class="loading">' + esc(t("att_loading")) + "</p>")
     + "</div></section>"
-    + commentForm({ canEdit: DATA.can_edit, it, t: TEXT, pending: pendingItems(it.id) }) + "</div>";   // コメントの追記と添付
+    + commentForm({ canEdit: DATA.can_edit, it, t: TEXT, pending: pendingItems(it.id),
+      notice: commentNotice && commentNotice.id === it.id ? commentNotice.text : "" }) + "</div>";   // コメントの追記と添付
   openId = id;
   showDrawer(d);
   setHash("#" + id);
@@ -396,6 +397,9 @@ function loadAttachments(id) {
     });
 }
 // submitComment はコメントのフォームの送信。送る順と空の送信の歯止めは render.js の sendComment にあり、ここは画面の表示だけを持つ。
+// commentNotice は直前のコメントの追記の応答が載せた注記（secret_notice。秘密らしい文字列を拒まずに保存した）。
+// statusNotice と同じく、ドロワーを描き直しても出し続け、閉じるか次の追記で消す。
+let commentNotice = null;
 async function submitComment(form) {
   const id = form.dataset.id;
   const err = form.querySelector(".form-error");
@@ -411,6 +415,7 @@ async function submitComment(form) {
       onUploaded: () => refreshPending(form) });
     if (res.login) { location.href = BASE + "/login"; return; }
     if (!res.ok) { fail(res.error); return; }
+    commentNotice = res.notice ? { id, text: res.notice } : null;
     pendingAttach.delete(id);
     form.reset();
     setHash("#" + id);
@@ -444,6 +449,7 @@ function showDrawer(d) {
 }
 function closeIssue() {
   statusNotice = null;
+  commentNotice = null;
   const d = document.getElementById("drawer");
   d.classList.remove("on");
   d.setAttribute("aria-hidden", "true");
@@ -455,7 +461,8 @@ function closeIssue() {
 /* ---------------- 起票・状態の変更・コメントの送信 ---------------- */
 // 既存の REST API を、画面のセッション（Cookie）と X-CSRF-Token で呼ぶ（サーバ側に新しい書き込みの経路は作らない）。
 // 失敗（権限の 403・ルールの 422 など）はサーバの文言をフォームの下に出す。上書きできる違反なら理由の欄を出す。
-// 成功しても応答が注意（acceptance_notice。受け入れ条件が雛形のままの着手。evidence_notice。エビデンスの無い Done）を載せたら、そのイシューの状態の変更フォームの
+// 成功しても応答が注意（acceptance_notice。受け入れ条件が雛形のままの着手。evidence_notice。エビデンスの無い Done。
+// secret_notice。同時のコメントの秘密らしい文字列を拒まずに保存した）を載せたら、そのイシューの状態の変更フォームの
 // 下に出し続ける（ドロワーは見直しのたびに描き直すので、フォームの中ではなくここに持つ）。閉じるか次の変更で消す。
 let statusNotice = null;
 function submitForm(form) {
@@ -485,7 +492,7 @@ function submitForm(form) {
       }
       form.reset();
       if (form.dataset.action === "status") {
-        const text = data ? ["acceptance_notice", "evidence_notice"].map(k => typeof data[k] === "string" ? data[k] : "").filter(Boolean).join(" ") : "";
+        const text = data ? ["acceptance_notice", "evidence_notice", "secret_notice"].map(k => typeof data[k] === "string" ? data[k] : "").filter(Boolean).join(" ") : "";
         statusNotice = text ? { id: form.dataset.id, text } : null;
       }
       const id = form.dataset.action === "create" ? data && data.issue && data.issue.id : form.dataset.id;

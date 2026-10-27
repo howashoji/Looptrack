@@ -48,21 +48,23 @@ func sendPromptsFile(o Options) string {
 	if key == "" {
 		return ""
 	}
-	var dir string
+	return filepath.Join(o.configDir(), sendPromptsDir, key)
+}
+
+// configDir は覚えた値を置く looptrack の置き場（Windows は %APPDATA%\looptrack、他は $XDG_CONFIG_HOME（無ければ ~/.config）/looptrack）。
+func (o Options) configDir() string {
 	if runtime.GOOS == "windows" {
 		appdata := o.Env.Get("APPDATA")
 		if appdata == "" {
 			appdata = filepath.Join(o.home(), "AppData", "Roaming")
 		}
-		dir = filepath.Join(appdata, cred.AppDir)
-	} else {
-		cfg := o.Env.Get("XDG_CONFIG_HOME")
-		if cfg == "" {
-			cfg = filepath.Join(o.home(), ".config")
-		}
-		dir = filepath.Join(cfg, cred.AppDir)
+		return filepath.Join(appdata, cred.AppDir)
 	}
-	return filepath.Join(dir, sendPromptsDir, key)
+	cfg := o.Env.Get("XDG_CONFIG_HOME")
+	if cfg == "" {
+		cfg = filepath.Join(o.home(), ".config")
+	}
+	return filepath.Join(cfg, cred.AppDir)
 }
 
 // SendPromptsAllowed は作業名を送ってよいか（send_prompts_allowed）。

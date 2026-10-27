@@ -81,6 +81,9 @@ func coreWants(w wiring, o *Options) []want {
 			add("Stop", "", "usage", "", 10)
 			add("SessionEnd", "", "usage", "", 10)
 		}
+		if !o.NoTranscript {
+			transcriptWants(add)
+		}
 		// MCP の呼び出しの直前に、会話のセッション ID を合鍵として届ける（サーバが _meta の tool_use_id で引く）。
 		// _meta にツール呼び出しの ID を入れてくるのは Claude Code だけなので、ほかの AI には配線しない
 		if !o.NoSessionBind {
@@ -92,6 +95,9 @@ func coreWants(w wiring, o *Options) []want {
 			add("Stop", "", "usage", "", 10)
 			add("SessionEnd", "", "usage", "", 10)
 		}
+		if !o.NoTranscript {
+			transcriptWants(add)
+		}
 	case "copilot":
 		// matcher は付けない（VS Code は無視し、CLI の MCP のツール名は <サーバ>-<ツール>。hook が中で絞る）。SessionEnd は CLI だけ
 		if !o.NoUsage {
@@ -101,6 +107,14 @@ func coreWants(w wiring, o *Options) []want {
 		}
 	}
 	return out
+}
+
+// transcriptWants は会話記録の自動送信（DESIGN.md §9-8「hook」）の配線（Claude Code と Codex の Stop・SessionEnd）。
+// 送るかは hook が 2 つの鍵（端末ごとの LOOPTRACK_SESSION_TRANSCRIPTS=1 とプロジェクトのルール session.transcripts）で決める
+// （鍵が切なら hook は記録を読まずにすぐ終わる）。配線ごと外すのは init --no-transcript。Copilot は会話記録の搬送の対象外。
+func transcriptWants(add func(ev, matcher, name, extra string, timeout int)) {
+	add("Stop", "", "transcript", "", 10)
+	add("SessionEnd", "", "transcript", "", 10)
 }
 
 // ---------------------------------------------------------------- 配線の見分け

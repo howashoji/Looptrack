@@ -91,6 +91,9 @@ func TestCLIGolden(t *testing.T) {
 			if c.PosixPerm && runtime.GOOS == "windows" {
 				t.Skip("POSIX のファイルの権限を前提にするケースのため Windows では省略")
 			}
+			if c.PosixPaths && runtime.GOOS == "windows" {
+				t.Skip("JSON の中に一時ディレクトリのパスを書くケースのため Windows では省略")
+			}
 			path := goldenPath(c.Name)
 			got := stableVersion(Run(t, impl, c).Golden())
 			if updating() {
@@ -140,6 +143,7 @@ func osLooseFor(goos, s string) string {
 	if goos != "windows" {
 		return s
 	}
+	s = strings.ReplaceAll(s, `\\`, "/") // JSON の文字列の中で逃がされた区切り（$TMP\\home）
 	s = strings.ReplaceAll(s, `\`, "/")
 	s = strings.ReplaceAll(s, `& '$LOOPTRACK'`, `"$LOOPTRACK"`)
 	return fileModeLine.ReplaceAllString(s, "$1 (mode)")

@@ -1,0 +1,57 @@
+{{define "admin_transcripts.html"}}{{template "head" (headData .Lang (T .Lang "server.web.admin_transcripts.title"))}}
+{{template "nav" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.admin_transcripts.title"}}</h1>
+  <p class="muted">{{T .Lang "server.web.common.back_prefix"}}<a href="{{base}}/admin/users">{{T .Lang "server.web.common.admin_users"}}</a>{{T .Lang "server.web.common.back_suffix"}}</p>
+  {{template "messages" .}}
+  {{if not .Available}}<p class="error" role="alert" data-transcripts-unavailable>{{T .Lang "server.web.admin_transcripts.unavailable"}}</p>{{end}}
+  <p class="muted">{{T .Lang "server.web.admin_transcripts.privacy_note"}}</p>
+  <section class="panel" id="limits">
+    <h2>{{T .Lang "server.web.admin_transcripts.limits_h2"}}</h2>
+    <p class="muted">{{T .Lang "server.web.admin_transcripts.limits_note"}}</p>
+    <ul>
+      <li>{{T .Lang "server.web.admin_transcripts.max_chunk"}} <strong data-limit="chunk">{{.MaxChunk}}</strong></li>
+      <li>{{T .Lang "server.web.admin_transcripts.max_user"}} <strong data-limit="user">{{.MaxUser}}</strong></li>
+      <li>{{T .Lang "server.web.admin_transcripts.retention"}} <strong data-limit="retention">{{.Retention}}</strong></li>
+    </ul>
+    <form method="post" action="{{base}}/admin/transcripts/limits" class="narrow">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>{{T .Lang "server.web.admin_transcripts.max_chunk_mib"}}<input name="max_chunk_mib" type="number" min="1" step="1" inputmode="numeric" value="{{.MaxChunkMiB}}" required></label>
+      <label>{{T .Lang "server.web.admin_transcripts.max_user_mib"}}<input name="max_user_mib" type="number" min="1" step="1" inputmode="numeric" value="{{.MaxUserMiB}}" required></label>
+      <label>{{T .Lang "server.web.admin_transcripts.retention_days"}}<input name="retention_days" type="number" min="0" max="{{.MaxRetentionDays}}" step="1" inputmode="numeric" value="{{.RetentionDays}}" required></label>
+      <button type="submit">{{T .Lang "server.web.admin_transcripts.limits_submit"}}</button>
+    </form>
+  </section>
+  <section class="panel" id="usage">
+    <h2>{{T .Lang "server.web.admin_transcripts.usage_h2"}}</h2>
+    <table class="list">
+      <thead><tr><th>{{T .Lang "server.web.admin_transcripts.th_user"}}</th><th>{{T .Lang "server.web.admin_transcripts.th_count"}}</th><th>{{T .Lang "server.web.admin_transcripts.th_bytes"}}</th><th>{{T .Lang "server.web.admin_transcripts.th_percent"}}</th></tr></thead>
+      <tbody>
+      {{range .Usage}}
+      <tr data-usage="{{.Login}}"{{if .Disabled}} class="inactive"{{end}}>
+        <td>{{.Name}} <span class="muted">{{.Login}}</span></td>
+        <td>{{.Transcripts}}</td><td>{{.Bytes}}</td><td>{{if .Over}}<strong>{{.Percent}}%</strong>{{else}}{{.Percent}}%{{end}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="4" class="muted">{{T $.Lang "server.web.admin_transcripts.none"}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+  <section class="panel" id="changes">
+    <h2>{{T .Lang "server.web.admin_security.changes_h2"}}</h2>
+    {{with .Changes}}
+    <table class="list">
+      <thead><tr><th>{{T $.Lang "server.web.admin_security.th_at"}}</th><th>{{T $.Lang "server.web.admin_security.th_actor"}}</th><th>{{T $.Lang "server.web.admin_security.th_via"}}</th><th>{{T $.Lang "server.web.admin_attachments.th_setting"}}</th><th>{{T $.Lang "server.web.admin_security.th_change"}}</th><th>{{T $.Lang "server.web.admin_security.th_ip"}}</th></tr></thead>
+      <tbody>
+      {{range .}}
+      <tr data-setting-change><td>{{.At}}</td><td>{{.Actor}}</td><td>{{.Via}}</td><td>{{.Setting}}</td><td>{{.From}} → {{.To}}</td><td>{{.IP}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">{{T .Lang "server.web.admin_security.changes_none"}}</p>
+    {{end}}
+  </section>
+</main>
+{{template "foot"}}{{end}}

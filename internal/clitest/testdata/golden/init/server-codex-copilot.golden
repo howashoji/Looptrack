@@ -13,7 +13,7 @@ kit の取得元: サーバ（$API/api/v1/dist・SHA-256 を確認）
   作成         .github/hooks/looptrack.json
   作成         AGENTS.md
   作成         .claude/.looptrack-kit.json
-verify: 配線 8 件・looptrack <版> を確かめました
+verify: 配線 10 件・looptrack <版> を確かめました
 次に:
   1. Codex のフックを信頼する（下の「フックの信頼」。ターミナルの codex で /hooks）
   2. Copilot: 新しいチャット（VS Code）か新しいセッション（Copilot CLI。このフォルダを信頼する）を始める（.github/hooks/looptrack.json のフックが読み込まれる）
@@ -113,6 +113,11 @@ ws/.codex/hooks.json (0644)
                 "command": "LOOPTRACK_API_URL=$API LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
                 "timeout": 10,
                 "type": "command"
+              },
+              {
+                "command": "LOOPTRACK_API_URL=$API LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
+                "timeout": 10,
+                "type": "command"
               }
             ]
           }
@@ -133,6 +138,11 @@ ws/.codex/hooks.json (0644)
             "hooks": [
               {
                 "command": "LOOPTRACK_API_URL=$API LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10,
+                "type": "command"
+              },
+              {
+                "command": "LOOPTRACK_API_URL=$API LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
                 "timeout": 10,
                 "type": "command"
               }

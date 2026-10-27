@@ -1,0 +1,17 @@
+# attachment-get/sha-mismatch
+$ issue attachment get 11
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: 添付 11 の本体の sha256 がサーバの記録と一致しません（記録 0000000000000000000000000000000000000000000000000000000000000000・受け取った本体 f066565636b17966854ea7c3a494a90788758362da427f35a124480368d4eb9f）。何も保存していません
+
+#### requests (1)
+GET /im/api/v1/attachments/11
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/howashoji/looptrack/internal/client/agentdirs"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
 )
 
@@ -29,21 +30,37 @@ func codexHead(path string) map[string]any {
 	return asMap(head["payload"])
 }
 
-// codexThreadGlob はスレッドの rollout の候補。Codex デスクトップは同じスレッドを続けるときに
-// rollout-<時刻>-<スレッド ID>_<別の ID>.jsonl という新しいファイルを作る。
+// codexRolloutExt は読める rollout の拡張子。古い rollout は Codex が背景で codexCompressedExt に圧縮する。
+// zstd の依存は足さないので圧縮済みは読まず、見つけて件数を知らせる（CodexUnreadRollouts）。
+const (
+	codexRolloutExt    = ".jsonl"
+	codexCompressedExt = ".jsonl.zst"
+)
+
+// codexThreadGlob はスレッドの rollout の候補。同じスレッドに新しい rollout を作る処理（Codex の thread/revert）は
+// rollout-<時刻>-<スレッド ID>_<別の ID>.jsonl という名前のファイルを作る。
 func codexThreadGlob(root, threadID string) []string {
+	return codexThreadGlobExt(root, threadID, codexRolloutExt)
+}
+
+// codexThreadGlobExt は codexThreadGlob の拡張子を選べる形（圧縮済みの探索にも使う）。
+func codexThreadGlobExt(root, threadID, ext string) []string {
 	var hits []string
 	for _, suffix := range []string{"", "_*"} {
-		hits = append(hits, globPaths(joinPath(root, "rollout-*"+threadID+suffix+".jsonl"))...)
+		hits = append(hits, globPaths(joinPath(root, "rollout-*"+threadID+suffix+ext))...)
 	}
 	return hits
 }
 
-// codexFindTranscript は作業ディレクトリが一致する直近の会話記録（session_meta.cwd）。sessionID があればそのスレッドの最新のファイル。
+// codexFindTranscript は作業ディレクトリが一致する直近の会話記録（session_meta.cwd）。置き場は CODEX_HOME/sessions（無ければ ~/.codex/sessions。agentdirs の 1 か所で決める）。sessionID があればそのスレッドの最新のファイル（名前だけ似ていて session_meta.id が違うものは選ばない）。
+// 圧縮済み（.jsonl.zst）は見つけない（読めないため）。見つからなかったときの件数は CodexUnreadRollouts で数える。
 func codexFindTranscript(cwd, sessionID string, o Options) string {
-	root := o.expandUser("~/.codex/sessions")
+	root := agentdirs.CodexSessionsDir(o.Env.Get, o.home())
+	if root == "" {
+		return ""
+	}
 	if sessionID != "" {
-		return newest(codexThreadGlob(joinPath(root, "*", "*", "*"), sessionID))
+		return codexFindThread(sessionID, o)
 	}
 	now := float64(o.now().UnixNano()) / 1e9
 	var cands []string
@@ -83,25 +100,61 @@ func allDigits(s string) bool {
 	return true
 }
 
-// codexThreadFiles は同じスレッド（session_meta.id が同じ）の rollout を古い順に返す。
-// ~/.codex/sessions/年/月/日/ の形なら全部の日を、そうでなければ同じディレクトリだけを探す。
+// codexThreadRoot は同じスレッドの rollout を探す範囲。<CODEX_HOME>/sessions/年/月/日/ の形なら全部の日、
+// そうでなければ同じディレクトリだけ。
+func codexThreadRoot(transcriptPath string) string {
+	abs, err := filepath.Abs(transcriptPath)
+	if err != nil {
+		abs = transcriptPath
+	}
+	day := dirName(abs)
+	parts := strings.Split(day, string(filepath.Separator))
+	if len(parts) > 3 {
+		parts = parts[len(parts)-3:]
+	}
+	if len(parts) == 3 && allDigits(parts[0]) && allDigits(parts[1]) && allDigits(parts[2]) {
+		return joinPath(dirName(dirName(dirName(day))), "*", "*", "*")
+	}
+	return day
+}
+
+// CodexUnreadRollouts は読めなかった Codex の rollout（圧縮済みの rollout-*.jsonl.zst）のうち、同じスレッドのもの。
+// 会話の累計には入らないので、呼ぶ側は件数を利用者に知らせる（黙って見落とさない）。
+// transcriptPath があればその置き場（<年>/<月>/<日>/ の形なら全部の日）を、無ければ CODEX_HOME/sessions（無ければ
+// ~/.codex/sessions）全体を探す。スレッドは session_meta.id（読めなければ sessionID。それも無ければ CODEX_THREAD_ID）。
+// CODEX_SESSION_ID は親の会話の ID でサブエージェントのスレッドと一致しないので、環境からは引かない
+// （引くと、親のスレッドの圧縮済みを今の会話のものとして数える）。スレッドが分からなければ nil。
+func CodexUnreadRollouts(transcriptPath, sessionID string, o Options) []string {
+	threadID := ""
+	if transcriptPath != "" {
+		threadID = strOr(codexHead(transcriptPath)["id"])
+	}
+	if threadID == "" {
+		threadID = sessionID
+	}
+	if threadID == "" {
+		threadID = o.Env.Get("CODEX_THREAD_ID")
+	}
+	if threadID == "" {
+		return nil
+	}
+	var where string
+	if transcriptPath != "" {
+		where = codexThreadRoot(transcriptPath)
+	} else if root := agentdirs.CodexSessionsDir(o.Env.Get, o.home()); root != "" {
+		where = joinPath(root, "*", "*", "*")
+	} else {
+		return nil
+	}
+	return codexThreadGlobExt(where, threadID, codexCompressedExt)
+}
+
+// codexThreadFiles は同じスレッド（session_meta.id が同じ）の rollout を古い順に返す（圧縮済みは読まない。CodexUnreadRollouts）。
 func codexThreadFiles(transcriptPath, threadID string) []string {
 	type f struct{ real, path string }
 	files := []f{{realpath(transcriptPath), transcriptPath}}
 	if threadID != "" {
-		abs, err := filepath.Abs(transcriptPath)
-		if err != nil {
-			abs = transcriptPath
-		}
-		day := dirName(abs)
-		parts := strings.Split(day, string(filepath.Separator))
-		if len(parts) > 3 {
-			parts = parts[len(parts)-3:]
-		}
-		where := day
-		if len(parts) == 3 && allDigits(parts[0]) && allDigits(parts[1]) && allDigits(parts[2]) {
-			where = joinPath(dirName(dirName(dirName(day))), "*", "*", "*")
-		}
+		where := codexThreadRoot(transcriptPath)
 		for _, p := range codexThreadGlob(where, threadID) {
 			if strOr(codexHead(p)["id"]) != threadID {
 				continue

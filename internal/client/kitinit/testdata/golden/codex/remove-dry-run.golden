@@ -46,10 +46,12 @@ init --remove-loop: $TMP/ws（dry-run）
                    "timeout": 10
                  }
                ]
-      @@ -41,15 +21,6 @@
+      @@ -39,15 +19,6 @@
+                   "type": "command",
+                   "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
                    "timeout": 10
-                 }
-               ]
+      -          }
+      -        ]
       -      },
       -      {
       -        "hooks": [
@@ -57,14 +59,12 @@ init --remove-loop: $TMP/ws（dry-run）
       -            "type": "command",
       -            "command": "looptrack hook post-work-complete-handoff-mark --agent codex",
       -            "timeout": 5
-      -          }
-      -        ]
+                 }
+               ]
              }
-           ],
-           "Stop": [
-      @@ -59,16 +30,6 @@
+      @@ -64,16 +35,6 @@
                    "type": "command",
-                   "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                   "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
                    "timeout": 10
       -          },
       -          {
@@ -79,7 +79,7 @@ init --remove-loop: $TMP/ws（dry-run）
                  }
                ]
              }
-      @@ -83,32 +44,6 @@
+      @@ -93,32 +54,6 @@
                  }
                ]
              }
@@ -115,7 +115,7 @@ init --remove-loop: $TMP/ws（dry-run）
   更新         AGENTS.md
       --- a/AGENTS.md
       +++ b/AGENTS.md
-      @@ -21,273 +21,3 @@
+      @@ -21,279 +21,3 @@
          利用者に `~/.codex/config.toml` への `[mcp_servers.looptrack]` の追加を勧めてください。本文・コメントはクォート付きヒアドキュメント（`<<'EOF'`）で渡します
        - 閲覧: http://127.0.0.1:9/im/p/demo/ （ログイン必須・閲覧専用）
        <!-- looptrack:end -->
@@ -284,6 +284,11 @@ dry-run のため何も書いていません。反映は --dry-run を外して�
               },
               {
                 "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
                 "command": "looptrack hook stop-handoff-freshness --agent codex --no-block",
                 "timeout": 10
               },
@@ -301,6 +306,11 @@ dry-run のため何も書いていません。反映は --dry-run を外して�
               {
                 "type": "command",
                 "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook usage --agent codex",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook transcript --agent codex",
                 "timeout": 10
               }
             ]

@@ -212,6 +212,39 @@ func MaskSecrets(s string) string {
 	return s
 }
 
+// MaskSecretsCount は MaskSecrets と同じ規則（secretMasks）で文字列 1 つをマスクし、置き換えた数を
+// SecretFinding.Label と同じ語ごとに返す。結果の文字列は MaskSecrets(s) と同じ。
+// 既にマスクした形（置き換えても変わらないもの）は FindSecret と同じく数えない。
+// 値そのものは返さない（キーは語だけ）。JSON の行は、呼ぶ側が文字列の値ごとにこれをかける
+// （生の行に MaskSecrets をかけると、\S+ が引用符・区切りを越えて JSON が壊れる）。
+func MaskSecretsCount(s string) (string, map[string]int) {
+	var counts map[string]int
+	for _, m := range secretMasks {
+		locs := m.re.FindAllStringSubmatchIndex(s, -1)
+		if len(locs) == 0 {
+			continue
+		}
+		var b strings.Builder
+		last := 0
+		for _, loc := range locs {
+			match := s[loc[0]:loc[1]]
+			repl := string(m.re.ExpandString(nil, m.repl, s, loc))
+			if repl != match {
+				if counts == nil {
+					counts = map[string]int{}
+				}
+				counts[string(m.re.ExpandString(nil, m.label, s, loc))]++
+			}
+			b.WriteString(s[last:loc[0]])
+			b.WriteString(repl)
+			last = loc[1]
+		}
+		b.WriteString(s[last:])
+		s = b.String()
+	}
+	return s, counts
+}
+
 // TailBytes は s の末尾 n バイト以内を、UTF-8 の文字境界で切って返す。
 func TailBytes(s string, n int) string {
 	if len(s) <= n {

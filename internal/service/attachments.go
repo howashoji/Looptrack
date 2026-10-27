@@ -2,9 +2,7 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"io"
 	"io/fs"
@@ -40,8 +38,8 @@ import (
 // AttachDirName は置き場を既定で決めるときのディレクトリ名（$STATE_DIRECTORY・SQLite の DB の隣・デスクトップの DataDir の下）。
 const AttachDirName = "attachments"
 
-// attachTmpDir は書き込み途中の一時ファイルを置く、置き場の中のディレクトリ（rename を同じファイルシステムの中で済ませるため）。
-const attachTmpDir = ".tmp"
+// attachTmpDir は書き込み途中の一時ファイルを置く、置き場の中のディレクトリ（会話記録と同じ blobTmpDir）。
+const attachTmpDir = blobTmpDir
 
 // OrphanGrace は、どこからも指されない本体でも消さずに残す新しさ。添付は rename の後にメタデータを入れるので、
 // その間に整合の検査が走ると、記録の直前の本体が「どこからも指されない」に見える。書かれて（触れられて）から
@@ -69,9 +67,7 @@ func AttachDirFromEnv(getenv func(string) string) string {
 var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // AttachmentBodyPath は本体の置き場のパス（<dir>/ab/cd/<sha256>）。
-func AttachmentBodyPath(dir, sum string) string {
-	return filepath.Join(dir, sum[:2], sum[2:4], sum)
-}
+func AttachmentBodyPath(dir, sum string) string { return blobBodyPath(dir, sum) }
 
 // errTooLarge は 1 ファイルの上限を超えた添付の拒否（REST は 413。本体もメタデータも残さない）。
 func errTooLarge(max int64) *Error {
@@ -295,10 +291,27 @@ func (s *Service) Attach(ctx context.Context, a Actor, in AttachInput) (*store.A
 
 	s.attachMu.Lock()
 	defer s.attachMu.Unlock()
+	// 本体を先に置き、トランザクションの中には上限の判定と 1 行の記録だけを入れる（会話記録の追記と同じ形。rename と fsync の間、
+	// プロジェクトの行のロックを握らない）。別のプロセスの消去と整合の検査（repair-attachments）に、置いてから記録が確定するまでの
+	// 添付があることを示す印を、置く前に作る。本体が既にあれば placeBlob は置くのを飛ばすので、印が無いと、その直後に消す側が
+	// 本体を消して、記録した添付が無い本体を指す
+	placing, err := beginBlobPlace(s.AttachDir, sum)
+	if err != nil {
+		return nil, err
+	}
+	if err := placeAttachBody(s.AttachDir, tmp, sum); err != nil {
+		placing()
+		return nil, err
+	}
+	if s.AttachPlaced != nil {
+		s.AttachPlaced(sum)
+	}
 	now := s.Now()
 	out := &store.Attachment{ProjectID: p.ID, IssueID: row.ID, SHA256: sum, Size: size, Filename: name, MediaType: mt,
 		CreatedAt: now, AuthorUserID: a.UserID, TokenID: a.TokenID, Via: a.Via, ProjectSlug: p.Slug, IssueDisplayID: row.DisplayID}
-	err = s.inTx(ctx, func(tx *sql.Tx) error {
+	wctx, cancel := context.WithTimeout(ctx, blobPlaceWindow)
+	err = s.inTx(wctx, func(tx *sql.Tx) error {
+		ctx := wctx
 		// プロジェクトの行をロックして、同じプロジェクトへの添付を 1 つずつにする（上限の判定と記録の間に合計が変わらないように）
 		var pid int64
 		if err := tx.QueryRowContext(ctx, "SELECT id FROM projects WHERE id = ? FOR UPDATE", p.ID).Scan(&pid); err != nil {
@@ -320,9 +333,6 @@ func (s *Service) Attach(ctx context.Context, a Actor, in AttachInput) (*store.A
 				"used", i18n.MN("service.err.attach.bytes", int(used), "n", used),
 				"size", i18n.MN("service.err.attach.bytes", int(size), "n", size)))
 		}
-		if err := placeAttachBody(s.AttachDir, tmp, sum); err != nil {
-			return err
-		}
 		id, err := store.InsertAttachment(ctx, tx, *out)
 		if err != nil {
 			return err
@@ -331,76 +341,40 @@ func (s *Service) Attach(ctx context.Context, a Actor, in AttachInput) (*store.A
 		return store.InsertEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: row.ID, Kind: "attach", SessionID: a.SessionID,
 			Author: s.author(a, now), Detail: map[string]any{"attachment_id": id, "sha256": sum, "size": size, "filename": name, "media_type": mt}})
 	})
+	cancel()
+	// 印は確定（か失敗）の後に消す。失敗の片付けより先に消す（自分の印を、置こうとしているほかの添付と数えないため）
+	placing()
 	if err != nil {
+		// 記録できなかった。置いた本体がどこからも指されていなければ消す（同じ内容を指す添付か会話記録のチャンクがあれば残す。
+		// 別のプロセスで同じ本体を置いて記録する前の添付があれば、その印を見て残す。
+		// 消せなかったときは、どこからも指されない本体として repair-attachments --apply が拾う）
+		_, _ = removeBlobGuarded(s.AttachDir, repairAttachmentsCmd, sum, false, func() (int, error) { return s.attachBodyRefs(ctx, sum) })
 		return nil, err
 	}
 	return out, nil
 }
 
-// writeAttachTemp は本体を置き場の一時ファイルに書き、fsync して閉じる。max を超えたら・途中で失敗したら一時ファイルを消して失敗を返す。
+// attachBodyRefs は本体 sum を指す、消去していない添付と会話記録のチャンクの数（チャンクは、置き場を取り違えた設定でも消さないために数える）。
+func (s *Service) attachBodyRefs(ctx context.Context, sum string) (int, error) {
+	n, err := store.LiveAttachmentCount(ctx, s.DB, sum)
+	if err != nil || n > 0 {
+		return n, err
+	}
+	return store.LiveTranscriptChunkCount(ctx, s.DB, sum)
+}
+
+// writeAttachTemp は本体を置き場の一時ファイルに書き、fsync して閉じる。max を超えたら・途中で失敗したら一時ファイルを消して失敗を返す
+// （書き込みは会話記録と共有する部品 writeBlobTemp。上限を超えたときの文面だけが添付のもの）。
 func writeAttachTemp(dir string, r io.Reader, max int64) (path, sum string, size int64, err error) {
-	if r == nil {
-		r = strings.NewReader("")
+	path, sum, size, err = writeBlobTemp(dir, r, max)
+	if errors.Is(err, errBlobTooLarge) {
+		return "", "", 0, errTooLarge(max)
 	}
-	tmpDir := filepath.Join(dir, attachTmpDir)
-	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
-		return "", "", 0, err
-	}
-	f, err := os.CreateTemp(tmpDir, "upload-*")
-	if err != nil {
-		return "", "", 0, err
-	}
-	path = f.Name()
-	fail := func(e error) (string, string, int64, error) {
-		f.Close()
-		os.Remove(path)
-		return "", "", 0, e
-	}
-	h := sha256.New()
-	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(r, max+1))
-	if err != nil {
-		return fail(err)
-	}
-	if n > max {
-		return fail(errTooLarge(max))
-	}
-	if err := f.Sync(); err != nil {
-		return fail(err)
-	}
-	if err := f.Close(); err != nil {
-		os.Remove(path)
-		return "", "", 0, err
-	}
-	return path, hex.EncodeToString(h.Sum(nil)), n, nil
+	return path, sum, size, err
 }
 
-// placeAttachBody は一時ファイルを本体の置き場へ rename する。本体が既にあれば上書きせず、一時ファイルを捨てて
-// 本体の更新時刻だけを進める（整合の検査が、記録の直前の本体を「どこからも指されない」として消さないように。OrphanGrace）。
-// 何度呼んでも結果は同じ（トランザクションの再試行で 2 回目に呼ばれても、本体があれば何もしない）。
-func placeAttachBody(dir, tmp, sum string) error {
-	final := AttachmentBodyPath(dir, sum)
-	if _, err := os.Lstat(final); err == nil {
-		os.Remove(tmp)
-		now := time.Now()
-		return os.Chtimes(final, now, now)
-	}
-	if err := os.MkdirAll(filepath.Dir(final), 0o700); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, final); err != nil {
-		return err
-	}
-	syncDir(filepath.Dir(final))
-	return nil
-}
-
-// syncDir は rename をディスクに残すため、ディレクトリを fsync する（できない OS・ファイルシステムでは何もしない）。
-func syncDir(dir string) {
-	if d, err := os.Open(dir); err == nil {
-		_ = d.Sync()
-		d.Close()
-	}
-}
+// placeAttachBody は一時ファイルを本体の置き場へ rename する（placeBlob。既にある本体は上書きせず更新時刻だけを進める）。
+func placeAttachBody(dir, tmp, sum string) error { return placeBlob(dir, tmp, sum) }
 
 // Attachments はイシューの添付を古い順に返す（消去済みも含め、Purged で見分ける）。閲覧できる人なら誰でも読める。
 // メタデータだけなので、置き場が設定されていなくても返す。
@@ -508,7 +482,10 @@ func (s *Service) PurgeAttachment(ctx context.Context, a Actor, id int64, reason
 	if err != nil {
 		return nil, err
 	}
-	if err := os.Remove(AttachmentBodyPath(s.AttachDir, at.SHA256)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	// 本体は removeBlobGuarded で消す（指す行を数え、外し、置いている別のプロセスの添付の印を探し、数え直す）。
+	// 消去の後に、別のプロセスの添付が同じ本体を「既にある」と見て置くのを飛ばしたまま記録しようとしていれば、本体を残す
+	// （その添付は消去の後に送られたものなので、行も本体もそのまま使える）
+	if _, err := removeBlobGuarded(s.AttachDir, repairAttachmentsCmd, at.SHA256, false, func() (int, error) { return s.attachBodyRefs(ctx, at.SHA256) }); err != nil {
 		return res, i18n.Wrapf(err, "service.err.attach.purge_remove", "sha256", at.SHA256)
 	}
 	return res, nil
@@ -552,43 +529,15 @@ func (s *Service) CheckAttachments(ctx context.Context) (*AttachmentCheck, error
 		}
 	}
 	now := time.Now()
-	// WalkDir は根がシンボリックリンクだとその中へ降りない（黙って 0 件になる）ので、根だけは先に解いてから辿る。
-	// 報告するパスは設定した置き場の下の形に戻す（途中のリンクは os.Remove も辿る）。
-	root := s.AttachDir
-	if r, err := filepath.EvalSymlinks(root); err == nil {
-		root = r
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return nil, err
-	}
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) && path == root { // 置き場がまだ無い（1 度も添付していない）
-				return filepath.SkipDir
-			}
-			return err
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			if rel == attachTmpDir {
-				return filepath.SkipDir
-			}
+	err = walkBlobs(s.AttachDir, func(path, sum string, info fs.FileInfo) error {
+		if referenced[sum] {
 			return nil
 		}
-		parts := strings.Split(filepath.ToSlash(rel), "/")
-		if len(parts) != 3 || !sha256Re.MatchString(parts[2]) || parts[0] != parts[2][:2] || parts[1] != parts[2][2:4] || !d.Type().IsRegular() {
-			return nil
-		}
-		if referenced[parts[2]] {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
+		// 会話記録のチャンクが指す本体は添付の側からは数えない（置き場を取り違えた設定でも消さない。removeOrphanBlobs）
+		if n, err := store.LiveTranscriptChunkCount(ctx, s.DB, sum); err != nil || n > 0 {
 			return err
 		}
-		res.Orphans = append(res.Orphans, OrphanBody{Path: filepath.Join(s.AttachDir, rel), SHA256: parts[2], ModTime: info.ModTime(), Recent: now.Sub(info.ModTime()) < OrphanGrace})
+		res.Orphans = append(res.Orphans, OrphanBody{Path: path, SHA256: sum, ModTime: info.ModTime(), Recent: now.Sub(info.ModTime()) < OrphanGrace})
 		return nil
 	})
 	if err != nil {
@@ -597,31 +546,28 @@ func (s *Service) CheckAttachments(ctx context.Context) (*AttachmentCheck, error
 	return res, nil
 }
 
+// AttachmentLeftovers は、途中で止まった削除と添付が添付の置き場の .tmp に残したものの数え。
+type AttachmentLeftovers = blobLeftovers
+
+// RecoverAttachmentLeftovers は、途中で止まった削除（removeBlobGuarded が本体を .tmp へ外した後に落ちた）が残した本体と、
+// 落ちた添付が残した古い印を数え、apply なら片付ける（外した本体は本体のパスが空いていれば戻し、空いていなければ捨てる。
+// 古い印は消す）。CheckAttachments より先に呼ぶ（戻した本体を、指す行が無ければふつうの規則で消すため）。
+func (s *Service) RecoverAttachmentLeftovers(ctx context.Context, apply bool) (AttachmentLeftovers, error) {
+	if s.AttachDir == "" {
+		return AttachmentLeftovers{}, errAttachUnavailable()
+	}
+	s.attachMu.Lock()
+	defer s.attachMu.Unlock()
+	return recoverBlobLeftovers(s.AttachDir, apply, nil)
+}
+
 // RemoveOrphanBodies は CheckAttachments が見つけた、どこからも指されない本体を消す（Recent のものは消さない）。
-// 消す直前に、その本体を指す消去していない添付が無いことを DB で確かめ直す（検査の後に同じ内容が添付されたときに消さないため）。
+// 消す直前に、その本体を指す消去していない添付も会話記録のチャンクも無いこと・触れられて OrphanGrace が経っていること・
+// 別のプロセスで同じ本体を置いて記録する前の添付が無いことを確かめ直す（removeBlobGuarded。会話記録の本体と同じやり方）。
+// 検査の後に同じ内容が添付されたとき・置き場を取り違えて会話記録の本体が混ざっているときに消さないため。
 // 本体の欠けは直さない（直せるものが無い）。消したパスを返す。
 func (s *Service) RemoveOrphanBodies(ctx context.Context, c *AttachmentCheck) ([]string, error) {
 	s.attachMu.Lock()
 	defer s.attachMu.Unlock()
-	var removed []string
-	for _, o := range c.Orphans {
-		if o.Recent {
-			continue
-		}
-		n, err := store.LiveAttachmentCount(ctx, s.DB, o.SHA256)
-		if err != nil {
-			return removed, err
-		}
-		if n > 0 {
-			continue
-		}
-		if info, err := os.Stat(o.Path); err != nil || time.Since(info.ModTime()) < OrphanGrace {
-			continue // 消えた・検査の後に触れられた（同じ内容が添付されようとしている）
-		}
-		if err := os.Remove(o.Path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return removed, err
-		}
-		removed = append(removed, o.Path)
-	}
-	return removed, nil
+	return removeOrphanBlobs(s.AttachDir, repairAttachmentsCmd, c.Orphans, nil, func(sum string) (int, error) { return s.attachBodyRefs(ctx, sum) })
 }

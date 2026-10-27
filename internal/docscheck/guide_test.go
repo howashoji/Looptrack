@@ -18,7 +18,7 @@ import (
 //  2. 各ファイルの見出しの階層の並び（コードブロックの外）・コードブロックの数・表の数が同じ
 //  3. 相対リンクの先のファイルがある
 //  4. 社内固有の名前・内部の番号が無い（公開リポジトリ github.com/<組織>/looptrack と、そのインストーラを取る
-//     raw.githubusercontent.com/<組織>/looptrack と、利用者ガイドのサイト <組織>.github.io/Looptrack/ は除く）
+//     raw.githubusercontent.com/<組織>/looptrack と、利用者ガイドのサイト <組織>.github.io/Looptrack/ は除く。正本は deploy/public-names.txt）
 
 // 語は分けて書く（このファイル自身が公開物の検査に掛からないように）
 var (
@@ -26,18 +26,59 @@ var (
 	forbidden = regexp.MustCompile(strings.Join([]string{`IM` + `-[0-9]`, "HP" + "C-", "REQ" + "-", "RW" + "-", org, "宝" + "和", `dev\.` + org}, "|"))
 	allowed   = "github.com/" + org + "/looptrack"
 	allowRaw  = "raw.githubusercontent.com/" + org + "/looptrack"
+	// 公開名の例外は deploy/public-names.txt が正本（public-scan.sh と publish-public.sh も同じ一覧を読む）。
 	// 公開名の直後が英数字・_・- のときは別の名前の一部なので許さない（looptrack-internal の社名まで消さない）。
-	allowNames = regexp.MustCompile(`(` + regexp.QuoteMeta(allowRaw) + `|` + regexp.QuoteMeta(allowed) + `)([^A-Za-z0-9_-]|$)`)
-	// 利用者ガイドのサイト。末尾の / まで含めるので、Looptrack-internal/ のような別の名前は通さない。
-	allowSite = org + ".github.io/Looptrack/"
-	link      = regexp.MustCompile(`\]\(([^)#\s]+)(#[^)]*)?\)`)
-	fence     = regexp.MustCompile("^\\s*(```|~~~)")
-	heading   = regexp.MustCompile(`^(#{1,6})\s`)
-	tableRule = regexp.MustCompile(`^\|\s*-{2,}`)
-	scheme    = regexp.MustCompile(`^[a-z]+:`)
+	allowNames, allowSite = loadPublicNames()
+	link                  = regexp.MustCompile(`\]\(([^)#\s]+)(#[^)]*)?\)`)
+	fence                 = regexp.MustCompile("^\\s*(```|~~~)")
+	heading               = regexp.MustCompile(`^(#{1,6})\s`)
+	tableRule             = regexp.MustCompile(`^\|\s*-{2,}`)
+	scheme                = regexp.MustCompile(`^[a-z]+:`)
 )
 
 const guideDir = "../../docs/guide"
+
+// publicNames は deploy/public-names.txt の中身（種別ごとの正規表現）。
+type publicNames struct{ names, sites, ends []string }
+
+func readPublicNames() publicNames {
+	data, err := os.ReadFile("../../deploy/public-names.txt")
+	if err != nil {
+		panic(err)
+	}
+	var p publicNames
+	for _, line := range strings.Split(string(data), "\n") {
+		f := strings.Fields(line)
+		if len(f) != 2 {
+			continue
+		}
+		switch f[0] {
+		case "name":
+			p.names = append(p.names, f[1])
+		case "site":
+			p.sites = append(p.sites, f[1])
+		case "end":
+			p.ends = append(p.ends, f[1])
+		}
+	}
+	if len(p.names) == 0 || len(p.sites) == 0 || len(p.ends) != 1 {
+		panic("deploy/public-names.txt に name・site が無いか、end が 1 行ではありません")
+	}
+	return p
+}
+
+// loadPublicNames は、利用者ガイドで許す公開名（name の直後の文字つき）とサイト（site）を作る。
+// ガイドに出てくるのは公開リポジトリとインストーラの取得元だけなので、ghcr・net・api は許さない。
+func loadPublicNames() (names, site *regexp.Regexp) {
+	p := readPublicNames()
+	var ns []string
+	for _, n := range p.names {
+		if strings.HasPrefix(n, `github\.com/`) || strings.HasPrefix(n, `raw\.githubusercontent\.com/`) {
+			ns = append(ns, n)
+		}
+	}
+	return regexp.MustCompile(`(?:` + strings.Join(ns, "|") + `)(?P<end>` + p.ends[0] + `)`), regexp.MustCompile(strings.Join(p.sites, "|"))
+}
 
 type shape struct {
 	headings       []int
@@ -46,8 +87,8 @@ type shape struct {
 
 // guideLineForbidden は、1 行に社内固有の名前か内部の番号が残っているかを返す（許す公開名を除いてから判定する）。
 func guideLineForbidden(line string) bool {
-	rest := allowNames.ReplaceAllString(line, "$2")
-	return forbidden.MatchString(strings.ReplaceAll(rest, allowSite, ""))
+	rest := allowNames.ReplaceAllString(line, "${end}")
+	return forbidden.MatchString(allowSite.ReplaceAllString(rest, ""))
 }
 
 func shapeOf(text string) shape {
@@ -199,14 +240,19 @@ func TestGuideAllowedNameBoundary(t *testing.T) {
 		"https://" + allowRaw + "-internal/main/install.sh",
 		allowed + "ops",
 		allowed + "_old",
+		allowed + ".internal",
+		"https://" + allowed + ".git",
+		"https://ghcr.io/" + org + "/looptrack",
+		"net." + org + ".looptrack",
 	}
 	passed := []string{
 		"https://" + allowed + "/",
-		"https://" + allowed + ".git",
+		"https://" + allowed + ".",
+		allowed + ":1",
 		"https://" + allowed,
 		"`" + allowed + "`",
 		"https://" + allowRaw + "/main/install.sh",
-		"https://" + allowSite + "guide/",
+		"https://" + org + ".github.io/Looptrack/guide/",
 	}
 	// 対照: 続きの名前が検出されること（ここが通らなければ、通る側の確認は何も言えない）。
 	for _, l := range detected {
@@ -292,5 +338,43 @@ func TestEmbeddedGuideStructure(t *testing.T) {
 	}
 	if e.tables != j.tables {
 		t.Errorf("internal/guide/common.md: 表の数が違います（英 %d / 日 %d）", e.tables, j.tables)
+	}
+}
+
+// 正本に足した語がそのまま全体の許可にならないよう、各行の形を確かめる。
+func TestPublicNamesFileShape(t *testing.T) {
+	p := readPublicNames()
+	for _, n := range p.names {
+		if !strings.HasSuffix(n, "looptrack") || strings.ContainsAny(n, "()") {
+			t.Errorf("name の行は looptrack で終わり、かっこを含めません: %s", n)
+		}
+	}
+	for _, n := range p.sites {
+		if !strings.HasSuffix(n, "[Ll]ooptrack/") {
+			t.Errorf("site の行は [Ll]ooptrack/ で終わる必要があります: %s", n)
+		}
+	}
+}
+
+// 続きの名前は、どの公開名でも例外にしない（ガイドに出ない ghcr・net も含め、正本の語は name の形で見る）。
+func TestPublicNamesEndBoundary(t *testing.T) {
+	p := readPublicNames()
+	all := regexp.MustCompile(`(?:` + strings.Join(p.names, "|") + `)(?P<end>` + p.ends[0] + `)`)
+	for _, c := range []struct {
+		in   string
+		pass bool
+	}{
+		{"net." + org + ".looptrack.internal", false},
+		{"github.com/" + org + "/looptrack.internal", false},
+		{"github.com/" + org + "/looptrack-internal", false},
+		{"ghcr.io/" + org + "/looptrack:1", true},
+		{"github.com/" + org + "/looptrack/", true},
+		{"github.com/" + org + "/looptrack.", true},
+		{"net." + org + ".looptrack", true},
+	} {
+		got := !forbidden.MatchString(all.ReplaceAllString(c.in, "${end}"))
+		if got != c.pass {
+			t.Errorf("%s: 通る=%v を期待しましたが %v でした", c.in, c.pass, got)
+		}
 	}
 }

@@ -73,6 +73,18 @@ func Detect(e env.Env) Mark {
 	return Mark{}
 }
 
+// WithHookSession は hook の入力のセッション ID（session_id / sessionId）を、明示の LOOPTRACK_SESSION_ID の次・
+// AI の環境変数より前に置いた環境を返す（hook から CLI や API を呼ぶとき。順は 明示 → 入力 → AI の環境変数）。
+// hook の入力のセッション ID は会話のセッション ID そのものなので、明示の値と同じ扱い（種類の印を付けない）にする。
+// 明示の値があるとき・入力のセッション ID が空のときは e をそのまま返す（Detect の順のまま）。
+func WithHookSession(e env.Env, hookSession string) env.Env {
+	hookSession = strings.TrimSpace(hookSession)
+	if hookSession == "" || e.Value(env.SessionID) != "" {
+		return e
+	}
+	return env.Overlay(e, map[string]string{env.Name(env.SessionID): hookSession})
+}
+
 // first は names の順に最初に値のある環境変数を返す（値と、その環境変数の名前）。
 func first(e env.Env, names ...string) (string, string) {
 	for _, n := range names {
@@ -103,4 +115,22 @@ func (m Mark) Headers() map[string]string {
 		h["X-Looptrack-Session-Kind"] = m.Kind
 	}
 	return h
+}
+
+// AIKind は CLI を動かしている AI の種類（"claude-code" / "codex" / "copilot"。分からなければ "other"）。
+// セッション要約の見出しの ai に入れる値（DESIGN.md §9-7。looptrack session digest が欠けたときに足す）。
+// 読む環境変数は Detect と同じで、推測（状態ファイル・作業ディレクトリ）では決めない。
+// 明示の LOOPTRACK_SESSION_ID は AI の種類を言わないので見ない。
+func AIKind(e env.Env) string {
+	if _, name := first(e, "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID", "CLAUDE_CODE_HOST_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"); name != "" {
+		if strings.HasPrefix(name, "CODEX_") {
+			return "codex"
+		}
+		return "claude-code"
+	}
+	if (e.Get("COPILOT_CLI") == "1" && strings.TrimSpace(e.Get("COPILOT_AGENT_SESSION_ID")) != "") ||
+		e.Get("AI_AGENT") == "github_copilot_vscode_agent" || e.Get("COPILOT_AGENT") == "1" {
+		return "copilot"
+	}
+	return "other"
 }

@@ -26,6 +26,9 @@ func (p Paths) DB() string { return filepath.Join(p.DataDir, "looptrack.db") }
 // Attachments は添付の本体の置き場（DB の隣。更新しても消さない）。
 func (p Paths) Attachments() string { return filepath.Join(p.DataDir, service.AttachDirName) }
 
+// Transcripts は会話記録の本体の置き場（DB の隣。添付とは別のディレクトリ。更新しても消さない）。
+func (p Paths) Transcripts() string { return filepath.Join(p.DataDir, service.TranscriptDirName) }
+
 // Lock は二重起動の防止に使うロックのファイル（中身は使わない。OS のファイルロックだけを見る）。
 func (p Paths) Lock() string { return filepath.Join(p.DataDir, "desktop.lock") }
 

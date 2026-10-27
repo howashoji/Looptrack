@@ -56,7 +56,7 @@ API モードの詳細:
 | 切替 | 環境変数 `LOOPTRACK_API_URL`（例 `https://example.com/looptrack`）があれば API モードになります。プロジェクト単位で切り替えるには、そのプロジェクトの `.claude/settings.json` の `env` に `LOOPTRACK_API_URL` と `LOOPTRACK_PROJECT` を書きます。Claude Code がこれを Bash ツールと hook に渡します |
 | プロジェクト | `LOOPTRACK_PROJECT` です（MCP はヘッダ `X-Looptrack-Project` か引数） |
 | トークン | `LOOPTRACK_TOKEN`、無ければ `~/.config/looptrack/credentials.json`（URL ごと）を使います。保存するのは `looptrack issue login --browser`（OAuth・§3-2）か `login --url`（貼る方式）で、`/me` で検証してから 0600 で書きます。グループや他者が読める権限なら拒否します。OAuth で保存したものは、期限の前と 401 のときに更新トークンから自動で取り直します。Keychain は使いません（`security` にトークンを引数で渡すとプロセスの一覧に出るため）。Go 版（looptrack）の置き場と Windows での保護は §5-1 の「資格情報の置き場」にあります |
-| 送るヘッダ | `X-Looptrack-Client: cli` を送ります。`X-Looptrack-Session` の値は `LOOPTRACK_SESSION_ID` → `CLAUDE_CODE_SESSION_ID` → `CLAUDE_SESSION_ID` → `CLAUDE_CODE_HOST_SESSION_ID` → `CODEX_THREAD_ID` → `CODEX_SESSION_ID` → `COPILOT_AGENT_SESSION_ID`（`COPILOT_CLI=1` のときだけ）の順に探します。Claude Code の Bash に渡るのは `CLAUDE_CODE_SESSION_ID`、Codex のシェルに渡るのは `CODEX_THREAD_ID`、Copilot CLI は `COPILOT_AGENT_SESSION_ID` です。**`CLAUDE_CODE_HOST_SESSION_ID` はデスクトップ版のセッションの窓（器）が渡す ID です。`CLAUDE_CODE_SESSION_ID` が渡らない窓でも並行するセッションを見分けられるよう、最後に読みます。会話記録のファイル名とは一致しないので、トークン情報を引くのには使いません（`usagesnap.Detect` は読みません）。この ID を送るときは `X-Looptrack-Session-Kind: host` も送り、サーバが付与の対象から外せるようにします**（§9-5「器のセッション ID」）。`X-Looptrack-Session-Kind` は `host` のときだけ送ります（上記）。`X-Looptrack-Agent: copilot` は Copilot の下で動いているときだけ送ります。対象は VS Code のエージェント用ターミナル（`AI_AGENT=github_copilot_vscode_agent` / `COPILOT_AGENT=1`）と Copilot CLI で、既定では送りません |
+| 送るヘッダ | `X-Looptrack-Client: cli` を送ります。`X-Looptrack-Session` の値は `LOOPTRACK_SESSION_ID` → `CLAUDE_CODE_SESSION_ID` → `CLAUDE_SESSION_ID` → `CLAUDE_CODE_HOST_SESSION_ID` → `CODEX_THREAD_ID` → `CODEX_SESSION_ID` → `COPILOT_AGENT_SESSION_ID`（`COPILOT_CLI=1` のときだけ）の順に探します。Claude Code の Bash に渡るのは `CLAUDE_CODE_SESSION_ID`、Codex のシェルに渡るのは `CODEX_THREAD_ID`、Copilot CLI は `COPILOT_AGENT_SESSION_ID` です。**`CLAUDE_CODE_HOST_SESSION_ID` はデスクトップ版のセッションの窓（器）が渡す ID です。`CLAUDE_CODE_SESSION_ID` が渡らない窓でも並行するセッションを見分けられるよう、最後に読みます。会話記録のファイル名とは一致しないので、トークン情報を引くのには使いません（`usagesnap.Detect` は読みません）。この ID を送るときは `X-Looptrack-Session-Kind: host` も送り、サーバが付与の対象から外せるようにします**（§9-5「器のセッション ID」）。`X-Looptrack-Session-Kind` は `host` のときだけ送ります（上記）。`X-Looptrack-Agent: copilot` は Copilot の下で動いているときだけ送ります。対象は VS Code のエージェント用ターミナル（`AI_AGENT=github_copilot_vscode_agent` / `COPILOT_AGENT=1`）と Copilot CLI で、既定では送りません。**hook が CLI を呼ぶとき**（SessionStart の `looptrack hook summary` と、引き継ぎの鮮度ガードが読む `summary --json`）は、`LOOPTRACK_SESSION_ID` の次に hook の入力の `session_id`（Copilot CLI は `sessionId`）を読み、その後に上の AI の環境変数を読みます（`session.WithHookSession`）。hook の環境には AI の環境変数が渡らないことがあり、そのままでは `X-Looptrack-Session` が付かず、別のセッションの要約と「別のセッションが着手しています」の 1 行が出ないからです |
 | 出力を固定するもの | list / ready / show / comment / status / close と、入力の誤り・見つからない場合のエラー（stdout・stderr・終了コード）です。ゴールデンテストで全件を比べます（入力は合成フィクスチャ `internal/testdata/fixtures`） |
 | 出力の決まり | `new` は `作成: <ID> <タイトル>` を出します（存在しないパスは出しません）。`index` / `matrix` はファイルを書かず、生成した Markdown を標準出力へ出します。`--labels "a, b,"` のように空白や空の要素を含む入力は、正規化して保存します（`[a, b]`） |
 | 担当者（§9-2） | 担当が付いたイシューは出力が増えます。`show` の frontmatter の `assignee:` 行、`list` / `ready` / `summary` の `ASSIGNEE` 列（担当が 1 件でもある表だけ）、`status` の `担当: <ID>: <旧> → <新>` 行です。最後の行は明示の変更と引き継ぎのときだけ出し、In Progress で本人が担当になる R1 では出しません。担当の無いイシューだけの表には列を出しません |
@@ -232,9 +232,14 @@ migrations は MySQL と SQLite の両方に足し（0007）、`deploy/grants.sq
 
 本体のパスは `<置き場>/<sha256 の先頭 2 字>/<次の 2 字>/<sha256>` です。
 置き場の中の `.tmp` に書いて fsync し、rename してからメタデータを入れる順です。既にある本体は上書きしません。
+rename と fsync はトランザクションの前に済ませ、トランザクションは上限の判定と 1 行の記録だけにします（会話記録の追記と同じ形）。
+記録に失敗したら、置いた本体がどこからも指されていなければ消します（消し方は下の `removeBlobGuarded`。消せなければ `repair-attachments` が拾う）。
 同じ内容を 2 回添付すると本体は 1 つで行は 2 つになります。
 
-消去では本体のファイルを消して `attachment_purges` に 1 行を足します。
+消去では `attachment_purges` に 1 行を足してから、本体のファイルを消します。
+本体を消すのは整合の検査と同じ `removeBlobGuarded` で、消去の後に別のプロセスの添付が同じ本体を置いて記録しようとしていれば本体を残します。
+その添付の行は消去の後に記録されるので、行も本体もそのまま使えます。DB の行（消去済みにする範囲）はこの判定に左右されません。
+送信が消去より前に始まり記録が消去の後になった添付もこれに当たり、消した本体と同じ内容が新しい添付として読めます。その添付も消すなら、もう一度消去します。
 効くのは消去の時点で同じ本体を指していた添付すべてです（`through_attachment_id` まで）。読むと「消去済み」（`attachment_purged`）を返します。一覧には `purged` が立ちます。
 秘密を消すための操作なので、同じ本体を指すほかの添付にも効くのが正しい形です。消去の後に同じ内容を添付し直したものは、消去済みに数えません。
 
@@ -263,6 +268,12 @@ compose の置き場を `.env` に書かず compose.yaml に書くのは、volum
 バックアップは DB と添付の 2 系統になります。手順の説明は `docs/server/DEPLOY.md` の「添付の置き場とバックアップ」です。
 DB と置き場の食い違い（本体の欠け・どこからも指されない本体）は、管理者のサブコマンド `looptrack repair-attachments` が `repair-lists` と同じ形で調べます。
 `--apply` が無ければ報告だけです。`--apply` はどこからも指されない本体を消しますが、書かれて 1 時間（`service.OrphanGrace`）以内のものは残します。添付の途中（rename の後・メタデータの前）の本体を消さないためです。
+本体を消す手順は消去と同じく会話記録と同じ `removeBlobGuarded` です（下の「消去と保持期間」の「本体を消す順」）。指す添付と会話記録のチャンクを数えてから本体を `.tmp` へ rename して外します。続けて置いている添付の印を探し、指す行を数え直します。
+印か行があるとき・触れられて `OrphanGrace` が経っていないときは本体を戻します。
+添付の側は本体を置く前に印（`.tmp/inflight-<sha256>-…`）を作ります。印はメタデータを記録するトランザクションが終わってから消します。
+同じ内容の本体が既にあると `placeBlob` は置くのを飛ばします。印が無ければ別のプロセスの検査が更新時刻を見た直後に本体を消すことがあり、記録した添付が無い本体を指します。
+印は `OrphanGrace` より古ければ数えません。そのため添付も会話記録の追記と同じく、置いてから記録するまでを 10 分（`blobPlaceWindow`）に収め、越えたら記録せずに失敗します。
+`repair-attachments` は本体を調べる前に `.tmp` を見て、外したまま残った本体と古い印を `repair-transcripts` と同じ規則で片付けます（`service.RecoverAttachmentLeftovers`。dry-run は数えるだけ）。
 
 #### 経路
 
@@ -292,6 +303,12 @@ DB と置き場の食い違い（本体の欠け・どこからも指されな�
   ほかは `application/octet-stream` と `Content-Disposition: attachment` で返します。画像を名乗る HTML をそのまま表示させないためです。
 - 添付の経路のどの応答にも `Content-Security-Policy: sandbox; default-src 'none'` と `X-Content-Type-Options: nosniff` を付ける。認証の前に付けるので 401 にも付きます。
 - 中身はサーバではマスクできません。CLI はテキストのファイルに検証の出力と同じ秘密の検査（`domain.FindSecret`）を当て、当たれば 1 件も送らずに止めます。止めた理由には行と規則の語だけを出し、値は出さない。
+- gzip・zip・tar（中身の先頭で見分ける。gzip は `1f 8b`、zip は `PK\x03\x04`、tar は 257 バイト目の `ustar`。印の無い古い tar は拡張子が `.tar` のときだけ）は、CLI がメモリの中で展開し（標準ライブラリだけ。ディスクには書かない）、
+  要素ごとに同じ検査を当てます（`internal/client/cli/attach_archive.go`）。止めた理由には書庫のパス・中のパス・行・規則の語を出します。
+  展開するのは 2 重まで（tar.gz・zip や tar の中の .gz など）。上限は 1 つの添付につき展開後の要素の合計 64 MiB と要素 10,000 個です（要素がそれ自体書庫なら、その大きさは数えず中を数える）。
+  読むときは残りの枠 + 1 バイトまでしか読まないので、申告の大きさを偽った書庫（zip bomb）でも枠より多くは確保しません。
+  上限を超えたもの・壊れて読めないもの・3 重目の書庫は「検査できないので送らない」で止めます。検査していないものは送りません。
+  そのほかのバイナリ（画像・PDF・xz・bzip2・7z など）はこれまでどおり中を見ずに送り、その限界を `issue attach -h` と利用者ガイドに書いています。
 - 前段のプロキシにも本文の上限があります。nginx の `client_max_body_size` は既定で 1MB なので、1 ファイルの上限に合わせて広げる（`docs/server/DEPLOY.md`）。
 
 #### 書き出し・取り込み
@@ -318,6 +335,100 @@ DB と置き場の食い違い（本体の欠け・どこからも指されな�
 `attachments.via` の CHECK も作者の外部キーも取り込みを想定していないので、DB の形を変えずにはできません。
 目録があるプロジェクトを取り込むと、運ばなかったことを件数つきで 1 行出します（黙って捨てない）。
 添付を含めた控えと移し替えは DB と置き場の 2 系統で取ります（`docs/server/DEPLOY.md` の「添付の置き場とバックアップ」）。
+
+### 2-5. 会話記録の置き場（利用者ごと）
+
+AI の生の会話記録（Claude Code の `<設定の置き場>/projects/<slug>/<sessionId>.jsonl` とその付属のファイル、Codex の rollout）を、
+**同じ利用者の別の端末**へ運ぶための置き場です。運んだ記録は取り込んだ端末で **fork** して続きを読みます（同じ会話を 2 か所で続けることはしない）。
+送る前の変換（パスの書き換え・秘密のマスク）・送り方・取り込み・hook・限界は §9-8 にあり、ここにはデータと置き場だけを書きます。
+作業の文脈を要約で渡す §9-7 とは別のものです。要約はイシューのコメント（プロジェクトの全員に見える）で、こちらは本人にしか見えない生の記録です。
+
+#### 添付（§2-4）との違い
+
+本体を sha256 の名前でディスクに置き、メタデータを追記専用の表に置く作りは添付と同じです（書き込みの部品も共有する。下の「置き場」）。
+違うのは、誰に見えるかと、どう増えるかです。
+
+| 項目 | 添付（§2-4） | 会話記録 |
+| -- | -- | -- |
+| 見える人 | イシューを閲覧できる全員 | **持ち主だけ**。プロジェクトの管理者にも利用者の役割 admin にも、無いものと同じ 404 を返す |
+| 結び付く先 | イシュー | 利用者。送ったときのプロジェクトも記録する（プロジェクト別ルールの判定と一覧の絞り込みのため。見える範囲は広げない） |
+| 増え方 | 1 回の添付で 1 ファイル | 同じ記録に**追記**する（チャンクの連番と楽観ロック。会話は続く間ずっと伸びるため） |
+| 中身の検査 | CLI が `domain.FindSecret` で止める（サーバは見ない） | CLI がパスを書き換え、文字列の値ごとにマスクする。サーバも値ごとに読み直し、読めない行や残った秘密があれば拒む（§9-8） |
+| 消去 | 管理者（同じ本体を指す添付すべて） | 持ち主・保持期間の切れ（自動）・サーバの運用者（管理用のサブコマンド） |
+| 上限 | 1 ファイル・1 プロジェクト | 1 チャンク・1 利用者・保持日数 |
+| 置き場 | `LOOPTRACK_ATTACH_DIR` ほか | **別のルート**（`LOOPTRACK_TRANSCRIPT_DIR` ほか） |
+| 書き出し（`looptrack export`） | 運ぶ | 運ばない（個人の記録で、プロジェクトの控えに入れるものではない） |
+
+#### データ
+
+| テーブル | 主な列 | 備考 |
+| -- | -- | -- |
+| `transcripts` | id, user_id, project_id, agent（`claude-code` / `codex`）, vendor_session_id（Claude の sessionId・Codex のスレッド ID。128 文字まで）, machine_label（64 文字まで）, origin_os（`linux` / `darwin` / `windows`）, agent_version（記録の中の版。64 文字まで）, created_at, token_id, via | 会話 1 つが 1 行。`(user_id, agent, vendor_session_id)` で一意。今の連番・ファイルごとの長さ・使用量は行に持たず、チャンクから数える（行を書き換えないため） |
+| `transcript_chunks` | id, transcript_id, seq（1 から隙間なく）, file_key, file_kind（`jsonl` / `json` / `text`）, src_offset, src_length, line_count（行の数。`LINES` は MySQL の予約語なので `lines` にしない）, sha256, size, encoding（`identity` / `gzip`）, nonce, placeholders（JSON）, stats（JSON）, created_at, token_id, via | 追記 1 回分。`(transcript_id, seq)` で一意（楽観ロックはこの一意性で取る）。`file_key` は記録の置き場の中の相対パス（下）。`src_offset`・`src_length` は元のファイルの中の位置（伸ばす前の論理的なバイト数）。`sha256`・`size` は置いた本体（gzip ならその形）。`nonce` と `placeholders` はパスの書き換えの印（§9-8）で、**元の絶対パスはサーバに送らない** |
+| `transcript_purges` | id, transcript_id, through_chunk_id, cause（`owner` / `retention` / `operator`）, at, actor_user_id（保持期間の切れは NULL）, via, reason | 本体を消した記録（保持期間の切れは via が `system`）。`through_chunk_id` 以下のチャンクが消去済みになる（添付の `through_attachment_id` と同じ考え方）。消去の後に同じ会話を送り直したチャンクは数えない |
+| `transcript_locks` | user_id | 追記と消去を利用者ごとに 1 つずつにするためのロックの行（§9-8「送る」）。値は書き換えず、`FOR UPDATE` で握るだけ。最初の追記・消去の前にトランザクションの外で作る。`users` への外部キーは置かない（子の行を足すたびに親の行へ共有ロックが掛かり、`users` の更新を待たせるため。利用者の行は消さない） |
+
+- `transcript_locks` を除く 3 つは**追記専用**です。マイグレーションは MySQL と SQLite の両方に次の番号で足し、SQLite は添付と同じく `append_only_unlock` を見るトリガで UPDATE・DELETE を拒みます。
+  `deploy/grants.sql` は 3 つの表に SELECT・INSERT だけを与えます。`transcript_locks` には SELECT・INSERT・UPDATE を与えます（MySQL の `FOR UPDATE` は UPDATE の権限を要る）。
+- **`file_key`** は端末の名前を含まない相対パスです。Claude は `projects/<slug>/` からの相対（`<sessionId>.jsonl`・`<sessionId>/subagents/<名前>`・`<sessionId>/tool-results/<名前>`）、
+  Codex は `sessions/` からの相対（`<年>/<月>/<日>/rollout-…jsonl`）です。`..`・絶対パス・制御文字・255 バイト超は 400 で拒み、agent ごとに許す形（正規表現）に合わないものも拒みます（`transcript_file_key`）。
+  Claude の形はその記録の `vendor_session_id` の下に限ります（ほかのセッションの名前は拒む）。読み方（`file_kind`）も形から決めます（`<sessionId>.jsonl` と `subagents/*.jsonl` は `jsonl`・`subagents/*.json` は `json`・`tool-results/*` は `text`・Codex は `jsonl`。`service.TranscriptFileKind`）。
+  Codex は `history_base` がたどる元の rollout のスレッド ID が違うので、名前の中のスレッド ID は縛りません。
+- **今の連番**は `MAX(seq)`、**ファイルごとの送った長さ**は最後の消去より後のチャンクの `src_offset + src_length` の最大、**利用者の使用量**は消去していないチャンクの `size` の合計です。
+- `stats` はクライアントが数えた件数だけ（書き換えた値の数を欄の種類ごとに・マスクした値の数を規則の語（`SecretFinding.Label`）ごとに・書き換えなかった絶対パスの数）。値は入れません。
+  規則の語は `domain.MaskSecrets` をかけた形（`password=***`・`Bearer ***`）で送ります。語そのもの（`password=…`）が秘密の規則に当たり、サーバの `stats` の検査（下の 3）に拒まれるためです（実サーバに対する CLI のテストで見つけた。マスクした形は `FindSecret` に当たらない）。
+
+#### 置き場
+
+本体のパスは添付と同じ形 `<置き場>/<sha256 の先頭 2 字>/<次の 2 字>/<sha256>` で、書き込みも同じ順（置き場の中の `.tmp` に書いて fsync → rename → メタデータ）です。
+書き込みの部品（`internal/service/attachments.go` の `writeAttachTemp`・`placeAttachBody`・`AttachmentBodyPath`・`syncDir` と、
+整合の検査の `CheckAttachments`・`RemoveOrphanBodies` の置き場を歩く部分）は、ルートを引数に取る形に切り出して添付と会話記録で共有します
+（`internal/service/blobstore.go` の `writeBlobTemp`・`placeBlob`・`blobBodyPath`・`syncDir`・`walkBlobs`・`removeOrphanBlobs`。添付の 4 つの名前はこれを呼ぶ薄い包みとして残す）。
+
+**ルートは添付と分けます。** 添付の整合の検査（`looptrack repair-attachments --apply`）は、添付の表から指されない本体を消します。
+同じルートに会話記録の本体を置くと、それを「どこからも指されない本体」として消してしまいます。逆も同じなので、会話記録には別の検査
+（`looptrack repair-transcripts [--apply]`。`repair-attachments` と同じ形で、`service.OrphanGrace` も同じ）を置きます。
+2 つのルートの一方がもう一方の中にあるとき（同じ場所を含む。`service.BlobRootsNested`）は、サーバは起動時に会話記録の API を使えなくし、理由をログに残します（片方の検査がもう片方の本体を消さないように）。
+service の側でも会話記録の操作のたびに同じ判定をし（`transcriptRoot`）、`repair-transcripts` も何も見ずに止めます。
+加えて、どちらの検査も消す直前に添付の表と会話記録の表の両方を引き直し、どちらかから指されている本体は消しません（以前の設定で同じ場所に置いた本体が残っていても消さない）。
+
+置き場は次の順で決まります（`service.AttachDirFromEnv` と同じ考え方の別の関数 `service.TranscriptDirFromEnv`）。
+
+1. 環境変数 `LOOPTRACK_TRANSCRIPT_DIR`
+2. `$STATE_DIRECTORY/transcripts`
+3. SQLite の DB と同じディレクトリの `transcripts`
+4. デスクトップ版は `DataDir/transcripts`（`desktop.Paths.Transcripts`。`Attachments` と並べた）
+
+どれも無ければ会話記録の API は「置き場が設定されていない」を返し、ほかは動きます（添付の決めたことの 7 と同じ）。
+install.sh・setup の compose.yaml は添付と同じやり方で置き場を書きます（systemd は `.env` に `LOOPTRACK_TRANSCRIPT_DIR='/var/lib/looptrack/transcripts'`、
+compose は compose.yaml の `environment` に `LOOPTRACK_TRANSCRIPT_DIR: /data/transcripts`）。install.sh の `--upgrade` の控えに本体は含めません。
+**バックアップは DB・添付・会話記録の 3 系統になります**（`docs/server/DEPLOY.md`）。
+
+同じ内容の本体は 1 つにまとまりますが、チャンクごとに nonce が違う（§9-8）ので、別の会話や別の利用者のチャンクが同じ本体を指すことは事実上ありません。
+それでも消去は、同じ本体を指す消去していないチャンクが残っていれば本体を消しません（添付と違い、ほかの利用者の記録を巻き込まないため）。
+
+#### 上限と保持期間
+
+`system_settings` に置き、変更は `setting_changes` に記録します（添付の上限の `store.SetAttachLimitTx` と同じ形）。値は要求ごとに DB から読みます。
+
+| 設定名 | 既定 | 意味 |
+| -- | -- | -- |
+| `transcript_max_chunk_bytes` | 32MiB | 1 チャンクの**伸ばした後**の大きさ。サーバが検査のために伸ばすので、圧縮した大きさではなくこちらで縛る（gzip の爆弾を防ぐ） |
+| `transcript_max_user_bytes` | 2GiB | 1 利用者の、消去していないチャンクの `size` の合計 |
+| `transcript_retention_days` | 90 | 最後のチャンクからこの日数が経った会話の本体を消す（0 は無期限） |
+
+管理者の画面（`/admin/transcripts`）に、上限の設定と利用者ごとの使用量（バイト数と会話の数だけ。中身・題名・ファイル名・セッション ID は出さない）を置きます。
+上限は MiB、保持日数は日（0 は無期限）で入力し、変更は `setting_changes` に残します（規則は `service.SetTranscriptLimits`・`service.TranscriptOverview` で、管理者だけ）。
+画面に消去の操作は置きません（消すのは持ち主と、運用者の `purge-transcripts`。管理者の画面の注記に、その実際の書き方を載せます）。
+
+#### 見える人と見えない人（利用者に約束すること）
+
+- API・CLI・Web から読めるのは**送った本人だけ**です。プロジェクトの管理者にも、サーバの管理者（利用者の役割 admin）にも見えません（無いものと同じ 404）。
+- **暗号化はしません。サーバの運用者（サーバのディスク・DB・バックアップを読める人）は中身を読めます。** 置き場の本体は、マスクとパスの書き換えの後の平文の JSONL です。
+- 会話記録には、AI が読んだファイルの中身（ソースコード・`CLAUDE.md`・コマンドの出力）がそのまま入っています。送ることは、それらをサーバに置くことです。
+- 秘密のマスクは `domain.MaskSecrets` の規則に当たるものだけです。規則に当たらない秘密（形の決まっていない値・顧客の情報）はそのまま残ります。
+- 消去は本体のファイルを消します。メタデータ（ファイルの相対パス・大きさ・sha256・件数・時刻）は追記専用の表に残ります。バックアップに入った本体は、バックアップの側で消すまで残ります。
+- この約束は利用者ガイド（`docs/guide` と `docs/guide/ja`）にも同じ文で書きます。
 
 ## 3. 認証と権限
 
@@ -555,7 +666,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | `POST /projects/{slug}/issues` | 起票（採番はトランザクション内） | `new` |
 | `GET /issues/{id}` | 詳細（`?format=md` で現行 `show` と同じ全文） | `show` / `edit` |
 | `PATCH /issues/{id}` | 項目・本文の更新（`If-Match: <version>`） | `push` / `set` |
-| `POST /issues/{id}/comments` | コメント追記 | `comment` |
+| `POST /issues/{id}/comments` | コメント追記（セッション要約は `path_hints` を添えられる・§9-7） | `comment` |
 | `POST /issues/{id}/status` | 状態変更（`comment` 同時指定可・ルール検証・`assignee` 同時指定可） | `status` / `close` |
 | `POST /issues/{id}/assign` | 担当者の変更（`{assignee, override_reason}`・§9-2） | `assign` |
 | `GET /issues/{id}/verify` | 検証コマンドの一覧・本文の版・直近の記録（§9-3-3・viewer 可） | `verify --list` / `--last`・MCP `verify_issue` |
@@ -564,6 +675,12 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | `GET /issues/{id}/attachments` | 添付の一覧（メタデータだけ・消去済みは `purged`・画面に画像として出すかは `inline`・§2-4） | ドロワーの添付の一覧（MCP `get_issue` は同じ一覧を service から読む） |
 | `GET /attachments/{id}` | 添付の本体（閲覧できる人・§2-4「安全」） | 画面のリンク |
 | `POST /attachments/{id}/purge` | 添付の本体の消去（`{"reason"}`・管理者だけ・§2-4。管理者の画面 `/admin/attachments` は同じ処理をフォームで呼ぶ） | （CLI・MCP には無い） |
+| `POST /projects/{slug}/transcripts` | 会話記録の登録（`{agent, vendor_session_id, machine_label, origin_os, agent_version}`・同じものがあれば 200 で返す・ルール `session.transcripts` が切なら 422・参加者（viewer 以上）・§2-5・§9-8） | `session transcript push` |
+| `POST /transcripts/{id}/chunks` | チャンクの追記（本文はチャンクそのもの・`Content-Encoding: gzip` 可・`If-Match: "<seq>"` 必須（無ければ 428・違えば 409 `transcript_seq`）・位置と印は `X-Looptrack-Transcript-*`・サーバが値ごとに読み直して検査・持ち主だけ・§9-8） | `session transcript push`・hook `transcript` |
+| `GET /transcripts?project=` | 自分の会話記録の一覧（メタデータだけ・ほかの利用者のものは載らない） | `session transcript list` |
+| `GET /transcripts/{id}` | 会話記録 1 つとチャンクの一覧（持ち主だけ。ほかの人には無いものと同じ 404） | `session transcript pull` |
+| `GET /transcripts/{id}/chunks/{seq}` | チャンクの本体（置いた形のまま・`X-Looptrack-Transcript-Encoding`・添付と同じ安全のヘッダ・持ち主だけ） | `session transcript pull` |
+| `POST /transcripts/{id}/purge` | 会話記録の本体の消去（`{"reason"}`・持ち主だけ。運用者は管理用のサブコマンド `purge-transcripts`・§9-8） | `session transcript purge` |
 | `GET /projects/{slug}/matrix` | トレース表 + 警告 2 種 | `matrix` / `index` |
 | `GET /projects/{slug}/summary` | SessionStart 用（① 進行中・ready 上位 ② In Review と滞留 ③ 未応答のフィードバック の 3 層と、トークン情報の未付与の件数・§9-3-7） | `summary` |
 | `GET /activity?ids=&since=` | ID ごとの最終更新イベント時刻 | `activity` |
@@ -590,11 +707,11 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | `GET /issues/{id}` | ID は大文字小文字を区別しません。`?project=<slug>` でプロジェクトの中に限れます（ファイルモードの find と同じ範囲）。`?format=md` は `show` と同じ全文です（CLI は末尾に改行を 1 つ足して表示します）。`ETag: "<version>"` を返します |
 | `PATCH /issues/{id}` | `If-Match: <version>` が必須です。本文は `{"markdown": 全文}`、項目は `{"title", "type", "priority", "parent", "labels", "blocked_by", "traces", "refs"}` で送ります（併用はできません）。**id・created・status・assignee・コメント節（preamble とコメント）は変えられません**。担当は `/assign` で変えます。担当が他人なら 422 で、`override_reason` を付ければ通します（担当は替えない・§9-2）。状態は `/status`、追記は `/comments` です。送ったコメント節が現在のコメントの先頭部分なら、後から付いたコメントを保持します。クローズ済みは 422 です。updated はサーバが設定します。ファイル名（title 由来）は変えません |
 | `POST /projects/{slug}/issues` | `{"title", "type", "status", "priority", "parent", "labels"[], "blocked_by"[], "traces"[], "refs"[], "body"}` です。既定値は CLI の `new` と同じです。リストの値は前後の空白を除き、空のものを捨てます。カンマ・改行は 400 です。**blocked_by / traces / refs は途中に空白を含む値も 400** です（§2-3・labels は空白可）。201 で `{"issue": 詳細, "path": "open/<ファイル名>"}` を返します |
-| `POST /issues/{id}/comments` | `{"text"}` です。本文（前後の空白を除く）も添付も無いコメントは 400（`comment_empty`）で拒み、何も残しません（コメントは消せないため。判定は service の 1 か所）。添付だけのコメントは通りますが、REST では `"text":""` を付ける必要があります（`text` を省くと従来どおり 400（`invalid_argument`）で、添付があっても拒みます）。クローズ済みにも追記できます（経緯を足せるようにするため）。`message` は CLI の出力です（`コメント追記: <ID>`） |
-| `POST /issues/{id}/status` | `{"status", "comment"}` です。`messages` は CLI の出力行です（`<ID>: <旧> → <新>` と、コメントを作ったときだけ `コメント追記: <ID>`）。空白だけのコメントは作らず、状態の変更だけ通します（`コメント追記` の行も出しません。MCP の `set_status` も同じ） |
-| 一覧 | `list` / `ready` は `{"items": [...], "count"}` を返します。項目は frontmatter の値と `closed` `version` `file_name`、未知のキー（`extra`）です。**In Progress の項目には `other_session`（要求のセッション ID と最後に着手したイベントのセッション ID が比べられて違う）・`cross_path_session`（経路が違って比べられない）と `started_ago`（着手からの経過）が付きます**。判定は summary と同じで、CLI と MCP は「別のセッションが着手しています」の 1 行を出します。セッション ID が分からない経路では付きません。`all` / `reverse` は `1` / `true` です。`has_feedback=1` は未応答のフィードバックを持つものだけに絞り、**既定でクローズ済みも含めます**（`all` と同じ）。項目には `feedback_pending`（未応答の件数）が付きます（§9-3-6） |
+| `POST /issues/{id}/comments` | `{"text"}` です。本文（前後の空白を除く）も添付も無いコメントは 400（`comment_empty`）で拒み、何も残しません（コメントは消せないため。判定は service の 1 か所）。添付だけのコメントは通りますが、REST では `"text":""` を付ける必要があります（`text` を省くと従来どおり 400（`invalid_argument`）で、添付があっても拒みます）。クローズ済みにも追記できます（経緯を足せるようにするため）。`message` は CLI の出力です（`コメント追記: <ID>`）。**セッション要約**（先頭が `セッション要約:` / `Session digest:`）だけは、任意の `"path_hints": {"roots": [...], "home": "...", "machine_local": [...]}` で本文の端末のパスを置き換え、見出し・秘密・上限を検査します（422 の `digest_header`・`comment_secret`・`comment_too_long`。手がかりの形の誤りは 400 の `invalid_argument`・§9-7）。ほかのコメントは `path_hints` を見ず、本文も変えません。**秘密の検査（`domain.FindSecret`）だけは要約でないコメントにも当て**、当たればプロジェクト別ルール `comment.reject_secret`（既定は入・§9-1）で決めます。入なら 422（`comment_secret`。文面は行番号と規則の語（`SecretFinding.Label`）だけで値を含まず、値を `***` に置き換えて送り直す案内を付ける）で何も残しません。切なら保存して、応答に `secret_notice`（行番号と規則の語の注記）を付けます（CLI は `コメント追記` の行の次に出し、Web はコメントのフォームの下に出す。MCP の `add_comment` は本文の次の行と `secret_notice`）。要約はルールに関わらず拒みます |
+| `POST /issues/{id}/status` | `{"status", "comment"}` です。`messages` は CLI の出力行です（`<ID>: <旧> → <新>` と、コメントを作ったときだけ `コメント追記: <ID>`）。空白だけのコメントは作らず、状態の変更だけ通します（`コメント追記` の行も出しません。MCP の `set_status` も同じ）。セッション要約を `comment` に入れると 422（`digest_on_status`）で、状態も変えません（要約は `/comments` だけで受ける・§9-7）。`comment` には `/comments` と同じ秘密の検査を当てます（`comment.reject_secret`・§9-1）。入なら 422（`comment_secret`）で状態も変えず、切なら保存して `messages` の最後の行と `secret_notice` に注記を載せます（Web は状態の変更フォームの下・MCP の `set_status` は本文の行） |
+| 一覧 | `list` / `ready` は `{"items": [...], "count"}` を返します。項目は frontmatter の値と `closed` `version` `file_name`、未知のキー（`extra`）です。**In Progress の項目には `other_session`（要求のセッション ID と最後に着手したイベントのセッション ID が比べられて違う）・`own_session`（比べられて同じ＝要求のセッションが着手した）・`cross_path_session`（経路が違って比べられない）と `started_ago`（着手からの経過）が付きます**（どれも当たらなければキーごと出しません）。判定は summary と同じで、CLI と MCP は「別のセッションが着手しています」の 1 行を出します。セッション ID が分からない経路では付きません。`all` / `reverse` は `1` / `true` です。`has_feedback=1` は未応答のフィードバックを持つものだけに絞り、**既定でクローズ済みも含めます**（`all` と同じ）。項目には `feedback_pending`（未応答の件数）が付きます（§9-3-6） |
 | `GET /projects/{slug}/matrix` | JSON（rows / untested / orphans）を返します。`?format=md` は matrix.md と同じ文字列です |
-| `GET /projects/{slug}/summary` | counts（open / in_progress / in_review / ready / open_bugs / by_status）・進行中・In Review・ready 上位（`?limit=`、既定 5）を返します。`usage_missing` は呼び出した利用者の AI 操作のうち、直近 7 日でトークン情報が付いていないものです（count・issues・command・message・§9-5）。`usage_requests` は未完了のトークンレポート作成依頼です（§9-5）。3 層の追加キー（§9-3-7・既存のキーは変えない）は、`in_review[]` の各項目の `review_since`・`review_hours`・`review_stale`（48 時間超）・`review_age`・`verify_self_reported`、`feedback`（`count`・`issue_count`・`issues[]`: id・title・status・pending・first_at・excerpt）、`counts` の `in_review_stale`・`feedback_pending` です |
+| `GET /projects/{slug}/summary` | counts（open / in_progress / in_review / ready / open_bugs / by_status）・進行中・In Review・ready 上位（`?limit=`、既定 5）を返します。`usage_missing` は呼び出した利用者の AI 操作のうち、直近 7 日でトークン情報が付いていないものです（count・issues・command・message・§9-5）。`usage_requests` は未完了のトークンレポート作成依頼です（§9-5）。3 層の追加キー（§9-3-7・既存のキーは変えない）は、`in_review[]` の各項目の `review_since`・`review_hours`・`review_stale`（48 時間超）・`review_age`・`verify_self_reported`、`feedback`（`count`・`issue_count`・`issues[]`: id・title・status・pending・first_at・excerpt）、`counts` の `in_review_stale`・`feedback_pending` です。`in_progress[]` の各項目には一覧と同じ `other_session`・`own_session`・`cross_path_session`・`started_ago` が付きます。**`in_progress[]` の各項目には、最新のセッション要約があれば `latest_digest`（`excerpt`・`machine_label`・`created_at`・`age`・`session_id`・`other_session`）が付きます**（無ければキーごと出しません・§9-7）。CLI の `summary`（SessionStart の注入文）と MCP の `project_summary` は、`other_session` が `true` のものだけを出します。`session_digest_required` はプロジェクト別ルール `session.digest_required` の値（既定 `false`・§9-1）で、引き継ぎの鮮度ガードがこの応答 1 本で読みます（CLI の `summary --json` も素通しで出します） |
 | 変更の応答 | 起票・コメント・状態変更・更新の応答には、AI からの操作なら `usage_notice` が付きます（トークン情報の付与の指示・§9-5 の経路 ③） |
 | `GET /activity` | `?ids=A,B&since=<UNIX 秒・小数可>` で、`items[]`（id・project・last_at（RFC 3339）・last_epoch・last_kind・last_via・events_since）を返します。見つからない ID や権限の無い ID は含めません。`now_epoch` も返します |
 
@@ -624,6 +741,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | -- | -- |
 | `issue …` | イシューの操作（サブコマンド・引数・`--json`・出力・終了コード・決まった文言をゴールデンテストで固定します） |
 | `hook <名前> --agent <AI>` | core の hook（鮮度ガード・usage の送信と spool・summary・MCP の呼び出しの合鍵）と loop の hook 14 本・gates |
+| `session digest`・`session pull` | セッション要約を送る・最新の要約を作業コピーの置き場に書き出す（§9-7） |
 | `report pdf` | トークンレポートの PDF |
 | `serve`・`setup`・`user`・`project` … | サーバ |
 | `desktop` | デスクトップ版です。ローカルモードのサーバを上げてブラウザで開きます（`--background`・`--no-tray`・`--status`・`--quit`）。desktop ビルド（`-tags desktop`）はトレイつきです。引数なしの起動（ダブルクリック）もこれになります。headless ビルドでもサブコマンドとしては動きます。トレイは出ず、止めるには `--quit` かシグナルを使います。引数なしなら使い方を出します。§5-4 |
@@ -813,6 +931,8 @@ guide が返す Markdown の中身:
 
 `{action, message, issue（全文つき）, from, acceptance（「## 受け入れ条件」節）, verify（「## 検証コマンド」節。無ければ null。§9-3-1）, related {parent, blocked_by[], traces[], children[]}（各 id・title・type・status。無い ID は missing）, others[], containers[], outside_types[], skipped[], next_steps[], text}`
 
+返すイシューに最新のセッション要約があれば `latest_digest`（summary の項目と同じ形・§9-7）が付きます。`text` には、それが別のセッションの要約（`other_session: true`）のときだけ、メッセージの直後に端末のラベル・経過・抜粋を出します。
+
 - `text` には受け入れ条件の後に「検証コマンド（`looptrack issue verify <ID>` で実行して記録する）」の一覧が出ます（節があるときだけ）。
 - `text` は人と AI が読む形です。CLI はこれをそのまま出します。MCP のツール結果の本文も同じです。
 - 候補が無ければ `action: none` になります。`ready` / `summary` を見て利用者に相談するよう返します。
@@ -822,7 +942,7 @@ guide が返す Markdown の中身:
 
 #### init（導入の一発化）
 
-`looptrack issue init --project <slug> [--agent claude-code|codex|copilot|other] [--url] [--dir] [--source link|copy|server] [--dry-run] [--force] [--mcp] [--no-freshness] [--no-usage] [--no-summary] [--no-session-bind] [--no-skill]`。
+`looptrack issue init --project <slug> [--agent claude-code|codex|copilot|other] [--url] [--dir] [--source link|copy|server] [--dry-run] [--force] [--mcp] [--no-freshness] [--no-usage] [--no-summary] [--no-session-bind] [--no-transcript] [--no-skill]`。
 プロジェクトを載せるときの手作業（[ADD-PROJECT.md](../ADD-PROJECT.md) §4）を 1 回のコマンドにまとめます。
 
 | AI | 書くもの |
@@ -840,6 +960,7 @@ Claude Code に書くもの:
   - 鮮度ガード（UserPromptSubmit / PostToolUse の mark・Stop の check）
   - トークン計測（PostToolUse `mcp__.*`・Stop・SessionEnd の `usage`）
   - MCP の呼び出しの合鍵（PreToolUse `mcp__.*` の `issue-session-bind`・§6「セッションの見分け方」。`--no-session-bind` で外せます）
+  - 会話記録の自動送信（Stop・SessionEnd の `transcript`・§9-8「hook」。2 つの鍵が切なら何もしません。`--no-transcript` で外せます）
 - コマンドのルートは `${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}` にします。VS Code の Copilot や Copilot CLI もこの hooks を読みますが、`CLAUDE_PROJECT_DIR` を渡さないためです。hook は Claude Code 以外から起動されたと分かると何も出さずに exit 0 で終わります。
 - `permissions.allow` の `Bash(looptrack issue:*)`
 - **スクリプトは 1 つも置きません**。
@@ -850,6 +971,7 @@ Codex に書くもの:
 
 - `.codex/hooks.json` に SessionStart の `summary --agent codex` を書きます。
 - 同じファイルに、PostToolUse（matcher `mcp__.*`）/ Stop / SessionEnd の `looptrack hook usage` を書きます。Codex は英数字・`_`・`|` だけの matcher を完全一致で比べます。`mcp` のような短い matcher は MCP のツール名に合いません。
+- 同じファイルに、Stop / SessionEnd の `looptrack hook transcript`（会話記録の自動送信・§9-8「hook」。`--no-transcript` で外せます）を書きます。
 - コマンドには `LOOPTRACK_API_URL=… LOOPTRACK_PROJECT=…` を前置します。パスは `git rev-parse --show-toplevel` から引きます（Codex の文書の推奨）。
 - `AGENTS.md` の案内節も書きます。操作は MCP のツールが主で、CLI は MCP に無い操作だけに使います。
 - スクリプトは Claude Code と同じ場所です。
@@ -1284,6 +1406,8 @@ missing と stale の手順:
 - stale（looptrack の通知がある導入。実行ファイルの版か kit の控えが古い）:
   1. [AI] 上の 1 と同じ取得 + init です。loop の答えがあれば、その旗を付けた 1 つにします（init は 1 回だけ。`self-update` と `--url` の無い init は返しません）。
   2. [AI] 確認（任意）: 置いた looptrack に `LOOPTRACK_API_URL`・`LOOPTRACK_PROJECT` を前置した `issue installed --agent <種類>` です（AI の作業環境の環境変数に頼りません）。
+- ローカルモード（デスクトップ版）: login の手順は出しません。CLI はトークンなしで通るからです（`api.Client.LocalMode` が `/healthz` の名乗りを見て Authorization を付けずに呼び、サーバの `localAPI` は Authorization を見ません）。
+  配布ディレクトリに looptrack が無いときの ① は、管理者への依頼ではなくトレイのメニューの「CLI を使えるようにする」を頼む利用者の手順です。looptrack はアプリに同梱されています。
 
 loop の問いの 2 段（利用者の判断 2026-09-19）: 1 つの結果に問いと答えごとの 2 通りのコマンドを並べていた時期がありました。すると AI が問いを示さずにコマンドを実行することがありました。Copilot CLI 1.0.86 の実物で 3 回中 2 回でした。モデルによる差があります。問いの段階を飛ばせない形にするため、setup を 2 段にしています。Claude Code・Codex・Copilot で同じ形です。
 
@@ -1497,6 +1621,8 @@ go-sdk の既定の判定（ループバックのアドレスで受けた要求�
   - `board.html` が `domain.template.acceptance_heading`・`domain.template.empty` を画面の文面として渡します。
   - それをサーバの `domain.NewDocument` が CLI の new と同じ雛形（背景 / 内容 / 受け入れ条件 / コメント）に差し込みます。本文が受け入れ条件を持てば雛形の受け入れ条件は外れます。
 - 失敗（403・400・ルールの 422）したら、サーバの `error.message` をフォームの下にそのまま出します。
+  コメントの秘密の検査（422 `comment_secret`・§9-1 `comment.reject_secret`）も同じです。成功した応答が注記（`secret_notice`）を載せたら、
+  コメントの追記ならコメントのフォームの下に、状態の変更なら状態の変更フォームの下（`acceptance_notice` と同じ位置）に出し、ドロワーを閉じるか同じフォームから次に送ると消します。
 - 上書きできる違反（`error.overridable`。`usage` / `verify` のクローズ時の必須など）なら「上書きの理由」の欄を出し、再送できるようにします。
 - 4 秒ごとの見直しではドロワーのフォームに書きかけがあれば詳細を開き直しません。
 - 画面の操作は人の操作なので、`usage.require_on_close` には掛かりません。この規則の対象は AI の操作だけです。
@@ -1652,6 +1778,8 @@ hook は `kit/loop/manifest.json` の `copilot` に従って `.github/hooks/loop
 | `usage` | 任意 | `{"require_on_close": true}` で、AI からの操作で Done / Canceled（`statuses` で変更可）にするとき、その会話のトークン情報がイシューに 1 件以上あることを求める（§9-5。理由付きで上書き可）。無い・`false` なら警告だけ（既定）。`case_pattern`（正規表現）はトークンレポートの案件別の規則（§9-5「案件ラベル別」）で、判定には使わない。例は `CASE-\d+`。`send_prompts: true`で指示文の作業名を送れるようにする（§9-5「指示文」。既定 false。Web のプロジェクト管理画面でも切り替えられる） |
 | `verify` | 任意（§9-3-4） | `{"require_on_close": true}` で、「## 検証コマンド」節を持つイシューを Done（`statuses` で変更可。既定は Done だけ）にするとき、**現在の本文**に対する直近の `verify` の記録が全件成功であることを求める（記録なし・本文が変わった・失敗の 3 通りの文言で `looptrack issue verify <ID>` を案内。理由付きで上書き可）。節の無いイシューには効かない。AI の操作に限らず全ての経路に効く。`require_evidence`（既定は入。ルールを何も設定していないプロジェクトにも効く）は `require_on_close` と独立に、検証コマンドを 1 つ以上持つイシューを Done にするとき、現在の本文に対する直近の記録に添付（エビデンス）があることを求める（§9-3-4「エビデンスの網」。理由付きで上書き可）。`false` にすると拒否の代わりに注意だけを返す |
 | `acceptance` | 任意 | `{"require_on_close": true}` で、「## 受け入れ条件」節を持つイシューを Done（`statuses` で変更可。既定は Done だけ。Canceled は既定で対象外）にするとき、節に**中身のある行が 1 行以上**あることを求める（起票の雛形のまま・空のチェックボックス・「（未記入）」だけなら拒否。`looptrack issue edit <ID>` を案内。理由付きで上書き可）。節の無いイシューには効かない。AI の操作に限らず全ての経路に効く。有効なプロジェクトでは、**着手（In Progress 以外から In Progress への遷移。`next` を含む）の時点で節が雛形のままなら、止めずに注意を応答に載せる**（`service` の `setStatus` で判定。REST の `messages` と `acceptance_notice`・`next` の `text` と `acceptance_notice`・MCP の本文・Web の状態の変更フォームの下。close の直前に初めて気づいて実装の後追いで条件を書くのを防ぐ。拒否しないのは、調査・記録のように条件を先に書きにくいイシューで上書きの常用を招かないため） |
+| `comment` | 任意（既定は入） | `reject_secret`（既定 `true`。ルールを何も設定していないプロジェクトにも効く）は、セッション要約でないコメント（`POST /issues/{id}/comments`・MCP `add_comment`・CLI `issue comment`・Web のコメントのフォーム・状態の変更と同時の `comment`（`next` を含む））の本文が秘密の検査（`domain.FindSecret`。verify の出力のマスク・添付の検査と同じ規則）に当たるときの扱い。`true` なら 422（`comment_secret`。行番号と規則の語だけを示し値は出さない。値を `***` に置き換えて送り直す案内）で、コメントも状態の変更も残さない（`next` は候補を見送らずにこの理由で返し、何も着手しない）。`false` なら保存して、応答に注記（行番号と規則の語。REST の `secret_notice`・状態の変更は `messages` の行も・`next` は `text` の行も・MCP の本文の行・CLI の出力・Web のフォームの下）を付ける。判定は `internal/service` の `prepareComment`（要約の検査と同じ関数）の 1 か所。**セッション要約はこのルールに関わらず拒む**（要約は AI が書くもので値を要しない・§9-7）。上書きはできない。既定を入にしたのは、コメントが追記専用で消せず（`comments` は SELECT・INSERT のみ）、入った値は失効させるしか無いため。散文にも当たる（`bearer\s+\S+`・`token:` の形）ので、誤検知が多いプロジェクトは切にして注記だけにできる |
+| `session` | 任意（§9-7） | `{"digest_required": true}` で、セッション要約を必須にする。**サーバは状態の変更を拒まない**。値は `summary` の応答の `session_digest_required`（既定 `false`）で kit/loop の Stop hook `stop-handoff-freshness` に届き、hook が引き継ぎの backend（`LOOPTRACK_LOOP_HANDOFF_BACKEND`）に関わらず、backend `issue` と同じ判定（このセッションが着手中のイシューに、作業の完了より新しい自分の要約があるか）も行う。backend の判定と両方が通ったときだけ通す（§9-7「引き継ぎの鮮度ガード」）。`false`・未設定なら backend の判定だけ。`guide` の「このプロジェクトのルール」には文で出す（`false` は設定の JSON のまま）。`{"transcripts": true}` で、利用者が会話記録をこのプロジェクトから送れるようにする（§9-8。既定 `false`。切なら登録を 422 `transcript_rule_off` で拒む。hook の自動送信には、利用者の `LOOPTRACK_SESSION_TRANSCRIPTS=1` も要る） |
 | 共通 | 全体 | 採番アトミック、列挙値、コメント append-only、クローズ済みの本文・項目は編集不可 |
 
 実装の取り決め:
@@ -1660,7 +1788,7 @@ hook は `kit/loop/manifest.json` の `copilot` に従って `.github/hooks/loop
 | -- | -- |
 | 置き場所 | 判定は `internal/domain/rules.go`（DB に依存しない純粋関数）、呼び出しは `internal/service`（REST・MCP・Web 共通）。**コードにプロジェクト固有の分岐を入れない**。各プロジェクトの設定は `deploy/rules/<slug>.json`（hook の文言をそのまま移した） |
 | 設定 | `looptrack project rules set <slug> <file\|->` / `show` / `clear`。保存前に検査し、**未知のキー・存在しない状態や型・不正な正規表現は拒否**（綴り間違いでルールが黙って無効になるのを防ぐ）。取り込み（import）はルールを変えない。DB 上の設定が壊れていたら変更を 500 で失敗させる（黙って素通りさせない） |
-| 適用箇所 | 起票（状態・本文）、状態変更（状態・同時コメント）、コメント（本文）、全文更新（本文）。項目の部分更新は状態を変えないため対象外 |
+| 適用箇所 | 起票（状態・本文）、状態変更（状態・同時コメント）、コメント（本文）、全文更新（本文）。項目の部分更新は状態を変えないため対象外。`comment.reject_secret` はコメント（本文）と状態変更の同時コメントだけ（起票・全文更新の本文には当てない） |
 | 判定順 | hook と同じ: `forbid_status` → `done_requires_keyword` → `require_comment_before`。最初の 1 件で拒否。その後に `acceptance` → `verify` → `usage`（いずれも `internal/service` の `checkStatus` で判定し、状態変更のときだけ。`acceptance` は本文だけを見るので DB を引く 2 つより先。§9-3-4） |
 | コメントの数え方 | 件数は `### 日時` のコメントだけ（前置きは数えない。hook と同じ）。空のコメントも 1 件。キーワードは前置き・既存コメント・同時コメントから探す |
 | チェックボックス | 区間はチェックボックスの出現位置から次の改行または次のチェックボックスまで（hook と同じ。`--body` が 1 行で渡る場合に対応）。**変更前の本文に既にある区間は対象外**（過去の記述を理由に無関係な編集を止めない）。hook の実装と 15 例で判定が一致することをテストで確認 |
@@ -2051,8 +2179,8 @@ viewer 向けの入口（専用のコマンド・ツール・画面のフォー�
 | 項目 | 決定 |
 | -- | -- |
 | 先頭語 | コメント本文の**先頭**が `フィードバック:` または `フィードバック：`（全角コロン）なら「フィードバック」。先頭の空白・改行は許さない（`LIKE` で引けるようにする。AI には先頭に書くよう指示する）。`判断:` / `差し戻し:`（B）も同じ規則だが、いまは判定に使わない（記録の形式だけ） |
-| 置き場所 | Go は `internal/domain/leadword.go` の `LeadWord(content) string`（`"feedback"` / `"decision"` / `"sendback"` / `""`）。例は `internal/domain/testdata/leadword.json` |
-| 応答 | フィードバック F（`created_at` がある＝サーバで書かれたもの）より後に、**先頭語が「フィードバック」でないコメント**（seq が大きい）か **状態変更**（`issue_events` kind `status`、`at` > F の `created_at`）があれば応答済み。コメントは editor 以上しか書けない（viewer はフィードバックも応答も書けない）ので、「editor 以上のコメント」の条件は役割を引かずに満たされる |
+| 置き場所 | Go は `internal/domain/leadword.go` の `LeadWord(content) string`（`"feedback"` / `"decision"` / `"sendback"` / `"digest"` / `""`。`"digest"` はセッション要約の印・§9-7）。例は `internal/domain/testdata/leadword.json` |
+| 応答 | フィードバック F（`created_at` がある＝サーバで書かれたもの）より後に、**先頭語が「フィードバック」でも「セッション要約」でもないコメント**（seq が大きい。セッション要約は hook が自動で付けうる記録で、人の応答ではないので数えない。§9-7）か **状態変更**（`issue_events` kind `status`、`at` > F の `created_at`）があれば応答済み。コメントは editor 以上しか書けない（viewer はフィードバックも応答も書けない）ので、「editor 以上のコメント」の条件は役割を引かずに満たされる |
 | 未応答のイシュー | 未応答の F を 1 件以上持つイシュー。**クローズ済みも含める**（反応は Done の後に来る）。期間では切らない（7 日で消えると放置が見えなくなる。応答 1 つで消えるので溜まらない） |
 | 取り込み分 | `created_at` が NULL のコメント（取り込み）は対象外（先頭語の規約より前のもの） |
 
@@ -2222,7 +2350,21 @@ AI-GUIDE §2「ループ運用」には 5. の 2 段落（人の判断待ち・�
 | 送信の経路 ① **CLI 内蔵** | CLI の変更操作（`new` / `push` / `comment` / `status` / `close` / 着手した `next` / `verify` / 担当が変わった `assign`）が成功したら、その場でスナップショットを送る。**フックの無い AI でも、CLI を使うだけで付く** | なし（下のアダプタがセッションを見つけられれば） |
 | 送信の経路 ② フック | MCP 経由の操作と、ターン終了・セッション終了を拾う。AI ごとの仕組みに合わせる | 下の「各 AI のフック」。無い AI・トークンの記録を読めない AI は ① と ③ だけ |
 | 送信の経路 ③ **応答での指示** | トークン情報の無い操作に、サーバが応答で `looptrack issue usage attach <ID>` を実行するよう返す（CLI・MCP のどちらの応答にも）。ツールの出力を読める AI ならどれでも回収できる | なし |
-| 収集（アダプタ） | AI の会話記録を読んで共通の形にする。`internal/client/usagesnap` に AI ごとのアダプタを置く | Claude Code: `~/.claude/projects/<slug>/<session>.jsonl` の `usage`。Codex: `~/.codex/sessions/年/月/日/rollout-*.jsonl` の `token_count`（`total_token_usage` は累計。`session_meta` に `id`・`cwd`）。どちらも 2026-09-18 にこの Mac の実物で形を確認。GitHub Copilot: 利用者が有効にした OpenTelemetry のファイル出力（JSON Lines）の `chat` / `invoke_agent` スパンの `gen_ai.usage.*`（Copilot CLI 1.0.86 の実物で 2026-09-19 に確認。出力先は `$COPILOT_HOME/otel/` の下に限る。下の「Copilot のトークン」） |
+| 収集（アダプタ） | AI の会話記録を読んで共通の形にする。`internal/client/usagesnap` に AI ごとのアダプタを置く | Claude Code: `~/.claude/projects/<slug>/<session>.jsonl` の `usage`。Codex: `~/.codex/sessions/年/月/日/rollout-*.jsonl` の `token_count`（置き場は環境変数で変わる。下の「会話記録の置き場」。`total_token_usage` は累計。`session_meta` に `id`・`cwd`）。どちらも 2026-09-18 にこの Mac の実物で形を確認。GitHub Copilot: 利用者が有効にした OpenTelemetry のファイル出力（JSON Lines）の `chat` / `invoke_agent` スパンの `gen_ai.usage.*`（Copilot CLI 1.0.86 の実物で 2026-09-19 に確認。出力先は `$COPILOT_HOME/otel/` の下に限る。下の「Copilot のトークン」） |
+
+**会話記録の置き場**: Claude Code と Codex は設定の置き場を環境変数で変えられるので、クライアントは次のとおり解決します。
+解決は `internal/client/agentdirs` の 1 か所で、会話記録の探索（`usagesnap` の `claudeFindTranscript`・`codexFindTranscript`）・
+auto-memory の引き継ぎ（hook `stop-handoff-freshness` が見る `MEMORY.md`）・セッション要約のパスの手がかり（`pathhint` の `machine_local` の自動追加）が同じ関数を呼びます。
+置き場の既定値（`~/.claude`・`~/.codex`）を呼ぶ側に直書きしません。
+
+| AI | 環境変数 | 会話記録 | auto-memory |
+| -- | -- | -- | -- |
+| Claude Code | `CLAUDE_CONFIG_DIR`（無い・空白だけなら `~/.claude`） | `<設定のディレクトリ>/projects/<slug>/<session>.jsonl`。サブエージェントは同じディレクトリの `<session>/subagents/*.jsonl` | `<設定のディレクトリ>/projects/<slug>/memory/MEMORY.md` |
+| Codex | `CODEX_HOME`（無い・空白だけなら `~/.codex`） | `<設定のディレクトリ>/sessions/年/月/日/rollout-*.jsonl` | なし |
+
+- 環境変数は CLI や hook が受け取った環境から読みます。hook の入力に `transcript_path` が来る経路はそのパスを使い、環境変数からセッション ID だけが分かる経路（CLI の変更操作の後の自動送信）がこの解決で会話記録を探します。
+- `pathhint` は、既定の置き場と環境変数で変えた置き場の**どちらも実在すれば両方**を `machine_local` に入れます（置き場を変える前の記録が残っていることがあるため）。探索（`usagesnap`・auto-memory）は、環境変数があればそちらだけを見ます。
+- `HOME` も環境変数も無く置き場を決められないときは、会話記録の探索は探さずに「見つからない」を返し、auto-memory は実在しない相対のパスになって「ありません」と出ます。
 
 各 AI のフックは 2026-09-18 に公式文書で確認しました。
 フックで「きっかけ」を取れることと、会話記録から「トークン」を読めることは別の話です。両方がそろって初めて ② が使えます。
@@ -2254,7 +2396,8 @@ AI を足すときに要るのはアダプタ 1 つと、あればフックの�
 | 1 回の応答は内容ブロックごとに複数行（同じ `message.id`・同じ `usage`）。サブエージェントは `<session>/subagents/agent-*.jsonl` の別ファイル | **`message.id` 単位で 1 回だけ数え**、subagents/ も読む |
 | モデルは応答ごとに記録され、セッション途中で変わる。キャッシュ作成は 1 時間 / 5 分の別がある | モデル別の内訳を持つ（費用換算を後から足せる） |
 | 再開したセッションは新しいセッション ID になるが、前の履歴（使用量つき）を複製して持つ | 累計は会話の中で単調に増える。会話 ID で束ねれば二重に数えない |
-| Codex デスクトップは中断のあと、同じスレッドを `rollout-<時刻>-<スレッド ID>_<別の ID>.jsonl` の新しいファイルで続け、`total_token_usage` を 0 から数え直す（`session_meta.id` は同じ） | Codex のアダプタは同じスレッドのファイルを全部古い順に読み、ファイルごとの最後の累計を足す（複製された同じ時刻・同じ合計の `token_count` は二度数えない）。応答数は合計が増えた `token_count` の数（新しい版は assistant の `message` を最終回答にしか書かない）。サブエージェント（guardian など）は別のスレッド ID で、本体に入れない |
+| Codex は `thread/revert`（巻き戻し）で、同じスレッドに `rollout-<時刻>-<スレッド ID>_<別の ID>.jsonl` の新しいファイルを作り、`total_token_usage` を 0 から数え直す（`session_meta.id` は同じ。openai/codex の rollout のソースで確認。以前はデスクトップが続けるときの名前と書いていたが、誤り） | Codex のアダプタは同じスレッドのファイルを全部古い順に読み、ファイルごとの最後の累計を足す（複製された同じ時刻・同じ合計の `token_count` は二度数えない）。応答数は合計が増えた `token_count` の数（新しい版は assistant の `message` を最終回答にしか書かない）。サブエージェント（guardian など）は別のスレッド ID で、本体に入れない |
+| Codex は古い rollout を背景で `rollout-*.jsonl.zst` に圧縮する（openai/codex の `rollout/src/compression.rs`）。`session_meta` は圧縮の中にあり、zstd を伸ばさないと読めない | zstd の依存は足さない（利用者の判断・2026-10-25）。探索（`codexFindTranscript`・`codexThreadFiles`）は `.jsonl` だけを会話記録として扱い、圧縮済みは累計に入れない。**黙って見落とさない**: `usagesnap.CodexUnreadRollouts` が同じスレッドの `.jsonl.zst`（`_<別の ID>` 付きを含む。ファイル名のスレッド ID で選ぶ）を返し、CLI の `usage attach` は件数を標準エラーに 1 行出し（変更操作の後の自動の送信は `LOOPTRACK_USAGE_DEBUG` のときだけ）、付与の hook は debug に出す。スナップショット（payload）には載せない（サーバの形と golden を変えないため）。圧縮済みの分だけトークンが少なく数えられる。会話記録の搬送（§9-8）が運ばないファイルの件数も同じ関数で数える |
 | Codex の人の指示は、旧形式では `event_msg` の `user_message`（`payload.message` が本文）。新しい版（デスクトップ 26.915・codex-cli 0.155 で確認）は `user_message` を書かず、`event_msg` の `item_completed`（`payload.item.type` が `UserMessage`・本文は `item.content` の `type: text` の `text`・`payload.turn_id` がターン）に書く。同じ指示は `response_item` の `message`（`role: user`・`internal_chat_message_metadata_passthrough.content_item_kinds` が `user.text`）にもあるが、`role: user` には AGENTS.md・`environment_context`・`turn_aborted` などの差し込みも混ざる。ターンは `task_started` 〜 `task_complete` / `turn_aborted` | Codex のアダプタは両方の形を人の指示として読み（同じ指示が両方にあれば 1 回）、`role: user` の `message` は使わない。区間・関与の指標・「レポート対象外」の判定・会話 ID（最初の指示の時刻 + MD5）を Claude Code と同じ規則で作る。実行中のターンに届いた 2 件目の指示は割込。区間の終わりは最後の応答（合計が増えた `token_count` か assistant の `message`）。区間ごとの消費はその区間に増えた累計（和は会話の累計と一致。一致しなければ最後の区間にまとめる）。新しい版の会話は、それまで会話 ID がスレッド ID の先頭 8 桁だった（UUIDv7 のため約 65 秒以内に始めたスレッドどうしで重なる） |
 
 #### 記録の単位と保存の方針
@@ -2745,6 +2888,7 @@ PDF の既定の保存先はリポジトリの外の `~/Documents/トークン�
 | `判断:` | `Decision:` | コメントの**先頭**（§9-3-6 と同じ。先頭の空白・改行は許さない）。英語は半角コロンだけ。英字の大小を問わない |
 | `差し戻し:` | `Changes requested:` | 同上（GitHub のレビューの語に合わせる） |
 | `フィードバック:` | `Feedback:` | 同上。未応答のフィードバックの問い合わせ（`internal/store/feedback.go` の `LIKE`）も英語の先頭語を含める。応答の判定（先頭語の無いコメント）も同じ |
+| `セッション要約:` | `Session digest:` | 同上（§9-7）。日本語は半角・全角のコロン、英語は半角のコロンだけで、英字の大小を問わない |
 | 確認モードの語（`確認して`・`調査して` … / `実装して`・`修正して` …） | 確認: check・investigate・look into・review・audit・analyze・explain・propose・plan / 実行: implement・fix・apply・create・write・add・remove・update・commit・merge・deploy・release・go ahead | 英語は単語の境界で、大小を問わずに判定する（`fixture` を `fix` と読まない）。日本語の語で決まればそれを使い、英語の語は日本語で決まらないときだけ見る（「deploy.sh を確認して」を英単語 deploy で実行モードにしない）。英語だけの依頼の中では、今の規則どおり実行系が勝つ |
 
 #### 置き場所と実装の注意
@@ -2967,6 +3111,475 @@ HTTP では `Accept-Language: ja` で固定します。CLI と hook では `LOOP
 | 原文をキーにして英訳だけを表に持つ（gettext 的な方式） | 既存コードを `T("…")` で包むだけで済むが、原文を直すたびにキーが変わり、訳が静かに外れる。ID を付ける正攻法を採った |
 | 3 言語目を増やせる作りにする | v1.0.0 では日英の 2 つに絞る。対訳表の形は増やせるが、増やす前提の抽象を先に作らない |
 
+### 9-7. セッション要約（別の端末のセッションに作業の文脈を渡す）
+
+同じ利用者が別の端末で作業を引き継げるよう、AI が書く要約を**印付きのコメント**としてイシューに残します（v1 では新しいテーブルを足しません）。
+会話の記録そのものは運びません。規則（印・見出し・パスの正規化・秘密の検査・本文の上限）は `internal/service/digest.go` の
+`prepareComment` の **1 か所**に置き、コメントを作る経路（`AddComment`（REST・MCP・CLI の `comment`）と状態の変更と同時のコメント）はすべてそこを通ります。
+ハンドラ（REST・MCP・CLI・Web）には書きません。経路によって効いたり効かなかったりするからです。
+
+#### 形
+
+```text
+セッション要約: <端末のラベル>
+branch: <ブランチ>
+head: <HEAD の SHA>
+ai: <claude-code | codex | copilot | other>
+
+（本文: 利用者の指示の要旨・決定と理由・試して捨てたこと・現在地・次の一手）
+```
+
+| 項目 | 決定 |
+| -- | -- |
+| 印 | 本文の**先頭**が `セッション要約:`（全角コロン可）か `Session digest:`（英字の大小を問わない・半角コロンだけ）。判定は §9-3-6 の先頭語と同じ `domain.LeadWord`（種別 `"digest"`）。先頭の空白・改行は許さない |
+| 端末のラベル | 1 行目の印の後ろ。前後の空白を除いて空でなく、64 文字まで・制御文字なし |
+| 見出しの必須項目 | **8 行目まで**（1 行目を含む）に `branch:`・`head:`・`ai:` の行が 1 つずつ。順は問わない。キーは ASCII の大小を問わず、コロンは半角・全角のどちらでもよい。branch は空白を含まない 255 バイトまでの名前、head は 16 進 7〜40 桁、ai は `claude-code`・`codex`・`copilot`・`other`（小文字のまま）。同じキーが 8 行目までに 2 つあれば拒む（どちらを読むかで食い違わないため）。ほかの行（`machine:` などの見出しの続きや本文）は見ない |
+| 本文の上限 | **16 KiB**（16,384 バイト。`service.MaxDigestBytes`）。パスを置き換えた**後**の、保存する形で数える |
+| 要約でないコメント | 本文を変えない（`path_hints` も見ない。上限・見出しもかけない）。秘密の検査だけは当て、拒むか注記で通すかはプロジェクト別ルール `comment.reject_secret`（既定は拒む・§9-1）で決める。要約の秘密はルールに関わらず拒む |
+
+#### パスの正規化（`path_hints`）
+
+サーバは端末のパスを知らないので、置き換える値は**クライアントが要求に添えます**。添えなければ何も置き換えません。
+
+| 欄 | 中身 | 置き換え先 |
+| -- | -- | -- |
+| `roots` | git の作業ツリーのルート。`git rev-parse --show-toplevel` の文字列（literal）と realpath、macOS の `/private/tmp`・`/private/var`・`/private/etc` の有無を入れ替えた形 | `.`（`/Users/me/proj/a.go` → `./a.go`） |
+| `home` | 利用者のホームディレクトリ（`$HOME`。Windows は `USERPROFILE`） | `~` |
+| `machine_local` | その端末にしか無い置き場（hook の `scratchpad_dir`・`transcript_path` のディレクトリ・AI の会話記録の置き場） | `<machine-local>` |
+
+- 値は絶対パス（`/…`・`C:\…`・`C:/…`・`\\…`）で、ルートそのもの（`/`・`C:\`）でなく、制御文字を含まず 4,096 バイトまで。1 つの欄に 32 件まで。外れれば 400（`invalid_argument`）。末尾の区切りは除いて比べます。
+- 置き換えは**長い値から順に**、本文を左から 1 回だけ読みます（置き換えた結果をもう一度置き換えない）。同じ値が 2 つの欄にあれば `roots`・`machine_local`・`home` の順に先のものを採ります。
+- 当たるのは語の境界だけです。値の前が先頭か、パスに使う文字（英数字・`_` `-` `.` `~` `/` `\`）でない文字（日本語の文字を含む）で、
+  値の後ろが区切り（`/`・`\`。区切りは残す）か、終わりか、英数字・`_` `-` `.` でない文字のときです（`.` は後ろが英数字・`_` `-` `.` でなければ文の句点として境界と読む）。
+  `/Users/me/proj` は `/Users/me/proj2/…`・`/Users/me/proj.bak/…`・`/x/Users/me/proj/…` の中では当たりません。大小は区別します。
+- **CLI**（`looptrack issue comment`）は本文が要約のときだけ `path_hints` を自分で集めて添えます（`internal/client/pathhint` の `Collect` の 1 か所。
+  作業ディレクトリと `CLAUDE_PROJECT_DIR` の git のルート（git を起動せず `.git` を上へたどる。`hookio.GitRoot`）とその realpath・`/private` の形、`HOME`、
+  `LOOPTRACK_MACHINE_LOCAL`（OS のパスの区切りで複数）と、実在する `~/.claude/projects`・`$CLAUDE_CONFIG_DIR/projects`・`~/.codex/sessions`・`$CODEX_HOME/sessions`）。
+  要約でないコメントには添えません（古いサーバは知らないキーを 400 で拒むため）。
+- **MCP** の `add_comment` は任意の引数 `path_hints`（同じ形）を受けます。REST は本文の `path_hints` です。
+- **`looptrack session digest <ID> [-|<ファイル>]`** は要約を送る CLI の入口です（ファイルを省くか `-` なら標準入力）。本文に欠けた見出しの行だけを足し、
+  あとは `issue comment` と同じ経路（`internal/client/cli` の `postComment`。`path_hints` も同じ `Collect`）で送ります。同じ本文なら送る要求はバイト一致します（`internal/clitest` の `TestSessionDigestSameAsComment`）。
+  検査（見出しの形・秘密・上限）はサーバの 1 か所のままで、拒まれたらサーバの理由（行番号と規則の語）だけを `エラー: …` で出して終了コード 1 です。足すのは次の行だけです。
+  - 先頭の空白・空行は除きます。本文が印（`セッション要約:`・`Session digest:`）で始まらなければ、`<印> <端末のラベル>`・`branch: …`・`head: …`・`ai: …` の 4 行と空行を本文の前に足します。印は利用者の言語のもの（日本語は `セッション要約:`、英語は `Session digest:`）です。
+  - 印で始まるなら、1 行目の端末のラベルが空のときだけラベルを足し、**8 行目までに無い** `branch:`・`head:`・`ai:` の行をこの順で 1 行目の直後に足します。書いてある行は値の形が違っても書き換えません。改行は 1 行目に合わせます（CRLF なら CRLF）。
+  - 値: 端末のラベルは `LOOPTRACK_MACHINE_LABEL`（無ければホスト名の最初の `.` より前）、branch は作業ディレクトリでの `git rev-parse --abbrev-ref HEAD`（ブランチから外れていれば `HEAD`）、head は `git rev-parse HEAD`、ai は `X-Looptrack-Session` / `X-Looptrack-Agent` と同じ環境変数から決めた種類（`claude-code`・`codex`・`copilot`、分からなければ `other`。`session.AIKind`）です。足す行が要るときだけ git を起動し、決められなければ要求を送らずに止めます。
+  - 行を足すと元の 2 行目より後ろが下がるので、元が 6〜8 行目にあった見出しの行が 8 行目より後ろへ押し出されることがあります。そのときはサーバが「その行が無い」と拒みます（黙って通らず、その場で分かる）。
+- **`looptrack session pull <ID> [--limit N]`** はイシューのコメントのうち要約（先頭語が `digest`）を新しい順に N 件（既定 3）取り出し、
+  作業コピーと同じ置き場の `.claude/.looptrack-work/<ID>-digest.md`（派生物なので上書きする）に書いて、標準出力にも同じものを出します。足すのは見出しの行（イシューの ID・件数・各要約の時刻とコメントの番号）だけで、本文はサーバに保存された形のまま（端末のパスは置き換え済み）です。書いた場所はプロジェクトのディレクトリからの相対で標準エラーに出します。要約が無ければその旨を出して終了コード 0 で、ファイルは書きません。読むのは既存の `GET /issues/{id}` の `comments` で、サーバの API は足していません。
+- 同じ本文を同じ手がかりで 3 経路から送ると、保存される本文はバイト一致します（`internal/service/digest_test.go`・`internal/server/digest_test.go`）。
+
+#### 秘密の検査と拒否
+
+| 拒否 | コード | 文面に出すもの |
+| -- | -- | -- |
+| `domain.FindSecret` に当たる（置き換えた後の本文） | 422 `comment_secret` | 行番号と規則の語（`SecretFinding.Label`。例 `Bearer …`・`token: …`）だけ。値は出さない。値を `***` に置き換えて送り直す案内を付ける |
+| 上限を超える | 422 `comment_too_long` | 長さと上限 |
+| 見出しが形に合わない | 422 `digest_header` | 欠けた・形の違う・重なったキーと、見出しの形 |
+| 状態の変更と同時のコメントが要約 | 422 `digest_on_status` | `comment` の経路で送る案内（状態も変えない） |
+
+拒んだときはコメントも記録（`issue_events`）も残しません。検査の順は「手がかりの検査と置き換え → 上限 → 見出し → 秘密」です。
+`FindSecret` は散文にも当たります（実測: 実際の会話記録 925 行のうち 10 行。規律の文章の引用で、`bearer\s+\S+` や `token:` の形）。
+要約も AI の書く散文なので同じ誤検知が起きます。拒否の文面に、語を言い換えるか `***` に置き換える案内を入れているのはそのためです。
+
+#### 記録（`issue_events`）
+
+要約のコメントの記録（kind `comment`）の `detail` に `"kind": "digest"` を付けます（`{"seq": N, "kind": "digest"}`・添付があれば `attachments` も）。
+要約でないコメントの記録には付けません。最新の要約は `kind = 'comment' AND JSON_UNQUOTE(JSON_EXTRACT(detail, '$.kind')) = 'digest'` の
+最大の `id` で引けます（イシュー・プロジェクトごと。`session_id` に書いたセッションが残る）。`summary` と `next` に載せるときはこれを使います。
+要約は状態の変更と同時には受けない（`digest_on_status`）ので、kind `status` の記録を見る必要はありません。
+
+#### summary と next に載せる（`latest_digest`）
+
+`GET /projects/{slug}/summary` の `in_progress[]` の各項目と、`POST /projects/{slug}/next` が返すイシューに、最新の要約を `latest_digest` として載せます。
+引くのは `internal/store/digests.go` の `LatestDigests`（上の記録の印の最大の `id` と、その `detail.seq` のコメントの本文の先頭 1,200 文字。対象のイシューの一覧に絞った 1 クエリ）で、
+形と判定は `internal/service/digest_latest.go` の 1 か所です（REST・MCP・CLI・SessionStart の hook はそれを読むだけ）。先頭語の LIKE で `comments` を探さないのは、規則（`domain.LeadWord`）を SQL に写さずに済むからです。
+
+| キー | 中身 |
+| -- | -- |
+| `excerpt` | 1 行目（印と端末のラベル）と見出しの項目（先頭の 8 行（`domain.DigestHeaderLines`）の中で `domain.DigestHeaderField` が読める `branch`・`head`・`ai` の行）を除いた、空でない先頭の 8 行（`service.DigestExcerptLines`）。見出しの項目は数えもしない（数えると見出しだけで 3 行を使い、本文の末尾の「次の一手」などが切れる）。400 文字（`service.DigestExcerptChars`）を超えたら切って `…` を付ける |
+| `machine_label` | 1 行目の端末のラベル |
+| `created_at` | 要約の記録の時刻（RFC 3339・UTC） |
+| `age` | 作成からの経過（`started_ago` と同じ形・要求の言語） |
+| `session_id` | 要約を書いたセッション（記録の `session_id`。MCP の要約を会話に結んだものは、着手の判定と同じ `service.StarterSession` で結んだ値） |
+| `other_session` | 要求の `X-Looptrack-Session` と比べられるとき（`service.ComparableSessions`）だけ出す。違えば `true`、同じなら `false`。比べられない（どちらかが空・CLI のセッション ID と MCP の接続 ID）ときはキーごと出さない |
+
+- 要約が無いイシューには `latest_digest` を付けません。既存のキーは変えません。
+- **文面に出すのは `other_session: true` のものだけ**です（CLI の `summary` と、それを呼ぶ SessionStart の注入文・`next` の `text`・MCP の `project_summary`）。
+  自分のセッションが書いた要約と、比べられない要約は出しません（JSON には載ります）。出す形は「※ <ID> の最新のセッション要約は別のセッションが書いたものです（<ラベル>・<経過>前）:」の後に、抜粋を 2 文字字下げして並べます。
+- 書いた利用者は問いません（同じイシューの要約なら、同じ利用者の別の端末のものも、ほかの利用者のものも載ります）。
+
+#### 引き継ぎの鮮度ガード（`LOOPTRACK_LOOP_HANDOFF_BACKEND=issue`）
+
+kit/loop の Stop hook `stop-handoff-freshness`（`internal/client/hook/loop/handoff.go`・判定は `handoffdigest.go`）の判定先の 1 つです。
+ほかの backend（`file`・`auto-memory`・`command`）と同じく、PostToolUse `post-work-complete-handoff-mark` が積む作業完了のマーカー
+（`<状態>/handoff-pending.d/<session_id>`）があるときだけ判定します。hook の名前と配線は増やしていません。
+
+- **読むもの**: `looptrack issue summary --limit 0 --json` を、hook の入力の `session_id` を `LOOPTRACK_SESSION_ID` に明示して 1 回だけ呼びます（実行ファイルは `LOOPTRACK_LOOP_ISSUE_CLI` → 実行中の `looptrack`）。
+  要求は `X-Looptrack-Session` 付きの `GET /projects/{slug}/summary` 1 本です。
+- **対象のイシュー**: `in_progress[]` のうち `own_session: true`（要求のセッションが着手した）のものだけです。`other_session: true` は別のセッションの作業なので見ません。
+  どちらも付かないもの（着手のセッション ID が分からない Web・手で打ったシェルの着手、CLI と MCP で比べられないもの、`own_session` を返さない古いサーバ）は**判定の対象にせず**、
+  止めずに注意（イシューの ID を並べる）で知らせます。誤って差し戻すと、利用者が着手したイシューに AI が要約を書くよう迫られるからです。
+- **新しいとみなす条件**: 対象のイシューの**すべて**に、`latest_digest` があり、それがこのセッションのもの（`other_session: false`、またはキーが無く `session_id` が要求のセッション ID と同じ）で、
+  `created_at` が完了のマーカーの更新時刻（秒に丸める。`created_at` は秒までなので、完了と同じ秒の要約を古いと見ない）より前でないこと。
+  対象が 1 つも無い（close した後の Stop など）ときも新しいとみなします。新しければマーカーを畳みます。
+- **古いとき**: Stop を 1 回差し戻します（回数の扱いは `file` と同じ。Claude Code などは `stop_hook_active`、Copilot は差し戻しの写し）。理由の文には、
+  これまでどおり完了のイベントの行とマーカーのパスを出し、足りないイシューごとの理由（無い・完了より古い・別のセッションのもの）と、送るコマンド `looptrack session digest <ID> -` をイシューの ID を埋めて並べます。
+- **サーバに届かない・遅い・応答が読めない（fail-open）**: 止めません。注意を 1 つ（`systemMessage`）出して通し、**マーカーは畳みません**（つながった後の Stop でもう一度確かめます）。
+  summary は 1 要求 2 秒で打ち切り（CLI の `summaryTimeout`）、子プロセス全体も 5 秒（`digestFetchTimeout`。hook の打ち切り 9 秒より短く）で打ち切ります。
+  止めないのは、オフラインの端末でどのターンも終えられなくなるのを避けるためです。代わりにオフラインの間は、マーカーが残る限り Stop のたびに注意が出ます。
+  hook の入力にセッション ID が無いときも、判定できないので注意を出して通します（このときはマーカーを畳みます）。
+- **時計**: `created_at` はサーバの時刻、マーカーは端末の時刻です。端末の時計が進んでいると、送った直後の要約を「古い」と見て 1 回だけ差し戻すことがあります（差し戻しは 1 回なので、作業は止まりません）。
+- 作業完了を検知したとき（PostToolUse）は、backend が `issue` なら送るコマンドの案内を 1 行足します。
+- **プロジェクト別ルール `session.digest_required`（§9-1）**: 入なら、backend が `file`・`auto-memory`・`command` でも同じ判定を足します。値は同じ `summary` の応答の
+  `session_digest_required` で知るので、ルールのためだけの要求は足しません。そのかわり backend が `issue` でなくても、**完了のマーカーが積まれている Stop では `summary` を 1 回読みます**
+  （マーカーが無い Stop では読みません。届かなければ 2 秒で打ち切り、ルールが分からないので backend の判定だけで決めます。注意も出しません）。
+  **読むのは backend の判定を済ませた後で、hook の持ち時間（入口で決めた 9 秒の締切）の残りの中でだけです**（`digestBudget`）。
+  打ち切りは「残り − 1 秒」と 5 秒の短いほうで、残りが 1.5 秒（`digestMinBudget`）より短ければ読みません。
+  backend の判定（`command` は 8 秒まで）の前に固定の 5 秒で読むと、合わせて持ち時間を越え、入口の打ち切りが何も出さずに通します。
+  ルールが切のプロジェクトでも、backend が差し戻すはずの Stop が黙って通っていました。
+  残りが足りずに読まなかった・打ち切ったときは、ルールの側だけを fail-open にします。backend の判定で決め（差し戻すなら backend の文面のまま差し戻し、
+  通すならマーカーも backend の判定どおりに畳む）、通すときだけ、ルールを確かめていない旨の注意を 1 行出します。backend の判定は落としません。
+  backend が差し戻すときも、残りがあれば `summary` を読みます。差し戻しは 1 回だけ（`stop_hook_active`）なので、要約の理由も同じ 1 回に並べるためです。
+  backend と要約の**両方が通ったときだけ**通し、差し戻しの理由には両方の理由を並べます。backend が判定しない（`command` の判定コマンドが空・0 と 1 以外を返した・知らない backend）ときは、要約が足りなければ要約の理由だけで差し戻し、足りていれば従来どおりマーカーに触れずに通します。
+  切・未設定なら、backend の判定だけです（backend `issue` はルールに関わらず要約で判定します）。
+- テスト: `internal/client/hook/loop/handoffdigest_test.go`（差し戻し 4 形・通過・判定の対象・fail-open と、`file` が要約を見ない対照。ルールの入・切は `TestHandoffDigestRequiredRule`。
+  持ち時間は `TestHandoffDigestRuleBudget`（7.5 秒後に「古い」と返す判定コマンドと 2 秒かかる `summary` で差し戻すこと・残りを越える `summary` を打ち切って注意で通すこと）と `TestRuleDigestsSkipsWhenBudgetShort`）。サーバ側の `own_session` と CLI の `--json` の素通しは `internal/server/digest_latest_test.go`、ルールの値と `guide` の文は `internal/server/session_digest_rule_test.go`。
+
+#### 採らなかった案
+
+| 案 | 採らなかった理由 |
+| -- | -- |
+| ハンドラ（REST・MCP・CLI）ごとに正規化・検査を書く | 経路によって効いたり効かなかったりし、「3 経路でバイト一致」が保てない |
+| サーバが端末のパスを推測して置き換える | サーバは端末のパスを知らない。推測は外れたときに黙ってパスを残す |
+| 秘密を拒まず `MaskSecrets` で伏せて保存する | 伏せた形は元に戻せず、利用者が気づかないまま要約の意味が変わる。拒んで書き直させる |
+| 要約を状態の変更と同時にも受ける | 記録の印が kind `comment` と `status` の 2 種類に割れ、最新の要約を引く問い合わせが 2 通りになる |
+| backend `issue` で、サーバに届かないときは差し戻す（fail-closed） | オフラインの端末でどのターンも終えられなくなる。差し戻しは 1 回で通るので守りにもならない |
+| ルール `session.digest_required` の `summary` を、backend が差し戻すときは読まない | 差し戻しは 1 回だけ（次の Stop は `stop_hook_active` で通る）なので、backend の理由だけで差し戻すと、引き継ぎを直した後の Stop で要約の判定が抜け落ちる。持ち時間の残りの中で読めば、差し戻しは落ちない |
+| backend `issue` の対象を「`other_session` が付かない In Progress のすべて」にする | 着手のセッション ID が分からないもの（Web の着手など）まで自分の作業と見て、要約を書くよう迫る。比べられて同じときだけ付く `own_session` を足した |
+
+### 9-8. 会話記録の搬送（別の端末で fork して続きを読む）
+
+同じ利用者が、別の端末で前の会話をそのまま読み返し、**fork して続きから**作業できるようにします。運ぶのは生の会話記録で、置き場とデータは §2-5 です。
+要約（§9-7）で足りる場面では要約を使います。こちらは「前の会話を丸ごと読み返したい」「AI に前の文脈をそのまま持たせたい」ときのためのものです。
+
+#### 決めたこと
+
+1. **対象は Claude Code と Codex の両方**です（利用者の判断・2026-10-25）。Copilot とクラウド版の AI は対象にしません。
+2. **置き場は利用者ごと**で、持ち主にしか見えません。**暗号化はしません**。サーバの運用者がディスクを読めることを文書に書きます（§2-5「見える人と見えない人」）。
+3. **取り込みは常に fork** です。CLI は記録を置いて再開のコマンドを**表示するだけ**で、AI を自分では起動しません。
+   実測（Claude Code 2.1.310・headless `-p`・使い捨ての `CLAUDE_CONFIG_DIR`）では、plain の `--resume <id>` は**元のファイルに追記**し、
+   別のディレクトリから起こしても元の slug のファイルに書きました（cwd が混ざった 1 ファイルになる）。`--fork-session` は**現在の cwd の slug に新しい sessionId のファイル**を作り、
+   元のファイルは変えませんでした。fork なら取り込んだ記録は読むだけの元として残ります。
+4. **パスの書き換えは `cwd` の欄だけでは足りません**。tool_use の入力（`file_path`・`path`・`notebook_path`・Bash の `command` の中の絶対パス）も書き換えます。
+   実測（同じ版・別の clone へ移して fork・n=1）では、`cwd` だけを書き換えた記録で「前に直したのと同じファイルに 5 行目を足して」と頼むと、
+   新しい Edit が旧ルートを指し、**元の checkout が変更されました**（1/1）。中立の頼み方では 2/2 が新しいルートでした。
+5. **書き換えは可逆**です。チャンクごとに nonce を付けたプレースホルダに置き換え、取り込む端末で、その端末のパスに戻します。元の絶対パスはサーバに送りません。
+6. **秘密のマスクは JSON を読んで文字列の値ごと**にかけます。生の行に `domain.MaskSecrets` をかけると、`\S+` が `"`・`,`・`}` を越えて食い、
+   JSON が壊れます（実測: 合成の行 4/4・実際の記録 925 行のうち 1 行）。値ごとにマスクして書き直すと JSON は保たれます（6/6・10/10）。
+   検査（`domain.FindSecret`）も値ごとに行い、書き直した行には当てません（同じ理由で 2/10 が誤って当たる）。
+7. **書き換えとマスクの後に全行を JSON として読み直し、1 行でも読めなければその記録は送りません**（fail-closed）。報告は件数だけで、行の中身は出しません。
+8. **自動で送るには 2 つの鍵が要ります**: プロジェクト別ルール `session.transcripts`（既定 切）と、利用者の端末ごとのオプトイン `LOOPTRACK_SESSION_TRANSCRIPTS=1`（既定 切）。
+   手で打つ `push` は、ルールが入っていれば送れます（打つこと自体が本人の同意なので）。
+
+#### サブコマンドの名前
+
+既存の `looptrack session digest` / `session pull <イシューの ID>`（§9-7。要約）と取り違えないよう、会話記録の操作は 1 段下の **`looptrack session transcript`** にまとめます。
+
+| コマンド | 中身 |
+| -- | -- |
+| `session transcript push [--current \| <セッション ID>] [--agent claude-code\|codex] [--dry-run]` | 会話記録を送る（前回の続きだけ）。`--current` は今のセッション（`X-Looptrack-Session` と同じ決め方。セッション ID を省いたときの既定）。`--agent` を省くと環境の AI から決め、決まらなければ Claude Code → Codex の順に探す。`--dry-run` は送らずに件数（ファイル・行・チャンク・書き換え・マスク・書き換えなかった絶対パス・運ばないファイル）だけを出す（状態のファイルの長さからの続きを数え、要求は 1 本も送らない）。手で打つ `push` は `LOOPTRACK_SESSION_TRANSCRIPTS` を見ない |
+| `session transcript pull <記録の ID> [--print-resume] [--out <ディレクトリ>]` | 記録を取り込む端末の置き場に新しいセッション ID で置き、再開のコマンドを表示する。`--print-resume` は標準出力にコマンドの 1 行だけを出す（置くのは同じ。ほかの表示は標準エラーへ）。`--out` は AI の置き場ではなく指定のディレクトリに同じ形で書き出す（中身を見るため。再開のコマンドは出さない）。AI は起動しない |
+| `session transcript list [--all-projects] [--json]` | 自分の記録の一覧（ID・agent・セッション ID・端末のラベル・プロジェクト・チャンク数・ファイル数・大きさ・最後に送った時刻・消去済み）。既定は今のプロジェクトだけ。`--json` はサーバの応答のまま |
+| `session transcript purge <記録の ID> [--reason <理由>]` | 自分の記録の本体を消す（理由は省ける。サーバは空の理由も受け付ける） |
+
+`session pull` を `session fetch` に改名する案は採りません。`session pull` は要約の取り出しとして既に配られ、ガイド・golden・利用者の手順に載っています。
+`session push` / `session list` を同じ段に足すと、`session pull` が要約を、`session push` が会話記録を扱うという対にならない並びになり、
+`session list` が要約と会話記録のどちらの一覧かも読めません。1 段下げれば `push` と `pull` が対のまま残り、引数（イシューの ID と記録の ID）も混ざりません。
+
+#### 何を運ぶか（発見）
+
+探し方は `internal/client/usagesnap` のものを使います（`claudeFindTranscript`・`<記録のディレクトリ>/<sessionId>/subagents/*.jsonl` の列挙・`codexFindTranscript`・`codexThreadFiles`）。
+小文字の関数なので、会話記録の側から呼べるよう公開の入口を足します。置き場の根（`CLAUDE_CONFIG_DIR` が無ければ `~/.claude`、`CODEX_HOME` が無ければ `~/.codex`）は、
+§9-5 の探索・`internal/client/pathhint` の `Collect`・引き継ぎの auto-memory（`internal/client/hook/loop/handoff.go` の `handoffTargets`）と同じ 1 つの関数で決めます。
+以前の探索は `~/.claude/projects`・`~/.codex/sessions` を固定で見ていたので、先にそれを直しました。決める関数は `internal/client/agentdirs` にあります。
+
+| agent | 運ぶもの | 運ばないもの（`--dry-run` に件数と名前を出す） |
+| -- | -- | -- |
+| Claude Code | `<sessionId>.jsonl`（本体）・`<sessionId>/subagents/*.jsonl` と同じディレクトリの `*.json`（`*.meta.json`・`*.prefix.json`）・`<sessionId>/tool-results/*` | `<sessionId>/` の下のそのほか（`workflows/` など）と、知らないファイル |
+| Codex | 同じスレッドの rollout（`codexThreadFiles`。`rollout-<時刻>-<スレッド ID>[_<rollout ID>].jsonl`）と、`session_meta` の `history_base` がたどる元の rollout | 圧縮済みの `.jsonl.zst`（v1 では読まない。件数は `usagesnap.CodexUnreadRollouts` で数える。§9-5）・ほかのスレッド（サブエージェントのスレッドを含む） |
+
+Claude の付属のファイルの形はこの環境の記録で確かめました（2026-10-25・1 セッション: 本体 1・subagents の `.jsonl` 9・付属の `.json` 17・tool-results 21・`workflows/` 7）。
+Codex の形は公式のソース（openai/codex 970111f6）を読んだもので、手元では確かめていません（下の「要実測」）。
+ソースでは、`_<rollout ID>` は `thread/revert` が同じスレッドに新しい rollout を作るときの名前で、古い rollout は背景の処理が `.jsonl.zst` に圧縮します。
+
+#### 送る前の変換（クライアントの 1 か所）
+
+変換は新しいパッケージ `internal/client/transcript` の 1 か所に置き、`push`・`--dry-run`・hook はすべてそこを通ります。順は次のとおりで、各段の件数を数えます。
+
+1. 行を読む（`jsonl` は 1 行ずつ、`json` はファイル全体、`text` はそのまま）。最後の改行より後ろ（書きかけの行）は送らず、次の回に回します。
+2. JSON として読む（`jsonorder.Decode`。キーの順と数の表記を保つ）。読めない行が 1 つでもあれば、そのファイルは送りません。
+3. パスを書き換える（下の表の欄だけ）。
+4. 文字列の値ごとに `domain.MaskSecrets` をかけ、当たった数を規則の語ごとに数えます。キー（オブジェクトの名前）に `domain.FindSecret` が当たったら、送りません（キーはマスクしない）。
+5. 書き換えもマスクも当たらなかった行は**元のバイトのまま**にします。変わった行も、変わった文字列の字面の、変わった部分だけを書き直し、区切り・数の字面・キー・ほかの文字列は元のバイトのまま残します
+   （`jsonorder.Marshal` で行ごと書き直すと区切りの空白と数の字面が変わり、戻しても元のバイトに戻らないため。読めるかの確かめは 2・6 の `jsonorder.Decode`）。
+6. **全行をもう一度 JSON として読み直します。** 読めない行があれば送らず、「<ファイル>: 読めない行 N 件」とだけ出して終了コード 1 にします（hook は失敗として記録する）。
+7. チャンクに分けます（行の境目で、`transcript_max_chunk_bytes` 以内。1 行がそれを超えれば送らない。実測の最長の行は 445,805 バイト）。
+
+`text`（tool-results）は 4 だけを文字列全体にかけます（JSON ではないので、`MaskSecrets` をそのままかけても壊れない）。パスは書き換えません（コマンドの出力で、散文と同じ扱い）。
+
+#### パスの書き換え（可逆なプレースホルダ）
+
+- 形は `{{LT:<nonce>:<種類>}}` です。nonce は**チャンクごと**に作る 12 桁の 16 進で、チャンクの元の中身に `{{LT:<nonce>:` が現れたら作り直します（8 回で決まらなければ送らない）。
+  会話がプレースホルダそのものを話題にしても（この節を読んだ会話など）、nonce が違うので取り違えません。
+- 種類と、取り込む端末で戻す先:
+
+  | 種類 | 送る端末での値 | 取り込む端末で戻す先 |
+  | -- | -- | -- |
+  | `ROOT0`・`ROOT1`… | git の作業ツリーのルート（`pathhint.Collect` と同じ literal・realpath・macOS の `/private` の形。形ごとに番号を分ける） | 取り込む端末のルートの realpath（Claude の slug と各行の `cwd` は realpath から作られる。実測） |
+  | `SDIR` | 記録のディレクトリ（`<設定の置き場>/projects/<slug>`。Codex は無し） | 取り込む端末の `<設定の置き場>/projects/<新しい slug>` |
+  | `VDIR` | AI の設定の置き場（`CLAUDE_CONFIG_DIR` か `~/.claude`・`CODEX_HOME` か `~/.codex`） | 取り込む端末の同じもの |
+  | `HOME` | ホームディレクトリ | 取り込む端末のホーム |
+
+  置き換えは長い値から順に、左から 1 回だけです。当たるのは語の境界だけで、境界の規則は §9-7 の `path_hints`（`internal/service/digest.go` の `normalizeDigestPaths`）と**同じ関数**（`internal/domain` の `ReplacePathPrefixes`。置き換え先は呼ぶ側が渡す）を使います
+  （サーバの要約とクライアントの会話記録で規則を 2 つに写さないよう、境界の判定を `internal/domain` に置いて両方から呼ぶ）。
+  値に `\` か `"` がある手がかり（Windows のパス）は、JSON の文字列の中の JSON（Codex の `function_call.arguments`）に現れる逃がした形も足し、種類の後ろに `J` を付けます（`ROOT0J` など）。
+  戻すときは `J` の種類を同じく逃がした形に戻します。
+- チャンクの行には `nonce` と、使った種類の一覧（`placeholders`）だけを残します。**値（元の絶対パス）はサーバに送りません**。
+  元の値は送った端末の状態のファイル（下の「hook」）にだけ残し、同じ値で戻せば元のバイトに戻る（マスクした値を除く）ことをテストで固定します。
+- **書き換える欄**（キーの名前で選ぶ。深さは問わない。形式の版が上がって入れ子が変わっても当たるように）:
+
+  | agent | 値の先頭がパスの欄（値の頭だけを置き換える） | 中のどこにでもパスが出る欄（境界の規則で中を置き換える） |
+  | -- | -- | -- |
+  | Claude Code | `cwd`・`live_cwd`・`root`（`serverClassifierContext` の中）・`workingDirectory`・`scratchpadDirectory`（`attachment` の下の全階層）・`attachment.files[].path`・`toolUseResult` の下の `outputFile`・`transcriptDir`・`path` と、名前が正規表現 `^[a-z][A-Za-z]*Path$` に当たる欄すべて（`scriptPath`・`persistedOutputPath` などは例）・`wireIngestContext.*.cwd` | tool_use の `input` の文字列の値すべて（`file_path`・`path`・`notebook_path`・Bash の `command`・MCP の引数など）と、同じ入力を写した `wireToolInputs.*` |
+  | Codex | `cwd`（`session_meta.payload`・`turn_context.payload`・`thread_settings_applied`・`world_state.payload.state.environments.environments.local`）・`session_meta.payload.runtime_workspace_roots[]`・`turn_context.payload.workspace_roots[]`・書き込める根（古い形の `sandbox_policy.writable_roots[]` と、新しい形の `file_system_sandbox_policy.entries[].path.path`・`permission_profile.file_system.entries[].path.path`。`thread_settings.permission_profile` の下も同じ。`entries` はこの 2 つの下だけ）・`world_state.payload.state.agents_md.directory`・`item.parsed_cmd[].path`・`item.changes` の中の `move_path`・`working_directory`・`workdir` | `function_call.arguments`（JSON を文字列にしたもの。Windows のパスは `\\` に符号化された形も手がかりに足す）・`executed_tool_calls[].arguments` の下（`executed_tool_calls` の外の `arguments` の下は書き換えない）・`custom_tool_call.input`（`exec` の入力と `apply_patch` の差分の文字列。種類の値では選ばず、行の `payload` の直下の `input` に絞る）・`item.command[]`・`item.parsed_cmd[].cmd`・`local_shell_call.action` の文字列 |
+
+  **コマンド行の欄**: Claude Code の `hookInfos[].command`・`attachment.command`（hook のコマンド行。`<実行ファイルの絶対パス> hook …` の形）は、値に空白があるので値の頭の欄としては扱いません。**先頭の語（最初の空白まで）が手がかりに当たる絶対パスのときだけ、その語の頭を同じプレースホルダに置き換えます**（戻すのも同じ）。
+  引数の中のパスは書き換えず、散文と同じく「書き換えなかった絶対パス」に数えます（引数が散文かパスかは語の形からは分からないため）。tool_use の入力の `command` は上の表の「中のどこでも」のままです。
+  **キーの欄**: Codex の `item.changes`（パッチで変えたファイルの一覧）は、変えたファイルの絶対パスをキーにした dict です。このキーだけは値の頭と同じ規則で頭をプレースホルダにします。
+  戻すのは値と同じく字面の上の置き換えなので、キーも元のバイトに戻ります。ほかのキーは書き換えず、残った絶対パスを「書き換えなかった絶対パス」のキーの件数に数えます。
+  書き換えるのはその dict のキーがすべて同じ 1 つの種類（`ROOT0` だけなど）に当たるときだけです。種類が混ざると取り込む端末で同じキーが 2 つでき、値が黙って失われます。
+  たとえば `ROOT0` と `ROOT1` はどちらも取り込む端末のルートに戻り、ルートがホームの下なら `HOME` と `ROOT0` も重なりえます。
+  書き換えないキーが混ざる dict も同じ理由で書き換えません。どちらの dict でもキーは元のまま残ります。残したキーの絶対パスは、上と同じくキーの件数に数えます。
+  Codex の欄は利用者の端末の実測（2026-10-26・codex-cli 0.156.1・Codex 自身が書いた rollout の `.jsonl.zst` 84 件のキーと件数。値は見ていない）で足しました
+  （`file_system_sandbox_policy.entries[].path.path` 1,188・`permission_profile.file_system.entries[].path.path` 1,188・`thread_settings` の下の同じ欄 1,124・`workspace_roots[]` 302・
+  `item.command[]` 224・`custom_tool_call` の `input` 267・`writable_roots[]` 198 ほか）。`local_shell_call` は 0 行でしたが古い版の rollout のために残しています。
+  Claude の欄は、この環境の実際の記録（Claude Code 2.1 系・2026-10-25・10 ファイル 4,456 行）で、値が絶対パスで始まる欄を数えて選びました
+  （`cwd` 4,069・`serverClassifierContext.context.git_state.cwd` 369・`live_cwd` 369・`git_state.root` 367・`attachment.files[].path` 110・tool_use の `input.path` 12・`input.file_path` 10 ほか。値は見ていない）。
+- **書き換えない欄**: 散文（`message.content[].text`・tool_result の `content`・`attachment` の本文（`CLAUDE.md` や system-reminder）・`toolUseResult` の `stdout` など）、
+  base64、差分、暗号化された欄（Codex の `encrypted_content`・`encrypted_function_args`）。ここに残った絶対パスは、送る端末のルート・ホームに当たる数だけを
+  「書き換えなかった絶対パス」として数え、`--dry-run` と `push` の結果に欄の種類ごとに出します。
+  構造の欄として数えるのは、値がパスだけ（空白を含まない）で頭が手がかりに当たり、欄の名前が本文の欄（`text`・`content`・`stdout`・`stderr`・`output`・`thinking`）でないもので、
+  件数の表には欄の経路（識別子の形でないキーは `*`）を出します。キーの中に残ったものは別に数えます。
+- 送る端末と取り込む端末の OS が違うと（macOS → Windows など）、区切りが混ざります（`C:\Users\me\proj/sub/a.go`）。v1 は同じ OS の系統どうしを対象にし、
+  `origin_os` の OS の系統（Windows とそれ以外）が違う記録の `pull` は、置かずに止めます（決めたこと「OS の系統をまたぐ取り込みは対象外」。
+  同じ系統で OS だけが違う（Linux → macOS）ときは注意を出してから置く）。以前の版のこの節は「注意を出してから置く（止めない）」でしたが、
+  区切りの混ざった記録を置いても fork の後の AI が正しく使えないので、実装で止める側にしました。
+
+#### 送る（API・連番・圧縮）
+
+1. 記録を登録する: `POST /projects/{slug}/transcripts`（`{agent, vendor_session_id, machine_label, origin_os, agent_version}`）。
+   同じ `(利用者, agent, vendor_session_id)` が既にあればそれを返します（201 ではなく 200）。ルール `session.transcripts` が切なら 422 `transcript_rule_off`。
+   応答には、記録の ID・今の連番（`seq`）・ファイルごとの送った長さ（`files[]`: `file_key`・`length`）・ルールの値（`transcripts_enabled`）を載せます。
+2. チャンクを足す: `POST /transcripts/{id}/chunks`。本文はチャンクの中身そのもの（`Content-Encoding: gzip` なら gzip のまま置く）。
+   `If-Match: "<今の seq>"` が必須で、無ければ 428 `transcript_seq_required`、違えば 409 `transcript_seq`（`error.current` に今の seq）。新しいチャンクは seq + 1 で、`(transcript_id, seq)` の一意性で取り合いを決めます
+   （アプリ用の DB 利用者は追記専用の表に行ロックを取れないので、一意性に任せる）。足せるのは持ち主だけで、そのときもプロジェクトに参加していて、
+   プロジェクトがアーカイブされておらず、ルール `session.transcripts` が入であることを確かめます（後から切にされたら 422 `transcript_rule_off` で、クライアントは切を覚える）。利用者の使用量の判定は、ロックのためだけの表 `transcript_locks`（1 利用者 1 行）の行を `FOR UPDATE` して、同じ利用者の追記と消去を 1 つずつにします。使用量は利用者の全部の会話記録の合計なので、会話記録ごとに並べると、別々の会話記録への同時の追記が互いの未確定の行を見ずに（REPEATABLE READ）、合わせて上限を超えます。**`users` の行はロックしません**（握ると、同じ利用者のログインの記録・言語の保存・トークンやセッションの発行が追記の間ずっと待つ）。本体の rename と fsync はトランザクションの前に済ませ、ロックの間は連番・送った長さ・使用量の読み直しと 1 行の記録だけにします（記録に失敗したら、どこからも指されない本体を消す。消せなければ `repair-transcripts` が拾う）。サーバのプロセスの中の排他は本体（sha256）ごとで、置いてから記録が確定するまでの間に、消去や整合の検査が同じ本体を「どこからも指されない」と数えて消さないためだけにあります（同じ内容の本体は利用者をまたいで 1 つにまとまるので、利用者ごとでは足りず、全利用者で 1 つにする理由も無い）。別のプロセス（2 つ目のサーバ・`purge-transcripts`・`repair-transcripts`）にはこの排他が届かないので、置き場の中の印で順を決めます（下の「消去と保持期間」の「本体を消す順」）。
+   位置と印はヘッダで渡します: `X-Looptrack-Transcript-File`（`file_key` をパーセント符号化）・`X-Looptrack-Transcript-Offset`（`src_offset`）・`X-Looptrack-Transcript-Nonce`・
+   `X-Looptrack-Transcript-Placeholders`・`X-Looptrack-Transcript-Stats`（件数の JSON）・`X-Looptrack-Transcript-Length`（`src_length`。変換する前の元のファイルの中の長さで、
+   変換で中身の長さが変わるので本文からは決まらない）。`src_offset` がそのファイルの送った長さと違えば 409 `transcript_offset`（抜けも重なりも作らない）。
+3. サーバの検査（`internal/service` の 1 か所。REST とほかの経路はそれを呼ぶだけ）: 伸ばした大きさが上限以内・`file_key` の形・
+   `jsonl` は全行が JSON として読め、`json` は全体が読める・**文字列の値ごとと、キーごとに `domain.FindSecret` が当たらない**・`text` は全体に当たらない。
+   外れたら 422（`transcript_unreadable`・`transcript_secret`。理由は件数とファイルと行番号と規則の語だけで、値は出さない）で、本体もメタデータも残しません。
+   `jsonl` は最後の行も改行で終わること（書きかけの行は読めない行として数える）。`stats` も同じ規則で検査します（件数だけのはずなので）。
+   ほかの拒否: 伸ばした大きさが上限を超えれば 413 `transcript_too_large`（gzip は伸ばしながら上限で止める。置く形の大きさも、上限に gzip の増分の余裕を足した値で縛る）・
+   1 利用者の上限を超えれば 422 `transcript_quota`・持ち主が送ったプロジェクトから外れていれば 403。
+   クライアントが正しくマスクしていれば、値ごとの `FindSecret` は当たりません（`FindSecret` は `MaskSecrets` が変える箇所だけを数えるので、マスクした値には当たらない）。
+   サーバの検査は、変換を通らずに送ってくるクライアント（古い版・手で組んだ要求）を止めるためのものです。
+4. 読む: `GET /transcripts`（自分のものの一覧。`?project=`）・`GET /transcripts/{id}`（チャンクの一覧）・`GET /transcripts/{id}/chunks/{seq}`（本体。置いた形のまま返し、
+   `X-Looptrack-Transcript-Encoding` で `gzip` か `identity` を知らせる。HTTP の層で勝手に伸ばされないよう `Content-Encoding` は付けない）。
+   応答には添付と同じく `Content-Security-Policy: sandbox; default-src 'none'`・`X-Content-Type-Options: nosniff`・`Content-Disposition: attachment` を付けます。
+5. 消す: `POST /transcripts/{id}/purge`（`{"reason"}`・持ち主だけ）。
+6. 応答の形: 登録・追記・`GET /transcripts/{id}` は `transcript`（`id`・`project`・`agent`・`vendor_session_id`・`machine_label`・`origin_os`・`agent_version`・`created_at`・`via`・`seq`・`files[]`・`transcripts_enabled`）を返し、
+   今の `seq` を `ETag: "<seq>"` にも載せます（次の追記の `If-Match` にそのまま使える）。登録は `created`、追記は `chunk`、`GET /transcripts/{id}` は `chunks[]`（チャンクのメタデータと本体の `url`。消去済みは `purged`）を足します。
+   一覧は `transcripts[]`（消去していないチャンクの数・ファイルの数・バイト数・最後の送信の時刻・消去の回数・`purged`）と `count`。消去は `changed`・`chunk_ids`・`removed`。
+   `X-Looptrack-Transcript-Placeholders` は種類の名前の JSON の配列（`["ROOT0","HOME"]`）、`X-Looptrack-Transcript-Stats` は JSON のオブジェクトです。位置・長さ・`file_key` のヘッダが読めなければ 400 `invalid_argument`。
+   本体の応答は `Content-Type: application/octet-stream` で、ファイル名は付けません（`Content-Disposition: attachment` だけ）。
+
+この経路だけは本文の上限を `transcript_max_chunk_bytes` に合わせ、読み書きの締切を添付と同じく延ばします（`binWriteWindow` と同じやり方）。前段の nginx の `client_max_body_size` も合わせます。
+MCP には経路を足しません（MCP はファイルを運ばない。AI に頼むときは CLI を使う）。
+
+**送った続きの判断**: クライアントは送った端末の状態のファイル（`usagesnap.StateDir` の下の `transcript-push/<usagesnap.ProjectKey の鍵>/<agent>-<セッション ID>.json`）に、
+ファイルごとの送った長さと、その直前 4KiB の sha256 を持ちます。次に送るときは、元のファイルがその長さ以上あり、その 4KiB が同じときだけ続きを送ります。
+短くなった・中身が変わったときは送らず、「記録が書き換えられた」と件数で知らせます（`purge` してから送り直せば、最初から送れる）。
+状態のファイルが無い（別の端末から送った・消えた）ときは、サーバの長さの直前の 1 バイトが改行であることだけを確かめて続けます。
+`json`（`*.meta.json` など）と `text`（tool-results）は行の境目が無いので、ファイル全体を 1 回だけ送ります。送った後に大きさが変われば、同じく「書き換えられた」として数えます（空の `json` は書きかけとみなして次の回に回す）。
+「書き換えられた」ファイルがあれば、ほかのファイルを送った後に終了コード 1 にします（`purge` するまで続きを送れない状態を、黙って成功にしない）。
+
+`push` の順（`internal/client/cli/transcript_push.go`）: 運ぶファイルを全部読み、状態のファイルの長さから先に変換します。変換の止め（読めない行・キーの秘密・長すぎる行）が
+1 つでもあれば、**要求を 1 本も送らずに**ファイルごとの理由（件数だけ）を出して終了コード 1 にします。止めが無ければ登録し、サーバの長さが状態の長さと違うファイル
+（消去の後・別の端末から送った）はサーバの長さから変換し直してから、チャンクを順に追記します（`If-Match` は直前の応答の `seq`、本文は gzip）。409 の
+`transcript_seq`・`transcript_offset` は `GET /transcripts/{id}` で今の連番と長さを取り直し、続きから送り直します（3 回まで。超えたら止めて終了コード 1）。
+サーバの `transcript_max_chunk_bytes` は応答に載らないので、413 `transcript_too_large` を受けたらチャンクの上限を半分にし、同じく取り直して続きから分け直します（64KiB まで）。
+状態のファイルはチャンクを 1 つ送るたびに書き直します（一時ファイル → rename・`0600`）。
+
+#### 取り込み（常に fork）
+
+`session transcript pull <記録の ID>` は、チャンクを順に読んで伸ばし、プレースホルダを**この端末の値**に戻して、AI が探す場所に置きます。
+
+- **新しいセッション ID で置きます。** 写しは元の会話と同じ sessionId / スレッド ID を名乗りません。ID は記録ごとに決まる値
+  （`forkedID`: agent・元の ID・サーバの記録の ID・作った時刻の sha256 から作る UUID の形）なので、同じ記録を 2 回 `pull` すると同じ場所を見ます。
+  行の中の元の ID（`sessionId`・`session_meta.id`・tool-results を指すパス）は、`jsonl` と `json` のファイルの中ですべて新しい ID に書き換えます（`text` は散文なので変えない）。
+  理由: 元の ID のままだと、取り込んだ端末の hook や `push` がその写しを送ったとき、サーバの同じ記録（`(利用者, agent, vendor_session_id)` で一意）に
+  元の端末とは違う中身を足そうとして、送った長さが食い違う。2 つの端末に同じ ID の別の記録がある状態そのものも作らない。
+- **Claude Code**: `<設定の置き場>/projects/<現在の git のルートの realpath から作った slug>/` の下に、`<新しい ID>.jsonl` と `<新しい ID>/subagents/…`・`<新しい ID>/tool-results/…` を置きます
+  （slug の作り方は `handoffTargets` と同じ「realpath の英数字以外を `-` に」で、`agentdirs.ClaudeSlug` を共有する。実測で realpath から作られると確かめた）。
+  表示するのは `claude --resume <置いた本体の絶対パス> --fork-session` です。
+- **Codex（要実測）**: `<CODEX_HOME>/sessions/<年>/<月>/<日>/` に置きます（日付は名前から）。名前の中のスレッド ID だけを新しい ID にし（`history_base` がたどる別のスレッドの rollout は元の名前のまま）、
+  表示するのは `codex fork <新しい ID>` と、作業ツリーのルートで実行する旨です。
+  ソースでは、スレッド ID からの探索は SQLite の状態 DB を先に引き、無ければ `sessions/` の下をファイル名で歩いて見つけ、見つけた行を DB に入れ直します（read-repair）。
+  `codex fork` は新しいスレッド ID を作り、`session_meta` の `forked_from_id` に元の ID を残します。cwd が記録と違うと TUI が問い（`tui.resume_cwd` で固定できる）、
+  書き換えで記録の cwd を取り込む端末のルートにそろえるので、問いは出ない見込みです。
+- **同じ ID の写しを 2 か所に置きません。** 置く前に、その端末の置き場で元の sessionId / スレッド ID のファイルを探し（`claudeFindTranscript` と同じ glob・Codex は名前で）、
+  あれば置きません（送った端末自身で `pull` したとき・既に同じ会話があるとき）。新しい ID の写しが別の slug（別の作業ツリー）にあっても置きません。
+  置く場所に新しい ID の写しが既にあり中身が同じなら、そのファイルの再開のコマンドを表示して終わります（2 回目の `pull` は何も変えない）。違えば止めて、場所だけを出します。
+- 置いた記録を plain の `--resume` / `codex resume` で開くと、取り込んだ写しに追記されます。表示する文面には、必ず fork のコマンドを使う旨を添えます。
+- 使うのは最後の消去より後のチャンクだけです（消去の後に送り直した記録は取り込める）。そうしたチャンクが 1 つも無い（消去済み）なら取り込みません（「消去済み」と出して終了コード 1）。
+  チャンクの位置がファイルごとにつながらない・sha256 が一覧と違う・戻した行が JSON として読めないときも置きません。
+  プレースホルダが戻せない（この端末で git のルートが見つからない）ときは置かずに止めます。書き込みは無いファイルだけを `O_EXCL`（`0600`）で作り、途中で失敗したらこの回に書いたものを消します。
+
+#### hook（自動で送る）
+
+kit core の hook `looptrack hook transcript` を Stop と SessionEnd に配線します（Claude Code と Codex。`internal/client/kitinit/wiring.go` の `usage` と並べる。配線が増えるので
+`internal/client/kitinit` の golden を取り直す）。配線ごと外すのは `init --no-transcript` です（鍵が切なら hook は記録を読まずにすぐ終わるので、既定では入れる）。
+作りは使用量の hook（`internal/client/hook/core/usage.go`）と同じで、本体は `internal/client/hook/core/transcript.go` です。
+
+- 送るのは**2 つの鍵がどちらも入**のときだけ: 利用者の `LOOPTRACK_SESSION_TRANSCRIPTS` が `1`（前後の空白を除く）で、かつ覚えたプロジェクトのルールが入。
+  ルールの値は登録とチャンクの応答の `transcripts_enabled` から覚えます（`usagesnap.RememberSendPrompts` と同じ置き場の考え方で、
+  `<設定の置き場>/looptrack/session-transcripts/<usagesnap.ProjectKey の鍵>`。覚えるのは `usagesnap.RememberTranscriptsRule`、読むのは `usagesnap.TranscriptsRule`、
+  オプトインの判定は `usagesnap.TranscriptsOptIn`。手で打つ `push` も覚え、422 `transcript_rule_off` を受けたら切を覚える）。覚えた値が無いか 1 日より古ければ、子プロセスが登録の要求で確かめます。
+  使用量の `usage.send_prompts` は「ルールが入なら送る。利用者は `0` で断る」ですが、こちらは利用者の側も**既定で切**にします（送るものの重さが違う）。
+- Stop は前回から 10 分（`LOOPTRACK_TRANSCRIPT_THROTTLE_MIN`）未満なら何もしません（`throttled` と同じ。起点は子プロセスを起こした時刻で、
+  `<looptrack の置き場>/transcript-last/<セッション ID>` に残す。送れなかった分は退避が受け持つ）。SessionEnd は間引きません。
+- 送るのは切り離した子プロセス（`Env.SpawnTranscript`・`looptrack hook transcript --transcript-job`。仕事は標準入力の JSON で、作業ディレクトリは入力の `cwd`）で、hook はすぐ返ります。
+  子は手で打つ `push` と同じ本体（`cli.PushTranscriptForHook` → `cmdTranscriptPush`）を、`<セッション ID> --agent <AI>` で呼びます（変換・送り方・送った続きの判断を hook に写さない）。
+  `LOOPTRACK_TRANSCRIPT_FOREGROUND=1` なら同じプロセスで送ります（調べるときだけ）。
+- 送れなかったときの退避（spool）には**中身を入れません**。入れるのは「どの記録を送るか」（agent・セッション ID・記録のパス・作業ディレクトリ）だけで、
+  次の hook がそれを読み、元のファイルから続きを送ります（使用量の spool は送る中身そのものを置くが、会話記録は大きく秘密も混ざるので、写しを増やさない）。7 日で捨てます。
+  置き場は `<looptrack の置き場>/transcript-spool/<usagesnap.ProjectKey の鍵>/<agent>-<セッション ID>.json`（同じ記録は 1 つ。最初に退避した時刻から 7 日）。
+  退避するのは届かない・5xx・ログインしていない・送る前の失敗のときです。4xx の拒否（`transcript_rule_off` を除く）は退避せず、失敗として残します。
+- 失敗は使用量と同じ形で記録し（`<looptrack の置き場>/transcript-failure.json`・`usagesnap.RecordTranscriptFailure`。送れたら消す）、SessionStart（`summary`）が「会話記録を送れていない」を 1 行出します（退避だけがあるときは未送信の件数の 1 行）。
+- SessionStart は鍵の状態も 1 行出します: 覚えたルールが入で端末のオプトインも入なら「自動送信: 入」、ルールは入でオプトインが切なら `LOOPTRACK_SESSION_TRANSCRIPTS=1` で入れられる旨。
+  ルールが切・覚えていない・失敗も退避も無いときは何も出しません（以前の版のこの節は「成功・未設定のときは何も出さない」でしたが、自動で送っていることと送れることを本人が知れるよう、
+  鍵の行を足しました。`summary --json` の `transcript_send`）。
+- 変換で送れなかった（読めない行・キーの秘密・長すぎる行）ときと、サーバの値ごとの検査が拒んだ（422 `transcript_secret`・`transcript_unreadable`）ときは、退避せずに失敗として残します（同じ記録は何度試しても同じ結果になるため）。記録するのは止めたファイルの数だけで、
+  `<looptrack の置き場>/transcript-rejected/<鍵>/<agent>-<セッション ID>.json` に印を置き、そのセッションは自動では試し直しません（失敗も 1 回だけ記録する。印は 7 日で捨てる。手で打つ `push` は印を見ない）。
+
+#### 消去と保持期間
+
+- 持ち主は `session transcript purge` で本体を消せます。`transcript_purges` に 1 行を足し、その時点の最後のチャンクまでを消去済みにします。
+  同じ会話をその後に送ると、最初から送り直せます（送った長さは最後の消去より後のチャンクから数える）。
+- 保持期間（`transcript_retention_days`）が切れた会話は、サーバの定期の処理（`server.Housekeeping` の 1 時間ごとの回）が消します（cause `retention`）。
+  `Housekeeping` は引数にサーバの service（`Server.Service()`。置き場の設定は `server.New` が済ませたもの）を取り、置き場が使えないサーバでは何もしません。
+- サーバの運用者は管理用のサブコマンド `looptrack purge-transcripts --user <login> [--transcript <id>] [--reason <理由>] [--yes]`（`LOOPTRACK_DSN` の経路。`cmd/looptrack/purge_transcripts.go`）で、
+  利用者の記録をまとめて（`--transcript` ならその 1 つだけ）消せます（cause `operator`。操作した利用者は記録せず、via は `admin`）。
+  `--yes` が無いときは消す対象の会話記録の数・消去していないチャンクの数・バイト数を示すだけで何も変えません（`service.OperatorTranscripts`）。
+  `--yes` では理由が必須で（`service.PurgeOperatorTranscripts`）、利用者が居ない・会話記録が 1 つも無いときは終了コード 1 です。
+  秘密が混ざったと分かったとき・利用者を外すときのためです。Web にこの操作は置きません。
+- **本体を消す順**（消去・保持期間の切れ・`purge-transcripts`・失敗した追記の片付け・`repair-transcripts --apply` と、添付の消去・失敗した添付の片付け・`repair-attachments --apply` のすべて。`internal/service/blobstore.go` の `removeBlobGuarded`）:
+  本体を指す消去していないチャンクと添付を数え、0 なら本体を置き場の `.tmp` へ rename して本体のパスから外し、置いている追記の印を探し、
+  指す行を数え直します。印か行があれば本体を戻し、どちらも無いときだけ消します（`repair-transcripts` と `repair-attachments` は、触れられて `service.OrphanGrace` が経っていない本体も戻す）。
+  追記の側は、本体を置く前に印（`.tmp/inflight-<sha256>-…`）を作り、記録を確定してから（失敗したときは片付けの前に）消します。
+  理由: 本体は sha256 の名前で利用者をまたいで共有され、追記はトランザクションの前に本体を置くので、置いてから確定するまでの間は、
+  まだ確定していない参照を DB のどの行も示しません。持ち主の `transcript_locks` の行を握って数えても、同じ本体を指す別の利用者の追記は待たず、
+  置く処理もその行の外にあるので、別のプロセスの消去が「指す行が無い」と数えて消してしまいます（2 つのサーバのプロセスでは、
+  本体を置いた側の追記が拒まれ、その片付けが、同じ本体を置かずに使ったもう一方の追記の確定の前に消す形もある）。
+  取り合うのは置き場のファイルなので、置き場の中で順を決めます。外してから印と行を見るので、外す前に置き終えた追記は、
+  その印か（印を消すのは確定の後なので）確定した行のどちらかに必ず現れ、外した後に置く追記は本体が無いのを見て自分の一時ファイルを置きます
+  （`placeBlob` は、あると確かめた後に外されたときも自分の一時ファイルを置く）。確かめてから消すまでの隙は rename 1 回で閉じます。
+  猶予（`OrphanGrace`）だけに頼る形は採りません。追記してすぐの消去でも本体が残ってしまい、秘密が混ざったときの消去が効かないからです。
+  印は `OrphanGrace`（1 時間）より古ければ数えずに消します（落ちたプロセスが残した印で、本体を消せなくならないため）。
+  そのため追記は、置いてから確定するまでを 10 分（`blobPlaceWindow`。添付も同じ）に収め、越えたら記録せずに失敗します。
+  まだ動いている追記の印が数えられなくなることはありません。
+  外す前にも印を探し、見えれば外さずに残します（外した後の確かめは省きません）。古さを確かめられない印は、置いている追記として数えます。
+  消す側が本体を外した後に止まると、本体は `.tmp/remove-<sha256>-<名前を取った時刻>-…` に残り、本体を歩く検査（`.tmp` を見ない）からは見えません。
+  そこで `repair-transcripts --apply` は本体を検査する前に `.tmp` を見て、外したまま残った本体を、本体のパスが空いていて中身が sha256 と合えば戻し、
+  そうでなければ捨て、`OrphanGrace` より古い印を消します（`service.RecoverTranscriptLeftovers`）。戻した本体は、続く検査がふつうの規則で扱います
+  （指すチャンクがあれば本体の欠けが消え、どこからも指されず古ければ消す）。件数は出力の 1 行に出し、dry-run は数えるだけです。
+  中身を確かめるのは、消す側が外す前に名前だけ取った空のファイルが同じ名前で残りうるためです。
+  拾うのは、名前の時刻が `OrphanGrace`（1 時間）より古いものだけです。まだ動いている消す側は、名前を取ってから消すか戻すまで、その名前を使います。
+  その間に拾うと、検査が開いた空のファイルの名前へ消す側が本体を入れ、検査がそれを捨ててしまいます。時刻を名前に入れるのは、rename が本体の更新時刻を保ち、
+  ファイルの時刻では外した時刻が分からないためです。さらに、開いたファイルと捨てる・戻す直前のそのパスのファイルが同じでなければ何もしません。
+  戻す rename が「外した本体が無い」で失敗したときは、本体のパスにあるときだけ成功とし、無ければ失敗を返します。
+  消す側が外した本体を消そうとして、検査が先に戻していたと分かったら、消せなかったものとして失敗を返します
+  （消去の出力は「消せなかった本体」の件数と、`repair-transcripts --apply` で消せることを出す。黙って「本体 0」にすると、消去したはずの中身が残る）。
+  `purge-transcripts` は割り込み（Ctrl-C・SIGTERM）でプロセスをすぐには止めず、文脈を取り消します（`signal.NotifyContext`）。
+  外してから消すか戻すまではファイルの操作なので途切れず、続く本体は DB の読み出しが取り消されて止まります。
+
+#### ベンダーの形式が変わったときに壊れるもの
+
+Claude Code も Codex も、会話記録の形式は**内部のもので版ごとに変わる**と明言しています。壊れ方と気づき方:
+
+| 変わるもの | 壊れ方 | 気づけるか |
+| -- | -- | -- |
+| 置き場・ファイルの並び（`subagents/`・`tool-results/`・rollout の名前・圧縮） | 探索が何も見つけない・知らないファイルが残る | 気づける（「見つからない」で止まる。`--dry-run` が運ばないファイルを名前つきで出す） |
+| 行が JSON でなくなる | 変換の 2・6 で送らない | 気づける（fail-closed・件数） |
+| パスを持つ欄の名前・場所 | 新しい欄の絶対パスが書き換わらず、fork の後に旧ルートを指す（実測で Edit が別の checkout を変えた形） | **気づけない**。そこで「書き換えなかった絶対パス」を構造の欄（散文でない欄）と散文に分けて数え、構造の欄に 1 つでもあれば `push` の結果と `--dry-run` に注意を出す。実際の記録から作った合成の記録（値を置き換えたもの）を固定のテスト材料にし、版が上がったら取り直す（道具は `internal/tools/transcriptfixture`、材料は `internal/client/transcript/testdata/`、取り直す手順は道具の注釈） |
+| resume / fork の引数 | 表示したコマンドが通らない | 気づける（利用者が実行した時点でエラーになる） |
+| Codex の状態 DB・探索の規則 | `codex fork <ID>` が見つけない | 気づける（「見つからない」） |
+
+記録の版（Claude の行の `version`・Codex の `session_meta.payload.cli_version`）を `agent_version` に残し、`pull` は取り込む端末の版と違えば表示に添えます（止めない）。
+
+#### 大きさの見積もり
+
+1 セッションの実測（値は見ていない）:
+
+| 測った回 | 本体 | subagents | 付属の `.json` | tool-results | gzip（`-6`）の後 |
+| -- | -- | -- | -- | -- | -- |
+| 2026-10-24（調査） | 1.2MB | 9.0MB・25 ファイル | 未計測 | 452KB | 未計測 |
+| 2026-10-25（この設計のセッション） | 4.5MB | 10.2MB・9 ファイル | 94KB・17 ファイル | 1.05MB・21 ファイル | 本体 23%・subagents 26%・tool-results 29%（合計 15.9MB → 約 4.0MB） |
+
+長い作業の 1 セッションで、gzip の後に数 MB です。既定の上限（1 利用者 2GiB）なら数百セッション分で、保持期間（90 日）で古いものから消えます。
+gzip の比は Claude の 1 セッションだけの実測なので、Codex と別の作業の形では測り直します。
+
+#### パスの書き換えの限界
+
+- 散文（AI の返答・ツールの出力・読んだファイルの中身・system-reminder）・base64・差分の中の絶対パスは書き換えません。調査の記録では、絶対パスの出現の大半はこちら側でした
+  （1.2MB の記録に 242 回。うち `cwd` の欄は一部）。fork の後の AI は、散文の中の旧ルートを読みます。
+- 中立の頼み方なら新しいルートを使う（実測 2/2）一方で、「前のファイル」のように履歴を指す頼み方では、書き換えていない散文のパスを使うおそれが残ります。
+  **「最初の発言にパスの対応表（旧ルート → 新ルート）を入れる」案は未検証**です。v1 では入れず、`pull` の表示に「旧ルートのパスが会話に残っている」旨と件数だけを添えます。
+- 暗号化された欄（Codex）は書き換えもマスクもできません。
+- OS の系統をまたぐと区切りが混ざります（上）。
+
+#### 要実測（利用者の端末で確かめること）
+
+この環境には `codex` が無く、Codex の項目は書き換える欄を除いてソース（openai/codex 970111f6）を読んだだけです。次を受け入れ条件として、利用者の端末で確かめます。
+
+- Codex: `sessions/<年>/<月>/<日>/` に置いた rollout を、状態 DB に行が無いまま `codex fork <スレッド ID>` が見つけ、新しいスレッドの `session_meta` に `forked_from_id` が入り、元のファイルが変わらないこと。
+- Codex: 書き換えた `session_meta.payload.cwd` と `turn_context.payload.cwd` が作業ツリーのルートと同じとき、cwd の問いが出ないこと（違うときは出ること）。
+- Codex: `history_base` を持つ rollout の頻度と形（2026-10-26 の実測では 84 件中 0 件で、形は測れなかった）。書き換える欄の名前は実測で確かめて上の表に足しました。
+- Claude: fork の後に、tool-results を指す `persistedOutputPath` のファイルを AI が読めること（fork が付属のファイルを新しいセッションへ写すかどうか）。
+- Claude: `/compact` などで元のファイルが短くなる・書き換わることがあるか（「送った続きの判断」が止まる頻度）。
+- 両方: 別の端末（別の利用者名・別のルート）で `pull` → fork → 「前に直したファイル」を頼んだとき、Edit が新しいルートを指すこと（実験の形を書き換えた記録で繰り返す）。
+
+#### 採らなかった案
+
+| 案 | 採らなかった理由 |
+| -- | -- |
+| イシューの添付（§2-4）で運ぶ | 添付はイシューを閲覧できる全員に見える。会話は個人のもので、要約（§9-7）と違い本人の試行錯誤や読んだファイルの中身がそのまま入る。添付の上限（1 プロジェクト）を個人の記録で食う。追記ができず、伸び続ける記録を毎回丸ごと送ることになる |
+| 暗号化して置く（端末の鍵で暗号化し、サーバは中身を読めない） | 利用者の判断（2026-10-25）。端末をまたいで鍵を配る仕組みが要り、鍵を失えば読めない。サーバが値ごとの検査（読めない行・残った秘密の拒否）をできなくなる。運用者が読めることは隠さず書く |
+| 両方の端末で作業ツリーを同じ絶対パスに置く（書き換えをしない） | 同じ OS・同じ利用者名の組み合わせでしか成り立たない。利用者ガイド（`docs/guide/ja/ai-agents.md` の「近道: 同じ絶対パスに置く」）では近道として案内するが、搬送の前提にはしない |
+| 生の行に `MaskSecrets` をかける | JSON が壊れ、後ろの `cwd`・`uuid` が消える（実測 4/4） |
+| マスクした後の行に `FindSecret` をかけて検査する | `FindSecret` は `MaskSecrets` で変わる箇所だけを数えるので、作りの上で必ず 0 件になる。書き直した行に当てると逆に誤って当たる（2/10）。値ごとに当てる |
+| plain の `--resume` で取り込む | 元のファイルに追記し、別のディレクトリからでも元の slug に書く（実測）。2 つの端末の記録が混ざる |
+| `pull` が AI を起動する | 起動の仕方（引数・権限の設定・端末）は利用者ごとに違い、Looptrack が代わりに決めない。コマンドを表示するだけにする |
+| 送る端末のパスをサーバに送り、サーバが書き換える（§9-7 の `path_hints` と同じ形） | 可逆にするには元のパスをサーバに残すことになり、利用者名やディレクトリの構成が持ち主以外の目（運用者）にも触れる。書き換えは端末で行い、サーバにはプレースホルダの印だけを置く |
+| 全文を毎回送る（追記をしない） | 長い作業では 1 回が数 MB〜十数 MB になり、Stop のたびに送れない。連番の追記なら前回の続きだけで済む |
+| 同じ会話の複数の版（世代）を別の行で持つ | 消去してから送り直せば足りる。世代を持つと一覧と取り込みの選び方が増える |
+| 追記のロックに `users` の行を使う | 同じ利用者の `users` の更新（ログインの記録・TOTP・言語）と、`users` を参照する表への挿入（コメント・トークン・セッション・使用量）が、本体の rename と fsync の間ずっと待つ |
+| 会話記録の行（`transcripts`）をロックし、記録の後の合計で使用量を判定する | アプリ用の DB 利用者は `transcripts` に UPDATE の権限が無く `FOR UPDATE` できない。権限を足しても会話記録ごとの並びにしかならず、REPEATABLE READ では別の会話記録の未確定の行が合計に見えないので、同時の追記が合わせて上限を超える |
+| `GET_LOCK` で利用者ごとに並べる | 接続に付くロックで、トランザクションが終わっても外れない（接続を固定して確定の後に外す手順が要る）。名前が MySQL のインスタンス全体で共有される。SQLite に無い |
+| 本体の置き換えをプロセスの中で全利用者 1 つずつにする | 守りたいのは同じ本体の「置いてから記録が確定するまで」と「数えてから消すまで」が交わらないことだけで、本体ごとの排他で足りる。全体で 1 つにすると、1 人の追記の fsync とロック待ちが全員の追記を止める |
+
 ## 10. セキュリティ
 
 - インターネットに公開され、未修正の脆弱性の情報も載りうる前提で作ります。HTTPS のみ・Cookie は `Secure; HttpOnly; SameSite=Strict; Path=/looptrack`・CSRF トークン・CSP（インラインスクリプト禁止・nonce）を使います。
@@ -2983,4 +3596,5 @@ HTTP では `Accept-Language: ja` で固定します。CLI と hook では `LOOP
 - アプリ用の DB 利用者に与えるのは、その DB の表だけです（`deploy/grants.sql`）。`comments` / `issue_events` には UPDATE / DELETE を与えません
   （append-only を DB の権限でも担保するため）。
 - 監査: すべての変更を `issue_events` に記録します（誰が・どの経路で・どのセッションから）。
+- 会話記録（§2-5・§9-8）は持ち主にしか API で見せませんが、暗号化はしません。サーバの運用者はディスク・DB・バックアップから読めます。送る前に端末がパスを書き換え、文字列の値ごとに秘密をマスクし、サーバも値ごとに読み直して検査します。
 

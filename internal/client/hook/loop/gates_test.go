@@ -22,6 +22,8 @@ func TestGates(t *testing.T) {
 		"missing":  "test:\n\t@true\n",
 		"partial":  "build:\n\t@true\nlint:\n\t@true\n",
 		"full":     "build:\n\t@true\nlint:\n\t@true\ntest:\n\t@true\n",
+		"helpdir":  "build:\n\t@true\n",
+		"flagdir":  "build:\n\t@true\n",
 		"fastfail": "a:\n\t@true\nb:\n\t@false\nc:\n\t@echo ran-c > c.txt\n",
 	}
 	gates := func(repo string, env map[string]string, args ...string) func(*sandbox) call {
@@ -77,6 +79,23 @@ func TestGates(t *testing.T) {
 				mk: gates("sub", map[string]string{"LOOPTRACK_LOOP_GATES_DIR": "app", "LOOPTRACK_LOOP_GATES_STAGES": "unit e2e"}),
 				want: check(func(g got, _ *sandbox) bool {
 					return g.code == 0 && has(g, "✓ unit: PASS") && has(g, "✓ e2e: PASS")
+				})},
+			{name: "--help は使い方を出して終わり、make を呼ばない（段として渡さない）", mk: gates("helpdir", nil, "--help"),
+				want: check(func(g got, s *sandbox) bool {
+					return g.code == 0 && has(g, "LOOPTRACK_LOOP_GATES_STAGES") && has(g, "LOOPTRACK_LOOP_GATES_DIR") &&
+						!has(g, "全段グリーン") && !s.exists(s.p("helpdir", ".gates"))
+				})},
+			{name: "-h も同じ", mk: gates("helpdir", nil, "build", "-h"),
+				want: check(func(g got, s *sandbox) bool {
+					return g.code == 0 && has(g, "LOOPTRACK_LOOP_GATES_DIR") && !s.exists(s.p("helpdir", ".gates"))
+				})},
+			{name: "未知の - 始まりの引数は段にせずエラー（非 0・make を呼ばない）", mk: gates("flagdir", nil, "--bogus"),
+				want: check(func(g got, s *sandbox) bool {
+					return g.code != 0 && has(g, "--bogus") && !has(g, "全段グリーン") && !s.exists(s.p("flagdir", ".gates"))
+				})},
+			{name: "対照: ふつうの段名は従来どおり make に渡る", mk: gates("full", nil, "build"),
+				want: check(func(g got, s *sandbox) bool {
+					return g.code == 0 && has(g, "✓ build: PASS") && s.exists(s.p("full", ".gates", "build.log"))
 				})},
 			{name: "-C <dir> で Makefile のディレクトリを指定できる", mk: gates("sub", nil, "-C", "app", "unit"),
 				want: check(func(g got, _ *sandbox) bool { return g.code == 0 && has(g, "✓ unit: PASS") && !has(g, "e2e") })},

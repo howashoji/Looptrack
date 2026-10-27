@@ -82,6 +82,10 @@ looptrack issue init --project <slug> --url <サーバの URL> --agent <AI>
 【配布スクリプトの更新】の案内はこのコマンドを直接は示しません。AI に setup ツールを呼ばせると、`--url` 付きの取得 + init の 1 つのコマンドが返ります（置き場の `looptrack` が配布物と同じなら取得を省きます）。案内のコマンドを `--url` も `LOOPTRACK_API_URL` も無い端末で実行すると、手元のローカルモードに向いてしまうからです。
 更新すると次のセッションの開始時にサーバへ知らせ直され、案内は消えます。
 
+1.0.2 以前の `init` で入れたプロジェクトには、会話記録を自動で送る hook（Claude Code と Codex の Stop・SessionEnd）の配線がありません。
+`looptrack` を置き換えるだけでは配線は増えず、summary もサーバの案内もそれを知らせません。
+自動で送るなら、新しい `looptrack` で上の `init` を各プロジェクトでもう一度実行してください。セッション要約と手で打つ `session transcript push` は配線が無くても使えます。
+
 ## サーバ
 
 サーバは既定では自動で更新されません。入れ替えるのは管理者です（新しい版は知らせます。下の「新しい版の知らせと自動の置き換え」）。
@@ -156,6 +160,20 @@ docker compose up -d
 
 systemd（`--service systemd`）で動かしているときも順番は同じです。
 サービスを止めて実行ファイルを置き換え、`.env` の設定を読ませて `looptrack migrate` を実行してから起動します。
+
+MySQL のアプリ用の利用者を最小権限にしているなら、表が増える版では手順が 2 つ増えます。
+1 つ目はマイグレーションです。その 1 回だけ `LOOPTRACK_DSN` を表を作れる接続先にしてください。
+2 つ目は権限の確認です。`looptrack grants check` を実行し、終了コード 3 で終わったら `looptrack grants apply` で足りない権限を与えます。管理用の資格情報は端末で尋ねられるので、答えてから起動してください。
+compose なら上の `migrate` の行を次のように置き換えます。接続先はコンテナから見た形で書き、値はコマンドの引数に書かずに環境変数で渡します。
+
+```bash
+read -rs LOOPTRACK_DSN && export LOOPTRACK_DSN   # 表を作れる接続先を入力する（画面にも履歴にも残らない）
+docker compose run --rm --no-deps -e LOOPTRACK_DSN looptrack migrate
+unset LOOPTRACK_DSN
+docker compose run --rm --no-deps looptrack grants check   # 終了コード 3 なら次の行
+docker compose run --rm --no-deps looptrack grants apply   # 管理用の資格情報は端末で尋ねる
+docker compose up -d
+```
 
 ### 利用者に配る looptrack（配布ディレクトリ）
 

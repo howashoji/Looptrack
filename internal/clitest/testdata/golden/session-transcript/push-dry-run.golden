@@ -1,0 +1,30 @@
+# session-transcript/push-dry-run
+$ session transcript push 00000000-0000-4000-8000-0000000000f1 --dry-run
+env LOOPTRACK_MACHINE_LABEL=desk-a
+
+#### exit 0
+
+#### stdout
+dry-run（送りません）: claude-code のセッション 00000000-0000-4000-8000-0000000000f1
+ファイル: 送る 2・運ばない 0・書き換えられた 0
+行: 4・チャンク: 2・書きかけの行（次の回に送る）: 0 バイト
+書き換えたパス: 0
+マスクした値: 1（password=… 1）
+書き換えなかった絶対パス: 構造の欄 0・本文 0・キー 0
+
+#### stderr
+
+#### requests (0)
+
+#### files (5)
+home/.claude/projects/-proj/00000000-0000-4000-8000-0000000000f1.jsonl (0644)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","version":"2.1.0","message":{"role":"user","content":"x.go を直して"}}
+    {"type":"assistant","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Edit","input":{"file_path":"/srv/x/x.go"}}]}}
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"user","content":"設定は password=Synthetic0Value9 にある"}}
+home/.claude/projects/-proj/00000000-0000-4000-8000-0000000000f1/subagents/agent-a1.jsonl (0644)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","isSidechain":true,"cwd":"/srv/x","message":{"role":"user","content":"調べて"}}
+ws/.git/HEAD (0644)
+    ref: refs/heads/feature/x
+ws/.git/objects/.keep (0644)
+ws/.git/refs/heads/feature/x (0644)
+    0123456789abcdef0123456789abcdef01234567

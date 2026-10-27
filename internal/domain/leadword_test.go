@@ -76,7 +76,7 @@ func TestLeadWordEnglishAliases(t *testing.T) {
 			t.Errorf("%s: LeadWord(%q) = %q, want %q", c.Name, c.Content, got, c.Kind)
 		}
 	}
-	for _, k := range []string{LeadFeedback, LeadDecision, LeadSendback, ""} {
+	for _, k := range []string{LeadFeedback, LeadDecision, LeadSendback, LeadDigest, ""} {
 		if !kinds[k] {
 			t.Errorf("lead_en に種別 %q の例が無い", k)
 		}
@@ -88,5 +88,23 @@ func TestLeadWordEnglishAliases(t *testing.T) {
 		if got := FeedbackExcerpt(c.Content, c.N); got != c.Out {
 			t.Errorf("%s: FeedbackExcerpt = %q, want %q", c.Name, got, c.Out)
 		}
+	}
+}
+
+// LeadWordSpellings の綴りが LeadWord の判定と食い違わないこと（SQL で引く側が綴りをここから取るので）。
+func TestLeadWordSpellings(t *testing.T) {
+	for _, k := range []string{LeadFeedback, LeadDecision, LeadSendback, LeadDigest} {
+		ja, en := LeadWordSpellings(k)
+		if len(ja) != 2 || len(en) != 1 {
+			t.Fatalf("%s: ja=%v en=%v（日本語は半角・全角の 2 つ、英語は 1 つ）", k, ja, en)
+		}
+		for _, p := range append(append([]string{}, ja...), en...) {
+			if got := LeadWord(p + "x"); got != k {
+				t.Errorf("%s: LeadWord(%q) = %q", k, p+"x", got)
+			}
+		}
+	}
+	if ja, en := LeadWordSpellings("none"); ja != nil || en != nil {
+		t.Errorf("未知の種別は空: %v %v", ja, en)
 	}
 }

@@ -1,0 +1,25 @@
+# session-transcript/push-reject
+$ session transcript push 00000000-0000-4000-8000-0000000000f1
+env LOOPTRACK_MACHINE_LABEL=desk-a
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+00000000-0000-4000-8000-0000000000f1.jsonl: キーに秘密らしい文字列がある行が 1 件あるので送りません
+エラー: 送れないファイルが 1 個あるので、何も送りませんでした（理由は上の行）
+
+#### requests (0)
+
+#### files (4)
+home/.claude/projects/-proj/00000000-0000-4000-8000-0000000000f1.jsonl (0644)
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","version":"2.1.0","message":{"role":"user","content":"x.go を直して"}}
+    {"type":"assistant","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Edit","input":{"file_path":"/srv/x/x.go"}}]}}
+    {"type":"user","sessionId":"00000000-0000-4000-8000-0000000000f1","cwd":"/srv/x","message":{"role":"user","content":"設定は password=Synthetic0Value9 にある"}}
+    {"type":"user","password=Synthetic0Value9":1}
+ws/.git/HEAD (0644)
+    ref: refs/heads/feature/x
+ws/.git/objects/.keep (0644)
+ws/.git/refs/heads/feature/x (0644)
+    0123456789abcdef0123456789abcdef01234567

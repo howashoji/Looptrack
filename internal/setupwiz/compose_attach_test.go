@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	composeAttachRe = regexp.MustCompile(`(?m)^ {6}LOOPTRACK_ATTACH_DIR: (\S+)$`)
-	composeVolumeRe = regexp.MustCompile(`(?m)^ {6}- (\./[^:\s]+):(/[^:\s]+)(:ro)?$`)
+	composeAttachRe     = regexp.MustCompile(`(?m)^ {6}LOOPTRACK_ATTACH_DIR: (\S+)$`)
+	composeTranscriptRe = regexp.MustCompile(`(?m)^ {6}LOOPTRACK_TRANSCRIPT_DIR: (\S+)$`)
+	composeVolumeRe     = regexp.MustCompile(`(?m)^ {6}- (\./[^:\s]+):(/[^:\s]+)(:ro)?$`)
 )
 
 // composeAttachMount は compose.yaml の LOOPTRACK_ATTACH_DIR が、書ける volume（:ro でない）の中にあるかを確かめる。
@@ -60,6 +61,11 @@ func TestComposeAttachDirIsOnWritableVolume(t *testing.T) {
 			}
 			if fi, err := os.Stat(filepath.Join(dir, "data")); err != nil || !fi.IsDir() {
 				t.Errorf("ホストの ./data が無い（Docker が root の持ち物で作り、uid 65534 のコンテナが書けない）: %v", err)
+			}
+			// 会話記録の置き場も同じ volume の中で、添付の置き場とは入れ子にしない（入れ子だと会話記録が使えない）
+			if m := composeTranscriptRe.FindStringSubmatch(compose); m == nil || m[1] != transcriptContainerDir ||
+				!strings.HasPrefix(m[1], "/data/") || strings.HasPrefix(m[1]+"/", attachContainerDir+"/") || strings.HasPrefix(attachContainerDir+"/", m[1]+"/") {
+				t.Errorf("会話記録の置き場 = %v（want %q。/data の中で添付の置き場の外）:\n%s", m, transcriptContainerDir, compose)
 			}
 			if env := envOf(t, dir); env["LOOPTRACK_ATTACH_DIR"] != "" {
 				t.Errorf("compose の置き場は compose.yaml に書く（.env に書くと volume の無い compose.yaml でも置き場が決まってしまう）: %q", env["LOOPTRACK_ATTACH_DIR"])

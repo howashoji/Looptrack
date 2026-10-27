@@ -1,4 +1,4 @@
-// Package core は core の hook（鮮度ガード・トークンの送信と spool・SessionStart の summary・MCP の呼び出しの合鍵）の Go 版（
+// Package core は core の hook（鮮度ガード・トークンの送信と spool・会話記録の自動送信・SessionStart の summary・MCP の呼び出しの合鍵）の Go 版（
 // DESIGN.md §5-1）。元は以前の hook（1.0.0 より前）の鮮度ガード・トークンの送信と、以前の CLI の summary --agent / --hook-json。
 //
 // 各 hook は hookio.Event を読んで hookio.Result を返す（AI ごとの入出力の違いは internal/hookio が吸収する）。
@@ -68,6 +68,7 @@ func init() {
 		{"issue-freshness-mark", "", 4 * time.Second, FreshnessMark},
 		{"issue-freshness-check", hookio.Stop, 9 * time.Second, FreshnessCheck},
 		{"usage", "", 9 * time.Second, Usage},
+		{"transcript", "", 9 * time.Second, Transcript},
 		{"issue-session-bind", hookio.PreToolUse, 3 * time.Second, SessionBind},
 		{"summary", hookio.SessionStart, 9 * time.Second, Summary},
 	} {
@@ -108,6 +109,9 @@ type Env struct {
 	Now func() time.Time
 	// Spawn は usage の送信を切り離した子プロセスで行う（job は子の標準入力に渡す JSON）。nil なら自分を起動する（detach.go）。
 	Spawn func(job []byte, dir string) error
+	// SpawnTranscript は会話記録の送信を切り離した子プロセスで行う（job は子の標準入力に渡す JSON・dir は子の作業ディレクトリ）。
+	// nil なら自分を TranscriptChildArgs で起動する（detach.go）。
+	SpawnTranscript func(job []byte, dir string) error
 	// Sleep は Copilot の OTel の書き出し待ち（テストで縮める）。
 	Sleep func(time.Duration)
 }
@@ -134,6 +138,9 @@ func (e *Env) withDefaults() *Env {
 	}
 	if c.Spawn == nil {
 		c.Spawn = spawnSelf
+	}
+	if c.SpawnTranscript == nil {
+		c.SpawnTranscript = spawnTranscriptSelf
 	}
 	if c.Sleep == nil {
 		c.Sleep = time.Sleep
@@ -196,6 +203,11 @@ func mainWith(ctx context.Context, name string, args []string, stdin io.Reader, 
 	if name == "usage" && hasArg(args, usageJobFlag) {
 		// 切り離した子プロセス（usage の送信の本体）。親が標準入力に usageJob を渡す
 		runUsageJob(ctx, &Call{Env: e, Args: args, Stderr: stderr}, stdin)
+		return 0
+	}
+	if name == "transcript" && hasArg(args, transcriptJobFlag) {
+		// 切り離した子プロセス（会話記録の送信の本体）。親が標準入力に transcriptJob を渡す
+		runTranscriptJob(ctx, &Call{Env: e, Args: args, Stderr: stderr}, stdin)
 		return 0
 	}
 	opts, rest, err := hookio.ParseArgs(args, e.Vars.Get)

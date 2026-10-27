@@ -1,0 +1,17 @@
+# session-transcript/list-empty
+$ session transcript list --all-projects
+
+#### exit 0
+
+#### stdout
+会話記録はありません
+
+#### stderr
+
+#### requests (1)
+GET /im/api/v1/transcripts
+  Authorization: Bearer imp_golden_token
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+
+#### files (0)

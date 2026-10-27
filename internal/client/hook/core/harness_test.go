@@ -114,7 +114,7 @@ func (f *fakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	hs := map[string]string{"Authorization": r.Header.Get("Authorization")}
 	for k := range r.Header {
-		if strings.HasPrefix(strings.ToLower(k), "X-Looptrack-") {
+		if strings.HasPrefix(strings.ToLower(k), "x-looptrack-") {
 			hs[http.CanonicalHeaderKey(k)] = r.Header.Get(k)
 		}
 	}

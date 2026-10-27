@@ -2,11 +2,13 @@ package clitest
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -18,6 +20,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/howashoji/looptrack/internal/client/usagesnap"
 	"github.com/howashoji/looptrack/internal/privfile"
 )
 
@@ -30,6 +33,10 @@ const Project = "demo"
 // APIPlaceholder は Seed の中身で偽 API の URL（LOOPTRACK_API_URL の値）に置き換える印（資格情報のキーなど）。
 const APIPlaceholder = "{{API}}"
 
+// RootPlaceholder は Seed の中身と Env の値で、実行ごとの一時ディレクトリ（ws・home の親）に置き換える印
+// （会話記録の行の cwd のように、端末の絶対パスを中身に持つファイルを置くため）。golden では $TMP になる。
+const RootPlaceholder = "{{ROOT}}"
+
 // Seed は実行前に置くファイル。Path は ws/…（作業ディレクトリ）か home/…（HOME）で始める。
 type Seed struct {
 	Path    string
@@ -40,7 +47,8 @@ type Seed struct {
 // Case は 1 回の CLI の実行。
 type Case struct {
 	Name    string            // golden のファイル名（testdata/golden/<Name>.golden）。/ で階層を分ける
-	Args    []string          // issue の後ろの引数
+	Group   string            // 実行するサブコマンドの群（空なら Impl のもの＝issue。"session" なら looptrack session …）
+	Args    []string          // 群（issue）の後ろの引数
 	Env     map[string]string // 既定の環境変数への上書き。値が "" なら消す
 	Stdin   string
 	Routes  []Route
@@ -48,6 +56,9 @@ type Case struct {
 	Browser bool // BROWSER にブラウザの代わり（authorize を開いて戻り先へ送る）を入れる
 	// PosixPerm は POSIX のファイルの権限（chmod）を前提にするケース。Windows には無い（ACL で守る）ので省略する。
 	PosixPerm bool
+	// PosixPaths は CLI が一時ディレクトリのパスを JSON の文字列の中に書くケース（会話記録の取り込み）。Windows のパスは
+	// JSON の中で \\ に逃がされ、golden の正規化（$TMP）に当たらないので省略する。
+	PosixPaths bool
 }
 
 // Impl は CLI の実装（実行ファイルと、引数の前に付けるもの）。
@@ -176,7 +187,7 @@ func Run(t testing.TB, impl Impl, c Case) Result {
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		content := strings.ReplaceAll(s.Content, APIPlaceholder, api.URL())
+		content := strings.ReplaceAll(strings.ReplaceAll(s.Content, APIPlaceholder, api.URL()), RootPlaceholder, root)
 		if mode&0o077 == 0 {
 			// 本人だけのファイル（資格情報など）は、CLI が書くときと同じく privfile で置く。POSIX は 0600、Windows は本人だけの ACL。
 			// Windows の os.WriteFile は ACL を親から継承するので、CLI の読み取りの検査（privfile.Check）に「広すぎる」と止められる
@@ -198,7 +209,7 @@ func Run(t testing.TB, impl Impl, c Case) Result {
 
 	overrides := map[string]string{}
 	for k, v := range c.Env {
-		overrides[k] = strings.ReplaceAll(v, APIPlaceholder, api.URL())
+		overrides[k] = strings.ReplaceAll(strings.ReplaceAll(v, APIPlaceholder, api.URL()), RootPlaceholder, root)
 	}
 	if c.Browser {
 		helper, err := browserHelper(bin)
@@ -220,6 +231,9 @@ func Run(t testing.TB, impl Impl, c Case) Result {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	argv := append([]string(nil), impl.Argv...)
+	if c.Group != "" && len(argv) > 1 {
+		argv[1] = c.Group
+	}
 	for _, a := range c.Args {
 		argv = append(argv, strings.ReplaceAll(a, APIPlaceholder, api.URL()))
 	}
@@ -241,7 +255,12 @@ func Run(t testing.TB, impl Impl, c Case) Result {
 		t.Fatalf("%s が時間内に終わりませんでした", impl.Name)
 	}
 	host, _ := os.Hostname()
-	norm := &Normalizer{Exes: exePaths(impl), Paths: []string{root, rawTemp(root)}, Repo: repoRoot(), APIBase: api.URL(), Hostname: host, Start: start, End: end}
+	project := Project
+	if v, ok := overrides["LOOPTRACK_PROJECT"]; ok {
+		project = v
+	}
+	norm := &Normalizer{Exes: exePaths(impl), Paths: []string{root, rawTemp(root)}, Repo: repoRoot(), APIBase: api.URL(), Hostname: host, Start: start, End: end,
+		ProjectKey: usagesnap.ProjectKey(api.URL(), project)}
 	return Result{Case: c, Code: code, Stdout: stdout.String(), Stderr: stderr.String(), Requests: api.Requests(),
 		Files: snapshot(t, root, "ws", "home"), Norm: norm}
 }
@@ -335,7 +354,11 @@ func (r Result) Golden() string {
 	n := r.Norm
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n", r.Case.Name)
-	fmt.Fprintf(&b, "$ issue %s\n", strings.ReplaceAll(n.Text(shellJoin(r.Case.Args)), APIPlaceholder, "$API"))
+	group := "issue"
+	if r.Case.Group != "" {
+		group = r.Case.Group
+	}
+	fmt.Fprintf(&b, "$ %s %s\n", group, strings.ReplaceAll(n.Text(shellJoin(r.Case.Args)), APIPlaceholder, "$API"))
 	keys := make([]string, 0, len(r.Case.Env))
 	for k := range r.Case.Env {
 		keys = append(keys, k)
@@ -369,6 +392,9 @@ func (r Result) Golden() string {
 		sort.Strings(names)
 		for _, k := range names {
 			for _, v := range q.Header[k] {
+				if k == "X-Looptrack-Transcript-Nonce" && v != "" {
+					v = "$NONCE" // 会話記録のチャンクごとの乱数（本文の {{LT:<nonce>:…}} も $NONCE にする）
+				}
 				fmt.Fprintf(&b, "  %s: %s\n", k, n.Text(v))
 			}
 		}
@@ -391,6 +417,13 @@ func (r Result) Golden() string {
 
 func (r Result) body(q Request) string {
 	ct := q.Header.Get("Content-Type")
+	if q.Header.Get("Content-Encoding") == "gzip" { // 会話記録のチャンク: 伸ばした中身を記録する（gzip のバイト列は golden に向かない）
+		if zr, err := gzip.NewReader(bytes.NewReader(q.Body)); err == nil {
+			if plain, err := io.ReadAll(zr); err == nil && utf8.Valid(plain) {
+				return "(gzip を伸ばした中身)\n" + r.Norm.Text(string(plain))
+			}
+		}
+	}
 	if !utf8.Valid(q.Body) || bytes.IndexByte(q.Body, 0) >= 0 { // 添付のバイナリ（files の欄と同じ形で記録する）
 		sum := sha256.Sum256(q.Body)
 		return fmt.Sprintf("(バイナリ %d バイト sha256=%s)\n", len(q.Body), hex.EncodeToString(sum[:]))

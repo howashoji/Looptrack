@@ -21,6 +21,7 @@ import (
 //
 // ファイルは全部読んで確かめてから 1 つ目を送る。テキストのファイル（BOM を外し UTF-16 を直した後に NUL を含まないもの）には
 // 検証の出力と同じ秘密の検査（domain.FindSecret。マスクの規則と同じ並び）を当て、当たれば 1 件も送らずに止める。
+// gzip・zip・tar はメモリの中で展開して要素ごとに同じ検査を当てる（attach_archive.go。上限を超えたものは検査できないので送らない）。
 // サーバは中身をマスクできないので、ここが送る前の最後の関所になる。止めた理由には行と規則の語だけを出し、値は出さない。
 //
 // 古いサーバ（添付の経路が無い）とは、添付を使わない限りこれまでどおりに話す。comment・verify の本文の attachments は
@@ -51,16 +52,21 @@ func attachMediaType(name string, data []byte) string {
 	return http.DetectContentType(data)
 }
 
-// checkAttachText はテキストのファイルに秘密の検査を当てる（バイナリは見ない）。
+// checkAttachText はテキストのファイルに秘密の検査を当てる（バイナリは見ない。書庫の中は checkAttachFile が見る）。
 func checkAttachText(path string, data []byte) error {
-	text := textenc.Decode(data)
-	if bytes.IndexByte(text, 0) >= 0 {
-		return nil
-	}
-	if f, ok := domain.FindSecret(string(text)); ok {
+	if f, ok := findTextSecret(data); ok {
 		return i18n.Errorf("cli.err.attach_secret", "path", path, "line", f.Line, "label", f.Label)
 	}
 	return nil
+}
+
+// findTextSecret は data がテキスト（BOM を外し UTF-16 を直した後に NUL を含まない）なら秘密の検査を当てる。
+func findTextSecret(data []byte) (domain.SecretFinding, bool) {
+	text := textenc.Decode(data)
+	if bytes.IndexByte(text, 0) >= 0 {
+		return domain.SecretFinding{}, false
+	}
+	return domain.FindSecret(string(text))
 }
 
 // readAttachments は添付するファイルを全部読み、秘密の検査を当てる（1 つでも止まれば何も返さない）。
@@ -77,7 +83,7 @@ func readAttachments(paths []string) ([]attachFile, error) {
 		if data == nil {
 			data = []byte{}
 		}
-		if err := checkAttachText(p, data); err != nil {
+		if err := checkAttachFile(p, data); err != nil {
 			return nil, err
 		}
 		name := filepath.Base(p)

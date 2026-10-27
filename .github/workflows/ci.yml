@@ -402,6 +402,9 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: internal/server/static
         run: node --test render_test.mjs
+      - name: node --test（利用者ガイドのサイトの言語の振り分け）
+        if: ${{ !cancelled() }}
+        run: node --test site/lib/lang.test.mjs
       - name: actionlint（workflow の lint）
         if: ${{ !cancelled() }}
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12

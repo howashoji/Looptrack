@@ -119,7 +119,7 @@ const (
 type Options struct {
 	Project, URL, Agent, Dir, Source, Dist                       string
 	DryRun, Force, MCP, NoFreshness, NoUsage, NoSummary, NoSkill bool
-	NoSessionBind                                                bool
+	NoSessionBind, NoTranscript                                  bool
 	Loop, NoLoop, RemoveLoop, NoVerify                           bool
 	agents                                                       []string
 }
@@ -128,7 +128,7 @@ func optionsFrom(v *cli.Values, e env.Env) *Options {
 	o := &Options{
 		Project: v.Str("project"), URL: v.Str("url"), Agent: v.Str("agent"), Dir: v.Str("dir"), Source: v.Str("source"), Dist: v.Str("dist"),
 		DryRun: v.Bool("dry_run"), Force: v.Bool("force"), MCP: v.Bool("mcp"), NoFreshness: v.Bool("no_freshness"), NoUsage: v.Bool("no_usage"),
-		NoSummary: v.Bool("no_summary"), NoSessionBind: v.Bool("no_session_bind"), NoSkill: v.Bool("no_skill"), Loop: v.Bool("loop"), NoLoop: v.Bool("no_loop"),
+		NoSummary: v.Bool("no_summary"), NoSessionBind: v.Bool("no_session_bind"), NoTranscript: v.Bool("no_transcript"), NoSkill: v.Bool("no_skill"), Loop: v.Bool("loop"), NoLoop: v.Bool("no_loop"),
 		RemoveLoop: v.Bool("remove_loop"), NoVerify: v.Bool("no_verify"),
 	}
 	if !v.IsSet("project") {

@@ -1,0 +1,13 @@
+# session-pull/bad-limit
+$ session pull DEMO-0001 --limit 0
+
+#### exit 1
+
+#### stdout
+
+#### stderr
+エラー: --limit は 1 以上で指定してください
+
+#### requests (0)
+
+#### files (0)

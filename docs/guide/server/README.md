@@ -11,7 +11,7 @@ On your own, on one PC, with no terminal? The [desktop app](../desktop/README.md
 | Page | What it covers |
 | -- | -- |
 | [Getting started](getting-started.md) | From downloading `looptrack` to setting up the server, creating a project and connecting your agent |
-| [Administration](admin.md) | Users, permissions, two-factor auth, project rules, token reports |
+| [Administration](admin.md) | Users, permissions, two-factor auth, project rules, attachment and transcript limits, token reports |
 | [Updating](updating.md) | Updating the server and the CLI: what is automatic and what is manual, `self-update`, `install.sh --upgrade`, the looptrack you distribute to users |
 
 ## Once your agent is connected

@@ -49,7 +49,9 @@ type Error struct {
 	Current     *Issue // Conflict のとき現在の内容
 	Rule        string // ルール違反のときのルール名
 	Overridable bool   // 理由付きで上書きできるルール違反か
-	msg         error  // i18n の ID を持つ文面（errf で作ったときだけ。無ければ nil）
+	// CurrentSeq は会話記録の追記の連番の不一致（transcript_seq）のときの今の連番（0 もありうるのでポインタ。transcripts.go）
+	CurrentSeq *int64
+	msg        error // i18n の ID を持つ文面（errf で作ったときだけ。無ければ nil）
 }
 
 // Unwrap は ID を持つ文面を返す。i18n.Text が errors.As でこれを見つけて訳す。
@@ -162,6 +164,19 @@ type Service struct {
 	AttachDir string
 	// attachMu は本体の置き換え（添付の rename とメタデータの記録・消去の記録と本体の削除）を、このプロセスの中で 1 つずつにする
 	attachMu sync.Mutex
+	// TranscriptDir は会話記録の本体の置き場（TranscriptDirFromEnv・デスクトップは DataDir/transcripts）。空か、AttachDir と
+	// 入れ子なら会話記録の操作だけが「置き場が設定されていない」で失敗し、ほかの操作はそのまま動く（transcripts_dir.go）
+	TranscriptDir string
+	// transcriptBodies は会話記録の本体（sha256）ごとに、置いてから記録が確定するまでと、指す行を数えてから消すまでを、
+	// このプロセスの中で 1 つずつにする（同じ内容の本体は利用者をまたいで 1 つにまとまるので、利用者ごとではなく本体ごと）。
+	// 利用者ごとの追記と消去の順は DB の行（transcript_locks）が決める（transcripts.go の冒頭のコメント）
+	transcriptBodies blobLocks
+	// TranscriptPlaced は、会話記録の追記が本体を置いた後・記録を確定する前に、本体の sha256 を渡して呼ばれる（nil なら呼ばない）。
+	// テストが別のプロセスの追記をその間で止め、消去と取り合わせるためだけにある（本番では設定しない）
+	TranscriptPlaced func(sum string)
+	// AttachPlaced は、添付が本体を置いた後・記録を確定する前に、本体の sha256 を渡して呼ばれる（nil なら呼ばない）。
+	// テストが別のプロセスの添付をその間で止め、整合の検査と取り合わせるためだけにある（本番では設定しない）
+	AttachPlaced func(sum string)
 }
 
 // New は Service を作る。
@@ -184,6 +199,9 @@ type Issue struct {
 	Row      store.StoredIssue
 	Item     domain.Issue
 	Markdown string // Detail で読んだときだけ
+	// SecretNotice は AddComment が返すときだけ。comment.reject_secret を切にしたプロジェクトで、本文が秘密の検査に
+	// 当たったまま保存したときの注記（行番号と規則の語だけ。prepareComment）。経路はこれをそのまま応答に載せる。対象外なら空
+	SecretNotice string
 }
 
 // Closed はクローズ済みか。
@@ -472,11 +490,36 @@ func (s *Service) Comment(ctx context.Context, a Actor, p store.Project, issueID
 // CommentAttach はコメントを追記し、そのイシューの添付の ID を記録に付ける（attachments が空なら Comment と同じ）。
 // 添付の ID はコメントの本文には書かず、issue_events の detail.attachments にだけ残す（本文は人の書いたまま）。
 func (s *Service) CommentAttach(ctx context.Context, a Actor, p store.Project, issueID int64, text string, attachments []int64) (*Issue, error) {
+	return s.AddComment(ctx, a, p, issueID, CommentInput{Text: text, Attachments: attachments})
+}
+
+// CommentInput はコメントの追記の入力。
+type CommentInput struct {
+	Text string
+	// Attachments はコメントに付ける、そのイシューの添付の ID
+	Attachments []int64
+	// PathHints はセッション要約の本文のパスを置き換える手がかり（digest.go）。セッション要約でなければ見ない
+	PathHints *PathHints
+}
+
+// AddComment はコメントを追記する（REST・MCP・CLI の入口。Comment・CommentAttach もここを通る）。
+// 本文はまず prepareComment（digest.go）を通す。セッション要約なら置き換え・検査をした後の本文を保存し、
+// 記録（issue_events）の detail に kind: "digest" を付ける（最新の要約を記録から引けるようにする）。
+// 要約でないコメントには秘密の検査だけを当て、comment.reject_secret が切なら保存して戻り値の SecretNotice に注記を入れる。
+func (s *Service) AddComment(ctx context.Context, a Actor, p store.Project, issueID int64, in CommentInput) (*Issue, error) {
 	rules, err := rulesOf(p)
 	if err != nil {
 		return nil, err
 	}
-	return s.mutate(ctx, a, p, issueID, 0, func(tx *sql.Tx, doc *mdformat.Document, it domain.Issue, now string) (change, error) {
+	attachments := in.Attachments
+	var secretNotice string
+	out, err := s.mutate(ctx, a, p, issueID, 0, func(tx *sql.Tx, doc *mdformat.Document, it domain.Issue, now string) (change, error) {
+		pc, err := prepareComment(it.ID, in.Text, commentOpts{Hints: in.PathHints, Rules: rules, Lang: a.Lang})
+		if err != nil {
+			return change{}, err
+		}
+		text, digest := pc.Text, pc.Digest
+		secretNotice = pc.SecretNotice
 		if v := rules.CheckText(a.Lang, it.ID, "", text); v != nil {
 			return change{}, ruleError(v)
 		}
@@ -493,8 +536,16 @@ func (s *Service) CommentAttach(ctx context.Context, a Actor, p store.Project, i
 		if len(refs) > 0 {
 			detail["attachments"] = refs
 		}
+		if digest {
+			detail["kind"] = domain.LeadDigest
+		}
 		return change{kind: "comment", detail: detail}, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	out.SecretNotice = secretNotice
+	return out, nil
 }
 
 // StatusResult は状態変更の結果。
@@ -512,6 +563,9 @@ type StatusResult struct {
 	// EvidenceNotice は、verify.require_evidence を切にしたプロジェクトで、エビデンスの無いまま Done にしたときの注意
 	// （止めない。domain.Rules.CheckEvidence）。経路は AcceptanceNotice と同じく応答に載せる。対象外なら空
 	EvidenceNotice string
+	// SecretNotice は、comment.reject_secret を切にしたプロジェクトで、同時のコメントが秘密の検査に当たったまま保存したときの注記
+	// （行番号と規則の語だけ。prepareComment）。経路は AcceptanceNotice と同じく応答に載せる。対象外なら空
+	SecretNotice string
 	// CommentAdded は、同時にコメントを作ったか。本文が空白だけのコメントは作らず状態の変更だけ通すので、
 	// 要求に comment があったかではなく、これで応答の「コメント追記」の行を決める（経路ごとに判定しない）
 	CommentAdded bool
@@ -538,7 +592,7 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 	if err != nil {
 		return nil, err
 	}
-	var from, acceptanceNotice, evidenceNotice string
+	var from, acceptanceNotice, evidenceNotice, secretNotice string
 	var commentAdded bool
 	var assigned *assignPlan
 	it, err := s.mutate(ctx, a, p, issueID, 0, func(tx *sql.Tx, doc *mdformat.Document, cur domain.Issue, now string) (change, error) {
@@ -564,6 +618,13 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 		// 受け入れ条件が雛形のままの着手は止めずに知らせる（close の関門に後で止められる前に。next もここを通る）
 		acceptanceNotice = rules.AcceptanceStartNotice(a.Lang, domain.AcceptanceStart{ID: cur.ID, From: cur.Status, To: status,
 			HasSection: domain.HasAcceptanceSection(doc.BodyMain), Filled: domain.AcceptanceFilled(doc.BodyMain)})
+		// セッション要約は comment の経路だけで受ける（prepareComment が拒む）。ほかのコメントは本文を変えず、
+		// 秘密の検査だけを当てる（comment.reject_secret。拒めば状態も変えない）
+		pc, err := prepareComment(cur.ID, comment, commentOpts{OnStatus: true, Rules: rules, Lang: a.Lang})
+		if err != nil {
+			return change{}, err
+		}
+		secretNotice = pc.SecretNotice
 		from = domain.SetStatus(doc, status, now)
 		detail := map[string]any{"from": from, "to": status}
 		commentAdded = strings.TrimSpace(comment) != "" // 空白だけなら、コメントは作らず状態の変更だけ通す
@@ -581,7 +642,8 @@ func (s *Service) setStatus(ctx context.Context, a Actor, p store.Project, issue
 	if err != nil {
 		return nil, err
 	}
-	res := &StatusResult{Issue: it, From: from, AcceptanceNotice: acceptanceNotice, EvidenceNotice: evidenceNotice, CommentAdded: commentAdded}
+	res := &StatusResult{Issue: it, From: from, AcceptanceNotice: acceptanceNotice, EvidenceNotice: evidenceNotice, CommentAdded: commentAdded,
+		SecretNotice: secretNotice}
 	if assigned != nil {
 		res.AssigneeChanged, res.AssigneeFrom, res.AssigneeAuto = true, assigned.from.Login, assigned.auto
 	}

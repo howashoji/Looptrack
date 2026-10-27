@@ -50,6 +50,8 @@ type Failure struct {
 	Reason string    `json:"reason"`           // Fail* のどれか（知らないキーはそのまま表示する）
 	Status int       `json:"status,omitempty"` // rejected のときの HTTP の状態
 	Count  int       `json:"count"`            // 送信に成功するまでに続けて失敗した回数
+	// Files は会話記録の変換が止めたファイルの数（transcript_rejected のときだけ。件数だけで、名前も中身も持たない）
+	Files int `json:"files,omitempty"`
 }
 
 // StateDir は usage-spool・usage-last・usage-failure.json の置き場（資格情報と同じ looptrack の置き場。
@@ -64,22 +66,27 @@ func StateDir(e env.Env) string {
 
 // RecordFailure は最後の失敗を書く（続けて失敗した回数を 1 つ増やす）。書けなくてもエラーにしない（hook を止めない）。
 func RecordFailure(dir string, now time.Time, reason string, status int) {
+	recordFailureIn(dir, failureFile, now, reason, status, 0)
+}
+
+// recordFailureIn は dir の name に最後の失敗を書く（使用量と会話記録で同じ形。置き場のファイルだけが違う）。
+func recordFailureIn(dir, name string, now time.Time, reason string, status, files int) {
 	if dir == "" {
 		return
 	}
-	f := ReadFailure(dir)
+	f := readFailureIn(dir, name)
 	n := 1
 	if f != nil {
 		n = f.Count + 1
 	}
-	b, err := json.Marshal(Failure{At: now.UTC(), Reason: reason, Status: status, Count: n})
+	b, err := json.Marshal(Failure{At: now.UTC(), Reason: reason, Status: status, Count: n, Files: files})
 	if err != nil {
 		return
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}
-	_ = os.WriteFile(filepath.Join(dir, failureFile), b, 0o644)
+	_ = os.WriteFile(filepath.Join(dir, name), b, 0o644)
 }
 
 // ClearFailure は送信に成功したときに最後の失敗の記録を消す。
@@ -91,11 +98,13 @@ func ClearFailure(dir string) {
 }
 
 // ReadFailure は最後の失敗（無い・読めなければ nil）。
-func ReadFailure(dir string) *Failure {
+func ReadFailure(dir string) *Failure { return readFailureIn(dir, failureFile) }
+
+func readFailureIn(dir, name string) *Failure {
 	if dir == "" {
 		return nil
 	}
-	b, err := os.ReadFile(filepath.Join(dir, failureFile))
+	b, err := os.ReadFile(filepath.Join(dir, name))
 	if err != nil {
 		return nil
 	}

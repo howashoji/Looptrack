@@ -24,6 +24,15 @@ func spawnSelf(job []byte, dir string) error {
 	return spawnDetached(exe, ChildArgs, job, dir, nil)
 }
 
+// spawnTranscriptSelf は自分の実行ファイルを TranscriptChildArgs で起動する（Env.SpawnTranscript の既定。会話記録の送信）。
+func spawnTranscriptSelf(job []byte, dir string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	return spawnDetached(exe, TranscriptChildArgs, job, dir, nil)
+}
+
 // spawnDetached は exe を切り離して起動し、job を標準入力に書いて待たずに離す（environ が nil なら親の環境）。
 func spawnDetached(exe string, args []string, job []byte, dir string, environ []string) error {
 	r, w, err := os.Pipe()

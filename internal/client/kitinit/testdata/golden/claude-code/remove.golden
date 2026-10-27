@@ -194,6 +194,11 @@ init --remove-loop: $TMP/ws
               },
               {
                 "type": "command",
+                "command": "looptrack hook transcript --agent claude-code",
+                "timeout": 10
+              },
+              {
+                "type": "command",
                 "command": "looptrack hook stop-tool-markup-guard --agent claude-code",
                 "timeout": 5
               },
@@ -216,6 +221,11 @@ init --remove-loop: $TMP/ws
               {
                 "type": "command",
                 "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook transcript --agent claude-code",
                 "timeout": 10
               }
             ]
@@ -400,6 +410,11 @@ init --remove-loop: $TMP/ws
                 "type": "command",
                 "command": "looptrack hook usage --agent claude-code",
                 "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook transcript --agent claude-code",
+                "timeout": 10
               }
             ]
           }
@@ -410,6 +425,11 @@ init --remove-loop: $TMP/ws
               {
                 "type": "command",
                 "command": "looptrack hook usage --agent claude-code",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook transcript --agent claude-code",
                 "timeout": 10
               }
             ]

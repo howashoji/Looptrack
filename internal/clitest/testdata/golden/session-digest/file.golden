@@ -1,0 +1,33 @@
+# session-digest/file
+$ session digest DEMO-0001 digest.md
+
+#### exit 0
+
+#### stdout
+コメント追記: DEMO-0001
+
+#### stderr
+
+#### requests (1)
+POST /im/api/v1/issues/DEMO-0001/comments?project=demo
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "path_hints": {
+        "home": "$TMP/home"
+      },
+      "text": "セッション要約: desk-a\nbranch: feature/x\nhead: 0123abc\nai: claude-code\n\n現在地: CLI の session digest を足した。\n次の一手: golden を取り直す。\n"
+    }
+
+#### files (1)
+ws/digest.md (0644)
+    セッション要約: desk-a
+    branch: feature/x
+    head: 0123abc
+    ai: claude-code
+
+    現在地: CLI の session digest を足した。
+    次の一手: golden を取り直す。

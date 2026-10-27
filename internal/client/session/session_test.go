@@ -92,3 +92,29 @@ func TestDetectHostSessionKind(t *testing.T) {
 		}
 	}
 }
+
+// AIKind はセッション要約の見出しの ai に入れる値。サーバの見出しの検査が受ける値（claude-code・codex・copilot・other）だけを返す。
+func TestAIKind(t *testing.T) {
+	cases := []struct {
+		name string
+		env  map[string]string
+		want string
+	}{
+		{"人", nil, "other"},
+		{"明示の ID だけでは種類が分からない", map[string]string{"LOOPTRACK_SESSION_ID": "e"}, "other"},
+		{"Claude Code", map[string]string{"CLAUDE_CODE_SESSION_ID": "c"}, "claude-code"},
+		{"Claude の旧い名前", map[string]string{"CLAUDE_SESSION_ID": "c"}, "claude-code"},
+		{"Claude の器の ID", map[string]string{"CLAUDE_CODE_HOST_SESSION_ID": "h"}, "claude-code"},
+		{"Codex", map[string]string{"CODEX_THREAD_ID": "t"}, "codex"},
+		{"Codex の親だけ", map[string]string{"CODEX_SESSION_ID": "p"}, "codex"},
+		{"Copilot CLI", map[string]string{"COPILOT_CLI": "1", "COPILOT_AGENT_SESSION_ID": "x"}, "copilot"},
+		{"COPILOT_CLI なしの ID は読まない", map[string]string{"COPILOT_AGENT_SESSION_ID": "x"}, "other"},
+		{"VS Code の Copilot", map[string]string{"AI_AGENT": "github_copilot_vscode_agent"}, "copilot"},
+		{"COPILOT_AGENT=1", map[string]string{"COPILOT_AGENT": "1"}, "copilot"},
+	}
+	for _, c := range cases {
+		if got := AIKind(env.FromMap(c.env)); got != c.want {
+			t.Errorf("%s: AIKind = %q（%q のはず）", c.name, got, c.want)
+		}
+	}
+}
