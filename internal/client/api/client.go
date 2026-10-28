@@ -72,6 +72,13 @@ type Error struct {
 
 func (e *Error) Error() string { return e.Message }
 
+// proxyBodyLimitMsg は、前段のリバースプロキシが本文の大きさの上限で止めたとき（JSON の error を持たない 413）の文面の ID
+// （i18n の検査は文字列リテラルの ID しか数えないので、作る側は i18n.M にリテラルで渡す。ここは比べるだけ）。
+const proxyBodyLimitMsg = "cli.err.proxy_body_limit"
+
+// ProxyBodyLimit は、前段のリバースプロキシが本文の大きさの上限で止めた 413 か（サーバ自身の 413 は JSON の error を持つので偽）。
+func (e *Error) ProxyBodyLimit() bool { return e.Msg.ID == proxyBodyLimitMsg }
+
 // Text は利用者の言語の文面。ID を持たない（サーバ由来の）ものは Message をそのまま返す。
 func (e *Error) Text(lang i18n.Lang) string {
 	if e.Msg.ID == "" {
@@ -371,6 +378,12 @@ func (c *Client) once(r Request, base, token string) (*Response, error) {
 				e.Code = eo.String("code")
 				e.Message = eo.String("message")
 			}
+		}
+		if e.Message == "" && e.Code == "" && status == http.StatusRequestEntityTooLarge {
+			// JSON の error が無い 413 はサーバではなく前段（nginx の client_max_body_size など）が返したもの。
+			// 「HTTP 413」だけでは直す場所が分からないので、こちらで文面を作る（ID を持たせて表示する側に訳させる）
+			e.Msg = i18n.M("cli.err.proxy_body_limit") // 文字列は proxyBodyLimitMsg と同じ
+			e.Message = e.Msg.In(i18n.JA)
 		}
 		if e.Message == "" {
 			e.Message = fmt.Sprintf("HTTP %d", status)

@@ -23,6 +23,122 @@ Nothing yet.
 
 まだありません。
 
+## [1.2.0-rc.1] - 2026-10-28
+
+First release candidate for 1.2.0. It is published as a pre-release, so
+`v1.1.0` stays the Latest release on GitHub Releases and keeps the `latest`
+tag on GHCR.
+The changes below are relative to `v1.1.0`. The main additions tell
+administrators about features that are off by default, and check whether the
+reverse proxy in front lets a conversation transcript through. This version
+adds no migrations.
+
+### Added
+
+- **The server tells administrators about a feature that is off by default
+  and still off in every project.** Rules such as `session.transcripts`
+  (added in 1.1.0) stay off after an upgrade, and until now nothing said so.
+  When no project that isn't archived has such a rule on, the server writes a
+  warning to its startup log and shows a notice at the top of
+  `/admin/projects`, each with how to turn it on.
+- **`looptrack features`** is a new server command. For each feature that is
+  off by default it prints how many projects have it on, and how to turn it
+  on when none do. The exit code is always 0.
+- **`looptrack check-proxy [--url <base URL>]`** checks whether the reverse
+  proxy in front lets one conversation transcript chunk through. It sends a
+  32MiB body without credentials to the transcript route under
+  `LOOPTRACK_PUBLIC_URL` plus `LOOPTRACK_BASE_PATH` from `.env`, and reports
+  one of three results: enough, stopped by the proxy with HTTP 413, or
+  could not tell. Nothing is stored, and the exit code is 0.
+- install.sh runs `looptrack check-proxy` once the service is up, both on a
+  fresh install and after `--upgrade`. After `--upgrade` it also runs
+  `looptrack features`. A failing check prints a warning and the run goes on.
+  `LOOPTRACK_LOCAL_MODE=1` skips the proxy check, and `--no-start` skips both.
+- The summary response carries `session_transcripts`, the value of the
+  project rule of that name.
+
+### Changed
+
+- Transcripts now mask a password given to a MySQL client before they are
+  sent: the value joined to `-p` (`-p…`, `-p'…'`) and `--password=…` after
+  `mysql`, `mysqldump`, `mysqladmin` and the other MySQL clients, and
+  `MYSQL_PWD=…`. A word after `-p` and a space is a database name to the
+  MySQL client, so it is left alone, and so are `--password` with no value
+  and `-P` (the port). The same rules also mask the password in
+  `user:…@tcp(…)` and `https://user:…@`, `Authorization: Basic …`, the value
+  of an upper-case `*_KEY=`, and GitHub (`ghp_`, `github_pat_`), Slack
+  (`xox?-`) and temporary AWS (`ASIA`) tokens.
+- These rules are shared, so verify output, the check before an attachment
+  is sent, and the comment check (`comment.reject_secret`) see them too. A
+  comment that carries one of these forms is now refused (or saved with a
+  notice, if the project turned the rule off). Replace the value with `***`
+  and send it again.
+- When a project has transcript storage turned off, `issue summary` and the
+  summary injected at SessionStart now say so in one line. If this machine
+  lacks `LOOPTRACK_SESSION_TRANSCRIPTS=1` as well, the same line says that it
+  is needed too.
+
+### Fixed
+
+- The line pointing to `LOOPTRACK_SESSION_TRANSCRIPTS=1` now appears when the
+  project rule is on and the variable is missing. The client used to learn the
+  rule only from a send, and a machine without the variable never sent, so
+  the line never showed. The summary now reads the rule from the server.
+- An HTTP 413 without a JSON error comes from the reverse proxy in front, not
+  from looptrack. The CLI now says that the proxy stopped the request at its
+  body size limit, that it never reached the server, and that only the
+  server's administrator can fix it (with nginx, `client_max_body_size 33m`
+  or more). It used to print only "HTTP 413". When the automatic transcript
+  hook fails this way, the failure line in the session-start summary says the
+  same.
+- `issue attach` no longer stops a text file when a word such as `secret` or
+  `token` ends one line and the next line starts with `=` or `:`. The check
+  before an attachment joined the two lines into one match, so a verbose
+  `go test -v` log with a test name ending in `secret` could not be attached.
+  A key and its value are now looked for within one line. The same rules mask
+  verify output and transcripts and check comments, so those no longer join
+  lines either.
+
+### Docs
+
+- The server user guide (Getting started) now has a section on reverse proxy
+  settings. It shows the Nginx example that install.sh prints and why each
+  line is there, including `client_max_body_size 33m` for transcript chunks
+  and attachments. It also shows how to check the settings with `nginx -t` and
+  a large request, and gives the Caddy example.
+
+---
+
+1.2.0 のリリース候補の 1 つ目です。プレリリースとして公開するので、GitHub Releases の Latest と GHCR の `latest` タグは `v1.1.0` のままです。下の変更は `v1.1.0` からの差分です。中心は既定で切の機能を管理者に知らせることと、前段のリバースプロキシが会話記録を通すかを確かめることです。この版はマイグレーションを足しません。
+
+### 追加
+
+- **既定で切のままどのプロジェクトでも切の機能を、サーバが管理者に知らせます。** 1.1.0 で足した `session.transcripts` のようなルールは版を上げても切のままで、これまでは誰にも知らされませんでした。アーカイブしていないどのプロジェクトでも切なら、起動時のログに警告を残して `/admin/projects` の上にも知らせを出します。どちらにも入れ方を添えます。
+- **`looptrack features`** はサーバの管理用の新しいコマンドです。既定で切の機能ごとに入のプロジェクトの数を出し、どこでも切なら入れ方も出します。終了コードはいつも 0 です。
+- **`looptrack check-proxy [--url <基点>]`** は前段のリバースプロキシが会話記録の 1 チャンクを通すかを確かめます。`.env` の `LOOPTRACK_PUBLIC_URL` と `LOOPTRACK_BASE_PATH` の下の会話記録の経路へ 32MiB の本文を認証なしで送ります。結果は「足りている」「前段が HTTP 413 で止めた」「確かめられなかった」のどれかです。何も保存せず終了コードは 0 です。
+- install.sh はサービスの起動を確かめた後に `looptrack check-proxy` を実行します。新しく入れたときと `--upgrade` の後の両方です。`--upgrade` の後には `looptrack features` も実行します。確かめが失敗しても注意を出して続けます。`LOOPTRACK_LOCAL_MODE=1` では前段の確かめを飛ばし、`--no-start` ではどちらも実行しません。
+- summary の応答に、同じ名前のプロジェクト別ルールの値 `session_transcripts` を足しました。
+
+### 変更
+
+- 会話記録は MySQL のクライアントに付けたパスワードを送る前に伏せるようになりました。対象は `mysql`・`mysqldump`・`mysqladmin` などの `-p` につなげた値（`-p…`・`-p'…'`）と `--password=…`、それに `MYSQL_PWD=…` です。
+  MySQL のクライアントでは `-p` の後に空白がある語は DB 名なので、伏せません。値の無い `--password` と大文字の `-P`（ポート）も残します。
+  同じ規則で `user:…@tcp(…)` と `https://user:…@` のパスワード・`Authorization: Basic …`・大文字の変数名の `*_KEY=` の値も伏せます。GitHub（`ghp_`・`github_pat_`）・Slack（`xox?-`）・AWS の一時キー（`ASIA`）のトークンも対象です。
+- 規則は共有なので、verify の出力・添付を送る前の検査・コメントの検査（`comment.reject_secret`）にも効きます。これらの形を含むコメントは拒否されます（ルールを切にしたプロジェクトでは注記を付けて保存します）。値を `***` に替えて送り直してください。
+- 会話記録の保存を切にしているプロジェクトでは、`issue summary` と SessionStart で注入する要約がそのことを 1 行で知らせます。この端末に `LOOPTRACK_SESSION_TRANSCRIPTS=1` も無ければそれも要ることを同じ行で添えます。
+
+### 修正
+
+- プロジェクト別ルールが入で環境変数が無いときに、`LOOPTRACK_SESSION_TRANSCRIPTS=1` を案内する行が出るようになりました。クライアントはルールを送ったときの応答からしか覚えません。変数の無い端末は一度も送らないので、この行が出ませんでした。要約はルールをサーバから読みます。
+- JSON の error を持たない HTTP 413 は、looptrack ではなく前段のリバースプロキシが返したものです。CLI はこれを「前段のリバースプロキシが本文の大きさの上限で止めた。サーバには届いていない。直せるのはサーバの管理者」と知らせます（nginx なら `client_max_body_size` を 33m 以上にします）。これまでは「HTTP 413」とだけ出ていました。会話記録を自動で送る hook がこれで失敗したときも、セッションの冒頭の要約の失敗の行が同じことを伝えます。
+- `secret` や `token` のような語で終わる行の次の行が `=` や `:` で始まっていても、`issue attach` はテキストのファイルを止めなくなりました。添付の前の検査が 2 つの行を 1 つの一致としてつないでいたので、テスト名が `secret` で終わる `go test -v` のログを添付できませんでした。鍵と値はいまは同じ行の中だけで探します。verify の出力と会話記録のマスクとコメントの検査も同じ規則を使うので、これらも行をつながなくなりました。
+
+### 文書
+
+- サーバ版の利用者ガイドの「始め方」に、install.sh が表示する Nginx の例と各行が要る理由を載せた
+  リバースプロキシの設定の節を足しました。会話記録のチャンクと添付のための `client_max_body_size 33m`
+  もその 1 つです。確かめ方と Caddy の例もあります。
+
 ## [1.1.0] - 2026-10-27
 
 1.1.0 is a stable release. The changes below are relative to `v1.1.0-rc.1`,
@@ -1734,7 +1850,9 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけでリモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの・まだ手を動かす必要がある所・うまくいかないときに確かめることも書いています。手を動かす所は auto モードでも Claude Code で要るインストールのコマンド・認可の後の Copilot CLI の 2 回目の再起動・再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - 新しいガイド「更新」。更新するとき何が自動で何が手作業かは、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.1.0-rc.1...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.2.0-rc.1...HEAD
+[1.2.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0-rc.1
+[1.1.0]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0
 [1.1.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0-rc.1
 [1.0.2]: https://github.com/howashoji/looptrack/releases/tag/v1.0.2
 [1.0.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1

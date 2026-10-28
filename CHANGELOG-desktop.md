@@ -23,6 +23,86 @@ Nothing yet.
 
 まだありません。
 
+## [1.2.0-rc.1] - 2026-10-28
+
+First release candidate for 1.2.0. It is published as a pre-release, so
+`v1.1.0` stays the Latest release on GitHub Releases.
+The changes below are relative to `v1.1.0`. Transcripts mask more kinds of
+values, and the check before an attachment no longer stops on a false match.
+
+### Changed
+
+- Transcripts now mask a password given to a MySQL client before they are
+  sent: the value joined to `-p` (`-p…`, `-p'…'`) and `--password=…` after
+  `mysql`, `mysqldump`, `mysqladmin` and the other MySQL clients, and
+  `MYSQL_PWD=…`. A word after `-p` and a space is a database name to the
+  MySQL client, so it is left alone, and so are `--password` with no value
+  and `-P` (the port). The same rules also mask the password in
+  `user:…@tcp(…)` and `https://user:…@`, `Authorization: Basic …`, the value
+  of an upper-case `*_KEY=`, and GitHub (`ghp_`, `github_pat_`), Slack
+  (`xox?-`) and temporary AWS (`ASIA`) tokens.
+- These rules are shared, so verify output, the check before an attachment
+  is sent, and the comment check (`comment.reject_secret`) see them too. A
+  comment that carries one of these forms is now refused (or saved with a
+  notice, if the project turned the rule off). Replace the value with `***`
+  and send it again.
+- When a project has transcript storage turned off, `issue summary` and the
+  summary injected at SessionStart now say so in one line. If this machine
+  lacks `LOOPTRACK_SESSION_TRANSCRIPTS=1` as well, the same line says that it
+  is needed too.
+
+### Fixed
+
+- The line pointing to `LOOPTRACK_SESSION_TRANSCRIPTS=1` now appears when the
+  project rule is on and the variable is missing. The client used to learn the
+  rule only from a send, and a machine without the variable never sent, so
+  the line never showed. The summary now reads the rule from the server.
+- An HTTP 413 without a JSON error comes from a reverse proxy in front of a
+  team server, not from looptrack. The bundled CLI now says that the proxy
+  stopped the request at its body size limit, that it never reached the
+  server, and that only the server's administrator can fix it. It used to
+  print only "HTTP 413". When the automatic transcript hook fails this way,
+  the failure line in the session-start summary says the same.
+- `issue attach` no longer stops a text file when a word such as `secret` or
+  `token` ends one line and the next line starts with `=` or `:`. The check
+  before an attachment joined the two lines into one match, so a verbose
+  `go test -v` log with a test name ending in `secret` could not be attached.
+  A key and its value are now looked for within one line. The same rules mask
+  verify output and transcripts and check comments, so those no longer join
+  lines either.
+
+### Docs
+
+- The server user guide (Getting started) now has a section on reverse proxy
+  settings. It shows the Nginx example that install.sh prints and why each
+  line is there, including `client_max_body_size 33m` for transcript chunks
+  and attachments. It also shows how to check the settings with `nginx -t` and
+  a large request, and gives the Caddy example.
+
+---
+
+1.2.0 のリリース候補の 1 つ目です。プレリリースとして公開するので、GitHub Releases の Latest は `v1.1.0` のままです。下の変更は `v1.1.0` からの差分です。会話記録で伏せる値が増え、添付の前の検査の誤検知を直しました。
+
+### 変更
+
+- 会話記録は MySQL のクライアントに付けたパスワードを送る前に伏せるようになりました。対象は `mysql`・`mysqldump`・`mysqladmin` などの `-p` につなげた値（`-p…`・`-p'…'`）と `--password=…`、それに `MYSQL_PWD=…` です。
+  MySQL のクライアントでは `-p` の後に空白がある語は DB 名なので、伏せません。値の無い `--password` と大文字の `-P`（ポート）も残します。
+  同じ規則で `user:…@tcp(…)` と `https://user:…@` のパスワード・`Authorization: Basic …`・大文字の変数名の `*_KEY=` の値も伏せます。GitHub（`ghp_`・`github_pat_`）・Slack（`xox?-`）・AWS の一時キー（`ASIA`）のトークンも対象です。
+- 規則は共有なので、verify の出力・添付を送る前の検査・コメントの検査（`comment.reject_secret`）にも効きます。これらの形を含むコメントは拒否されます（ルールを切にしたプロジェクトでは注記を付けて保存します）。値を `***` に替えて送り直してください。
+- 会話記録の保存を切にしているプロジェクトでは、`issue summary` と SessionStart で注入する要約がそのことを 1 行で知らせます。この端末に `LOOPTRACK_SESSION_TRANSCRIPTS=1` も無ければそれも要ることを同じ行で添えます。
+
+### 修正
+
+- プロジェクト別ルールが入で環境変数が無いときに、`LOOPTRACK_SESSION_TRANSCRIPTS=1` を案内する行が出るようになりました。クライアントはルールを送ったときの応答からしか覚えません。変数の無い端末は一度も送らないので、この行が出ませんでした。要約はルールをサーバから読みます。
+- JSON の error を持たない HTTP 413 は、looptrack ではなくチームのサーバの前段のリバースプロキシが返したものです。同梱の CLI はこれを「前段のリバースプロキシが本文の大きさの上限で止めた。サーバには届いていない。直せるのはサーバの管理者」と知らせます。これまでは「HTTP 413」とだけ出ていました。会話記録を自動で送る hook がこれで失敗したときも、セッションの冒頭の要約の失敗の行が同じことを伝えます。
+- `secret` や `token` のような語で終わる行の次の行が `=` や `:` で始まっていても、`issue attach` はテキストのファイルを止めなくなりました。添付の前の検査が 2 つの行を 1 つの一致としてつないでいたので、テスト名が `secret` で終わる `go test -v` のログを添付できませんでした。鍵と値はいまは同じ行の中だけで探します。verify の出力と会話記録のマスクとコメントの検査も同じ規則を使うので、これらも行をつながなくなりました。
+
+### 文書
+
+- サーバ版の利用者ガイドの「始め方」に、install.sh が表示する Nginx の例と各行が要る理由を載せた
+  リバースプロキシの設定の節を足しました。会話記録のチャンクと添付のための `client_max_body_size 33m`
+  もその 1 つです。確かめ方と Caddy の例もあります。
+
 ## [1.1.0] - 2026-10-27
 
 1.1.0 is a stable release. The changes below are relative to `v1.1.0-rc.1`,
@@ -1220,7 +1300,9 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定からチャットだけで AI エージェントをつなぐ方法。
 - 新しいガイド「更新」。デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.1.0-rc.1...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.2.0-rc.1...HEAD
+[1.2.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0-rc.1
+[1.1.0]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0
 [1.1.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0-rc.1
 [1.0.2]: https://github.com/howashoji/looptrack/releases/tag/v1.0.2
 [1.0.1]: https://github.com/howashoji/looptrack/releases/tag/v1.0.1

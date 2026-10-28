@@ -115,6 +115,11 @@ curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/ins
 同じ版ならサーバは置き換えません。利用者に配る `looptrack` だけをその版にそろえます（そろっていれば何も変えません）。
 MySQL を最小権限で使っているときはもう 1 段あります。表が増えた版では migrate の後にアプリ用の DB 利用者に権限を与え直すまで読めません。そこで `--upgrade` は MySQL の管理用の資格情報を端末で尋ね（表示しません。保存しません）、権限を与え直してから起動します。
 表が増える版（migrate がある版）は止めた後の migrate で表を作りますが、最小権限のアプリ用の利用者では作れません。表を作れる接続先を環境変数 `LOOPTRACK_SETUP_MIGRATE_DSN` で渡してください。渡していなければ `--upgrade` は止める前にそれを示して続けるかを尋ね、既定では何も変えずに止まります。
+サービスが起動した後に `--upgrade` は 2 つの確かめを実行し、その出力を示します。
+`looptrack check-proxy` は前段のリバースプロキシへ 32MiB の本文を送り、会話記録の 1 チャンクが通るかを確かめます。
+`looptrack features` は既定で切の機能のうちどのプロジェクトでも切のものを挙げて入れ方を添えます。
+既定で切の機能は版を上げても入りません。気づけるのはここです。
+新しく入れたときにも前段の確かめを実行します。確かめが失敗しても注意を出すだけで更新は止まりません。`LOOPTRACK_LOCAL_MODE=1` では前段の確かめを飛ばし、`--no-start` ではどちらも実行しません。
 詳しくは運用者向けの [DEPLOY.md の「更新（--upgrade）」](../../../server/DEPLOY.md)を見てください。
 
 ### 新しい版の知らせと自動の置き換え
@@ -264,6 +269,7 @@ looptrack doctor                 # PATH・配線に加え、配布の最新の�
 | macOS・Linux のデスクトップ版で `self-update` がエラーになる | デスクトップ版はアプリごと置き換えます（[デスクトップ版の更新](../desktop/updating.md)） |
 | サーバで `self-update` がエラーになり、インストーラの `--upgrade` を案内する | `install.sh` で入れたサーバです。`curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh \| sudo sh -s -- --upgrade` で更新します |
 | 更新したのに【配布スクリプトの更新】が消えない | 次のセッションの開始時に知らせ直されるまで残ります。kit が古いと出ている場合は `looptrack issue init` も実行します |
+| 入れた後か `--upgrade` の後に、前段のプロキシが HTTP 413 で本文を止めたと出る | 前段の本文の上限が会話記録の 1 チャンクより小さく、会話記録を送れません。nginx なら `client_max_body_size 33m;` を書いて設定を読み込み直します（Caddy は既定で上限を設けていません）。その後にサーバの上で `looptrack check-proxy --url <公開の URL>` を実行し直します。確かめられなかったと出るときは、サーバから自分の公開の URL に届かないだけのこともあります |
 | `install.sh --upgrade` の migrate が失敗した | systemd なら前の実行ファイルが `/usr/local/bin/looptrack.prev` にあり、compose なら前の版のイメージが残っています。戻し方はエラーの文に出ます。migrate が 1 本でも適用していれば（出力に「適用:」の行があれば）、DB も更新の前の控えに戻します |
 | `install.sh --auto-upgrade on` が「何も変えていません」で止まる | 自動の置き換えを入れられないサーバです。compose のサーバ・`--no-start` で入れたサーバ・systemd が動いていないサーバでは使えません。`minisign`（Debian・Ubuntu は `apt-get install -y minisign`、AlmaLinux などは EPEL から `dnf install -y epel-release && dnf install -y minisign`）と、新しい版の書庫と署名を取るための `curl` か `wget` も要ります |
 | 自動の置き換えを有効にしたのに新しい版にならない | `journalctl -u looptrack-upgrade` に理由が出ます。MySQL で新しい版が DB の形を変えるときは自動では置き換えないので、端末で `--upgrade` を実行します。途中で失敗した回は前の版に戻して動いています |

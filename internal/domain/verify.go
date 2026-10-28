@@ -162,8 +162,12 @@ func NoVerifyCommandsMsg(id string) i18n.Msg {
 }
 
 // 出力のマスク（DESIGN.md §9-3-2）。CLI が送る前にかけ、サーバも同じ規則で再度かける。
-// 添付のテキストのファイルを送る前の検査（FindSecret）も同じ並びを使う。label はどの規則に当たったかを人に示す語で、
-// 値そのものは含まない（$1 は当たった鍵の名前。値は入らない）。
+// 添付のテキストのファイルを送る前の検査（FindSecret）・会話記録・コメントの検査も同じ並びを使う。label はどの規則に
+// 当たったかを人に示す語で、値そのものは含まない（$1 は当たった鍵の名前。値は入らない）。
+// 鍵と値の間の空白は行の中だけで探す（[ \t]）。\s にすると、行末の鍵の語（テスト名の末尾の secret など）と
+// 次の行の先頭の = や値がつながって誤検知し、label にも改行が入る。
+// 上から順にかける。引用符で囲んだ値を丸ごと伏せる規則（MySQL のクライアント）は、\S+ で引用符の途中までしか
+// 伏せない password= の規則より前に置く。
 var secretMasks = []struct {
 	re    *regexp.Regexp
 	repl  string
@@ -171,10 +175,24 @@ var secretMasks = []struct {
 }{
 	{regexp.MustCompile(`(?s)(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----|\z)`), "${1}***${2}", "${1}"},
 	{regexp.MustCompile(`imp_[A-Za-z0-9_-]+`), "imp_***", "imp_…"},
-	{regexp.MustCompile(`(?i)bearer\s+\S+`), "Bearer ***", "Bearer …"},
-	{regexp.MustCompile(`(?i)(password|passwd|secret|token|api[_-]?key)(\s*[=:]\s*)\S+`), "${1}${2}***", "${1}${2}…"},
+	{regexp.MustCompile(`(?i)bearer[ \t]+\S+`), "Bearer ***", "Bearer …"},
+	{regexp.MustCompile(`(?i)(authorization[ \t]*:[ \t]*basic)[ \t]+\S+`), "${1} ***", "Authorization: Basic …"},
+	// MySQL のクライアントのパスワード。-p は値をつなげて書いたときだけパスワードで、空白を挟んだ語は DB 名
+	// （MySQL の CLI の決まり）。--password も = でつないだときだけ値を取る。大文字の -P はポートなので見ない。
+	{regexp.MustCompile(`(\b(?i:mysql(?:dump|admin|import|show|check|binlog|slap|pump)?|mariadb(?:-dump|-admin|-import|-show|-check)?)(?i:\.exe)?\s(?:[^\n;|&]*?\s)?)(-p|--password=)('[^'\n]*'|"[^"\n]*"|[^\s'"]+)`), "${1}${2}***", "mysql ${2}…"},
+	{regexp.MustCompile(`\b(MYSQL_PWD)([ \t]*=[ \t]*)('[^'\n]*'|"[^"\n]*"|\S+)`), "${1}${2}***", "${1}${2}…"},
+	{regexp.MustCompile(`(?i)(password|passwd|secret|token|api[_-]?key)([ \t]*[=:][ \t]*)\S+`), "${1}${2}***", "${1}${2}…"},
+	// .env 形式の *_KEY=（*_PASSWORD・*_SECRET・*_TOKEN は上の規則が見る）。ふつうの語の key= に当てないよう、大文字の変数名だけ。
+	{regexp.MustCompile(`\b([A-Z][A-Z0-9_]*_KEY)=('[^'\n]*'|"[^"\n]*"|[^\s'"]+)`), "${1}=***", "${1}=…"},
+	// 接続文字列の利用者情報のパスワード（Go の DSN の user:pass@tcp(…) と URL の scheme://user:pass@）。利用者名は残す。
+	{regexp.MustCompile(`\b([A-Za-z0-9_.-]+):([^\s:@/()]+)@(tcp|unix)\(`), "${1}:***@${3}(", "…:…@${3}("},
+	{regexp.MustCompile(`\b([A-Za-z][A-Za-z0-9+.-]*://[^\s:@/]*):([^\s@/]+)@`), "${1}:***@", "://…:…@"},
 	{regexp.MustCompile(`sk-[A-Za-z0-9_-]{20,}`), "sk-***", "sk-…"},
-	{regexp.MustCompile(`AKIA[0-9A-Z]{16}`), "AKIA***", "AKIA…"},
+	{regexp.MustCompile(`(AKIA|ASIA)[0-9A-Z]{16}`), "${1}***", "${1}…"},
+	// よく知られたトークンの接頭辞（GitHub・Slack）。OpenAI と Anthropic の API キーは上の sk- が見る。
+	{regexp.MustCompile(`\b(gh[pousr])_[A-Za-z0-9]{30,}`), "${1}_***", "${1}_…"},
+	{regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}`), "github_pat_***", "github_pat_…"},
+	{regexp.MustCompile(`\b(xox[abposr])-[A-Za-z0-9-]{10,}`), "${1}-***", "${1}-…"},
 }
 
 // SecretFinding は秘密らしい文字列が見つかった場所（値そのものは持たない）。

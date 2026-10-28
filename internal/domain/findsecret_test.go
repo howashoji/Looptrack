@@ -35,7 +35,11 @@ func TestFindSecret(t *testing.T) {
 			t.Errorf("マスクした後も当たった: %q → %+v", MaskSecrets(c.in), f)
 		}
 	}
-	for _, clean := range []string{"", "PASS\nok  \tpkg\t0.1s\n", "tokens are counted", "token=***", "Bearer ***"} {
+	// 鍵の語と = や値が別の行にあるときは当たらない（テスト名が secret で終わる行の次に === の行が来る -v のログ）。
+	// 対照は hits の同じ行の形（"password: hunter2"・"Bearer eyJ…"）で、行の中なら当たる。
+	for _, clean := range []string{"", "PASS\nok  \tpkg\t0.1s\n", "tokens are counted", "token=***", "Bearer ***",
+		"=== RUN   TestCLIGolden/attach/archive-secret\n=== RUN   TestCLIGolden/attach/next\n",
+		"token\n=abc", "password:\nhunter2", "Bearer\neyJhbGciOi", "Authorization: Basic\ndXNlcjpw", "MYSQL_PWD\n=x"} {
 		if f, ok := FindSecret(clean); ok {
 			t.Errorf("%q に当たった: %+v", clean, f)
 		}

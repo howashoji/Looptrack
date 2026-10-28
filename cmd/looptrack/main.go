@@ -28,7 +28,7 @@
 //	                                   desktop ビルド（-tags desktop）は引数なしの起動（ダブルクリック）もこれ。headless はトレイなし
 //
 // サーバの操作（setup・serve・user・member・token・settings・project・secret-key・healthcheck・migrate・import・verify・
-// export・verify-files・repair-lists・repair-attachments・repair-transcripts・purge-transcripts）は server.go の serverCommands。クライアントのサブコマンドと名前は重ならない。
+// export・verify-files・repair-lists・repair-attachments・repair-transcripts・purge-transcripts・features・check-proxy）は server.go の serverCommands。クライアントのサブコマンドと名前は重ならない。
 //
 //	looptrack version                  版とビルドの種類（headless / desktop）。サーバとクライアントで 1 つ
 //
@@ -116,6 +116,8 @@ func run(args []string, stdio cli.IO, e env.Env) int {
 		return runDesktop(args[1:], stdio, e)
 	case "worktree":
 		return worktree.Main(args[1:], stdio.Stdout, stdio.Stderr, e)
+	case "check-proxy":
+		return checkProxyCmd(args[1:], stdio, e)
 	case "doctor":
 		return kitinit.Doctor(args[1:], kitinit.DoctorOptions{Env: e, Stdout: stdio.Stdout, Stderr: stdio.Stderr, Version: version,
 			Lang: i18n.FromEnv(func(k string) string { return e.Get(k) })})

@@ -449,7 +449,7 @@ compose は compose.yaml の `environment` に `LOOPTRACK_TRANSCRIPT_DIR: /data/
 | 記録 | 管理操作とトークンの発行・失効は、サーバのログ（JSON）に操作者・対象・操作を出します。秘密は出しません |
 | 初回 | 最初の管理者だけは、サーバ上で `looptrack user add … --admin --two-factor required\|optional` を実行して作ります。二段階認証を必須にするか任意にするかもここで決めます（§2-1「二段階認証の設定」・DEPLOY.md） |
 | 二段階認証 | `/looptrack/account` に登録の状態と、任意のときの登録・解除があります。`/looptrack/admin/security`（管理者のみ・ほかは 403）で必須 / 任意の切り替えと変更の記録を扱います。詳しくは §2-1「二段階認証の設定」を見てください |
-| プロジェクト管理 | `/looptrack/admin/projects` です（管理者のみ・ほかは 404・メニューの「プロジェクト管理」から開く）。全プロジェクトを並べ、各プロジェクトの参加者と役割・自分が参加しているか・「開く」（`/looptrack/p/<slug>/`）を出します。付与・変更・解除は `POST /looptrack/admin/projects/<slug>/member` で行います。項目は `login`・`role`（空なら解除）と、代わりの担当者を示す `replacement` です（§9-2「参加を外すときの担当」）。利用者の画面の「プロジェクト権限」（`POST /looptrack/admin/users/<login>/member`）と同じ関数（`setProjectMember`）を通るので、結果は同じです。表示名の変更は `POST …/projects/<slug>/rename`（`name`。`service.RenameProject`）、アーカイブ（画面の「削除」）は `POST …/projects/<slug>/archive`（確認のため `confirm` に slug をそのまま入れさせ、違えば 400）、戻すのは `POST …/projects/<slug>/unarchive` です（どれも `service.SetProjectArchived` / `RenameProject` を呼ぶだけで、規則は service に置きます。管理者以外は 403）。アーカイブ済みのプロジェクトは参加者の欄を出さず、下の「アーカイブしたプロジェクト」に名前・slug・接頭辞と「戻す」だけを並べます。画面はサーバ側で描きます（JS なし・CSP） |
+| プロジェクト管理 | `/looptrack/admin/projects` です（管理者のみ・ほかは 404・メニューの「プロジェクト管理」から開く）。全プロジェクトを並べ、各プロジェクトの参加者と役割・自分が参加しているか・「開く」（`/looptrack/p/<slug>/`）を出します。付与・変更・解除は `POST /looptrack/admin/projects/<slug>/member` で行います。項目は `login`・`role`（空なら解除）と、代わりの担当者を示す `replacement` です（§9-2「参加を外すときの担当」）。利用者の画面の「プロジェクト権限」（`POST /looptrack/admin/users/<login>/member`）と同じ関数（`setProjectMember`）を通るので、結果は同じです。表示名の変更は `POST …/projects/<slug>/rename`（`name`。`service.RenameProject`）、アーカイブ（画面の「削除」）は `POST …/projects/<slug>/archive`（確認のため `confirm` に slug をそのまま入れさせ、違えば 400）、戻すのは `POST …/projects/<slug>/unarchive` です（どれも `service.SetProjectArchived` / `RenameProject` を呼ぶだけで、規則は service に置きます。管理者以外は 403）。アーカイブ済みのプロジェクトは参加者の欄を出さず、下の「アーカイブしたプロジェクト」に名前・slug・接頭辞と「戻す」だけを並べます。画面はサーバ側で描きます（JS なし・CSP）。既定で切の機能がどのプロジェクトでも切なら、一覧の上にその知らせと入れ方を出します（§5-1「既定で切の機能の知らせ」） |
 | プロジェクト権限と自己防衛 | プロジェクト権限は、一覧に出るプロジェクトとそこでの役割を決めます。**管理者も、参加している（行がある）プロジェクトではその役割で動きます**（viewer なら読むだけ）。**行が無いプロジェクトは閲覧のみ**です（役割 viewer 扱い）。プロジェクトの役割によらず管理者に書かせると、viewer で参加している管理者が自分の参加を外すだけで書けてしまうからです。書きたいときは、自分をここで editor / admin として参加させます（自分自身の参加・役割も変えられます）。`/looptrack/admin/*` の管理操作はプロジェクト権限に左右されません（利用者の役割 admin だけで判定します）。利用者の役割（admin / member）と無効化には自己防衛があります（自分には使えず、有効な管理者を 0 人にしません） |
 
 #### 一覧用と解決用
@@ -711,7 +711,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | `POST /issues/{id}/status` | `{"status", "comment"}` です。`messages` は CLI の出力行です（`<ID>: <旧> → <新>` と、コメントを作ったときだけ `コメント追記: <ID>`）。空白だけのコメントは作らず、状態の変更だけ通します（`コメント追記` の行も出しません。MCP の `set_status` も同じ）。セッション要約を `comment` に入れると 422（`digest_on_status`）で、状態も変えません（要約は `/comments` だけで受ける・§9-7）。`comment` には `/comments` と同じ秘密の検査を当てます（`comment.reject_secret`・§9-1）。入なら 422（`comment_secret`）で状態も変えず、切なら保存して `messages` の最後の行と `secret_notice` に注記を載せます（Web は状態の変更フォームの下・MCP の `set_status` は本文の行） |
 | 一覧 | `list` / `ready` は `{"items": [...], "count"}` を返します。項目は frontmatter の値と `closed` `version` `file_name`、未知のキー（`extra`）です。**In Progress の項目には `other_session`（要求のセッション ID と最後に着手したイベントのセッション ID が比べられて違う）・`own_session`（比べられて同じ＝要求のセッションが着手した）・`cross_path_session`（経路が違って比べられない）と `started_ago`（着手からの経過）が付きます**（どれも当たらなければキーごと出しません）。判定は summary と同じで、CLI と MCP は「別のセッションが着手しています」の 1 行を出します。セッション ID が分からない経路では付きません。`all` / `reverse` は `1` / `true` です。`has_feedback=1` は未応答のフィードバックを持つものだけに絞り、**既定でクローズ済みも含めます**（`all` と同じ）。項目には `feedback_pending`（未応答の件数）が付きます（§9-3-6） |
 | `GET /projects/{slug}/matrix` | JSON（rows / untested / orphans）を返します。`?format=md` は matrix.md と同じ文字列です |
-| `GET /projects/{slug}/summary` | counts（open / in_progress / in_review / ready / open_bugs / by_status）・進行中・In Review・ready 上位（`?limit=`、既定 5）を返します。`usage_missing` は呼び出した利用者の AI 操作のうち、直近 7 日でトークン情報が付いていないものです（count・issues・command・message・§9-5）。`usage_requests` は未完了のトークンレポート作成依頼です（§9-5）。3 層の追加キー（§9-3-7・既存のキーは変えない）は、`in_review[]` の各項目の `review_since`・`review_hours`・`review_stale`（48 時間超）・`review_age`・`verify_self_reported`、`feedback`（`count`・`issue_count`・`issues[]`: id・title・status・pending・first_at・excerpt）、`counts` の `in_review_stale`・`feedback_pending` です。`in_progress[]` の各項目には一覧と同じ `other_session`・`own_session`・`cross_path_session`・`started_ago` が付きます。**`in_progress[]` の各項目には、最新のセッション要約があれば `latest_digest`（`excerpt`・`machine_label`・`created_at`・`age`・`session_id`・`other_session`）が付きます**（無ければキーごと出しません・§9-7）。CLI の `summary`（SessionStart の注入文）と MCP の `project_summary` は、`other_session` が `true` のものだけを出します。`session_digest_required` はプロジェクト別ルール `session.digest_required` の値（既定 `false`・§9-1）で、引き継ぎの鮮度ガードがこの応答 1 本で読みます（CLI の `summary --json` も素通しで出します） |
+| `GET /projects/{slug}/summary` | counts（open / in_progress / in_review / ready / open_bugs / by_status）・進行中・In Review・ready 上位（`?limit=`、既定 5）を返します。`usage_missing` は呼び出した利用者の AI 操作のうち、直近 7 日でトークン情報が付いていないものです（count・issues・command・message・§9-5）。`usage_requests` は未完了のトークンレポート作成依頼です（§9-5）。3 層の追加キー（§9-3-7・既存のキーは変えない）は、`in_review[]` の各項目の `review_since`・`review_hours`・`review_stale`（48 時間超）・`review_age`・`verify_self_reported`、`feedback`（`count`・`issue_count`・`issues[]`: id・title・status・pending・first_at・excerpt）、`counts` の `in_review_stale`・`feedback_pending` です。`in_progress[]` の各項目には一覧と同じ `other_session`・`own_session`・`cross_path_session`・`started_ago` が付きます。**`in_progress[]` の各項目には、最新のセッション要約があれば `latest_digest`（`excerpt`・`machine_label`・`created_at`・`age`・`session_id`・`other_session`）が付きます**（無ければキーごと出しません・§9-7）。CLI の `summary`（SessionStart の注入文）と MCP の `project_summary` は、`other_session` が `true` のものだけを出します。`session_digest_required` はプロジェクト別ルール `session.digest_required` の値（既定 `false`・§9-1）で、引き継ぎの鮮度ガードがこの応答 1 本で読みます（CLI の `summary --json` も素通しで出します）。`session_transcripts` はプロジェクト別ルール `session.transcripts` の値（既定 `false`・§9-8）で、CLI の `summary` がルールの切を知らせるのに使います |
 | 変更の応答 | 起票・コメント・状態変更・更新の応答には、AI からの操作なら `usage_notice` が付きます（トークン情報の付与の指示・§9-5 の経路 ③） |
 | `GET /activity` | `?ids=A,B&since=<UNIX 秒・小数可>` で、`items[]`（id・project・last_at（RFC 3339）・last_epoch・last_kind・last_via・events_since）を返します。見つからない ID や権限の無い ID は含めません。`now_epoch` も返します |
 
@@ -859,6 +859,46 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | doctor | `GET /api/v1/dist` の応答に、トークンの利用者が admin のときだけ `server_update`（`version`・`current`・`url`・serve なら `command`）を付けます（member と券の一覧 `/setup/<券>/` には付けません）。`looptrack doctor` は、それがあれば注意の行でサーバの新しい版と更新の 1 行を出します（古いサーバは付けないので何も出しません） |
 | 自動の置き換え | `install.sh --auto-upgrade on|off`（既定は off・印の `AUTO_UPGRADE`）。on は systemd に限り、install.sh の写し `/usr/local/lib/looptrack/install.sh`（root 0755。ディレクトリも root 0755）・`looptrack-upgrade.service`（oneshot。`ExecStart=/bin/sh <写し> --upgrade --require-signature --yes --only-newer`）・`looptrack-upgrade.timer`（`OnCalendar=daily`・`RandomizedDelaySec=1h`・`Persistent=true`）を置きます。**timer は install.sh を取り直しません。** 写しを新しくするのは人が install.sh を動かしたとき（1 行か手元のファイルで、入れる・`--upgrade`・`--auto-upgrade on`）だけで、手元のファイルならそのファイルを、1 行（`$0` がファイルでない）なら同じ URL から取り直したもの（2 行目の印と `sh -n` を確かめる）を写します。timer の回で取るのは書庫だけで、書庫は SHA256SUMS と minisign の署名で確かめます（有効にするときに minisign が要ります）。`--only-newer` は取得した版が入っている版より新しい semver のときだけ置き換えます。compose・`--no-start` では on にできません。`--upgrade` のたびに設定どおりに入れ直し、`--uninstall` で外します |
 | 無人の更新 | `--yes` で尋ねる端末が無い `--upgrade`（timer の回）は、サービスを止めたままにしません。① MySQL では、止める前に新しい版の `looptrack migrate --check`（未適用があれば終了コード 3）で確かめ、未適用があれば置き換えずに 0 でない終了コードで終わります（migrate の後に新しい表の権限を与え直す資格情報を無人では尋ねられず、MySQL の DB は控えから戻せないため。サービスは今の版のまま動き、知らせは続きます）。② 止めた後の失敗（migrate・権限の欠けた表・`/healthz`）は、前の実行ファイル（`looptrack.prev`）に戻し、SQLite なら DB を止めた直後の控えに戻して、前の版で起動し直し、理由を journal に残して 0 でない終了コードで終わります（`rollback_upgrade`。印は前の版のまま。次の日の回も同じ理由なら同じく戻ります）。端末のある手動の `--upgrade`（尋ねて grants を流す）は変わりません。compose の `--upgrade` は対象外です（自動の置き換えが無いため） |
+
+#### 既定で切の機能の知らせ
+
+プロジェクト別ルールで入れる機能は、足した版に上げても切のままです。どこでも切なら誰も気づきません。
+そこでサーバはアーカイブしていないどのプロジェクトでも切の機能を 3 か所で知らせます。
+判定は `internal/service/feature_notices.go` の 1 か所に置き、見せる側はそこを呼ぶだけです。
+
+| 項目 | 決定 |
+| -- | -- |
+| 対象 | `service.DefaultOffFeatures` の一覧です。いまは会話記録のルール `session.transcripts`（1.1.0 で追加・§9-8）の 1 件です。次の機能も一覧に 1 件足せば 3 か所すべてに出ます |
+| 判定 | アーカイブしていないプロジェクトが 1 つ以上あり、そのどれでもルールが切のときに知らせます（`FeatureCount.OffEverywhere`）。読めないルールは切と数えます。プロジェクトが 0 件なら知らせません |
+| 起動時のログ | `looptrack serve` が起動時に、該当する機能ごとに Warn を 1 行残します（`cmd.serve.feature_off`。属性は `feature` と `since`）。ルールを読めなくても起動は止めず、その旨だけを残します |
+| 管理画面 | `/looptrack/admin/projects`（管理者だけ）のプロジェクトの一覧の上に、知らせと入れ方を出します（§3-1） |
+| `looptrack features` | 管理用のサブコマンドです（`LOOPTRACK_DSN` の経路・`cmd/looptrack/features.go`）。機能ごとに入のプロジェクトの数を「N 件のうち M 件」の形で出し、どこでも切なら知らせと入れ方を添えます。終了コードは結果によらず 0 で、DB を開けないときだけ 1 です。install.sh の `--upgrade` が名前で呼ぶので、名前は変えません |
+| 入れ方の文 | `looptrack project rules show <slug>` で今のルールを見て断片（`"session": {"transcripts": true}`）を足し、全体を `looptrack project rules set <slug> -` に渡す、と書きます。rules set はルールの全体を置き換えるので、今ある鍵を残すよう添えます。会話記録では、送る端末に `LOOPTRACK_SESSION_TRANSCRIPTS=1` も要ることを続けます |
+
+#### 前段のプロキシの確かめ
+
+前段のリバースプロキシの本文の上限（nginx の `client_max_body_size`。既定 1MB）が足りないと、会話記録のチャンクは前段が JSON でない 413 で止めます。
+サーバには届かずログにも残らないので、管理者には知る手段がありませんでした。
+`looptrack check-proxy [--url <基点>]`（`cmd/looptrack/checkproxy.go`・`internal/proxycheck`）は実際のチャンクと同じ経路へ同じ大きさの本文を送って確かめます。DB は開きません。
+
+| 項目 | 決定 |
+| -- | -- |
+| 送り先 | `.env` と同じ変数 `LOOPTRACK_PUBLIC_URL` と `LOOPTRACK_BASE_PATH`（無ければ `/looptrack`）をつなぎ、後ろに `/api/v1/transcripts/0/chunks` を付けます。`--url` を渡すと、その基点（接頭辞まで含めた URL）の後ろに付けます。公開の URL が無いか http(s) でなければ、確かめなかった旨を出します |
+| 送るもの | チャンクの既定の上限（`store.DefaultTranscriptMaxChunk`。32MiB）の大きさの 0 のバイトを、認証なしで POST します。`Expect: 100-continue` を付けるので、前段が見出しだけで 413 を返せば本文は流しません。転送は追わず、最初の応答で判定します。締切は 2 分です |
+| 判定 | looptrack の誤りの形の JSON（`error` の鍵に `code` か `message` を持つ。looptrack の 401 など）なら、本文は looptrack まで届いたので足りています。そうでない 413 なら前段の上限が足りません。`error` を持たない JSON の 413 も前段のものとみます。クライアントが「前段の上限」と判じる形（`internal/client/api` の `ProxyBodyLimit`）と同じ境目です。nginx なら `client_max_body_size 33m;` を書いて読み込み直す旨を出します。つながらないときと、ほかの応答は「確かめられなかった」です（ホストから自分の公開 URL に届かないこともあります） |
+| 確かめきれない前段 | 読んだ大きさで止める前段（Caddy の `request_body` の `max_size` など）は塞ぎません。looptrack は認証が無ければ本文を読まずに 401 を返すので、その前段は上限に届く前に後段の応答を返し、「足りている」と出ることがあります。実際の送信が前段の 413 で落ちれば利用者の `summary` に出て、その場で気づけます。足りているときの出力にもこのことを書きます |
+| 書き込まないこと | looptrack は経路より先に認証を見ます。トークンの無い要求には JSON の 401 で応え、会話記録には何も書きません。ID 0 の会話記録はありません |
+| 終了コード | 知らせるだけなので、どの判定でも 0 です。引数の誤りだけが 2 です |
+
+#### install.sh の起動の後の確かめ
+
+install.sh は起動を確かめた後に、管理用のコマンドを呼びます（`after_start_checks`）。
+どれが失敗しても warn を出して続け、入れる作業と更新は止めません。
+
+- 新しく入れたときと `--upgrade` の後にホストに置いた実行ファイルで `looptrack check-proxy --url <公開の URL>` を呼び、出力を字下げして示します。`LOOPTRACK_LOCAL_MODE=1` は前段を置かないので飛ばします。
+  compose でもホストの実行ファイルで呼びます。イメージは FROM scratch で CA 証明書を持たず、コンテナの中からでは https の公開の URL に TLS でつながらないからです。DB と `.env` は読みません。
+- `--upgrade` の後には `looptrack features` も呼んで既定で切の機能と入れ方を示します。DB を読むので、サービスと同じ利用者・同じ `.env` で呼びます（`app_run`）。上げても既定で切のものはここで示さないと誰にも知らされないからです。
+- `--no-start` ではどちらも呼びません。
 
 #### トークンレポートの PDF
 
@@ -1778,7 +1818,7 @@ hook は `kit/loop/manifest.json` の `copilot` に従って `.github/hooks/loop
 | `usage` | 任意 | `{"require_on_close": true}` で、AI からの操作で Done / Canceled（`statuses` で変更可）にするとき、その会話のトークン情報がイシューに 1 件以上あることを求める（§9-5。理由付きで上書き可）。無い・`false` なら警告だけ（既定）。`case_pattern`（正規表現）はトークンレポートの案件別の規則（§9-5「案件ラベル別」）で、判定には使わない。例は `CASE-\d+`。`send_prompts: true`で指示文の作業名を送れるようにする（§9-5「指示文」。既定 false。Web のプロジェクト管理画面でも切り替えられる） |
 | `verify` | 任意（§9-3-4） | `{"require_on_close": true}` で、「## 検証コマンド」節を持つイシューを Done（`statuses` で変更可。既定は Done だけ）にするとき、**現在の本文**に対する直近の `verify` の記録が全件成功であることを求める（記録なし・本文が変わった・失敗の 3 通りの文言で `looptrack issue verify <ID>` を案内。理由付きで上書き可）。節の無いイシューには効かない。AI の操作に限らず全ての経路に効く。`require_evidence`（既定は入。ルールを何も設定していないプロジェクトにも効く）は `require_on_close` と独立に、検証コマンドを 1 つ以上持つイシューを Done にするとき、現在の本文に対する直近の記録に添付（エビデンス）があることを求める（§9-3-4「エビデンスの網」。理由付きで上書き可）。`false` にすると拒否の代わりに注意だけを返す |
 | `acceptance` | 任意 | `{"require_on_close": true}` で、「## 受け入れ条件」節を持つイシューを Done（`statuses` で変更可。既定は Done だけ。Canceled は既定で対象外）にするとき、節に**中身のある行が 1 行以上**あることを求める（起票の雛形のまま・空のチェックボックス・「（未記入）」だけなら拒否。`looptrack issue edit <ID>` を案内。理由付きで上書き可）。節の無いイシューには効かない。AI の操作に限らず全ての経路に効く。有効なプロジェクトでは、**着手（In Progress 以外から In Progress への遷移。`next` を含む）の時点で節が雛形のままなら、止めずに注意を応答に載せる**（`service` の `setStatus` で判定。REST の `messages` と `acceptance_notice`・`next` の `text` と `acceptance_notice`・MCP の本文・Web の状態の変更フォームの下。close の直前に初めて気づいて実装の後追いで条件を書くのを防ぐ。拒否しないのは、調査・記録のように条件を先に書きにくいイシューで上書きの常用を招かないため） |
-| `comment` | 任意（既定は入） | `reject_secret`（既定 `true`。ルールを何も設定していないプロジェクトにも効く）は、セッション要約でないコメント（`POST /issues/{id}/comments`・MCP `add_comment`・CLI `issue comment`・Web のコメントのフォーム・状態の変更と同時の `comment`（`next` を含む））の本文が秘密の検査（`domain.FindSecret`。verify の出力のマスク・添付の検査と同じ規則）に当たるときの扱い。`true` なら 422（`comment_secret`。行番号と規則の語だけを示し値は出さない。値を `***` に置き換えて送り直す案内）で、コメントも状態の変更も残さない（`next` は候補を見送らずにこの理由で返し、何も着手しない）。`false` なら保存して、応答に注記（行番号と規則の語。REST の `secret_notice`・状態の変更は `messages` の行も・`next` は `text` の行も・MCP の本文の行・CLI の出力・Web のフォームの下）を付ける。判定は `internal/service` の `prepareComment`（要約の検査と同じ関数）の 1 か所。**セッション要約はこのルールに関わらず拒む**（要約は AI が書くもので値を要しない・§9-7）。上書きはできない。既定を入にしたのは、コメントが追記専用で消せず（`comments` は SELECT・INSERT のみ）、入った値は失効させるしか無いため。散文にも当たる（`bearer\s+\S+`・`token:` の形）ので、誤検知が多いプロジェクトは切にして注記だけにできる |
+| `comment` | 任意（既定は入） | `reject_secret`（既定 `true`。ルールを何も設定していないプロジェクトにも効く）は、セッション要約でないコメント（`POST /issues/{id}/comments`・MCP `add_comment`・CLI `issue comment`・Web のコメントのフォーム・状態の変更と同時の `comment`（`next` を含む））の本文が秘密の検査（`domain.FindSecret`。verify の出力のマスク・添付の検査と同じ規則）に当たるときの扱い。`true` なら 422（`comment_secret`。行番号と規則の語だけを示し値は出さない。値を `***` に置き換えて送り直す案内）で、コメントも状態の変更も残さない（`next` は候補を見送らずにこの理由で返し、何も着手しない）。`false` なら保存して、応答に注記（行番号と規則の語。REST の `secret_notice`・状態の変更は `messages` の行も・`next` は `text` の行も・MCP の本文の行・CLI の出力・Web のフォームの下）を付ける。判定は `internal/service` の `prepareComment`（要約の検査と同じ関数）の 1 か所。**セッション要約はこのルールに関わらず拒む**（要約は AI が書くもので値を要しない・§9-7）。上書きはできない。既定を入にしたのは、コメントが追記専用で消せず（`comments` は SELECT・INSERT のみ）、入った値は失効させるしか無いため。散文にも当たる（`bearer[ \t]+\S+`・`token:` の形）ので、誤検知が多いプロジェクトは切にして注記だけにできる |
 | `session` | 任意（§9-7） | `{"digest_required": true}` で、セッション要約を必須にする。**サーバは状態の変更を拒まない**。値は `summary` の応答の `session_digest_required`（既定 `false`）で kit/loop の Stop hook `stop-handoff-freshness` に届き、hook が引き継ぎの backend（`LOOPTRACK_LOOP_HANDOFF_BACKEND`）に関わらず、backend `issue` と同じ判定（このセッションが着手中のイシューに、作業の完了より新しい自分の要約があるか）も行う。backend の判定と両方が通ったときだけ通す（§9-7「引き継ぎの鮮度ガード」）。`false`・未設定なら backend の判定だけ。`guide` の「このプロジェクトのルール」には文で出す（`false` は設定の JSON のまま）。`{"transcripts": true}` で、利用者が会話記録をこのプロジェクトから送れるようにする（§9-8。既定 `false`。切なら登録を 422 `transcript_rule_off` で拒む。hook の自動送信には、利用者の `LOOPTRACK_SESSION_TRANSCRIPTS=1` も要る） |
 | 共通 | 全体 | 採番アトミック、列挙値、コメント append-only、クローズ済みの本文・項目は編集不可 |
 
@@ -2002,7 +2042,7 @@ Andrew Ng の 3 層の入れ子ループ（① AI の作業ループ・② 人�
 | 失敗時 | **止めずに全部実行**して全結果を送る | fail-fast: 後段の失敗が見えず、直して再実行する回数が増える |
 | 出力 | 標準出力と標準エラーを合わせ、**末尾 4,000 バイト**（UTF-8 の文字境界で切る）を保つ。手元の表示は失敗したコマンドの末尾 20 行 | 全文を送る: DB と会話を圧迫する。先頭を送る: 失敗の理由は末尾に出る |
 | 結果キャッシュの注記 | 出力に `go test` の結果キャッシュの行（`^ok\s+<パッケージ>\s+\(cached\)`）があれば、その結果に `cached: true` を付けて送る（切る前の末尾 64KiB で見る）。**失敗にはしない**（注記として記録とコメントに残す） | 失敗にする: `\| grep -v cached` で回避でき、出力に偶然その語が混ざると誤検知する。語がどこかにあるだけで印にする: 同じ理由で誤検知する（行の形で見る）。`make` / turbo など印を出さない実行系は捕まえられない（この注記は `go test` の書式だけを見る） |
-| 秘密のマスク | 送る前に次を置換する（既存のマスク規則は無いので新設。Go 側も同じ規則で再度かける。例は両方のテストで共有）: `imp_[A-Za-z0-9_-]+`（本システムの PAT）→ `imp_***`・`(?i)bearer\s+\S+` → `Bearer ***`・`(?i)(password\|passwd\|secret\|token\|api[_-]?key)(\s*[=:]\s*)\S+` → `\1\2***`・`sk-[A-Za-z0-9_-]{20,}`・`AKIA[0-9A-Z]{16}`・`-----BEGIN [A-Z ]*PRIVATE KEY-----` 以降（同じブロックの END まで） | マスクしない: テストの失敗出力に接続文字列やトークンが出ることがある |
+| 秘密のマスク | 送る前に次を置換する（既存のマスク規則は無いので新設。Go 側も同じ規則で再度かける。例は両方のテストで共有）: `imp_[A-Za-z0-9_-]+`（本システムの PAT）→ `imp_***`・`(?i)bearer[ \t]+\S+` → `Bearer ***`・`(?i)(password\|passwd\|secret\|token\|api[_-]?key)([ \t]*[=:][ \t]*)\S+` → `\1\2***`・`sk-[A-Za-z0-9_-]{20,}`（OpenAI と Anthropic の API キーもこれに当たる）・`(AKIA\|ASIA)[0-9A-Z]{16}`・`-----BEGIN [A-Z ]*PRIVATE KEY-----` 以降（同じブロックの END まで）。足した規則: MySQL のクライアント（`mysql`・`mysqldump`・`mysqladmin` など）の `-p` に値をつなげた形・`-p'…'`・`--password=…` と `MYSQL_PWD=…`。`-p` の後に空白がある語は DB 名なので伏せず、値の無い `--password` と大文字の `-P`（ポート）も伏せない。ほかに `Authorization: Basic …`・大文字の変数名の `*_KEY=…`・DSN の `user:…@tcp(`・URL の `scheme://user:…@`（利用者名は残す）・GitHub の `ghp_` などと `github_pat_`・Slack の `xox?-`。鍵の語と値は同じ行の中だけで探す（間の空白は `[ \t]`。改行を含む `\s` にすると、行末の鍵の語と次の行の `=` や値がつながって誤検知する）。規則は `internal/domain/verify.go` の `secretMasks` の 1 か所にあり、会話記録（§9-8）・添付の検査・コメントの検査（`comment.reject_secret`）も同じ並びを使う | マスクしない: テストの失敗出力に接続文字列やトークンが出ることがある |
 | 終了コード | 全成功 0・失敗あり 1・節なし 2（何も記録しない）・記録の送信に失敗 1（手元の結果は表示する） | |
 | `--list` | 実行せずにコマンドを表示する。`--last` はサーバの直近の記録（出力の末尾つき）を表示する | |
 
@@ -3178,7 +3218,7 @@ ai: <claude-code | codex | copilot | other>
 | 状態の変更と同時のコメントが要約 | 422 `digest_on_status` | `comment` の経路で送る案内（状態も変えない） |
 
 拒んだときはコメントも記録（`issue_events`）も残しません。検査の順は「手がかりの検査と置き換え → 上限 → 見出し → 秘密」です。
-`FindSecret` は散文にも当たります（実測: 実際の会話記録 925 行のうち 10 行。規律の文章の引用で、`bearer\s+\S+` や `token:` の形）。
+`FindSecret` は散文にも当たります（実測: 実際の会話記録 925 行のうち 10 行。規律の文章の引用で、`bearer[ \t]+\S+` や `token:` の形）。
 要約も AI の書く散文なので同じ誤検知が起きます。拒否の文面に、語を言い換えるか `***` に置き換える案内を入れているのはそのためです。
 
 #### 記録（`issue_events`）
@@ -3406,6 +3446,7 @@ Codex の形は公式のソース（openai/codex 970111f6）を読んだもの�
    本体の応答は `Content-Type: application/octet-stream` で、ファイル名は付けません（`Content-Disposition: attachment` だけ）。
 
 この経路だけは本文の上限を `transcript_max_chunk_bytes` に合わせ、読み書きの締切を添付と同じく延ばします（`binWriteWindow` と同じやり方）。前段の nginx の `client_max_body_size` も合わせます。
+前段が足りているかは `looptrack check-proxy` で確かめられます（§5-1「前段のプロキシの確かめ」）。
 MCP には経路を足しません（MCP はファイルを運ばない。AI に頼むときは CLI を使う）。
 
 **送った続きの判断**: クライアントは送った端末の状態のファイル（`usagesnap.StateDir` の下の `transcript-push/<usagesnap.ProjectKey の鍵>/<agent>-<セッション ID>.json`）に、
@@ -3420,6 +3461,7 @@ MCP には経路を足しません（MCP はファイルを運ばない。AI に
 （消去の後・別の端末から送った）はサーバの長さから変換し直してから、チャンクを順に追記します（`If-Match` は直前の応答の `seq`、本文は gzip）。409 の
 `transcript_seq`・`transcript_offset` は `GET /transcripts/{id}` で今の連番と長さを取り直し、続きから送り直します（3 回まで。超えたら止めて終了コード 1）。
 サーバの `transcript_max_chunk_bytes` は応答に載らないので、413 `transcript_too_large` を受けたらチャンクの上限を半分にし、同じく取り直して続きから分け直します（64KiB まで）。
+JSON の `error` を持たない 413 は前段のリバースプロキシが返したものなので分け直さず、前段の上限で止まったと分かる文面（`cli.err.proxy_body_limit`。nginx の `client_max_body_size` を 33m 以上にする旨と、直せるのはサーバの管理者である旨）で失敗します。
 状態のファイルはチャンクを 1 つ送るたびに書き直します（一時ファイル → rename・`0600`）。
 
 #### 取り込み（常に fork）
@@ -3470,9 +3512,16 @@ kit core の hook `looptrack hook transcript` を Stop と SessionEnd に配線�
   次の hook がそれを読み、元のファイルから続きを送ります（使用量の spool は送る中身そのものを置くが、会話記録は大きく秘密も混ざるので、写しを増やさない）。7 日で捨てます。
   置き場は `<looptrack の置き場>/transcript-spool/<usagesnap.ProjectKey の鍵>/<agent>-<セッション ID>.json`（同じ記録は 1 つ。最初に退避した時刻から 7 日）。
   退避するのは届かない・5xx・ログインしていない・送る前の失敗のときです。4xx の拒否（`transcript_rule_off` を除く）は退避せず、失敗として残します。
+  JSON の `error` を持たない 413 は前段のリバースプロキシが返したものです。サーバ自身の 413 は `transcript_too_large` を持ちます。
+  クライアント（`internal/client/api`）はこれに「前段のリバースプロキシが本文の大きさの上限で止めた。サーバには届いていない」という文面（`cli.err.proxy_body_limit`）を付けます。
+  hook はこれも退避せず理由を `proxy_limit` として失敗に残します。直す場所はサーバの外の前段の設定です。だから SessionStart の失敗の行も前段の上限と分かる文にしました。
 - 失敗は使用量と同じ形で記録し（`<looptrack の置き場>/transcript-failure.json`・`usagesnap.RecordTranscriptFailure`。送れたら消す）、SessionStart（`summary`）が「会話記録を送れていない」を 1 行出します（退避だけがあるときは未送信の件数の 1 行）。
 - SessionStart は鍵の状態も 1 行出します: 覚えたルールが入で端末のオプトインも入なら「自動送信: 入」、ルールは入でオプトインが切なら `LOOPTRACK_SESSION_TRANSCRIPTS=1` で入れられる旨。
-  ルールが切・覚えていない・失敗も退避も無いときは何も出しません（以前の版のこの節は「成功・未設定のときは何も出さない」でしたが、自動で送っていることと送れることを本人が知れるよう、
+  ルールは summary の応答の `session_transcripts`（§4）を先に使い、返さない古いサーバでは覚えた値に戻ります。
+  覚えた値は送った応答からしか作られません。だからオプトインの無い端末は一度も覚えず、ルールが入でも鍵の行が出ませんでした。
+  応答のルールは表示にだけ使い、覚えた値のファイルは書き換えません（hook が送るかどうかは覚えた値で決まる）。
+  応答のルールが切なら「このプロジェクトでは会話記録の保存を切にしています」の 1 行を出し、端末のオプトインも無ければ同じ行で `LOOPTRACK_SESSION_TRANSCRIPTS=1` も要ることを添えます（`transcript_send` の `auto` は `rule_off`、オプトインの有無は `opt_in`）。
+  `session_transcripts` を返さない古いサーバで覚えたルールが切か覚えていないうえ、失敗も退避も無いときは何も出しません（以前の版のこの節は「成功・未設定のときは何も出さない」でしたが、自動で送っていることと送れることを本人が知れるよう、
   鍵の行を足しました。`summary --json` の `transcript_send`）。
 - 鍵が両方とも入でも、送る hook（Stop・SessionEnd の `looptrack hook transcript`）が配線に無ければ、「自動送信: 入」の代わりに init のやり直しを案内します（`transcript_send` の `unwired` と `rewire`）。
   この hook を配線しない版の init で入れたプロジェクトは、CLI だけを上げてもこの形になります。導入が古いかの判定は CLI の版と kit/core の控えで見るので、配線の欠けは拾えません。

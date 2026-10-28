@@ -40,6 +40,8 @@ type trFake struct {
 	// ruleOff なら登録を 422 transcript_rule_off で拒む。status が 0 でなければ、すべての要求をその状態で返す。
 	ruleOff bool
 	status  int
+	// proxyLimit ならチャンクの追記を前段のリバースプロキシの真似（JSON でない HTML の 413）で止める。
+	proxyLimit bool
 	// hold が nil でなければ、登録の応答をそれが閉じられるまで返さない（記録は先にする）。
 	hold    chan struct{}
 	reqs    []string
@@ -114,6 +116,10 @@ func (f *trFake) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		reply(200, f.state())
+	case r.Method == "POST" && p == "/transcripts/7/chunks" && f.proxyLimit:
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+		_, _ = io.WriteString(w, "<html><body><h1>413 Request Entity Too Large</h1><hr>nginx</body></html>")
 	case r.Method == "POST" && p == "/transcripts/7/chunks":
 		key, _ := url.PathUnescape(r.Header.Get("X-Looptrack-Transcript-File"))
 		off, _ := strconv.ParseInt(r.Header.Get("X-Looptrack-Transcript-Offset"), 10, 64)
@@ -493,4 +499,34 @@ func TestTranscriptDetachEndToEnd(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatalf("子が追記を送っていない: %v", b.api.requests())
+}
+
+// hook の自動送信が前段のリバースプロキシの 413（JSON でない）で止まったら、失敗の理由を proxy_limit で残す。
+// 対照: サーバ自身の 413（JSON の error を持つ）は今までどおり rejected。どちらも 4xx なので退避はしない。
+func TestTranscriptProxyLimitRecorded(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		set    func(f *trFake)
+		reason string
+	}{
+		{"前段の HTML の 413", func(f *trFake) { f.proxyLimit = true }, usagesnap.FailProxyLimit},
+		{"サーバの JSON の 413", func(f *trFake) { f.status = http.StatusRequestEntityTooLarge }, usagesnap.FailRejected},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			b := newTrBox(t)
+			b.goodTranscript()
+			b.vars["LOOPTRACK_SESSION_TRANSCRIPTS"] = "1"
+			b.vars["LOOPTRACK_TRANSCRIPT_THROTTLE_MIN"] = "0"
+			b.rememberRule(true)
+			b.api.set(c.set)
+			b.run("SessionEnd")
+			f := usagesnap.ReadTranscriptFailure(b.stateDir())
+			if f == nil || f.Reason != c.reason || f.Status != http.StatusRequestEntityTooLarge {
+				t.Fatalf("失敗の理由 %+v（%s・413 のはず）。要求: %v", f, c.reason, b.api.requests())
+			}
+			if s := usagesnap.SpoolFiles(usagesnap.TranscriptSpoolDir(b.stateDir(), b.api.url(), "tst")); len(s) != 0 {
+				t.Fatalf("4xx は退避しないはず: %v", s)
+			}
+		})
+	}
 }

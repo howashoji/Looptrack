@@ -45,6 +45,8 @@ type HookPushResult struct {
 	Status int
 	// Files は HookPushRejected のとき、変換が止めたファイルの数。
 	Files int
+	// ProxyLimit は前段のリバースプロキシが本文の大きさの上限で止めた（JSON でない 413。HookPushRefused のとき）。
+	ProxyLimit bool
 	// NoToken はログインしていない（HookPushRetry のとき）。
 	NoToken bool
 	// Conn はサーバに届かない（通信断・名前解決・TLS・時間切れ。HookPushRetry のとき）。
@@ -99,7 +101,7 @@ func classifyHookPush(err error) HookPushResult {
 			// push は最初の拒否で止まるので、止めたのはそのチャンクのファイル 1 つ
 			r.Outcome, r.Status, r.Files = HookPushRejected, ae.Status, 1
 		case ae.Status >= 400 && ae.Status < 500:
-			r.Outcome, r.Status = HookPushRefused, ae.Status
+			r.Outcome, r.Status, r.ProxyLimit = HookPushRefused, ae.Status, ae.ProxyBodyLimit()
 		default:
 			r.Outcome, r.Status = HookPushRetry, ae.Status
 		}

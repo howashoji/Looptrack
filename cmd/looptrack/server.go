@@ -19,6 +19,7 @@
 //	looptrack repair-transcripts [--apply]   会話記録の DB と置き場の食い違いを報告する（同じ形。repair_transcripts.go）
 //	looptrack purge-transcripts --user <login> [--transcript <id>] [--reason <text>] [--yes]
 //	                                         利用者の会話記録の本体を消す運用者の操作（--yes が無ければ対象の数と大きさを示すだけ。purge_transcripts.go）
+//	looptrack features                    既定で切の機能ごとに入のプロジェクトの数を示す（install.sh の --upgrade が呼ぶ。features.go）
 package main
 
 import (
@@ -59,6 +60,7 @@ var serverCommands = map[string]func(args []string) int{
 	"repair-attachments": repairAttachmentsCmd,
 	"repair-transcripts": repairTranscriptsCmd,
 	"purge-transcripts":  purgeTranscriptsCmd,
+	"features":           featuresCmd,
 }
 
 // serverUsage は looptrack -h の「サーバの操作」の節。
