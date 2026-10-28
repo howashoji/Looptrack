@@ -4,6 +4,7 @@
   <h1>{{T .Lang "server.web.common.admin_projects"}}</h1>
   <p class="muted">{{T .Lang "server.web.admin_projects.intro_1"}}<strong>{{T .Lang "server.web.admin_projects.intro_strong"}}</strong>{{T .Lang "server.web.admin_projects.intro_2"}}<a href="{{base}}/admin/users">{{T .Lang "server.web.common.admin_users"}}</a>{{T .Lang "server.web.admin_projects.intro_3"}}</p>
   {{template "messages" .}}
+  {{range .FeaturesOff}}<p class="notice feature-off" role="status">{{.Notice}} <span class="muted">{{.Hint}}</span></p>{{end}}
   {{template "replacement" .}}
   {{range .Projects}}
   {{$act := printf "%s/admin/projects/%s/member" base .Slug}}

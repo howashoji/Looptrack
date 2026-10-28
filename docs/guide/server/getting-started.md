@@ -244,7 +244,7 @@ The installer is for Linux only. On macOS or Windows, use the [desktop edition](
 
 First it asks how to run the server (systemd or Docker compose). Then come the same questions as `looptrack setup`.
 When it finishes, it prints Nginx and Caddy configuration examples (also written to `/etc/looptrack/proxy-examples.txt`), the browser URL, the CLI login command and the MCP connection settings.
-Put the reverse proxy in front, sign in at the public URL, and carry on from step 4.
+Put the reverse proxy in front as described under "Reverse proxy settings" below, sign in at the public URL, and carry on from step 4.
 
 Choosing MySQL and giving the application's database user only the privileges it needs (`deploy/grants.sql`)? The same run takes care of that too.
 Per-table `GRANT`s can only run once the tables exist. So after setup creates the tables, the installer asks on the terminal for an administrative MySQL account (the password isn't shown and isn't stored).
@@ -253,6 +253,77 @@ If the administrative account is wrong, it stops without starting anything. Run 
 If the database does not exist yet, setup asks for the same administrative account up front and, after asking whether to go ahead, creates the database too (you are asked only once). This needs the user that creates the tables (`LOOPTRACK_SETUP_MIGRATE_DSN`) and its `GRANT` on that database to be in place first; without them it stops at the connection as before. Answer no and it stops without creating anything, showing the `CREATE DATABASE` statement to run yourself.
 
 To update, run `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` (details in [Updating](updating.md)). To remove it, use `--uninstall`. Add `--purge` and the settings and the data go too.
+
+### Reverse proxy settings (Nginx, Caddy)
+
+A team server takes HTTPS on a reverse proxy in front and passes it to `127.0.0.1:8090`.
+This is the Nginx example that install.sh prints. Replace `im.example.com`, `/looptrack` and `8090` with your own values.
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name im.example.com;
+    # ssl_certificate     /etc/letsencrypt/live/im.example.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/im.example.com/privkey.pem;
+
+    location = /looptrack { return 301 /looptrack/; }
+    location /looptrack/ {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        client_max_body_size 33m;
+    }
+}
+```
+
+| Line | Why it is there |
+| -- | -- |
+| `proxy_pass http://127.0.0.1:8090;` | No trailing `/`. With one, the `/looptrack` prefix is stripped on the way and the server cannot find the route |
+| The four `proxy_set_header` lines | They tell the server the original host, the client's IP and whether the request came over HTTPS. The server takes `X-Real-IP` as the client's IP when the request comes from a trusted proxy. Without a public URL set, it builds the OAuth URLs from `Host` and `X-Forwarded-Proto` |
+| `proxy_buffering off;` | MCP responses go to the AI as they arrive instead of piling up in Nginx |
+| `proxy_read_timeout 300s;` | A slow response is not cut off halfway. The Nginx default is 60 seconds |
+| `client_max_body_size 33m;` | The Nginx default is 1MB, and a larger request gets a 413 before it reaches the server. 33m is above the limit for one transcript chunk (32MiB by default) and lets one attachment of the default maximum (20MiB) through |
+
+If you raise the transcript or attachment limit on the admin screen, raise `client_max_body_size` with it.
+The CLI does not resend a transcript chunk after a 413 from the proxy; it fails.
+
+After changing the settings, check the syntax and reload.
+Then send a 32MiB body and make sure Nginx does not stop it.
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+head -c 33554432 /dev/zero > /tmp/body-32m
+curl -s -o /dev/null -w '%{http_code}\n' -X POST --data-binary @/tmp/body-32m https://im.example.com/looptrack/api/v1/transcripts/1/chunks
+rm /tmp/body-32m
+```
+
+`nginx -t` prints `syntax is ok` and `test is successful`.
+The curl request is not signed in, so a 401 means the body reached the server.
+A 413 means the Nginx limit still applies. Look for a smaller `client_max_body_size` in another `server` or `location`.
+
+Caddy gets its certificate by itself. It sets no body limit by default, and the install.sh example adds none.
+If you add one, set `max_size` under `request_body` to 33MiB, the same as Nginx.
+
+```caddy
+im.example.com {
+    redir /looptrack /looptrack/ 301
+    handle /looptrack/* {
+        request_body {
+            max_size 33MiB
+        }
+        reverse_proxy 127.0.0.1:8090 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+}
+```
+
+Check it the same way: run `caddy validate --config /etc/caddy/Caddyfile` for the syntax, then send the curl request above.
 
 ## 4. Create a project and join it
 

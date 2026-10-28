@@ -312,6 +312,8 @@ Not carried: 5f0c2a9e-7b1d-4c3e-9a8f-2d6b1e0c4a7f/workflows (workflows, 7)
 
 - **Paths in structural fields** (`cwd`, `file_path` and `path` in a tool's input, Bash's `command`, the executable path at the start of a hook's command line and the like) are rewritten. This machine's git working tree root, the agent's transcript and settings directories and the home directory are replaced with markers (placeholders) before sending, and the importing machine turns them back into its own paths. The original absolute paths never reach the server.
 - **Credential-shaped values** (`token=…`, `Bearer …`, private keys and the like) are masked to `***`, string value by string value.
+  A password given to a MySQL client is masked too: the value joined to `mysql -p`, `--password=…` and `MYSQL_PWD=…`. A word after `-p` and a space, as in `mysql -p im`, is a database name, so it stays.
+  Also masked: the password in the user part of a connection string (`user:…@tcp(…)`, `https://user:…@`), `Authorization: Basic …`, the values of `.env`-style `*_PASSWORD=`, `*_TOKEN=`, `*_SECRET=` and `*_KEY=`, GitHub, Slack and AWS tokens, and OpenAI and Anthropic API keys.
 - **Prose is not rewritten**: the agent's replies, tool output, the contents of files it read, and the text of system reminders. Only structural fields, picked by key name, are rewritten.
   Paths left in prose are the sending machine's, so `pull` shows how many there are as a note. In your first message after the fork, give the agent the path of the checkout you continue in (as in rule 5 above).
 - The transcript format is internal to each agent and changes between versions. When `push` notes "absolute paths left unrewritten in structural fields", the format has probably changed, and after a fork they may point at the old root.
@@ -326,6 +328,9 @@ If a file has any of the following, `push` sends nothing, prints the reason for 
 
 When a file became shorter or changed after it was sent, its continuation is not sent; the count is reported and the exit code is 1.
 Run `purge` and push again to send it from the start.
+
+When the reverse proxy in front of the server refuses a chunk for its size (an HTTP 413 that does not come from looptrack), `push` stops with a message saying so.
+Nothing reached the server, and only the server's administrator can fix the proxy setting.
 
 #### Importing
 
@@ -385,10 +390,11 @@ The best protection is never letting a credential's value into the conversation.
 - It sends only when both the project rule `session.transcripts` and the per-machine environment variable `LOOPTRACK_SESSION_TRANSCRIPTS=1` (off by default) are on.
 - At Stop it sends nothing until 10 minutes have passed since the last attempt (change the interval with `LOOPTRACK_TRANSCRIPT_THROTTLE_MIN`). SessionEnd is not thinned out.
 - The sending runs in a detached child process, and the hook returns at once. It never holds up the turn.
-- At the start of a session (the SessionStart summary, which init also wires), these lines appear. When the rule is off or not known yet, the first two do not appear.
+- At the start of a session (the SessionStart summary, which init also wires), these lines appear. The rule is the one the server returns with the summary; an older server that does not return it leaves the client with the value it remembered from its last send, and with the rule off or not known yet, the first two lines do not appear.
   - Both on: one line starting "Automatic transcript sending: on"
   - The rule on but no `LOOPTRACK_SESSION_TRANSCRIPTS=1`: one line pointing to that setting
-  - Not being sent: one line with the last failure, or one with the unsent count. It appears at every session start until a send succeeds
+  - The rule off: one line saying that this project has storing transcripts turned off, and that a project administrator can turn on `session.transcripts`. Without `LOOPTRACK_SESSION_TRANSCRIPTS=1`, the same line adds that this machine needs it too
+  - Not being sent: one line with the last failure, or one with the unsent count. It appears at every session start until a send succeeds. When the reverse proxy in front refused it for its size, the line says so
 - A transcript that could not be sent because of unreadable lines or a secret in a key is recorded as a failure once and not retried automatically. A `looptrack session transcript push` typed by hand still works as before.
 
 ## Installing through MCP only (the setup tool)

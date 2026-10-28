@@ -242,7 +242,7 @@ curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/ins
 
 最初の問いは systemd と Docker compose のどちらで動かすかです。続けて `looptrack setup` と同じことを聞かれます。
 終わると Nginx と Caddy の設定例・ブラウザの URL・CLI のログイン方法・MCP の接続設定が表示されます。設定例は `/etc/looptrack/proxy-examples.txt` にも書き出されます。
-リバースプロキシを前に置いて公開 URL でログインしたら、手順 4 へ進んでください。
+下の「リバースプロキシの設定」に沿ってリバースプロキシを前に置き、公開 URL でログインしたら手順 4 へ進んでください。
 
 保存先に MySQL を選び、`deploy/grants.sql` でアプリ用の DB 利用者に必要な権限だけを与えます。この場合も同じ 1 回の実行で進みます。
 表ごとの `GRANT` は表ができてからでないと流せません。だから setup が表を作った後で、インストーラが MySQL の管理用の資格情報を端末で尋ねます（パスワードは表示しません。保存もしません）。
@@ -251,6 +251,79 @@ curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/ins
 DB がまだ無ければ setup が同じ管理用の資格情報を先に尋ね、作ってよいかを確かめてから DB も作ります（尋ねるのは 1 回だけです）。表を作る利用者（`LOOPTRACK_SETUP_MIGRATE_DSN`）と、その DB への `GRANT` の 2 つは先に用意しておきます（無ければ従来どおり接続で止まります）。作らないと答えると何も作らずに止まり、自分で流す `CREATE DATABASE` の文を示します。
 
 更新は `curl -fsSL https://raw.githubusercontent.com/howashoji/looptrack/main/deploy/install.sh | sudo sh -s -- --upgrade` です（詳しくは[更新](updating.md)）。アンインストールは `--uninstall` で、`--purge` を付ければ設定とデータも消えます。
+
+### リバースプロキシの設定（Nginx・Caddy）
+
+チームのサーバは前段のリバースプロキシで HTTPS を受け、`127.0.0.1:8090` へ渡します。
+install.sh が表示する Nginx の例は次のとおりです。`im.example.com`・`/looptrack`・`8090` は自分の値に替えてください。
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name im.example.com;
+    # ssl_certificate     /etc/letsencrypt/live/im.example.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/im.example.com/privkey.pem;
+
+    location = /looptrack { return 301 /looptrack/; }
+    location /looptrack/ {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        client_max_body_size 33m;
+    }
+}
+```
+
+| 行 | 要る理由 |
+| -- | -- |
+| `proxy_pass http://127.0.0.1:8090;` | 末尾に `/` を付けません。付けると接頭辞 `/looptrack` が外れて届き、サーバが経路を見つけられません |
+| `proxy_set_header` の 4 行 | 元の宛先・接続元の IP・HTTPS かどうかをサーバへ伝えます。サーバは信用するプロキシから来た `X-Real-IP` を接続元の IP として使います。公開 URL を設定していなければ `Host` と `X-Forwarded-Proto` から OAuth の URL を組みます |
+| `proxy_buffering off;` | MCP の応答を Nginx に溜めず、届いた順に AI へ流します |
+| `proxy_read_timeout 300s;` | 時間のかかる応答を途中で切らないためです。Nginx の既定は 60 秒です |
+| `client_max_body_size 33m;` | Nginx の既定は 1MB で、超えた要求はサーバに届く前に 413 になります。会話記録の 1 チャンクの上限（既定 32MiB）より大きく、添付の 1 ファイルの上限（既定 20MiB）も通る値です |
+
+管理者の画面で会話記録か添付の上限を上げたら `client_max_body_size` も合わせて上げます。
+CLI はプロキシが返す 413 では会話記録のチャンクを送り直さずに失敗するからです。
+
+設定を変えたら文法を確かめて読み込み直し、32MiB の本文が Nginx で止まらないことを確かめます。
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+head -c 33554432 /dev/zero > /tmp/body-32m
+curl -s -o /dev/null -w '%{http_code}\n' -X POST --data-binary @/tmp/body-32m https://im.example.com/looptrack/api/v1/transcripts/1/chunks
+rm /tmp/body-32m
+```
+
+`nginx -t` が `syntax is ok` と `test is successful` を出せば文法は通っています。
+curl はログインせずに送るので、401 が返れば本文はサーバまで届いています。
+413 なら Nginx の上限が効いたままです。
+別の `server` や `location` に小さい `client_max_body_size` が無いかを見てください。
+
+Caddy は証明書を自動で取り、本文の上限も既定では付けません。
+install.sh の Caddy の例も上限の無い形です。
+付けるなら `request_body` の `max_size` を Nginx と同じ 33MiB にします。
+
+```caddy
+im.example.com {
+    redir /looptrack /looptrack/ 301
+    handle /looptrack/* {
+        request_body {
+            max_size 33MiB
+        }
+        reverse_proxy 127.0.0.1:8090 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+}
+```
+
+確かめ方は Nginx と同じです。
+`caddy validate --config /etc/caddy/Caddyfile` で文法を見てから上の curl を送ってください。
 
 ## 4. プロジェクトを作り、自分を参加させる
 

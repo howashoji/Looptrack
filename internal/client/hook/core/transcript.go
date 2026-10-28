@@ -262,7 +262,11 @@ func (c *Call) transcriptWork(_ context.Context, job transcriptJob) {
 			usagesnap.RecordTranscriptFailure(state, now, usagesnap.FailTranscriptRewritten, 0, 0)
 		case cli.HookPushRefused:
 			removeIn(spoolDir, name)
-			usagesnap.RecordTranscriptFailure(state, now, usagesnap.FailRejected, r.Status, 0)
+			reason := usagesnap.FailRejected
+			if r.ProxyLimit {
+				reason = usagesnap.FailProxyLimit // 直すのは前段の設定（要約で案内を分ける）
+			}
+			usagesnap.RecordTranscriptFailure(state, now, reason, r.Status, 0)
 		case cli.HookPushNotFound:
 			removeIn(spoolDir, name) // 記録が無い（消えた・別の AI のセッション）。失敗としては残さない
 			c.debug("%s", i18n.T(c.lang(), "core.usage.debug.no_transcript", "client", j.Agent, "path", j.SessionID))

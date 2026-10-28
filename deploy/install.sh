@@ -988,6 +988,34 @@ print_access() {
   say "  $DIR/.env の LOOPTRACK_SECRET_KEY を失うと全員の二段階認証が使えなくなります。別の場所に控えてください。"
 }
 
+# after_start_checks install|upgrade — 起動を確かめた後の知らせ。どれが失敗しても止めない（warn だけ）。
+#   - 前段のリバースプロキシが会話記録の 1 チャンク（既定 32MiB）を通すか（looptrack check-proxy）。前段の上限が足りないと
+#     チャンクは JSON でない 413 で止まり、サーバのログにも残らない。LOOPTRACK_LOCAL_MODE=1 は前段を置かないので飛ばす
+#   - --upgrade では、既定で切の新しい機能と入れるコマンド（looptrack features）。上げても既定で切のものは誰にも知らされない
+# check-proxy はホストに置いた $BIN で呼ぶ（公開の URL へ送るだけで DB も .env も読まない。compose のイメージは FROM scratch で
+# CA 証明書を持たないので、コンテナの中からでは https の公開の URL に TLS でつながらない）。送り先は .env から作った ${URL}。
+# features は DB を読むので app_run（サービスと同じ利用者・同じ .env）。古い版の looptrack にサブコマンドが無くても止めない。
+after_start_checks() {
+  [ "$NO_START" = 1 ] && return 0
+  if [ "$LOCAL_MODE" != 1 ]; then
+    step "前段のリバースプロキシ（looptrack check-proxy）"
+    if out=$("$BIN" check-proxy --url "$URL" 2>&1); then
+      printf '%s\n' "$out" | sed 's/^/  /'
+    else
+      warn "looptrack check-proxy が失敗しました（続けます）: $out"
+    fi
+  fi
+  if [ "$1" = upgrade ]; then
+    step "既定で切の新しい機能（looptrack features）"
+    if out=$(app_run features 2>&1); then
+      printf '%s\n' "$out" | sed 's/^/  /'
+    else
+      warn "looptrack features が失敗しました（続けます）: $out"
+    fi
+  fi
+  return 0
+}
+
 show_configured() {
   METHOD=$S_METHOD
   DIR=$S_DIR
@@ -1919,6 +1947,7 @@ upgrade() {
   write_state
   say ""
   say "更新しました: $S_VERSION → ${NEW_VERSION}（データはそのままです）"
+  after_start_checks upgrade
 }
 
 # ---------------------------------------------------------------- 外す
@@ -2037,6 +2066,7 @@ install_main() {
     say ""
     proxy_examples
   fi
+  after_start_checks install
 }
 
 main() {

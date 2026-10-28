@@ -67,6 +67,8 @@ func serve() int {
 		return fail(err)
 	}
 	warnSQLitePerms(os.Getenv("LOOPTRACK_DSN"), logger)
+	// どこでも切のままの、既定で切の機能を起動時のログで知らせる
+	logFeaturesOff(context.Background(), db, cmdLang(), logger)
 	if !store.IsSQLite(db) { // SQLite の接続の数は store.Open が決める（sqlite::memory: は 1 本でなければ DB が分かれる）
 		db.SetMaxOpenConns(10)
 		db.SetMaxIdleConns(4)

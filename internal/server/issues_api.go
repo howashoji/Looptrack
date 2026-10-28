@@ -761,6 +761,9 @@ func (s *Server) apiSummary(w http.ResponseWriter, r *http.Request) {
 		// session_digest_required はプロジェクト別ルール session.digest_required（既定 false）。引き継ぎの鮮度ガード（Stop hook）が
 		// この応答 1 本で、着手中のイシューの要約と一緒に読む（ルールのためだけに別の要求を足さない。DESIGN.md §9-7）
 		"session_digest_required": service.SessionDigestRequired(pr),
+		// session_transcripts はプロジェクト別ルール session.transcripts（既定 false）。CLI の summary が、ルールが切であることを
+		// 1 行で知らせるのに使う（会話記録は端末の設定だけでは送られない）
+		"session_transcripts": service.SessionTranscriptsEnabled(pr),
 	})
 }
 

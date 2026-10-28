@@ -122,7 +122,13 @@ func (c *Ctx) summaryBody(v *Values) error {
 	if local := localUsageFailure(c.Env, slug); local != nil { // この PC のフックの送信の失敗（サーバには届いていない）
 		data.Set("usage_send_failure", local)
 	}
-	if tr := localTranscriptState(c.Env, c.Root, slug, v.Str("agent")); tr != nil { // 会話記録の自動送信の鍵と配線、この PC の hook の失敗（DESIGN.md §9-8）
+	var serverRule *bool // サーバが返したルール session.transcripts（返さない古いサーバでは nil。表示だけに使い、覚えた値は書き換えない）
+	if x, ok := res.Get("session_transcripts"); ok {
+		if b, isBool := x.(bool); isBool {
+			serverRule = &b
+		}
+	}
+	if tr := localTranscriptState(c.Env, c.Root, slug, v.Str("agent"), serverRule); tr != nil { // 会話記録の自動送信の鍵と配線、この PC の hook の失敗（DESIGN.md §9-8）
 		data.Set("transcript_send", tr)
 	}
 	if agent := v.Str("agent"); agent != "" {
@@ -423,22 +429,34 @@ func usageFailureText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) s
 }
 
 // localTranscriptState は会話記録の自動送信（DESIGN.md §9-8「hook」）の、この PC での状態。auto は 2 つの鍵の組み合わせ
-// （on: 端末のオプトインと覚えたルールの両方が入・opt_in_off: ルールは入だが端末のオプトインが切。ルールが切か、覚えていなければ載せない）。
+// （on: 端末のオプトインとルールの両方が入・opt_in_off: ルールは入だが端末のオプトインが切・rule_off: サーバが返したルールが切）。
+// ルールは summary の応答の session_transcripts（server）を先に使い、返さない古いサーバでは覚えた値に戻る
+// （古いサーバで、覚えたルールが切か覚えていなければ auto は載せない）。覚えた値は push の応答からしか作られないので、
+// 端末のオプトインが無いと一度も覚えず、ルールが切でも何も出なかった。server は表示だけに使い、覚えた値のファイルは
+// 書き換えない（hook が送るかどうかは覚えた値で決まるので、表示のために hook の挙動を変えない）。
+// rule_off のときは端末のオプトインの有無を opt_in に載せる（無ければ、ルールを入れた後に要る変数のことも添える）。
 // 失敗と退避の件数は usagesnap の transcript-failure.json と transcript-spool（このプロジェクトの分）。出すものが無ければ nil。
 // 両方の鍵が入なのに送る hook の配線が無い AI は unwired に挙げ、配線し直す init のコマンドを rewire に載せる（正本では載せない）。
 // 鍵のどちらかが切なら hook は配線があっても送らないので、配線は見ない（`init --no-transcript` は控えに残らないので、鍵が両方とも入で外した利用者には案内が出る）。
 // agent は SessionStart の hook から呼ばれたときの AI（その AI の設定だけを見る）。手で打った要約では空で、Claude Code と Codex を見る。
-func localTranscriptState(e env.Env, root, project, agent string) *jsonorder.Object {
+func localTranscriptState(e env.Env, root, project, agent string, server *bool) *jsonorder.Object {
 	dir := usagesnap.StateDir(e)
 	f := usagesnap.ReadTranscriptFailure(dir)
 	spooled := len(usagesnap.SpoolFiles(usagesnap.TranscriptSpoolDir(dir, e.Value(env.APIURL), project)))
 	rule, _, known := usagesnap.TranscriptsRule(usagesnap.Options{Env: env.Overlay(e, map[string]string{env.Name(env.Project): project})})
+	if server != nil {
+		rule, known = *server, true
+	}
+	optIn := usagesnap.TranscriptsOptIn(e)
 	auto := ""
-	if known && rule {
+	switch {
+	case known && rule:
 		auto = "opt_in_off"
-		if usagesnap.TranscriptsOptIn(e) {
+		if optIn {
 			auto = "on"
 		}
+	case server != nil && !*server:
+		auto = "rule_off"
 	}
 	if auto == "" && f == nil && spooled == 0 {
 		return nil
@@ -446,6 +464,9 @@ func localTranscriptState(e env.Env, root, project, agent string) *jsonorder.Obj
 	o := jsonorder.NewObject()
 	if auto != "" {
 		o.Set("auto", auto)
+	}
+	if auto == "rule_off" {
+		o.Set("opt_in", optIn)
 	}
 	if auto == "on" && root != "" {
 		if agents := transcriptUnwired(root, agent); len(agents) > 0 {
@@ -500,6 +521,12 @@ func transcriptStateText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location
 		lines = append(lines, i18n.T(lang, "cli.summary.transcript_auto_on", "env", optIn))
 	case "opt_in_off":
 		lines = append(lines, i18n.T(lang, "cli.summary.transcript_auto_opt_in_off", "env", optIn))
+	case "rule_off":
+		if truthy(o, "opt_in") {
+			lines = append(lines, i18n.T(lang, "cli.summary.transcript_rule_off"))
+		} else {
+			lines = append(lines, i18n.T(lang, "cli.summary.transcript_rule_off.no_opt_in", "env", optIn))
+		}
 	}
 	spooled := intOf(get(o, "spooled", int64(0)))
 	reason := getStr(o, "reason", "")
@@ -513,6 +540,8 @@ func transcriptStateText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location
 			why = i18n.T(lang, "cli.summary.transcript_fail.no_token")
 		case usagesnap.FailRejected:
 			why = i18n.T(lang, "cli.summary.transcript_fail.rejected", "status", intOf(get(o, "status", int64(0))))
+		case usagesnap.FailProxyLimit:
+			why = i18n.T(lang, "cli.summary.transcript_fail.proxy_limit")
 		case usagesnap.FailSpool:
 			why = i18n.T(lang, "cli.summary.transcript_fail.spool_failed")
 		case usagesnap.FailClient:

@@ -759,9 +759,15 @@ func (s *Server) renderAdminProjects(w http.ResponseWriter, r *http.Request, p *
 	if status == 0 {
 		status = http.StatusOK
 	}
+	// どこでも切のままの、既定で切の機能（判定は service の 1 か所。この画面は管理者だけが開ける）
+	type featureOff struct{ Notice, Hint string }
+	var featuresOff []featureOff
+	for _, f := range service.FeaturesOffEverywhere(projects) {
+		featuresOff = append(featuresOff, featureOff{service.FeatureOffNotice(reqLang(r), f), service.FeatureEnableHint(reqLang(r), f)})
+	}
 	s.render(w, r, status, "admin_projects.html", map[string]any{
 		"User": p.User, "CSRF": p.Session.CSRFToken, "Projects": rows, "Archived": archived, "MemberRoles": memberRoles,
-		"Notice": res.Notice, "Error": res.Error, "Pending": res.pending, "Form": res.form,
+		"Notice": res.Notice, "Error": res.Error, "Pending": res.pending, "Form": res.form, "FeaturesOff": featuresOff,
 	})
 }
 

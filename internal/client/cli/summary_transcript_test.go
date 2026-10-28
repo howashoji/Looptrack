@@ -22,7 +22,7 @@ func TestSummaryTranscriptState(t *testing.T) {
 		"LOOPTRACK_API_URL": "https://issues.example.invalid/im"}
 	jst := time.FixedZone("JST", 9*3600)
 	lines := func() []string {
-		return transcriptStateText(i18n.JA, localTranscriptState(env.FromMap(vars), "", "demo", ""), jst)
+		return transcriptStateText(i18n.JA, localTranscriptState(env.FromMap(vars), "", "demo", "", nil), jst)
 	}
 	if got := lines(); len(got) != 0 {
 		t.Fatalf("ルールを覚えていなければ何も出さない: %q", got)
@@ -63,7 +63,7 @@ func TestSummaryTranscriptState(t *testing.T) {
 		t.Fatalf("退避だけの 1 行: %q", got)
 	}
 	// 英語の文面も同じ数だけ出る
-	if en := transcriptStateText(i18n.EN, localTranscriptState(env.FromMap(vars), "", "demo", ""), jst); len(en) != 2 || !strings.Contains(en[0], "Automatic transcript sending: on") {
+	if en := transcriptStateText(i18n.EN, localTranscriptState(env.FromMap(vars), "", "demo", "", nil), jst); len(en) != 2 || !strings.Contains(en[0], "Automatic transcript sending: on") {
 		t.Fatalf("英語: %q", en)
 	}
 }
@@ -81,7 +81,7 @@ func TestSummaryTranscriptUnwired(t *testing.T) {
 	usagesnap.RememberTranscriptsRule(true, usagesnap.Options{Env: ruleEnv})
 	jst := time.FixedZone("JST", 9*3600)
 	lines := func(lang i18n.Lang, root, agent string) []string {
-		return transcriptStateText(lang, localTranscriptState(env.FromMap(vars), root, "demo", agent), jst)
+		return transcriptStateText(lang, localTranscriptState(env.FromMap(vars), root, "demo", agent, nil), jst)
 	}
 	write := func(root, rel, body string) {
 		t.Helper()
@@ -224,5 +224,92 @@ func TestSummaryTranscriptUnwired(t *testing.T) {
 	}
 	if got := lines(i18n.JA, self, ""); len(got) != 1 || !strings.Contains(got[0], "init はしません") || strings.Contains(got[0], "issue init") {
 		t.Fatalf("正本の案内: %q", got)
+	}
+}
+
+// TestSummaryTranscriptServerRule は、summary の応答の session_transcripts（サーバが返したルール）を使って鍵の行を出すこと。
+// 覚えた値は push の応答からしか作られないので、端末の変数が無いと一度も覚えず、ルールが切でも何も出なかった。
+// 出る側（ルールが切・変数あり / なし、ルールが入・変数なし）と出ない側・今の挙動に戻る側（session_transcripts の無い古いサーバ）を
+// 同じテストで見る。サーバの値は表示だけに使い、覚えた値のファイルを書き換えないことも確かめる（hook の挙動を変えない）。
+func TestSummaryTranscriptServerRule(t *testing.T) {
+	home := t.TempDir()
+	vars := map[string]string{"HOME": home, "XDG_CONFIG_HOME": filepath.Join(home, "cfg"), "APPDATA": filepath.Join(home, "appdata"),
+		"LOOPTRACK_API_URL": "https://issues.example.invalid/im"}
+	jst := time.FixedZone("JST", 9*3600)
+	on, off := true, false
+	lines := func(lang i18n.Lang, server *bool) []string {
+		return transcriptStateText(lang, localTranscriptState(env.FromMap(vars), "", "demo", "", server), jst)
+	}
+	const ruleOff = "会話記録の保存を切にしています"
+	const needVar = "LOOPTRACK_SESSION_TRANSCRIPTS=1 も設定します"
+
+	// ルールが切・変数なし: 切の 1 行に変数のことも添える
+	if got := lines(i18n.JA, &off); len(got) != 1 || !strings.Contains(got[0], ruleOff) || !strings.Contains(got[0], "session.transcripts") ||
+		!strings.Contains(got[0], needVar) {
+		t.Fatalf("ルールが切で変数も無いなら、切と変数の 1 行: %q", got)
+	}
+	if en := lines(i18n.EN, &off); len(en) != 1 || !strings.Contains(en[0], "turned off") || !strings.Contains(en[0], "LOOPTRACK_SESSION_TRANSCRIPTS=1") {
+		t.Fatalf("英語: %q", en)
+	}
+	// ルールが切・変数あり: 切の 1 行だけ（変数のことは言わない）
+	vars["LOOPTRACK_SESSION_TRANSCRIPTS"] = "1"
+	if got := lines(i18n.JA, &off); len(got) != 1 || !strings.Contains(got[0], ruleOff) || strings.Contains(got[0], needVar) {
+		t.Fatalf("ルールが切で変数があるなら、切だけの 1 行: %q", got)
+	}
+	// ルールが入・変数あり: 覚えた値が無くても「入」の 1 行
+	if got := lines(i18n.JA, &on); len(got) != 1 || !strings.Contains(got[0], "会話記録の自動送信: 入") || strings.Contains(got[0], ruleOff) {
+		t.Fatalf("ルールが入で変数があるなら「入」の 1 行: %q", got)
+	}
+	// ルールが入・変数なし: 既存の opt_in_off の行のまま
+	vars["LOOPTRACK_SESSION_TRANSCRIPTS"] = "0"
+	if got := lines(i18n.JA, &on); len(got) != 1 || !strings.Contains(got[0], "LOOPTRACK_SESSION_TRANSCRIPTS=1 を設定") || strings.Contains(got[0], ruleOff) {
+		t.Fatalf("ルールが入で変数が無いなら opt_in_off の 1 行: %q", got)
+	}
+	// 古いサーバ（session_transcripts が無い）: 覚えた値に戻る。覚えていなければ何も出さない
+	if got := lines(i18n.JA, nil); len(got) != 0 {
+		t.Fatalf("古いサーバで覚えた値も無ければ何も出さない: %q", got)
+	}
+	ruleEnv := env.Overlay(env.FromMap(vars), map[string]string{"LOOPTRACK_PROJECT": "demo"})
+	usagesnap.RememberTranscriptsRule(false, usagesnap.Options{Env: ruleEnv})
+	if got := lines(i18n.JA, nil); len(got) != 0 {
+		t.Fatalf("古いサーバで覚えたルールが切なら、今までどおり何も出さない: %q", got)
+	}
+	usagesnap.RememberTranscriptsRule(true, usagesnap.Options{Env: ruleEnv})
+	if got := lines(i18n.JA, nil); len(got) != 1 || !strings.Contains(got[0], "LOOPTRACK_SESSION_TRANSCRIPTS=1 を設定") {
+		t.Fatalf("古いサーバで覚えたルールが入なら opt_in_off の 1 行: %q", got)
+	}
+	// サーバの値が覚えた値より先。表示に使っても覚えた値のファイルは書き換えない
+	if got := lines(i18n.JA, &off); len(got) != 1 || !strings.Contains(got[0], ruleOff) {
+		t.Fatalf("覚えた値が入でも、サーバが切を返せば切の行: %q", got)
+	}
+	if rule, _, known := usagesnap.TranscriptsRule(usagesnap.Options{Env: ruleEnv}); !known || !rule {
+		t.Fatalf("サーバの値で覚えた値を書き換えた（hook の挙動が変わる）: rule=%v known=%v", rule, known)
+	}
+}
+
+// TestSummaryTranscriptProxyLimitReason は、hook の失敗が前段の上限（proxy_limit）なら、送れていない行の理由を
+// 前段の設定の案内にすること。対照: サーバ自身の拒否（rejected）は今の文面のまま。
+func TestSummaryTranscriptProxyLimitReason(t *testing.T) {
+	home := t.TempDir()
+	vars := map[string]string{"HOME": home, "XDG_CONFIG_HOME": filepath.Join(home, "cfg"), "APPDATA": filepath.Join(home, "appdata"),
+		"LOOPTRACK_API_URL": "https://issues.example.invalid/im"}
+	jst := time.FixedZone("JST", 9*3600)
+	dir := usagesnap.StateDir(env.FromMap(vars))
+	at := time.Date(2026, 1, 2, 3, 4, 0, 0, time.UTC)
+	usagesnap.RecordTranscriptFailure(dir, at, usagesnap.FailProxyLimit, 413, 0)
+	got := transcriptStateText(i18n.JA, localTranscriptState(env.FromMap(vars), "", "demo", "", nil), jst)
+	if len(got) != 1 || !strings.Contains(got[0], "会話記録を送れていません") || !strings.Contains(got[0], "前段のプロキシが大きさの上限で拒否") ||
+		!strings.Contains(got[0], "client_max_body_size") {
+		t.Fatalf("前段の上限の理由: %q", got)
+	}
+	if en := transcriptStateText(i18n.EN, localTranscriptState(env.FromMap(vars), "", "demo", "", nil), jst); len(en) != 1 ||
+		!strings.Contains(en[0], "client_max_body_size") {
+		t.Fatalf("英語: %q", en)
+	}
+	usagesnap.ClearTranscriptFailure(dir)
+	usagesnap.RecordTranscriptFailure(dir, at, usagesnap.FailRejected, 413, 0)
+	got = transcriptStateText(i18n.JA, localTranscriptState(env.FromMap(vars), "", "demo", "", nil), jst)
+	if len(got) != 1 || !strings.Contains(got[0], "サーバが拒否（HTTP 413）") || strings.Contains(got[0], "前段") {
+		t.Fatalf("サーバ自身の拒否は今の文面: %q", got)
 	}
 }

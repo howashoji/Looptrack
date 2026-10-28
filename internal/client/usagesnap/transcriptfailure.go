@@ -28,6 +28,9 @@ const (
 const (
 	FailTranscriptRejected  = "transcript_rejected"  // 変換が止めた（読めない行・キーの秘密・長すぎる行。退避しない）
 	FailTranscriptRewritten = "transcript_rewritten" // 送った後に記録が書き換えられた（purge するまで続きを送れない）
+	// FailProxyLimit は前段のリバースプロキシが本文の大きさの上限で止めた（JSON でない 413。サーバには届いていない）。
+	// 4xx なので FailRejected と同じく送り直さないが、直すのはサーバではなく前段の設定なので理由を分けて案内する。
+	FailProxyLimit = "proxy_limit"
 )
 
 // RecordTranscriptFailure は会話記録の最後の失敗を書く（files は変換が止めたファイルの数。ほかの理由では 0）。

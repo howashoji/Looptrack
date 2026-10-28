@@ -128,6 +128,15 @@ looptrack project rules clear demo
 Unknown keys and misspellings are rejected at registration.
 Every override (`--override "reason"`) is recorded on the server.
 
+A rule that is off by default can stay off everywhere after an upgrade without anyone noticing.
+So when such a rule is off in every project that isn't archived, the server says so, with how to turn it on.
+You see it in the server's startup log, at the top of `<server URL>/admin/projects`, and in the output of `looptrack features` (run on the server; `install.sh --upgrade` runs it for you).
+Today this covers `session.transcripts`, added in 1.1.0.
+
+```bash
+looptrack features    # for each feature that is off by default, how many projects have it on (the exit code is always 0)
+```
+
 ## Attachment limits and purging
 
 On the admin screen's attachment page (`<server URL>/admin/attachments`) you change the attachment limits, see how much each project uses, and purge files.
@@ -162,6 +171,8 @@ On the admin screen's "Transcript management" page (`<server URL>/admin/transcri
 - The usage table shows only the number of transcripts and the space used (and its share of the limit) per user. It never shows their contents, titles, file names or session ids. Administrators cannot read transcripts through the screens or the API either.
 - The page has no purge button. Transcript content is deleted by its owner (`looptrack session transcript purge`), when the retention runs out, and by an operator (`looptrack purge-transcripts` below).
 - When you raise the per-chunk limit, raise the body limit of the proxy in front too (["Proxy limits in front" in DEPLOY.md](../../server/DEPLOY.md), written for operators).
+- `looptrack check-proxy` tells you whether the proxy in front lets a chunk of the default size (32MiB) through. It sends that much data without credentials to the transcript route under your public URL, and nothing is stored. `install.sh` runs it after installing and after `--upgrade`; to run it by hand, pass the public URL, as in `looptrack check-proxy --url https://example.com/looptrack`. A proxy that answers before reading the whole body (one that stops on the bytes read, such as Caddy's `request_body`) can't be fully checked this way.
+- A chunk the proxy stops never reaches the server, so it leaves nothing in the server's log. The user sees it instead: `push` and the summary at session start say that the reverse proxy in front stopped the request at its body size limit (HTTP 413), and that only the server's administrator can fix it.
 
 ### Where transcripts live
 
