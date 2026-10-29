@@ -15,11 +15,14 @@ import (
 // issPath は Windows のインストーラの設定（Inno Setup 7）。
 const issPath = "../../../deploy/release/windows/Looptrack.iss"
 
-// releaseYMLPath はリリースの組み立て（desktop-windows-installer の smoke が無人の上書きを試す）。
+// installerSmokePath はリリースの組み立て（release.yml の desktop-windows-installer）が無人の上書きを試す smoke の本体。
+const installerSmokePath = "../../../deploy/release/installer_smoke.ps1"
+
+// releaseYMLPath はリリースの組み立て。installer_smoke.ps1 を締切つきで呼ぶ段がある。
 const releaseYMLPath = "../../../.github/workflows/release.yml"
 
 // psArgList は PowerShell の配列の 1 行（$name = @('a','b',…)）から、一重引用符の項目を順に取り出す（無ければ nil）。
-// release.yml の smoke の引数と Go の installerArgs を同じ読み方で比べるために使う。
+// smoke の引数と Go の installerArgs を同じ読み方で比べるために使う。
 func psArgList(text, name string) []string {
 	m := regexp.MustCompile(`(?m)^\s*\$` + regexp.QuoteMeta(name) + `\s*=\s*@\(([^)]*)\)`).FindStringSubmatch(text)
 	if m == nil {
@@ -136,24 +139,35 @@ func TestInstallerScriptSettings(t *testing.T) {
 		t.Errorf("installerArgs に /RELAUNCH=1 がありません: %v", installerArgs)
 	}
 
-	// release.yml の smoke の無人の上書きの引数（$updateArgs）が Go の installerArgs と同じ並びで、/TASKS を含まないこと。
+	// smoke（installer_smoke.ps1）の無人の上書きの引数（$updateArgs）が Go の installerArgs と同じ並びで、/TASKS を含まないこと。
 	// 対照: 同じ読み方で、最初の導入の引数（$setupArgs）は /TASKS=startup,cli を含むと読める
-	yml, err := os.ReadFile(releaseYMLPath)
+	yml, err := os.ReadFile(installerSmokePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	setupArgs := psArgList(string(yml), "setupArgs")
 	if !slices.Contains(setupArgs, "/TASKS=startup,cli") {
-		t.Fatalf("前提が崩れています: release.yml の $setupArgs を読めないか /TASKS を見分けられません: %v", setupArgs)
+		t.Fatalf("前提が崩れています: installer_smoke.ps1 の $setupArgs を読めないか /TASKS を見分けられません: %v", setupArgs)
 	}
 	updateArgs := psArgList(string(yml), "updateArgs")
 	if !slices.Equal(updateArgs, installerArgs[:]) {
-		t.Errorf("release.yml の $updateArgs = %v, want（replace.go の installerArgs）%v", updateArgs, installerArgs)
+		t.Errorf("installer_smoke.ps1 の $updateArgs = %v, want（replace.go の installerArgs）%v", updateArgs, installerArgs)
 	}
 	for _, a := range updateArgs {
 		if strings.HasPrefix(strings.ToUpper(a), "/TASKS") {
-			t.Errorf("release.yml の $updateArgs に /TASKS があります: %v", updateArgs)
+			t.Errorf("installer_smoke.ps1 の $updateArgs に /TASKS があります: %v", updateArgs)
 		}
+	}
+
+	// 上の引数を持つ installer_smoke.ps1 を、release.yml が締切つきの run_with_deadline.ps1 を通して呼んでいること。
+	// 段で直接動かすと、残ったプロセスが段の標準出力を握って段の上限が効かなくなる
+	rel, err := os.ReadFile(releaseYMLPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := regexp.MustCompile(`(?m)^\s*pwsh\b[^\n]*-File deploy/release/run_with_deadline\.ps1[^\n]*\n\s*-Script deploy/release/installer_smoke\.ps1 -Seconds \d+`)
+	if !call.Match(rel) {
+		t.Errorf("release.yml が run_with_deadline.ps1 -Script deploy/release/installer_smoke.ps1 -Seconds <秒> を呼んでいません")
 	}
 }
 

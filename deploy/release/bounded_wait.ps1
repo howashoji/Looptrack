@@ -53,7 +53,8 @@ function Write-ProcessTree([int]$RootId) {
 # 同じ上限の中で待つ（unins000.exe は自分を消すために子に引き継いで先に終わるので、こちらを使う）。
 # Handle を先に取らないと、終わった後に ExitCode を読めないことがある。
 # 上限を超えても待っていたプロセスは止めない。止めると Inno Setup のログの終わりが書かれずに失われ、
-# 何で止まっていたかを後ろの段で残すログから追えなくなる。残ったプロセスはジョブの終わりに runner が片付ける
+# 何で止まっていたかを後ろの段で残すログから追えなくなる。残ったプロセスは、run_with_deadline.ps1 が中身の終わりに
+# インストーラのログを写してから一覧に出して止める
 function Invoke-Bounded {
   param(
     [Parameter(Mandatory = $true)][string]$FilePath,

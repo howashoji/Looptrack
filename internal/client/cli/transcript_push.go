@@ -15,8 +15,12 @@ package cli
 //
 // 送った続きの判断（ファイルごと）: 状態の長さがサーバの長さと同じなら、元のファイルがその長さ以上あり直前 4KiB が同じときだけ
 // 続きを送る。状態が無い（別の端末から送った・消えた）・食い違うときは、サーバの長さの直前の 1 バイトが改行であることだけを確かめる。
-// 短くなった・中身が変わったファイルは送らず、件数で知らせる（purge してから送り直せば最初から送れる）。json（*.meta.json など）と
-// text（tool-results）はファイル全体を 1 回だけ送り、後から変わったら同じく「書き換えられた」として数える。
+// 短くなった・中身が変わったファイルは送らず、件数で知らせる（purge してから送り直せば最初から送れる）。text（tool-results）は
+// ファイル全体を 1 回だけ送り、後から変わったら同じく「書き換えられた」として数える。
+// json（サブエージェントの *.meta.json・*.prefix.json）もファイル全体を 1 回だけ送る。Claude Code は走っている間に書き足し、
+// 終わったときに "finished": true を足すので、まだ送っていないものは、同じ agent-<id>.meta.json が "finished": true を持つか、
+// 同じ agent-<id>.jsonl の更新時刻が trSubagentIdle より前のときだけ送る。送った後に変わった json は送り直さず
+// （サーバは同じファイルを置き換えられない）、「書き換えられた」とは別の件数で知らせる（終了コードは変えない）。
 
 import (
 	"bytes"
@@ -35,6 +39,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/howashoji/looptrack/internal/client/agentdirs"
 	"github.com/howashoji/looptrack/internal/client/api"
@@ -58,7 +63,12 @@ const (
 	trStateVersion = 1
 	// trStateDir は状態のファイルの置き場（usagesnap.StateDir の下）。
 	trStateDir = "transcript-push"
+	// trSubagentIdle は、finished の無いサブエージェントを終わったとみなす、jsonl が更新されていない時間。
+	trSubagentIdle = 30 * time.Minute
 )
+
+// trNow は今の時刻（テストで差し替える）。
+var trNow = time.Now
 
 // trSent はファイル 1 つの送った長さと、その直前 trTailBytes の sha256。
 type trSent struct {
@@ -140,11 +150,12 @@ func trKindOf(k usagesnap.TranscriptKind) transcript.Kind {
 	return transcript.KindJSONL
 }
 
-// trSource は運ぶファイル 1 つと、読んだ時点の中身。
+// trSource は運ぶファイル 1 つと、読んだ時点の中身・更新時刻。
 type trSource struct {
 	usagesnap.TranscriptFile
 	kind transcript.Kind
 	data []byte
+	mod  time.Time
 }
 
 // trPlan はファイル 1 つについて今回送るもの。
@@ -153,6 +164,38 @@ type trPlan struct {
 	offset    int64
 	res       *transcript.Result
 	rewritten bool // 元のファイルが短くなった・送った部分が変わった（送らない）
+	changed   bool // 送った後に変わった json（送り直さない。rewritten とは別に数える）
+}
+
+// trSubagentStem は <sid>/subagents/agent-<id>.<種類>.json の「<sid>/subagents/agent-<id>」。
+func trSubagentStem(key string) string {
+	stem := strings.TrimSuffix(key, ".json")
+	if i := strings.LastIndexByte(stem, '.'); i > strings.LastIndexByte(stem, '/') {
+		stem = stem[:i]
+	}
+	return stem
+}
+
+// trSubagentDone は、サブエージェントの json（key）を送ってよいか。同じ agent-<id>.meta.json が "finished": true を持つか、
+// 同じ agent-<id>.jsonl の更新時刻が trSubagentIdle より前なら送る（走っている間は書き足されるので待つ）。
+func trSubagentDone(key string, srcs []*trSource) bool {
+	stem := trSubagentStem(key)
+	for _, s := range srcs {
+		switch s.FileKey {
+		case stem + ".meta.json":
+			var meta struct {
+				Finished bool `json:"finished"`
+			}
+			if json.Unmarshal(s.data, &meta) == nil && meta.Finished {
+				return true
+			}
+		case stem + ".jsonl":
+			if !s.mod.IsZero() && trNow().Sub(s.mod) >= trSubagentIdle {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // trPlanAll は offsets（ファイルごとの送った長さ）から各ファイルの送る分を決めて変換する。
@@ -162,6 +205,16 @@ func trPlanAll(srcs []*trSource, offsets map[string]int64, state *trPushState, o
 		p := &trPlan{src: s, offset: offsets[s.FileKey]}
 		plans = append(plans, p)
 		size := int64(len(s.data))
+		if s.kind == transcript.KindJSON && p.offset > 0 {
+			// json はファイル全体を 1 回だけ送る。送った後に変わっても送り直さない（別の件数で知らせる）
+			if sent, ok := state.Sent[s.FileKey]; size != p.offset || (ok && sent.Length == p.offset && tailSum(s.data, p.offset) != sent.Tail) {
+				p.changed = true
+			}
+			continue
+		}
+		if s.kind == transcript.KindJSON && s.Kind == usagesnap.KindSubagentMeta && !trSubagentDone(s.FileKey, srcs) {
+			continue // サブエージェントが走っている間は書き足されるので、終わってから送る
+		}
 		if p.offset > 0 {
 			if size < p.offset {
 				p.rewritten = true
@@ -177,7 +230,7 @@ func trPlanAll(srcs []*trSource, offsets map[string]int64, state *trPushState, o
 				continue
 			}
 			if s.kind != transcript.KindJSONL {
-				// json と text はファイル全体を 1 回だけ送る
+				// text はファイル全体を 1 回だけ送る
 				if size != p.offset {
 					p.rewritten = true
 				}
@@ -209,8 +262,8 @@ type trReject struct {
 
 // trTotals は件数の合計（出力用。値は持たない）。
 type trTotals struct {
-	files, chunks, rewritten, pending int
-	stats                             transcript.Stats
+	files, chunks, rewritten, changed, pending int
+	stats                                      transcript.Stats
 }
 
 func trSum(plans []*trPlan) trTotals {
@@ -218,6 +271,10 @@ func trSum(plans []*trPlan) trTotals {
 	for _, p := range plans {
 		if p.rewritten {
 			t.rewritten++
+			continue
+		}
+		if p.changed {
+			t.changed++
 			continue
 		}
 		if p.res == nil {
@@ -350,7 +407,11 @@ func readSources(files *usagesnap.TranscriptFiles) ([]*trSource, error) {
 		if err != nil {
 			return nil, i18n.Errorf("cli.err.transcript.read", "file", f.FileKey, "reason", errReason(err))
 		}
-		out = append(out, &trSource{TranscriptFile: f, kind: trKindOf(f.Kind), data: b})
+		var mod time.Time
+		if fi, err := os.Stat(f.Path); err == nil {
+			mod = fi.ModTime()
+		}
+		out = append(out, &trSource{TranscriptFile: f, kind: trKindOf(f.Kind), data: b, mod: mod})
 	}
 	return out, nil
 }
@@ -674,6 +735,9 @@ func (c *Ctx) printPushCounts(files *usagesnap.TranscriptFiles, t trTotals, dry 
 	}
 	c.Println(i18n.T(c.Lang, "cli.transcript.push.unrewritten", "structural", t.stats.UnrewrittenStructural,
 		"prose", t.stats.UnrewrittenProse, "keys", t.stats.UnrewrittenKeys))
+	if t.changed > 0 {
+		c.Println(i18n.T(c.Lang, "cli.transcript.push.json_changed", "count", t.changed))
+	}
 	for _, s := range files.Skipped {
 		c.Println(i18n.T(c.Lang, "cli.transcript.push.skipped", "name", s.Name, "reason", string(s.Reason), "count", s.Count))
 	}

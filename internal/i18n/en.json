@@ -332,6 +332,7 @@
   "cli.transcript.purge.unchanged": "Transcript {id} has no content left to purge",
   "cli.transcript.push.dry_title": "dry-run (nothing is sent): {agent} session {session}",
   "cli.transcript.push.files": "Files: to send {send}, not carried {skipped}, rewritten at the source {rewritten}",
+  "cli.transcript.push.json_changed": "JSON files changed after they were sent: {count} (not sent again; the server keeps the form first sent)",
   "cli.transcript.push.lines": "Lines: {lines}, chunks: {chunks}, unfinished line (sent next time): {pending} bytes",
   "cli.transcript.push.masked": "Masked values: {count}",
   "cli.transcript.push.masked_labels": "Masked values: {count} ({labels})",

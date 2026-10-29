@@ -76,7 +76,7 @@ const uninstallerName = "unins000.exe"
 // installerArgs は無人の上書きで setup.exe に渡す引数（/LOG は別に足す）。/TASKS は付けない（付けなければ Inno は前回の選択肢を
 // 引き継ぐ。付けると「ログイン時に起動する」「CLI を使えるようにする」を外した人にも入れてしまう）。/RELAUNCH=1 は
 // Looptrack.iss の DeinitializeSetup が読み、上書きが成功しても失敗しても（Inno が戻したときも）アプリを起動し直す。
-// release.yml の smoke も同じ並びで上書きする（TestInstallerScriptSettings が両方を同じ読み方で確かめる）。
+// release.yml の smoke（deploy/release/installer_smoke.ps1）も同じ並びで上書きする（TestInstallerScriptSettings が両方を同じ読み方で確かめる）。
 var installerArgs = [...]string{"/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/RELAUNCH=1"}
 
 // installerLog は setup.exe の /LOG の置き場（データの置き場の updates の中）。上書きに失敗した理由はここに残る。
