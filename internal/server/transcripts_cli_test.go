@@ -142,7 +142,7 @@ func writeClaudeSession(t *testing.T, m *trMachine) string {
 		trCLISID + ".jsonl": main,
 		filepath.Join(trCLISID, "subagents", "agent-a1.jsonl"): jsonLine(t, map[string]any{"type": "user", "sessionId": trCLISID, "isSidechain": true,
 			"cwd": m.root, "message": map[string]any{"role": "user", "content": "調べて"}}),
-		filepath.Join(trCLISID, "subagents", "agent-a1.meta.json"): `{"agentType":"general"}` + "\n",
+		filepath.Join(trCLISID, "subagents", "agent-a1.meta.json"): `{"agentType":"general","finished":true}` + "\n",
 		filepath.Join(trCLISID, "tool-results", "t1.txt"):          "出力の 1 行目\n2 行目\n",
 	}
 	for rel, body := range files {

@@ -2,10 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/client/transcript"
@@ -73,13 +75,66 @@ func TestTrPlanAllContinuation(t *testing.T) {
 		t.Fatalf("送り終えた json と text を送り直そうとしています")
 	}
 	plans, _ = trPlanAll([]*trSource{meta, text}, map[string]int64{meta.FileKey: 3, text.FileKey: 2}, none, trTestOpt)
-	if !plans[0].rewritten || !plans[1].rewritten {
-		t.Fatalf("送った後に大きさの変わった json と text を「書き換えられた」にしていません")
+	if plans[0].rewritten || !plans[0].changed || plans[0].res != nil {
+		t.Fatalf("送った後に大きさの変わった json は送り直さず、「書き換えられた」とは別に数えるはず: %+v", plans[0])
+	}
+	if !plans[1].rewritten || plans[1].changed {
+		t.Fatalf("送った後に大きさの変わった text を「書き換えられた」にしていません: %+v", plans[1])
 	}
 	empty := trSrc(trTestSID+"/subagents/b.meta.json", transcript.KindJSON, "  ")
 	plans, rejects := trPlanAll([]*trSource{empty}, map[string]int64{}, none, trTestOpt)
 	if len(rejects) != 0 || plans[0].res != nil || plans[0].rewritten {
 		t.Fatalf("書きかけ（空）の json は次の回に回すはず: %v %+v", rejects, plans[0])
+	}
+}
+
+// まだ送っていないサブエージェントの json は、同じ agent-<id>.meta.json が "finished": true を持つか、
+// 同じ agent-<id>.jsonl の更新時刻が 30 分以上前のときだけ送る。どちらでもなければ送らず、書き換えられたにも数えない。
+// 対照: 同じ組の jsonl は走っている間も送る。finished・30 分以上前のどちらかがあれば json も送る。
+func TestTrPlanAllSubagentJSONWaitsForFinish(t *testing.T) {
+	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
+	prev := trNow
+	trNow = func() time.Time { return now }
+	defer func() { trNow = prev }()
+	sub := func(name string, kind usagesnap.TranscriptKind, tk transcript.Kind, data string, mod time.Time) *trSource {
+		s := trSrc(trTestSID+"/subagents/"+name, tk, data)
+		s.Kind, s.mod = kind, mod
+		return s
+	}
+	none := &trPushState{Sent: map[string]trSent{}}
+	for _, c := range []struct {
+		name string
+		meta string
+		age  time.Duration // jsonl の更新からの時間
+		send bool
+	}{
+		{"finished なし・jsonl が新しい", `{"agentType":"x"}`, time.Minute, false},
+		{"finished なし・jsonl が 29 分前", `{"agentType":"x"}`, 29 * time.Minute, false},
+		{"finished: true", `{"agentType":"x","finished":true}`, time.Minute, true},
+		{"finished なし・jsonl が 30 分前", `{"agentType":"x"}`, 30 * time.Minute, true},
+		{"finished なし・jsonl が 31 分前", `{"agentType":"x"}`, 31 * time.Minute, true},
+	} {
+		jl := sub("agent-a.jsonl", usagesnap.KindSubagent, transcript.KindJSONL, `{"a":1}`+"\n", now.Add(-c.age))
+		meta := sub("agent-a.meta.json", usagesnap.KindSubagentMeta, transcript.KindJSON, c.meta, time.Time{})
+		prefix := sub("agent-a.prefix.json", usagesnap.KindSubagentMeta, transcript.KindJSON, `{"p":1}`, time.Time{})
+		// 別のサブエージェントの finished は効かない
+		other := sub("agent-b.meta.json", usagesnap.KindSubagentMeta, transcript.KindJSON, `{"finished":true}`, time.Time{})
+		plans, rejects := trPlanAll([]*trSource{jl, meta, prefix, other}, map[string]int64{}, none, trTestOpt)
+		if len(rejects) != 0 {
+			t.Fatalf("%s: 止め %v", c.name, rejects)
+		}
+		if plans[0].res == nil || len(plans[0].res.Chunks) != 1 {
+			t.Errorf("%s: 前提が崩れています: 同じ組の jsonl を送っていません", c.name)
+		}
+		for _, p := range plans[1:3] {
+			got := p.res != nil && len(p.res.Chunks) == 1
+			if got != c.send || p.rewritten || p.changed {
+				t.Errorf("%s: %s を送る %v・rewritten %v・changed %v（送る %v・false・false のはず）", c.name, p.src.FileKey, got, p.rewritten, p.changed, c.send)
+			}
+		}
+		if plans[3].res == nil {
+			t.Errorf("%s: finished: true の agent-b.meta.json を送っていません", c.name)
+		}
 	}
 }
 
@@ -172,5 +227,89 @@ func TestAgentVersion(t *testing.T) {
 	}
 	if v := agentVersion("codex", bytes.Repeat([]byte(`{"version":"1"}`+"\n"), 3)); v != "" {
 		t.Errorf("Codex で session_meta 以外の版を使っています: %q", v)
+	}
+}
+
+// 送った後に大きさが変わったサブエージェントの json（終わったときに "finished": true が足される）は、書き換えられたに数えない。
+// push は終了コード 0 で、別の件数として出し、hook の分け方も「送った」になる（FailTranscriptRewritten にならない）。
+// 対照（同じ回し方）: 送った後に短くなった jsonl と、大きさの変わった text（tool-results）は、これまでどおり
+// 書き換えられたに数えて終了コード 1、hook の分け方は HookPushRewritten になる。
+func TestPushJSONChangedAfterSendIsNotRewritten(t *testing.T) {
+	main := jsonlLine("hello")
+	sub := jsonlLine("sub") + jsonlLine("sub2")
+	for _, c := range []struct {
+		name    string
+		change  func(t *testing.T, dir string)
+		code    int
+		changed bool // 「送った後に変わった json: 1」が出る
+		outcome HookPushOutcome
+	}{
+		{"meta.json が 16 バイト増えた", func(t *testing.T, dir string) {
+			trWrite(t, filepath.Join(dir, "subagents", "agent-a.meta.json"), `{"agentType":"x","finished":true}`)
+		}, 0, true, HookPushSent},
+		{"対照: jsonl が短くなった", func(t *testing.T, dir string) {
+			trWrite(t, filepath.Join(dir, "subagents", "agent-a.jsonl"), jsonlLine("sub"))
+		}, 1, false, HookPushRewritten},
+		{"対照: text の大きさが変わった", func(t *testing.T, dir string) {
+			trWrite(t, filepath.Join(dir, "tool-results", "t.txt"), "out\nmore\n")
+		}, 1, false, HookPushRewritten},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := &trFake{limit: 1 << 30, lengths: map[string]int64{}}
+			srv := httptest.NewServer(f)
+			defer srv.Close()
+			vars, home, _ := trEnv(t, srv.URL)
+			writeClaudeSession(t, home, main, sub)
+			dir := filepath.Join(home, ".claude", "projects", "-work-proj", trTestSID)
+			metaPath := filepath.Join(dir, "subagents", "agent-a.meta.json")
+			trWrite(t, metaPath, `{"agentType":"x"}`)
+			trWrite(t, filepath.Join(dir, "tool-results", "t.txt"), "out\n")
+			// サブエージェントは終わっている（jsonl が 31 分前から更新されていない）ので、finished の無い meta.json も送る
+			old := time.Now().Add(-31 * time.Minute)
+			if err := os.Chtimes(filepath.Join(dir, "subagents", "agent-a.jsonl"), old, old); err != nil {
+				t.Fatal(err)
+			}
+			code, stdout, stderr := runSession(t, vars, "transcript", "push", trTestSID, "--agent", "claude-code")
+			metaKey := trTestSID + "/subagents/agent-a.meta.json"
+			if code != 0 || f.lengths[metaKey] != int64(len(`{"agentType":"x"}`)) {
+				t.Fatalf("前提が崩れています: 最初の push で meta.json を送れていません: 終了コード %d・長さ %v\nstdout %q\nstderr %q", code, f.lengths, stdout, stderr)
+			}
+			before, _ := os.Stat(metaPath)
+			c.change(t, dir)
+			if after, _ := os.Stat(metaPath); c.changed && after.Size()-before.Size() != 16 {
+				t.Fatalf("前提が崩れています: meta.json の増分 %d バイト（16 のはず）", after.Size()-before.Size())
+			}
+			code, stdout, stderr = runSession(t, vars, "transcript", "push", trTestSID, "--agent", "claude-code")
+			if code != c.code {
+				t.Fatalf("終了コード %d（%d のはず）\nstdout %q\nstderr %q", code, c.code, stdout, stderr)
+			}
+			if got := strings.Contains(stdout, "送った後に変わった json: 1"); got != c.changed {
+				t.Errorf("別の件数の行 %v（%v のはず）: %q", got, c.changed, stdout)
+			}
+			if got := strings.Contains(stderr, "送った後に元が短くなった・変わったファイルが 1 個"); got == c.changed {
+				t.Errorf("書き換えられたの注意 %v（%v のはず）: %q", got, !c.changed, stderr)
+			}
+			_, dry, _ := runSession(t, vars, "transcript", "push", trTestSID, "--agent", "claude-code", "--dry-run")
+			wantFiles := "書き換えられた 1"
+			if c.changed {
+				wantFiles = "書き換えられた 0"
+			}
+			if !strings.Contains(dry, wantFiles) {
+				t.Errorf("dry-run の件数に %q がありません: %q", wantFiles, dry)
+			}
+			if r := PushTranscriptForHook(env.FromMap(vars), "claude-code", trTestSID); r.Outcome != c.outcome {
+				t.Errorf("hook の分け方 %v（%v のはず）: %v", r.Outcome, c.outcome, r.Err)
+			}
+		})
+	}
+}
+
+func trWrite(t *testing.T, path, data string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

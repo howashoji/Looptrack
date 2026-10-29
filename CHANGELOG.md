@@ -23,6 +23,35 @@ Nothing yet.
 
 まだありません。
 
+## [1.2.0] - 2026-10-30
+
+1.2.0 is a stable release. The changes below are relative to `v1.2.0-rc.1`,
+and no migrations were added after it. If you upgrade from `v1.1.0`, read the
+section for 1.2.0-rc.1 as well. Unlike the release candidate, 1.2.0 becomes the
+Latest release on GitHub Releases and takes the `latest` tag on GHCR, so the
+one-line installer installs it. A server on 1.1.0 tells you about it, and so
+does one on 1.2.0-rc.1; once on 1.2.0, a server follows stable releases only.
+
+### Fixed
+
+- `looptrack session transcript push` no longer ends with exit code 1 on
+  every run because of Claude Code subagent files. Claude Code keeps writing
+  to `agent-<id>.meta.json` and `agent-<id>.prefix.json` while a subagent
+  runs, and adds `"finished": true` when it ends. Such a file that has not
+  been sent is now sent only when that `meta.json` has `"finished": true` or
+  the matching `agent-<id>.jsonl` has not changed for 30 minutes. A JSON file
+  that changes after it was sent is not sent again and is no longer counted
+  as rewritten. The output shows it on a separate line, and the hook that
+  sends transcripts no longer records a failure for it.
+
+---
+
+1.2.0 は正式版で、下の変更は `v1.2.0-rc.1` からの差分です。rc.1 の後に足したマイグレーションはありません。`v1.1.0` から上げるなら 1.2.0-rc.1 の節も読んでください。候補版と違って 1.2.0 は GitHub Releases の Latest になり、GHCR の `latest` タグも付きます。1 行のインストーラが入れるのもこの版です。1.1.0 と 1.2.0-rc.1 のサーバはこの版を知らせます。1.2.0 に上げた後は正式版だけを追います。
+
+### 修正
+
+- Claude Code のサブエージェントのファイルのせいで、`looptrack session transcript push` が毎回終了コード 1 で終わることはなくなりました。Claude Code はサブエージェントが走っている間も `agent-<id>.meta.json` と `agent-<id>.prefix.json` に書き足し、終わったときに `"finished": true` を足します。まだ送っていないこれらのファイルは、その `meta.json` が `"finished": true` を持つか同じ `agent-<id>.jsonl` が 30 分以上更新されていないときだけ送ります。終わる前に送ると後で中身が変わるからです。送った後に変わった JSON のファイルは送り直さず、書き換えられたファイルにも数えません。出力では別の行に件数を出し、会話記録を送る hook もこれを失敗として記録しません。
+
 ## [1.2.0-rc.1] - 2026-10-28
 
 First release candidate for 1.2.0. It is published as a pre-release, so
@@ -1850,7 +1879,8 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけでリモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの・まだ手を動かす必要がある所・うまくいかないときに確かめることも書いています。手を動かす所は auto モードでも Claude Code で要るインストールのコマンド・認可の後の Copilot CLI の 2 回目の再起動・再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - 新しいガイド「更新」。更新するとき何が自動で何が手作業かは、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.2.0-rc.1...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0
 [1.2.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0-rc.1
 [1.1.0]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0
 [1.1.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0-rc.1

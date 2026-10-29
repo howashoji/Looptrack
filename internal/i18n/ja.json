@@ -332,6 +332,7 @@
   "cli.transcript.purge.unchanged": "会話記録 {id} に消す本体はありません",
   "cli.transcript.push.dry_title": "dry-run（送りません）: {agent} のセッション {session}",
   "cli.transcript.push.files": "ファイル: 送る {send}・運ばない {skipped}・書き換えられた {rewritten}",
+  "cli.transcript.push.json_changed": "送った後に変わった json: {count}（送り直しません。サーバには最初に送った形が残ります）",
   "cli.transcript.push.lines": "行: {lines}・チャンク: {chunks}・書きかけの行（次の回に送る）: {pending} バイト",
   "cli.transcript.push.masked": "マスクした値: {count}",
   "cli.transcript.push.masked_labels": "マスクした値: {count}（{labels}）",
