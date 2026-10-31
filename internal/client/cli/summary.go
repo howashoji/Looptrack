@@ -101,6 +101,15 @@ func (c *Ctx) summaryBody(v *Values) error {
 		data.Set(k, x)
 	}
 	data.Set("usage_requests", orList(res, "usage_requests"))
+	if truthy(res, "unread_messages") { // 未読の連絡に対応したサーバで、未読があるときだけ
+		data.Set("unread_messages", get(res, "unread_messages", nil))
+	}
+	if truthy(res, "leases") { // 今取られている占有（§9-9。古いサーバには無い）
+		data.Set("leases", orList(res, "leases"))
+	}
+	if truthy(res, "active_sessions") { // 動いているほかのセッション（§9-9。古いサーバには無い）
+		data.Set("active_sessions", orList(res, "active_sessions"))
+	}
 	if x, ok := res.Get("timezone"); ok { // 時刻を描く時間帯（timezone を載せる前のサーバには無い）
 		data.Set("timezone", x)
 	}
@@ -194,6 +203,20 @@ func (c *Ctx) printSummary(data *jsonorder.Object, limit int64) error {
 		c.Println(reviewLayer(c.Lang, objects(get(data, "in_review", nil))))
 		c.Println(feedbackLayer(c.Lang, asObject(get(data, "feedback", nil)), loc))
 	}
+	if leases := objects(get(data, "leases", nil)); len(leases) > 0 {
+		c.Println("── " + i18n.T(c.Lang, "cli.summary.leases", "count", len(leases)) + " ──")
+		for _, l := range leases {
+			c.Println(leaseLine(l, loc))
+		}
+		c.Println("")
+	}
+	if others := objects(get(data, "active_sessions", nil)); len(others) > 0 {
+		c.Println("── " + i18n.T(c.Lang, "cli.summary.active_sessions", "count", len(others)) + " ──")
+		for _, o := range others {
+			c.Println(presenceLine(o, loc))
+		}
+		c.Println("")
+	}
 	counts := asObject(get(data, "counts", nil))
 	open, err := must(counts, "open")
 	if err != nil {
@@ -204,6 +227,9 @@ func (c *Ctx) printSummary(data *jsonorder.Object, limit int64) error {
 		return err
 	}
 	c.Println(i18n.T(c.Lang, "cli.summary.counts", "open", intOf(open), "bugs", intOf(bugs)))
+	if truthy(data, "unread_messages") {
+		c.Println(i18n.T(c.Lang, "cli.summary.unread_messages", "count", intOf(get(data, "unread_messages", nil))))
+	}
 	// 前のセッションで付けそこねたトークン情報を、このセッションで回収させる
 	missing := asObject(get(data, "usage_missing", nil))
 	if truthy(missing, "count") {

@@ -1,0 +1,35 @@
+{{define "lease_detail.html"}}{{template "head" (headData .Lang (T .Lang "server.web.lease.title"))}}
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <a class="appbar-crumb" href="{{base}}/p/{{.Slug}}/leases">{{T .Lang "server.web.lease.title"}}</a>
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <span class="appbar-title">{{.Lease.Name}}</span>
+{{template "appbar_end" .}}
+<main class="wide">
+  <h1>{{.Lease.Name}}</h1>
+  {{if .Lease.Held}}
+  <p class="muted">{{T .Lang "server.web.lease.meta" "holder" .Lease.HolderLogin "machine" .Lease.MachineLabel "session" .Lease.SessionID "expires" .Expires "purpose" .Lease.Purpose}}{{if .Lease.Expired}} {{T .Lang "server.web.lease.expired"}}{{end}}</p>
+  {{else}}
+  <p class="muted">{{T .Lang "server.web.lease.free"}}</p>
+  {{end}}
+  <section class="panel">
+    <h2>{{T .Lang "server.web.lease.history_h2"}}</h2>
+    <table class="list">
+      <thead><tr><th>{{T .Lang "server.web.lease.th_time"}}</th><th>{{T .Lang "server.web.lease.th_action"}}</th><th>{{T .Lang "server.web.lease.th_by"}}</th><th>{{T .Lang "server.web.lease.th_machine"}}</th><th>{{T .Lang "server.web.lease.th_session"}}</th><th>{{T .Lang "server.web.lease.th_prev"}}</th><th>{{T .Lang "server.web.lease.th_note"}}</th></tr></thead>
+      <tbody>
+      {{range .Events}}
+      <tr>
+        <td>{{.Created}}</td>
+        <td>{{.Action}}</td>
+        <td>{{.UserLogin}}</td>
+        <td>{{.MachineLabel}}</td>
+        <td>{{.SessionID}}</td>
+        <td>{{.PrevUserLogin}}</td>
+        <td class="name">{{if .Reason}}{{.Reason}}{{else}}{{.Purpose}}{{end}}{{if .WasExpired}}<br><span class="muted">{{T $.Lang "server.web.lease.was_expired"}}</span>{{end}}</td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+</main>
+{{template "foot"}}{{end}}

@@ -6,7 +6,7 @@
 init: $TMP/ws（プロジェクト demo・http://127.0.0.1:9/im・AI copilot）
 kit の取得元: 実行ファイルに埋め込んだ kit（looptrack dev）
 配線: looptrack hook <名前> --agent <AI>
-導入セット: core + loop（hook 20 本を配線）
+導入セット: core + loop（hook 23 本を配線）
   作成         .claude/rules/looptrack-loop/background-process.md
   作成         .claude/rules/looptrack-loop/en/background-process.md
   作成         .claude/rules/looptrack-loop/en/iteration-discipline.md
@@ -110,10 +110,10 @@ GitHub Copilot の設定（VS Code のエージェントモード・Copilot CLI�
         "SessionStart": [
           {
             "type": "command",
-            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
             "timeoutSec": 15
           }
         ],
@@ -166,10 +166,10 @@ GitHub Copilot の設定（VS Code のエージェントモード・Copilot CLI�
         "UserPromptSubmit": [
           {
             "type": "command",
-            "command": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-            "bash": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-            "powershell": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-            "windows": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
+            "command": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+            "bash": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+            "powershell": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+            "windows": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
             "timeoutSec": 15
           }
         ],

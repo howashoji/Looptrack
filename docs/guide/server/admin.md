@@ -95,6 +95,39 @@ looptrack settings two-factor required
 
 **If you lose `LOOPTRACK_SECRET_KEY` in `.env`, nobody's TOTP works any more.** Database backups don't include it. Keep a separate copy.
 
+## Message retention
+
+By default a message stops being readable after 30 days. 0 means no limit. The rows stay in the database, so removing them takes the administrative credentials.
+
+```bash
+looptrack settings message-retention       # current number of days
+looptrack settings message-retention 90
+```
+
+## Memory version retention
+
+Old versions of project memory are kept with no limit by default. Set a number of days (up to 36500) and the server deletes the content of older versions, and of deleted memories, once it has passed that age. It checks every hour.
+The current version is never deleted. 0 means no limit.
+
+```bash
+looptrack settings memory-retention       # current number of days
+looptrack settings memory-retention 180
+```
+
+A memory keeps the content of at most 100 versions. Past that, the oldest content goes first.
+
+When a secret has slipped in, purge the content of that memory's versions.
+
+```bash
+looptrack purge-memory --project <slug> --kind decision --name <name> --all-versions      # only reports the count and size
+looptrack purge-memory --project <slug> --kind decision --name <name> --all-versions --reason <reason> --yes
+```
+
+For a single version, pass `--version <n>` instead of `--all-versions`. `--user <login>` points at that user's personal memory.
+Appended sections carry over into later versions, so purge every version when you remove a secret. If the text of the version given to `--version` is still in a later version, the purge is refused and nothing is deleted.
+Each purge is recorded in `memory_purges`. Purging the current version moves the version on, so a replace based on a version read earlier is refused.
+Content inside a backup has to be removed from the backup. Whether it stays in the binary log of a MySQL server that has one enabled is unconfirmed.
+
 ## Setting project rules
 
 ### require_on_close and verify

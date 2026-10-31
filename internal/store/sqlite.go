@@ -374,6 +374,7 @@ func sqliteDSN(path string) (string, error) {
 		"_pragma=busy_timeout(10000)",
 		"_pragma=foreign_keys(1)",
 		"_pragma=case_sensitive_like(1)",
+		"_pragma=secure_delete(1)", // 消した行の本文をファイルの空き領域に残さない（記憶の版の本体を消すとき）
 		"_txlock=immediate",
 	}
 	if path != ":memory:" {

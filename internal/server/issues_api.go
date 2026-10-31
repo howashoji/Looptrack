@@ -216,6 +216,8 @@ func (s *Server) serviceError(w http.ResponseWriter, r *http.Request, err error)
 		body.Error.Current = &cur
 	} else if se.CurrentSeq != nil {
 		body.Error.Current = *se.CurrentSeq
+	} else if se.Lease != nil {
+		body.Error.Current = toLeaseJSON(*se.Lease)
 	}
 	writeJSON(w, status, body)
 }
@@ -742,16 +744,30 @@ func (s *Server) apiSummary(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
+	leases, err := s.svc.ProjectLeases(r.Context(), pr) // 今取られている占有（§9-9）
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	others, err := s.svc.OtherPresence(r.Context(), actor(r), pr) // 動いているほかのセッション（§9-9）
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
+		"leases":          leasesJSON(leases),
+		"active_sessions": presencesJSON(others),
 		"usage_missing": map[string]any{"count": missing.Missing, "issues": missing.Issues, "days": missing.Days,
 			"command": missing.Command, "message": usageMissingText(reqLang(r), missing)},
-		"project":     summaryOf(pr, role),
-		"counts":      cnt,
-		"in_progress": inProgress,
-		"in_review":   inReview,
-		"feedback":    fb,
-		"ready":       itemsJSON(pr, rows, ready[:min(limit, len(ready))]),
-		"ready_total": len(ready),
+		"project": summaryOf(pr, role),
+		"counts":  cnt,
+		// unread_messages はこの要求のセッションの未読の連絡の件数（DESIGN.md §9-9）
+		"unread_messages": s.unreadMessages(r.Context(), actor(r), pr.Slug),
+		"in_progress":     inProgress,
+		"in_review":       inReview,
+		"feedback":        fb,
+		"ready":           itemsJSON(pr, rows, ready[:min(limit, len(ready))]),
+		"ready_total":     len(ready),
 		// ① の末尾: 下位がすべて完了した開いている要件（上位 limit 件と総数）
 		"requirements_ready":       closablesJSON(reqLang(r), closable[:min(limit, len(closable))]),
 		"requirements_ready_total": len(closable),
@@ -765,6 +781,16 @@ func (s *Server) apiSummary(w http.ResponseWriter, r *http.Request) {
 		// 1 行で知らせるのに使う（会話記録は端末の設定だけでは送られない）
 		"session_transcripts": service.SessionTranscriptsEnabled(pr),
 	})
+}
+
+// unreadMessages は summary に添える未読の連絡の件数。数えられなくても summary 全体は止めない（0 にしてログに残す）。
+func (s *Server) unreadMessages(ctx context.Context, a service.Actor, slug string) int {
+	n, err := s.svc.UnreadMessages(ctx, a, slug)
+	if err != nil {
+		s.cfg.Logger.Warn("unread messages", "project", slug, "err", err)
+		return 0
+	}
+	return n
 }
 
 // --- 起票・参照・変更

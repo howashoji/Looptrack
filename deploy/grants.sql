@@ -6,8 +6,9 @@
 -- 方針:
 --   - DB 単位ではなくテーブル単位で付与する（MySQL は DB 単位の付与からテーブル単位で取り消せないため）。
 --   - comments / issue_events / usage_snapshots / usage_reports / usage_report_requests / setting_changes / issue_event_sessions / attachments / attachment_purges /
---     transcripts / transcript_chunks / transcript_purges は SELECT・INSERT のみ（追記専用。書き換え・削除させない）。
+--     transcripts / transcript_chunks / transcript_purges / memory_versions / memory_purges / messages / message_reads / lease_events は SELECT・INSERT のみ（追記専用。書き換え・削除させない）。
 --   - projects / issues は DELETE を与えない（削除の経路を持たない）。
+--   - memory_bodies は UPDATE を与えない（記憶の版の本体は足すか消すかだけ）。
 --   - スキーマ変更（migrate）と取り込み（import）は管理用の資格情報で行う。
 -- テーブルを追加したら、このファイルにも追記する。
 
@@ -41,3 +42,12 @@ GRANT SELECT, INSERT                 ON im.transcripts       TO 'im_app'@'%';
 GRANT SELECT, INSERT                 ON im.transcript_chunks TO 'im_app'@'%';
 GRANT SELECT, INSERT                 ON im.transcript_purges TO 'im_app'@'%';
 GRANT SELECT, INSERT, UPDATE         ON im.transcript_locks  TO 'im_app'@'%';
+GRANT SELECT, INSERT, UPDATE         ON im.memories          TO 'im_app'@'%';
+GRANT SELECT, INSERT                 ON im.memory_versions   TO 'im_app'@'%';
+GRANT SELECT, INSERT, DELETE         ON im.memory_bodies     TO 'im_app'@'%';
+GRANT SELECT, INSERT                 ON im.memory_purges     TO 'im_app'@'%';
+GRANT SELECT, INSERT                 ON im.messages          TO 'im_app'@'%';
+GRANT SELECT, INSERT                 ON im.message_reads     TO 'im_app'@'%';
+GRANT SELECT, INSERT, UPDATE         ON im.leases            TO 'im_app'@'%';
+GRANT SELECT, INSERT                 ON im.lease_events      TO 'im_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON im.session_presence  TO 'im_app'@'%';

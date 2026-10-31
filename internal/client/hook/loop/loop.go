@@ -52,12 +52,15 @@ func init() {
 	for _, e := range []Entry{
 		{"session-start-rules", hookio.SessionStart, 4 * time.Second, SessionStartRules},
 		{"session-start-memories", hookio.SessionStart, 4 * time.Second, SessionStartMemories},
+		{"session-start-messages", hookio.SessionStart, 4 * time.Second, MessagesHook},
 		{"session-start-iteration", hookio.SessionStart, 9 * time.Second, SessionStartIteration},
 		{"session-start-worktrees", hookio.SessionStart, 9 * time.Second, SessionStartWorktrees},
+		{"session-start-remote-sync", hookio.SessionStart, 9 * time.Second, SessionStartRemoteSync},
 		{"user-prompt-rules", hookio.UserPromptSubmit, 4 * time.Second, UserPromptRules},
 		{"user-prompt-task-mode", hookio.UserPromptSubmit, 4 * time.Second, UserPromptTaskMode},
 		{"session-scope-guard", hookio.UserPromptSubmit, 9 * time.Second, SessionScopeGuard},
 		{"user-prompt-stale-base", hookio.UserPromptSubmit, 4 * time.Second, UserPromptStaleBase},
+		{"user-prompt-messages", hookio.UserPromptSubmit, 4 * time.Second, MessagesHook},
 		{"pre-edit-task-mode-guard", hookio.PreToolUse, 4 * time.Second, PreEditTaskModeGuard},
 		{"pre-tool-scope-guard", hookio.PreToolUse, 4 * time.Second, PreToolScopeGuard},
 		{"pre-tool-secrets-guard", hookio.PreToolUse, 4 * time.Second, PreToolSecretsGuard},
@@ -182,6 +185,8 @@ type Command struct {
 	Env  []string // 環境の全部（KEY=VALUE。nil なら親と同じ。Env.run は Environ の後ろに hook が足す値を付けて渡す＝同じ名前は後ろが勝つ）
 	Name string
 	Args []string
+	// Grace が正なら、打ち切りで殺す前に SIGTERM を送り、この時間だけ終わるのを待つ（後始末の要るコマンド用）。
+	Grace time.Duration
 }
 
 // Runner はコマンドを起動して標準出力と終了コードを返す（標準エラーは捨てる）。起動できない・時間切れは error。

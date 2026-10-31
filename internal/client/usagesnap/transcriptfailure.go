@@ -60,6 +60,14 @@ func TranscriptRejectedDir(stateDir, apiURL, project string) string {
 	return keyedDir(stateDir, TranscriptRejectedDirName, apiURL, project)
 }
 
+// HandoffSpoolDirName はサーバに届かなかった引き継ぎの退避の置き場（StateDir の下）。
+const HandoffSpoolDirName = "handoff-spool"
+
+// HandoffSpoolDir はプロジェクト（API の URL + slug）の、引き継ぎの退避の置き場。数えるのは SpoolFiles。
+func HandoffSpoolDir(stateDir, apiURL, project string) string {
+	return keyedDir(stateDir, HandoffSpoolDirName, apiURL, project)
+}
+
 func keyedDir(stateDir, name, apiURL, project string) string {
 	key := ProjectKey(apiURL, project)
 	if stateDir == "" || key == "" {

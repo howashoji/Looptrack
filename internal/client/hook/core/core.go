@@ -79,7 +79,7 @@ func init() {
 	loop.RegisterPart("summary", summary.Timeout, func(ctx context.Context, getenv hookio.Getenv, getwd func() string, now func() time.Time,
 		args []string, ev hookio.Event) (hookio.Result, error) {
 		vars := env.FromFunc(getenv)
-		return Summary(ctx, &Call{Env: &Env{Vars: &vars, Getwd: getwd, Now: now}, Args: args}, ev)
+		return Summary(ctx, &Call{Env: &Env{Vars: &vars, Getwd: getwd, Now: now, Spawn: spawnSelf}, Args: args}, ev)
 	})
 }
 

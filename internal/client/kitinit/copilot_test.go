@@ -36,7 +36,7 @@ func copilotEvent(t *testing.T, root, ev string) []string {
 }
 
 const combinedCmd = "LOOPTRACK_API_URL=" + fakeURL + " LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot " +
-	"--parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees"
+	"--parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync"
 
 func TestCopilotSessionStartCombined(t *testing.T) {
 	stubs(t, true)
@@ -155,7 +155,7 @@ func TestCopilotSessionStartCombined(t *testing.T) {
 
 // Copilot の配線の UserPromptSubmit の合成: loop ありなら UserPromptSubmit は 1 本（looptrack hook user-prompt --parts …）。
 // 部分はすべて loop の hook なので env は前置しない（個別の配線と同じ）。
-const combinedPromptCmd = "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base"
+const combinedPromptCmd = "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages"
 
 func TestCopilotUserPromptCombined(t *testing.T) {
 	stubs(t, true)

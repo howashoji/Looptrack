@@ -42,6 +42,14 @@ const DefaultStaleBaseMaxAge = 4 * time.Hour
 // staleBaseRefs は基準にするブランチを探す順（LOOPTRACK_LOOP_STALE_BASE_REF が空のとき）。
 var staleBaseRefs = []string{"origin/main", "origin/master"}
 
+// staleBaseCandidates は基準の候補（remote-sync も同じものを使う）。
+func staleBaseCandidates(e *Env) []string {
+	if r := trimSpace(e.env("LOOPTRACK_LOOP_STALE_BASE_REF")); r != "" {
+		return []string{r}
+	}
+	return staleBaseRefs
+}
+
 // staleBase は、いま居る作業ツリーの基点について測ったもの。
 type staleBase struct {
 	Name    string        // 作業ツリーを指す名前（ブランチ名。detached ならディレクトリ名）
@@ -90,12 +98,8 @@ func UserPromptStaleBase(ctx context.Context, ev hookio.Event) (hookio.Result, e
 // measureStaleBase は作業ツリー top の基点を測る（基準が無い・git が失敗するときは ok = false）。
 func measureStaleBase(ctx context.Context, e *Env, top string) (staleBase, bool) {
 	b := staleBase{Behind: -1}
-	cands := staleBaseRefs
-	if r := trimSpace(e.env("LOOPTRACK_LOOP_STALE_BASE_REF")); r != "" {
-		cands = []string{r}
-	}
 	tip := ""
-	for _, c := range cands {
+	for _, c := range staleBaseCandidates(e) {
 		// 存在の確認と先端の SHA を 1 回で取る（先端は「そもそも遅れているか」を見るために要る）
 		if sha, ok := gitLine(ctx, e, top, "rev-parse", "--verify", "--quiet", c+"^{commit}"); ok && sha != "" {
 			b.Ref, tip = c, sha

@@ -166,6 +166,22 @@ Open: …
 EOF
 ```
 
+### server — the project memory on the server (several machines and users share one handoff)
+
+- The handoff: the server's memory `handoff/main`. Add a section with `looptrack handoff append -` (the body goes on standard input). Concurrent writes both survive.
+  Read it with `looptrack memory show handoff`: the text goes to standard output and the version to standard error.
+- Decisions and caveats: `looptrack memory append decision <name>` and `looptrack memory append caveat <name>`. The first line of the text becomes the summary.
+- While a local `.claude/memories/` exists, bring it in with `looptrack memory import`. A name that already exists is not overwritten.
+- Compacting: rewrite the whole text with `looptrack handoff compact --version <the version you read> -`. If another session wrote after you read it, nothing is written; read it again and retry.
+- At the top of the session `session-start-memories` injects the handoff and a list of summaries of the decisions and caveats. The limit and the trimming are the same as for file.
+- Freshness: it counts as up to date when **this session wrote** after the completion marker. The local record is checked first; if it is not newer, the server's version history is checked too, so the text needs no mark.
+- Never read, display, or put into version control a credential (a token, a password, a private key, a TOTP secret, a value from `.env`). The server refuses text shaped like one.
+- When the server cannot be reached, nothing is stopped. One notice is shown and the turn goes through, and the marker stays.
+- While it cannot be reached, `handoff append / compact` set the body aside locally, and the next SessionStart, Stop or write sends it. The marker is cleared at the Stop after it has gone out. If an "unsent" notice stays, check with `looptrack handoff spool`.
+  A body shaped like a credential is not set aside. Redo a compact whose version went stale, and rewrite and send whatever the server refused.
+  Then delete the old entry with `looptrack handoff spool --drop <name>`. The deleted body is gone and this cannot be undone.
+- Someone who cannot write this project's memory is not sent back.
+
 ## What not to do
 
 - **Stacking handoffs up as a new file or a new record** (nobody can tell which is current; with one session rewrite the one latest

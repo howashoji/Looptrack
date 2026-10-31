@@ -23,6 +23,113 @@ Nothing yet.
 
 まだありません。
 
+## [1.3.0-rc.1] - 2026-10-31
+
+First release candidate for 1.3.0. It is published as a pre-release, so
+`v1.2.0` stays the Latest release on GitHub Releases. The changes below are
+relative to `v1.2.0`.
+
+Several AI sessions on this PC can now work on one project together. They
+share memory and handoffs through the local server, send each other messages,
+hold work that runs only once at a time, and see each other. The server listens
+on 127.0.0.1 only, so none of this is shared with other PCs. The commands below
+are in the bundled CLI ("Make the CLI available" in the tray menu), and the
+six migrations run by themselves when the app starts.
+
+### Added
+
+- Project memory (handoffs, decisions and caveats) is now kept by the local
+  server, and `looptrack memory list|show|append|replace|delete` reads and
+  writes it. Appends from several sessions both survive, and a replace with a
+  stale `--version` is refused with 409 `memory_version`. The web view is
+  "Memory" above the board, and the MCP tools are `list_memories`, `get_memory`
+  and `write_memory`.
+- The loop kit can keep the handoff in that memory. With
+  `LOOPTRACK_LOOP_HANDOFF_BACKEND=server`, SessionStart injects the handoff and
+  a list of summaries of the decisions and caveats, so a session in another
+  directory on this PC starts from them.
+  `LOOPTRACK_LOOP_MEMORIES_MAX_CHARS` caps the size, trimmed as in the file
+  backend. `looptrack handoff append` adds a section, and
+  `looptrack handoff compact --version N` writes nothing if the version you
+  read is stale. The Stop guard looks for a version this session wrote after
+  the work finished. While the app is not running it only shows a notice, and
+  `handoff append` and `compact` set the body aside locally. The next
+  SessionStart, Stop or write sends it, and a resend never adds a section
+  twice. `looptrack handoff spool` lists what is waiting.
+- `looptrack memory import` brings `handoff.md`, `decision-*.md` and
+  `caveat-*.md` from `.claude/memories/` into the local server. A `> 要約:` line
+  becomes the summary. An existing name is never overwritten. The result lists
+  what was skipped and what was refused, and for a credential it gives only
+  the line and the rule.
+- `looptrack memory purge` deletes the content of memory versions for good,
+  with `--version N` or `--all-versions`, a reason and `--yes`. The version row
+  and a record of the purge stay. Appended text carries into later versions,
+  so if the text of version N is still in a later one, the purge answers 409
+  `memory_purge_text_remains` and deletes nothing; use `--all-versions` to
+  remove a secret. A memory keeps the content of at most 100 versions, the
+  oldest going first. The database now runs with SQLite's `secure_delete`, so
+  deleted text is not left in the free space of the file. Copies in `backups`
+  are not touched, so delete those files to remove the text from them too.
+- Sessions can send each other short messages through the local server.
+  `looptrack message send` and the MCP tool `send_message` address the whole
+  project (`--all`), yourself (`--to me`) or one session (`--to me --session`),
+  up to 4 KiB. The loop hooks `session-start-messages` and
+  `user-prompt-messages` put unread messages into that session's next turn, at
+  most 10 at a time and 500 characters each, and pass silently when the app is
+  not running. `LOOPTRACK_LOOP_MESSAGES=0` turns them off. Read with
+  `looptrack message inbox`, MCP `read_inbox` or "Messages" above the board. A
+  message stops being shown after 30 days.
+- Leases are available on the local server: `looptrack lease acquire`,
+  `extend`, `release`, `list`, `show` and `break`, the matching MCP tools, and
+  "Leases" above the board. Two sessions on this PC can hold work that runs only
+  once at a time, such as a deployment, without running it twice. The second one
+  exits with code 1 and sees the holder, the purpose and the expiry. A lease
+  lasts 1 hour by default and 24 hours at most, and it can be taken once it has
+  expired. `acquire` prints a `lease_token`, and `extend` and `release` need that
+  token or the same session.
+- The sessions running on this PC now show up in each other's
+  `looptrack issue summary`, in MCP `project_summary` and in "Presence" above
+  the board, with the branch, HEAD, directory name and issues in progress.
+  Hooks send this without making the AI wait. A session leaves the list 15
+  minutes after it last sent, or at SessionEnd.
+- The loop kit has a new SessionStart hook, `session-start-remote-sync`. It
+  fetches at most once per `LOOPTRACK_LOOP_REMOTE_SYNC_INTERVAL` (10 minutes by
+  default) and prints one line only when the current branch is behind, has
+  diverged, or holds unpushed commits. After a failed or timed-out fetch it
+  prints nothing, so silence does not prove you are in sync.
+
+### Moving from 1.2.0
+
+- The app applies migrations 0011 to 0016 to its SQLite database when it starts,
+  and first keeps a copy of the database in `backups`. To go back to 1.2.0, you
+  need that copy.
+- Run `looptrack issue init` again in each project that uses the loop kit. It
+  wires `session-start-messages`, `user-prompt-messages` and
+  `session-start-remote-sync`. Presence goes over the existing wiring and needs
+  no `init`.
+
+---
+
+1.3.0 の最初のリリース候補です。プレリリースとして公開するので、GitHub Releases の Latest は `v1.2.0` のままです。下の変更は `v1.2.0` からの差分です。
+
+この PC の複数の AI セッションが 1 つのプロジェクトで一緒に動けるようになりました。ローカルのサーバでできるのは記憶と引き継ぎの共有・連絡・同時に 1 本しか動かせない作業の占有・ほかのセッションの確認です。サーバは 127.0.0.1 だけで待ち受けるので、ほかの PC とは共有しません。下のコマンドは同梱の CLI（トレイのメニューの「CLI を使えるようにする」）に入っています。マイグレーション 6 本はアプリの起動時に自動で流れます。
+
+### 追加
+
+- プロジェクト記憶（引き継ぎ・決定・注意）をローカルのサーバに置けるようになりました。`looptrack memory list|show|append|replace|delete` で読み書きします。複数のセッションが追記しても両方の節が残り、古い `--version` の置き換えは 409 `memory_version` で拒みます。画面はボードの上の「記憶」で、MCP のツールは `list_memories`・`get_memory`・`write_memory` です。
+- loop の kit が引き継ぎをこの記憶に置けるようになりました。`LOOPTRACK_LOOP_HANDOFF_BACKEND=server` にすると、SessionStart が引き継ぎと決定・注意の要約の一覧を注入します。この PC の別のディレクトリのセッションも同じ内容から始められます。上限は `LOOPTRACK_LOOP_MEMORIES_MAX_CHARS` で、切り出し方は file の置き場と同じです。`looptrack handoff append` は節を足し、`looptrack handoff compact --version N` は読んだ版が古ければ何も書きません。Stop のガードは作業の完了より後にこのセッションが書いた版を探します。アプリが動いていないときは注意だけを出し、`handoff append` と `compact` の本文は手元に退避します。次の SessionStart・Stop か次の書き込みが送り、送り直しても節は増えません。未送信は `looptrack handoff spool` で確かめられます。
+- `looptrack memory import` で `.claude/memories/` の `handoff.md`・`decision-*.md`・`caveat-*.md` をローカルのサーバへ取り込めます。`> 要約:` の行は要約になります。既にある名前は上書きしません。結果には飛ばしたファイルと拒んだファイルが出て、資格情報のときは行と規則の語だけを示します。
+- `looptrack memory purge` で記憶の版の本体を戻せない形で消せます。`--version N` か `--all-versions` に理由と `--yes` を添えて実行します。版の行と消した記録は残ります。追記した本文は後の版に引き継がれるので、版 N の本文が後の版に残っていれば 409 `memory_purge_text_remains` で何も消しません。秘密を消すときは `--all-versions` を使ってください。本体を持つ版は記憶 1 件につき 100 版までで、古い版から消えます。DB は SQLite の `secure_delete` で動くようになり、消した本文をファイルの空き領域に残しません。`backups` の控えには触らないので、そこからも消すなら控えのファイルを消してください。
+- セッションの間でローカルのサーバ経由の短い連絡を送れます。`looptrack message send` と MCP の `send_message` の宛先はプロジェクト全員（`--all`）・自分（`--to me`）・セッション 1 本（`--to me --session`）で、本文は 4 KiB までです。loop の hook `session-start-messages` と `user-prompt-messages` が未読をそのセッションの次のターンに入れます。1 回に 10 件・1 件 500 文字までで、アプリが動いていないときは何も出さずに通します。止めるには `LOOPTRACK_LOOP_MESSAGES=0` を指定します。読むのは `looptrack message inbox`・MCP の `read_inbox`・ボードの上の「連絡」です。連絡は 30 日で出なくなります。
+- ローカルのサーバで占有を使えます。`looptrack lease acquire`・`extend`・`release`・`list`・`show`・`break` と MCP のツール、ボードの上の「占有」です。この PC の 2 つのセッションは反映のような同時に 1 本しか動かせない作業を重ねて動かさずに済みます。後から取ったほうは終了コード 1 で持ち主・目的・期限を確かめられます。期限は既定 1 時間・上限 24 時間で、切れた占有は取り直せます。`acquire` が `lease_token` を出すので、`extend` と `release` にはその鍵か同じセッションが要ります。
+- この PC で動いているセッションが、互いの `looptrack issue summary`・MCP の `project_summary`・ボードの上の「在席」に出ます。ブランチ・HEAD・ディレクトリの名前・着手中のイシューが見えます。hook が送るので AI を待たせません。最後に送ってから 15 分か SessionEnd で一覧から消えます。
+- loop の kit に SessionStart の hook `session-start-remote-sync` を足しました。`LOOPTRACK_LOOP_REMOTE_SYNC_INTERVAL`（既定 10 分）に 1 回まで fetch し、いまのブランチが遅れている・乖離している・push していないコミットを持つときだけ 1 行知らせます。fetch が失敗か時間切れなら何も出さないので、何も出ないことは同期している根拠になりません。
+
+### 1.2.0 から上げるとき
+
+- アプリは起動時にマイグレーション 0011〜0016 を SQLite の DB に流し、その前に DB の控えを `backups` に取ります。1.2.0 に戻すときはこの控えが要ります。
+- loop の kit を使うプロジェクトでは `looptrack issue init` をやり直してください。`session-start-messages`・`user-prompt-messages`・`session-start-remote-sync` が配線されます。在席は既にある配線で送るので `init` は要りません。
+
 ## [1.2.0] - 2026-10-30
 
 1.2.0 is a stable release. The changes below are relative to `v1.2.0-rc.1`,
@@ -1329,7 +1436,8 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定からチャットだけで AI エージェントをつなぐ方法。
 - 新しいガイド「更新」。デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.3.0-rc.1...HEAD
+[1.3.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0-rc.1
 [1.2.0]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0
 [1.2.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0-rc.1
 [1.1.0]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0

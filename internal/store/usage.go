@@ -235,6 +235,10 @@ type UsageEvent struct {
 // 片方だけを変えると充足率の分母と分子で数える操作が変わり、率だけが黙ってずれる。
 var usageCountedKinds = sqlStringList(usage.Ops)
 
+// usageNotMessageCond は連絡に添えたコメントを外す条件（AND から始まる）。連絡はイシューの作業ではなく、付与の hook も走らないので、
+// 数えると付けようのない未付与が残り続ける。
+const usageNotMessageCond = ` AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(e.detail, '$.kind')), '') <> 'message'`
+
 // sqlStringList は語の一覧を SQL の IN の右辺（('a', 'b')）にする。語は英小文字と _ だけ（それ以外は起動時に止める）。
 func sqlStringList(words []string) string {
 	quoted := make([]string, len(words))
@@ -271,7 +275,7 @@ func UsageCoverage(ctx context.Context, q execQuerier, projectID, userID int64, 
     AND (COALESCE(s.attempted_at, s.received_at) < e.at + INTERVAL ? SECOND OR s.trigger_kind = 'manual'))
 FROM issue_events e JOIN issues i ON i.id = e.issue_id LEFT JOIN users u ON u.id = e.actor_user_id
 WHERE e.project_id = ? AND e.at >= ? AND e.kind IN `+usageCountedKinds+`
-  AND (e.via = 'mcp' OR (e.via = 'cli' AND e.session_id IS NOT NULL))`+usageOptInCond()+usageHostSessionCond()+userCond+`
+  AND (e.via = 'mcp' OR (e.via = 'cli' AND e.session_id IS NOT NULL))`+usageOptInCond()+usageHostSessionCond()+usageNotMessageCond+userCond+`
 ORDER BY e.at DESC, e.id DESC`, args...)
 	if err != nil {
 		return nil, 0, err
@@ -294,7 +298,7 @@ ORDER BY e.at DESC, e.id DESC`, args...)
 	}
 	err = q.QueryRowContext(ctx, `SELECT COUNT(*) FROM issue_events e WHERE e.project_id = ? AND e.at >= ?
   AND e.kind IN `+usageCountedKinds+` AND e.via = 'cli' AND e.session_id IS NULL
-  AND JSON_EXTRACT(e.detail, '$.agent') IS NULL`+userCond, hargs...).Scan(&humans)
+  AND JSON_EXTRACT(e.detail, '$.agent') IS NULL`+usageNotMessageCond+userCond, hargs...).Scan(&humans)
 	return events, humans, err
 }
 

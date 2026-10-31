@@ -144,6 +144,7 @@ SHA256SUMS は署名の後の最終ファイルから作り、minisign で署名
 `codesign -vv --test-requirement="=notarized" <ファイル>` も併せて使うときは必ず `spctl` の後に実行してください。
 公証の控えが手元に無い初回は失敗し、`spctl` が Gatekeeper にオンラインで確かめた後なら成功するからです。
 .app と dmg は `stapler staple` → `stapler validate` で確かめます。
+sign-macos.sh は staple と validate を組にして、最大 5 回・20 秒間隔で試し直します（Apple の CloudKit への通信切れ Error 68 に備えます）。上限を越えたら最後の出力を添えて失敗します。回数と間隔は `STAPLE_MAX_ATTEMPTS`・`STAPLE_RETRY_WAIT` で変えられます。
 ブラウザで取得した（検疫の付いた）実行ファイルで、Gatekeeper の警告が出ないことも確かめてください。
 
 ### デスクトップ版（DESIGN.md §5-4）

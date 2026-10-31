@@ -57,6 +57,9 @@ type mcpWriteTool struct {
 	why string
 }
 
+const leaseToolWhy = "占有の表（leases・lease_events）だけを書き、issue_events を書かないので付与の対象ではない。" +
+	"loop の PreToolUse は他プロジェクトへの誤爆の確認の対象に入れている"
+
 // mcpWriteTools は宣言表。**一覧を書くのはここ 1 か所だけ**。
 //
 // 「扱いが揃っている」= serverWrite・event・hookOp・inPretool の 4 つが同じ側（すべて有・すべて無）。
@@ -79,6 +82,21 @@ var mcpWriteTools = []mcpWriteTool{
 	{tool: "create_project", serverWrite: true,
 		why: "プロジェクトを作るだけで、イシューも issue_events も書かないので付与の対象ではない。" +
 			"引数に project を持たない（作る先は slug）ので、loop の PreToolUse の他プロジェクトへの誤爆の確認にも当たらない"},
+	{tool: "write_memory", serverWrite: true, inPretool: true,
+		why: "プロジェクト記憶の表（memories・memory_versions）だけを書き、issue_events を書かないので付与の対象ではない。" +
+			"loop の PreToolUse は他プロジェクトへの誤爆の確認の対象に入れている"},
+	{tool: "send_message", serverWrite: true, event: "comment", inPretool: true,
+		why: "連絡の表（messages）を書く。issue_events の comment を書くのはイシューを添えたときだけで、ほとんどの連絡はイシューに付かないので、" +
+			"トークン情報の付与の対象にしない。loop の PreToolUse は他プロジェクトへの誤爆の確認の対象に入れている"},
+	{tool: "read_inbox", serverWrite: true,
+		why: "mark_read のときだけ既読の表（message_reads）を書く。issue_events は書かないので付与の対象ではなく、" +
+			"自分の既読だけの操作なので loop の PreToolUse の確認にも当たらない"},
+	{tool: "acquire_lease", serverWrite: true, inPretool: true, why: leaseToolWhy},
+	{tool: "extend_lease", serverWrite: true, inPretool: true, why: leaseToolWhy},
+	{tool: "release_lease", serverWrite: true, inPretool: true, why: leaseToolWhy},
+	{tool: "break_lease", serverWrite: true, event: "comment", inPretool: true,
+		why: "占有の表と、外された者への連絡（messages）を書く。連絡の関数がイシューを添えたときだけ comment を書くので静的には辿れるが、" +
+			"ここからはイシューを添えないので issue_events は書かず、付与の対象ではない。loop の PreToolUse は他プロジェクトへの誤爆の確認の対象に入れている"},
 	{tool: "verify_issue", inPretool: true,
 		why: "読み取り専用（ReadOnlyHint）で何も書かないが、loop の PreToolUse は" +
 			"他プロジェクトのイシューを読み違えないように確認の対象に入れている"},
