@@ -95,6 +95,39 @@ looptrack settings two-factor required
 
 **`.env` の `LOOPTRACK_SECRET_KEY` を失うと全員の TOTP が使えなくなります。** DB のバックアップには入っていません。別に控えておいてください。
 
+## 連絡の保持日数
+
+連絡は既定で 30 日を過ぎると読めなくなります。0 は無期限です。行は DB に残るので、消すときは管理用の資格情報で行います。
+
+```bash
+looptrack settings message-retention       # 今の日数
+looptrack settings message-retention 90
+```
+
+## 記憶の版の保持日数
+
+プロジェクト記憶の古い版は既定で期限なく残ります。保持日数は 36500 までです。短くすると、期限を過ぎた古い版と消した記憶の本体をサーバが 1 時間ごとに消します。
+今の版は消しません。0 は無期限です。
+
+```bash
+looptrack settings memory-retention       # 今の日数
+looptrack settings memory-retention 180
+```
+
+本体を持つ版は 1 件 100 版までで、超えると古い版から本体が消えます。
+
+秘密が混ざったと分かったら、指した記憶の版の本体を消します。
+
+```bash
+looptrack purge-memory --project <slug> --kind decision --name <名前> --all-versions      # 対象の数と大きさだけを示す
+looptrack purge-memory --project <slug> --kind decision --name <名前> --all-versions --reason <理由> --yes
+```
+
+1 つの版だけなら `--all-versions` の代わりに `--version <版>` を指定します。`--user <login>` を付けるとその利用者の personal の記憶を指します。
+追記した節は後の版に引き継がれるので、秘密を消すときは全部の版を消します。`--version` で指した版の本文が後の版に残っていると、何も消さずに拒みます。
+消した記録は `memory_purges` に残ります。今の版を消すと版が進むので、消す前に読んだ版の置き換えは拒まれます。
+バックアップの中の本体はバックアップの側で消してください。バイナリログを有効にした MySQL のログに本文が残るかは未確認です。
+
 ## プロジェクト別ルールの設定
 
 ### require_on_close と verify

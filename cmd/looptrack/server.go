@@ -17,6 +17,8 @@
 //	looptrack repair-lists [--apply] [slug…] 空白区切りで 1 要素に入った ID を分割する（repair.go）
 //	looptrack repair-attachments [--apply]   添付の DB と置き場の食い違いを報告する（--apply でどこからも指されない本体を消す。repair_attachments.go）
 //	looptrack repair-transcripts [--apply]   会話記録の DB と置き場の食い違いを報告する（同じ形。repair_transcripts.go）
+//	looptrack purge-memory --project <slug> --kind <kind> [--name <name>] [--user <login>] [--version <n>] [--reason <text>] [--yes]
+//	                                         プロジェクト記憶の版の本体を消す運用者の操作（purge_memory.go）
 //	looptrack purge-transcripts --user <login> [--transcript <id>] [--reason <text>] [--yes]
 //	                                         利用者の会話記録の本体を消す運用者の操作（--yes が無ければ対象の数と大きさを示すだけ。purge_transcripts.go）
 //	looptrack features                    既定で切の機能ごとに入のプロジェクトの数を示す（install.sh の --upgrade が呼ぶ。features.go）
@@ -60,6 +62,7 @@ var serverCommands = map[string]func(args []string) int{
 	"repair-attachments": repairAttachmentsCmd,
 	"repair-transcripts": repairTranscriptsCmd,
 	"purge-transcripts":  purgeTranscriptsCmd,
+	"purge-memory":       purgeMemoryCmd,
 	"features":           featuresCmd,
 }
 

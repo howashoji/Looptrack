@@ -6,9 +6,13 @@
      "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
     {"name": "hooks/session-start-memories", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 5, "order": 20,
      "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
+    {"name": "hooks/session-start-messages", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 5, "order": 25,
+     "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
     {"name": "hooks/session-start-iteration", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 10, "order": 30,
      "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
     {"name": "hooks/session-start-worktrees", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 10, "order": 40,
+     "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
+    {"name": "hooks/session-start-remote-sync", "kind": "hook", "runner": "looptrack", "event": "SessionStart", "matcher": null, "timeout": 10, "order": 50,
      "codex": {"event": "SessionStart", "matcher": null}, "copilot": {"event": "SessionStart", "matcher": null}},
 
     {"name": "hooks/user-prompt-rules", "kind": "hook", "runner": "looptrack", "event": "UserPromptSubmit", "matcher": null, "timeout": 5, "order": 10,
@@ -20,6 +24,8 @@
     {"name": "hooks/user-prompt-stale-base", "kind": "hook", "runner": "looptrack", "event": "UserPromptSubmit", "matcher": null, "timeout": 5, "order": 40,
      "codex": {"event": "UserPromptSubmit", "matcher": null}, "copilot": {"event": "UserPromptSubmit", "matcher": null}},
 
+    {"name": "hooks/user-prompt-messages", "kind": "hook", "runner": "looptrack", "event": "UserPromptSubmit", "matcher": null, "timeout": 5, "order": 50,
+     "codex": {"event": "UserPromptSubmit", "matcher": null}, "copilot": {"event": "UserPromptSubmit", "matcher": null}},
     {"name": "hooks/pre-edit-task-mode-guard", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Edit|Write|NotebookEdit", "timeout": 5, "order": 10,
      "codex": null, "copilot": {"event": "PreToolUse", "matcher": null}},
     {"name": "hooks/pre-tool-scope-guard", "kind": "hook", "runner": "looptrack", "event": "PreToolUse", "matcher": "Edit|Write|NotebookEdit|Bash|mcp__.*", "timeout": 5, "order": 20,

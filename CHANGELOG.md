@@ -23,6 +23,181 @@ Nothing yet.
 
 まだありません。
 
+## [1.3.0-rc.1] - 2026-10-31
+
+First release candidate for 1.3.0. It is published as a pre-release, so
+`v1.2.0` stays the Latest release on GitHub Releases and keeps the `latest`
+tag on GHCR. The changes below are relative to `v1.2.0`.
+
+This version is about several sessions working on one project from different
+machines or under different users. They can share memory and handoffs through
+the server, send each other messages, hold work that runs only once at a time,
+and see who else is running. Six migrations come with it, so read "Moving from
+1.2.0" before you upgrade.
+
+### Added
+
+- Project memory (handoffs, decisions and caveats) now lives on the server,
+  and concurrent writes lose nothing. `looptrack memory append` adds a section
+  whatever the version, so two appends both survive.
+  `looptrack memory replace --version N` rewrites the whole text only while N
+  is the current version, and otherwise answers 409 `memory_version`. A
+  `project` memory is read by every member and written by editors and admins.
+  A `personal` memory belongs to its owner, and anyone else gets 404, an
+  administrator included. Every write keeps a version with the user, the
+  machine label and the session. Text that looks like a credential is refused
+  without echoing the value. The REST routes are under
+  `/api/v1/projects/{slug}/memory`: an append takes an `Idempotency-Key`
+  header, a write can carry `written_at`, and the list reports `can_write`.
+  The MCP tools are `list_memories`, `get_memory` and `write_memory`, and the
+  web view is "Memory" above the board.
+- The loop kit can keep the handoff in that memory. With
+  `LOOPTRACK_LOOP_HANDOFF_BACKEND=server`, SessionStart injects the handoff and
+  a list of summaries of the decisions and caveats, so a session on another
+  machine or under another user starts from them.
+  `LOOPTRACK_LOOP_MEMORIES_MAX_CHARS` caps the size, trimmed as in the file
+  backend. `looptrack handoff append` adds a section, and
+  `looptrack handoff compact --version N` writes nothing if the version you
+  read is stale. The Stop guard looks for a version this session wrote after
+  the work finished. When the server cannot be reached it only shows a notice,
+  and `handoff append` and `compact` set the body aside locally. The next
+  SessionStart, Stop or write sends it, and a resend never adds a section
+  twice. `looptrack handoff spool` lists what is waiting.
+- `looptrack memory import` brings `handoff.md`, `decision-*.md` and
+  `caveat-*.md` from `.claude/memories/` into the server. A `> 要約:` line
+  becomes the summary. An existing name is never overwritten. The result lists
+  what was skipped and what was refused, and for a credential it gives only
+  the line and the rule.
+- The content of memory versions can now be purged for good, and its growth
+  has limits. `looptrack memory purge` is for a project admin, a server
+  administrator, or the owner of a personal memory. `looptrack purge-memory` is
+  for the operator, reaches other users' personal memory, and only reports the
+  count and size until you pass `--yes`. Both take `--version N` or
+  `--all-versions`, plus a reason. The version row stays, the content answers
+  404 `memory_version_purged`, and each purge is recorded in the append-only
+  `memory_purges`. Appended text carries into later versions, so if the text of
+  version N is still in a later one, the purge answers 409
+  `memory_purge_text_remains` and deletes nothing; use `--all-versions` to
+  remove a secret. Purging the current version moves the version on, so a
+  replace based on an earlier read is refused. A memory keeps the content of at
+  most 100 versions, the oldest going first.
+  `looptrack settings memory-retention` sets a retention of up to 36500 days.
+  The default, 0, means no limit, and the current version is never deleted.
+  SQLite now runs with `secure_delete`, so deleted text is not left in the free
+  space of the file. Copies in backups have to be removed from the backups.
+- Sessions, machines and users can send each other short messages through the
+  server. `looptrack message send` and the MCP tool `send_message` address the
+  whole project (`--all`), one user (`--to`) or one session (`--to` with
+  `--session`), up to 4 KiB. A message to the project reaches every member, and
+  any other message only its recipient and its sender. With `--issue`, a
+  comment stays on that issue as well. The loop hooks `session-start-messages`
+  and `user-prompt-messages` put unread messages into the next turn, at most 10
+  at a time and 500 characters each, and pass silently when the server cannot
+  be reached. `LOOPTRACK_LOOP_MESSAGES=0` turns them off. Read with
+  `looptrack message inbox`, MCP `read_inbox` or "Messages" above the board.
+  Editors and admins can send, viewers cannot, and text that looks like a
+  credential is refused. A message stops being shown after
+  `message_retention_days` (30 by default; `looptrack settings message-retention`
+  takes 0 for no limit, or up to 36500), but its row stays.
+- Leases let a project hold work that can run only once at a time, such as a
+  production deployment, a public pull request or a release tag.
+  `looptrack lease acquire deploy.dev --purpose "..." --ttl 30m` takes a lease
+  for 1 hour by default and 24 hours at most. If it is already held, the
+  command exits with code 1 and names the holder, the purpose and the expiry;
+  the REST answer is 409 `lease_held`. `acquire` prints a `lease_token`, and
+  `extend` and `release` need that token or the same session. Any editor or
+  admin can take a lease once it has expired, and can take a stuck one away
+  with `looptrack lease break --reason`. The previous holder gets a message,
+  and every action stays in a record. Holders show up in
+  `looptrack issue summary`, MCP `project_summary` and "Leases" above the
+  board. The REST routes are under `/api/v1/projects/{slug}/leases`, and the
+  MCP tools are `list_leases`, `acquire_lease`, `extend_lease`, `release_lease`
+  and `break_lease`.
+- Members can see the sessions running in a project. `looptrack issue summary`,
+  MCP `project_summary` and "Presence" above the board show each session's
+  user, machine, kind of AI, branch, HEAD, worktree directory name and issues
+  in progress. Hooks send this at SessionStart and Stop, and at most every 5
+  minutes during a turn, without ever making the AI wait. A session leaves the
+  list 15 minutes after it last sent, or at SessionEnd, and its row is deleted
+  after 7 days. The absolute worktree path is never sent. The REST routes are
+  `POST` and `DELETE /api/v1/projects/{slug}/presence`.
+- The loop kit has a new SessionStart hook, `session-start-remote-sync`. It
+  fetches at most once per `LOOPTRACK_LOOP_REMOTE_SYNC_INTERVAL` (10 minutes by
+  default) and prints one line only when the current branch is behind, has
+  diverged, or holds unpushed commits. After a failed or timed-out fetch it
+  prints nothing, so silence does not prove you are in sync.
+
+### Changed
+
+- Transcript retention now has the same upper limit as messages and memory,
+  36500 days, wherever it is set or read. A stored value above it is ignored
+  and the default applies.
+
+### Moving from 1.2.0
+
+- Migrations 0011 to 0016 add the tables for all of the above. A MySQL app user
+  with the minimum grants needs these:
+
+  | Table | Grants |
+  | -- | -- |
+  | `memories`, `leases` | SELECT, INSERT, UPDATE |
+  | `memory_versions`, `memory_purges`, `messages`, `message_reads`, `lease_events` | SELECT, INSERT |
+  | `memory_bodies` | SELECT, INSERT, DELETE |
+  | `session_presence` | SELECT, INSERT, UPDATE, DELETE |
+
+  `looptrack grants check` shows what is missing, and `looptrack grants apply`
+  grants it. `install.sh --upgrade` checks this and, if anything is missing,
+  asks for the admin credentials on the terminal.
+- On MySQL, run the `--upgrade` from a terminal. The automatic upgrade (the
+  timer of `--auto-upgrade on`) doesn't replace a version with pending
+  migrations, so it leaves the server on the version it has. With the minimum
+  grants the app user can't create tables, so pass a connection that can in
+  `LOOPTRACK_SETUP_MIGRATE_DSN` ("更新（--upgrade）" in `docs/server/DEPLOY.md`).
+- Run `looptrack issue init` again in each project that uses the loop kit. It
+  wires `session-start-messages`, `user-prompt-messages` and
+  `session-start-remote-sync`. Presence goes over the existing wiring and needs
+  no `init`.
+- Upgrade the server before relying on the new CLI. Against an older server,
+  `looptrack memory`, `message` and `lease` say the server does not support
+  them.
+
+---
+
+1.3.0 の最初のリリース候補です。プレリリースとして公開するので、GitHub Releases の Latest と GHCR の `latest` タグは `v1.2.0` のままです。下の変更は `v1.2.0` からの差分です。
+
+この版では別の端末や別の利用者のセッションが 1 つのプロジェクトで一緒に動けます。できるのは記憶と引き継ぎの共有・連絡・同時に 1 本しか動かせない作業の占有・ほかのセッションの確認です。マイグレーションが 6 本あるので、上げる前に「1.2.0 から上げるとき」を読んでください。
+
+### 追加
+
+- プロジェクト記憶（引き継ぎ・決定・注意）をサーバに置けるようになり、同時に書いても消えません。`looptrack memory append` は版を問わず節を足すので 2 つの追記はどちらも残ります。`looptrack memory replace --version N` が全文を置き換えるのは N が今の版のときだけで、違えば 409 `memory_version` を返します。`project` の記憶を読むのは参加者全員で書くのは editor と admin です。`personal` の記憶は持ち主のものなので、管理者を含むほかの利用者には 404 を返します。書くたびに利用者・端末のラベル・セッションを版に残します。資格情報の形の本文は値を出さずに拒みます。REST は `/api/v1/projects/{slug}/memory` の下にあります。追記は `Idempotency-Key` ヘッダを受け取り、書き込みには `written_at` を添えられます。一覧の応答には `can_write` が入ります。MCP のツールは `list_memories`・`get_memory`・`write_memory` で、画面はボードの上の「記憶」です。
+- loop の kit が引き継ぎをこの記憶に置けるようになりました。`LOOPTRACK_LOOP_HANDOFF_BACKEND=server` にすると、SessionStart が引き継ぎと決定・注意の要約の一覧を注入します。別の端末や別の利用者のセッションも同じ内容から始められます。上限は `LOOPTRACK_LOOP_MEMORIES_MAX_CHARS` で、切り出し方は file の置き場と同じです。`looptrack handoff append` は節を足し、`looptrack handoff compact --version N` は読んだ版が古ければ何も書きません。Stop のガードは作業の完了より後にこのセッションが書いた版を探します。サーバに届かないときは注意だけを出し、`handoff append` と `compact` の本文は手元に退避します。次の SessionStart・Stop か次の書き込みが送り、送り直しても節は増えません。未送信は `looptrack handoff spool` で確かめられます。
+- `looptrack memory import` で `.claude/memories/` の `handoff.md`・`decision-*.md`・`caveat-*.md` をサーバへ取り込めます。`> 要約:` の行は要約になります。既にある名前は上書きしません。結果には飛ばしたファイルと拒んだファイルが出て、資格情報のときは行と規則の語だけを示します。
+- 記憶の版の本体を戻せない形で消せるようにし、増え方に上限を設けました。`looptrack memory purge` を使えるのはプロジェクトの admin・サーバの管理者・personal の持ち主です。運用者向けの `looptrack purge-memory` はほかの利用者の personal にも届き、`--yes` を付けるまでは数と大きさを示すだけです。どちらも `--version N` か `--all-versions` と理由を指定します。版の行は残り本体を読むと 404 `memory_version_purged` を返します。消した記録は追記専用の `memory_purges` に残ります。追記した本文は後の版に引き継がれるので、版 N の本文が後の版に残っていれば 409 `memory_purge_text_remains` で何も消しません。秘密を消すときは `--all-versions` を使ってください。今の版を消すと版が進むので、前に読んだ版からの置き換えは拒まれます。本体を持つ版は記憶 1 件につき 100 版までで、古い版から消えます。保持日数は `looptrack settings memory-retention` で 36500 日まで指定できます。既定の 0 は無期限です。どの設定でも今の版は消えません。SQLite は `secure_delete` で動くようになり、消した本文をファイルの空き領域に残しません。バックアップの中の本体はバックアップの側で消してください。
+- セッション・端末・利用者の間でサーバ経由の短い連絡を送れます。`looptrack message send` と MCP の `send_message` の宛先はプロジェクト全員（`--all`）・利用者 1 人（`--to`）・セッション 1 本（`--to` と `--session`）で、本文は 4 KiB までです。プロジェクト宛ては参加者全員に届き、それ以外を読めるのは宛先と送り手だけです。`--issue` を付けるとそのイシューにコメントも残ります。loop の hook `session-start-messages` と `user-prompt-messages` が未読を次のターンに入れます。1 回に 10 件・1 件 500 文字までで、サーバに届かないときは何も出さずに通します。止めるには `LOOPTRACK_LOOP_MESSAGES=0` を指定します。読むのは `looptrack message inbox`・MCP の `read_inbox`・ボードの上の「連絡」です。送れるのは editor と admin だけです。資格情報の形の本文も拒みます。`message_retention_days` を過ぎた連絡は出なくなりますが行は残ります。既定は 30 日で、`looptrack settings message-retention` には 0（無期限）か 36500 日までの値を渡せます。
+- 本番への反映・公開の PR・リリースのタグのように同時に 1 本しか動かせない作業を、期限つきで占有できます。`looptrack lease acquire deploy.dev --purpose "…" --ttl 30m` で取ります。期限は既定 1 時間・上限 24 時間です。取られていれば終了コード 1 で持ち主・目的・期限を出し、REST は 409 `lease_held` を返します。`acquire` が `lease_token` を出すので、`extend` と `release` にはその鍵か同じセッションが要ります。期限が切れた占有は editor と admin なら誰でも取れます。止まった占有も `looptrack lease break --reason` で外せます。外された者には連絡が届き、操作はすべて記録に残ります。持ち主は `looptrack issue summary`・MCP の `project_summary`・ボードの上の「占有」に出ます。REST は `/api/v1/projects/{slug}/leases` の下にあり、MCP のツールは `list_leases`・`acquire_lease`・`extend_lease`・`release_lease`・`break_lease` です。
+- プロジェクトで動いているセッションを参加者が見られます。`looptrack issue summary`・MCP の `project_summary`・ボードの上の「在席」に、利用者・端末・AI の種類・ブランチ・HEAD・作業ツリーのディレクトリの名前・着手中のイシューが出ます。hook が SessionStart と Stop のほかターンの途中でも 5 分に 1 回まで送るので、AI を待たせません。最後に送ってから 15 分か SessionEnd で一覧から消え、行は 7 日で消えます。作業ツリーの絶対パスは送りません。REST は `POST`・`DELETE /api/v1/projects/{slug}/presence` です。
+- loop の kit に SessionStart の hook `session-start-remote-sync` を足しました。`LOOPTRACK_LOOP_REMOTE_SYNC_INTERVAL`（既定 10 分）に 1 回まで fetch し、いまのブランチが遅れている・乖離している・push していないコミットを持つときだけ 1 行知らせます。fetch が失敗か時間切れなら何も出さないので、何も出ないことは同期している根拠になりません。
+
+### 変更
+
+- 会話記録の保持日数にも連絡と記憶と同じ 36500 日の上限が付きました。設定と読み出しのどちらでも効きます。保存された値が上限を超えていれば既定の値を使います。
+
+### 1.2.0 から上げるとき
+
+- マイグレーション 0011〜0016 が上の機能の表を足します。MySQL のアプリ用の利用者を最小権限にしているときは、次の権限が要ります。
+
+  | 表 | 権限 |
+  | -- | -- |
+  | `memories`・`leases` | SELECT・INSERT・UPDATE |
+  | `memory_versions`・`memory_purges`・`messages`・`message_reads`・`lease_events` | SELECT・INSERT |
+  | `memory_bodies` | SELECT・INSERT・DELETE |
+  | `session_presence` | SELECT・INSERT・UPDATE・DELETE |
+
+  足りない権限は `looptrack grants check` で分かります。与えるのは `looptrack grants apply` です。`install.sh --upgrade` は足りないときに管理用の資格情報を端末で尋ねます。
+- MySQL では `--upgrade` を端末で実行してください。自動の置き換え（`--auto-upgrade on` の timer）は未適用のマイグレーションがある版を置き換えないので、サーバは今の版のまま動きます。最小権限のアプリ用の利用者は表を作れません。表を作れる接続先を `LOOPTRACK_SETUP_MIGRATE_DSN` で渡します（`docs/server/DEPLOY.md` の「更新（--upgrade）」）。
+- loop の kit を使うプロジェクトでは `looptrack issue init` をやり直してください。`session-start-messages`・`user-prompt-messages`・`session-start-remote-sync` が配線されます。在席は既にある配線で送るので `init` は要りません。
+- 新しい CLI の機能を使う前にサーバを上げてください。古いサーバには `looptrack memory`・`message`・`lease` が対応していないと出ます。
+
 ## [1.2.0] - 2026-10-30
 
 1.2.0 is a stable release. The changes below are relative to `v1.2.0-rc.1`,
@@ -1879,7 +2054,8 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけでリモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの・まだ手を動かす必要がある所・うまくいかないときに確かめることも書いています。手を動かす所は auto モードでも Claude Code で要るインストールのコマンド・認可の後の Copilot CLI の 2 回目の再起動・再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - 新しいガイド「更新」。更新するとき何が自動で何が手作業かは、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.3.0-rc.1...HEAD
+[1.3.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0-rc.1
 [1.2.0]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0
 [1.2.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0-rc.1
 [1.1.0]: https://github.com/howashoji/looptrack/releases/tag/v1.1.0

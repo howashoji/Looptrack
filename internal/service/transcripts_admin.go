@@ -44,7 +44,7 @@ func (s *Service) SetTranscriptLimits(ctx context.Context, a Actor, l store.Tran
 			return nil, errm(Invalid, "invalid_argument", i18n.M("store.err.transcript_limit.invalid", "value", v))
 		}
 	}
-	if l.RetentionDays < 0 {
+	if l.RetentionDays < 0 || l.RetentionDays > store.MaxRetentionDays {
 		return nil, errm(Invalid, "invalid_argument", i18n.M("store.err.transcript_limit.retention", "value", l.RetentionDays))
 	}
 	via := a.Via

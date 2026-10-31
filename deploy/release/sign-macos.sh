@@ -197,6 +197,29 @@ notarize() {
   fi
 }
 
+# staple_validate <パス> — stapler staple と validate を、上限つきで試し直す。
+# stapler は Apple の CloudKit（公証チケットの配信）に問い合わせるので、公証が Accepted でも
+# 通信切れ（Error 68）で一時的に落ちる。staple と validate は組にして試し直す（validate だけが落ちることもある）。
+# 上限は回数 STAPLE_MAX_ATTEMPTS（既定 5）と、試行の間の待ち STAPLE_RETRY_WAIT 秒（既定 20）。
+# 待ちは合計で 20 秒 × 4 回 = 80 秒。CloudKit の一時的な切れは数十秒で戻る見込みで、
+# 本当に落ちているときに CI の時間を使い切らない長さにした。上限を越えたら最後の出力を添えて失敗する。
+staple_validate() {
+  local f=$1 max=${STAPLE_MAX_ATTEMPTS:-5} wait=${STAPLE_RETRY_WAIT:-20} n=1 out
+  while :; do
+    if out=$({ xcrun stapler staple "$f" && xcrun stapler validate "$f"; } 2>&1); then
+      echo "$out" | sed 's/^/    /'
+      return 0
+    fi
+    echo "$out" | sed 's/^/    /' >&2
+    if [ "$n" -ge "$max" ]; then
+      die "stapler staple / validate が ${max} 回続けて失敗しました（${f}）。最後の出力は上のとおりです"
+    fi
+    echo "sign-macos: stapler が失敗しました（${n}/${max} 回目）。${wait} 秒待って試し直します" >&2
+    sleep "$wait"
+    n=$((n + 1))
+  done
+}
+
 if [ ${#bins[@]} -gt 0 ]; then
   # 単体の実行ファイルはまとめて 1 つの zip で出す（staple はできない）
   mkdir "$WORK/bins"
@@ -210,14 +233,12 @@ for f in ${apps[@]+"${apps[@]}"}; do
   z="$WORK/$(basename "$f").zip"
   ditto -c -k --keepParent "$f" "$z"
   notarize "$z" "$f"
-  xcrun stapler staple "$f"
-  xcrun stapler validate "$f"
+  staple_validate "$f"
   spctl --assess --type execute --verbose=2 "$f"
 done
 for f in ${dmgs[@]+"${dmgs[@]}"}; do
   notarize "$f" "$f"
-  xcrun stapler staple "$f"
-  xcrun stapler validate "$f"
+  staple_validate "$f"
   spctl --assess --type open --context context:primary-signature --verbose=2 "$f"
 done
 echo "署名と公証が終わりました（${#bins[@]} 個の実行ファイル・${#apps[@]} 個の .app・${#dmgs[@]} 個の dmg）"

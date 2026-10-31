@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode"
 	"unicode/utf8"
 
@@ -24,10 +25,23 @@ func execRun(ctx context.Context, c Command) ([]byte, int, error) {
 	if c.Env != nil {
 		cmd.Env = c.Env
 	}
+	if c.Grace > 0 {
+		cmd.Cancel = func() error {
+			// Windows の Process.Signal は Kill のほかを受け付けないので、そのときは殺す
+			if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+				return cmd.Process.Kill()
+			}
+			return nil
+		}
+		cmd.WaitDelay = c.Grace
+	}
 	out, err := cmd.Output()
 	var ee *exec.ExitError
 	if errors.As(err, &ee) && ctx.Err() == nil && ee.ExitCode() >= 0 {
 		return out, ee.ExitCode(), nil
+	}
+	if errors.Is(err, exec.ErrWaitDelay) && ctx.Err() == nil {
+		return out, 0, nil // 本体は 0 で終わった。孫のプロセスが出力を握っていただけ
 	}
 	if err != nil {
 		return out, -1, err

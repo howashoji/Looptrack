@@ -23,10 +23,10 @@ init --remove-loop: $TMP/ws（dry-run）
            "SessionStart": [
              {
                "type": "command",
-      -        "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-      -        "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-      -        "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-      -        "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
+      -        "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+      -        "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+      -        "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+      -        "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
       -        "timeoutSec": 15
       +        "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent copilot",
       +        "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook summary --agent copilot",
@@ -74,10 +74,10 @@ init --remove-loop: $TMP/ws（dry-run）
       -    "UserPromptSubmit": [
       -      {
       -        "type": "command",
-      -        "command": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-      -        "bash": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-      -        "powershell": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-      -        "windows": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
+      -        "command": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+      -        "bash": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+      -        "powershell": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+      -        "windows": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
       -        "timeoutSec": 15
       -      }
       -    ],
@@ -227,10 +227,10 @@ dry-run のため何も書いていません。反映は --dry-run を外して�
         "SessionStart": [
           {
             "type": "command",
-            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
-            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-iteration,session-start-worktrees",
+            "command": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+            "bash": "LOOPTRACK_API_URL=http://127.0.0.1:9/im LOOPTRACK_PROJECT=demo looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+            "powershell": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
+            "windows": "$env:LOOPTRACK_API_URL='http://127.0.0.1:9/im'; $env:LOOPTRACK_PROJECT='demo'; looptrack hook session-start --agent copilot --parts summary,session-start-rules,session-start-memories,session-start-messages,session-start-iteration,session-start-worktrees,session-start-remote-sync",
             "timeoutSec": 15
           }
         ],
@@ -283,10 +283,10 @@ dry-run のため何も書いていません。反映は --dry-run を外して�
         "UserPromptSubmit": [
           {
             "type": "command",
-            "command": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-            "bash": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-            "powershell": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
-            "windows": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base",
+            "command": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+            "bash": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+            "powershell": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
+            "windows": "looptrack hook user-prompt --agent copilot --parts user-prompt-rules,user-prompt-task-mode,session-scope-guard,user-prompt-stale-base,user-prompt-messages",
             "timeoutSec": 15
           }
         ],

@@ -18,7 +18,7 @@ import (
 // 消去の操作は置かない（運用者は管理用のサブコマンド purge-transcripts。§9-8）。
 
 // maxRetentionDays は保持日数の入力として受け取る最大（100 年）。
-const maxRetentionDays = 36500
+const maxRetentionDays = store.MaxRetentionDays
 
 // transcriptUsageRowView は利用者ごとの使用量の 1 行。
 type transcriptUsageRowView struct {

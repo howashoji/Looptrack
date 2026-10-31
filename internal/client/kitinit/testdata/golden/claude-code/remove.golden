@@ -105,12 +105,22 @@ init --remove-loop: $TMP/ws
               },
               {
                 "type": "command",
+                "command": "looptrack hook session-start-messages --agent claude-code",
+                "timeout": 5
+              },
+              {
+                "type": "command",
                 "command": "looptrack hook session-start-iteration --agent claude-code",
                 "timeout": 10
               },
               {
                 "type": "command",
                 "command": "looptrack hook session-start-worktrees --agent claude-code",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook session-start-remote-sync --agent claude-code",
                 "timeout": 10
               }
             ]
@@ -142,6 +152,11 @@ init --remove-loop: $TMP/ws
               {
                 "type": "command",
                 "command": "looptrack hook user-prompt-stale-base --agent claude-code",
+                "timeout": 5
+              },
+              {
+                "type": "command",
+                "command": "looptrack hook user-prompt-messages --agent claude-code",
                 "timeout": 5
               }
             ]

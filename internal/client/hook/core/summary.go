@@ -22,6 +22,7 @@ const summaryLimit = 12
 
 // Summary は `looptrack hook summary --agent <AI> [--limit N]`。
 func Summary(ctx context.Context, c *Call, ev hookio.Event) (hookio.Result, error) {
+	c.reportPresence(ev)
 	limit := summaryLimit
 	if v, ok := c.arg("--limit"); ok {
 		n, err := strconv.Atoi(v)

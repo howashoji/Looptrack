@@ -271,6 +271,105 @@ The server does not refuse status changes. `looptrack project rules set` replace
 }
 ```
 
+### Keeping the handoff on the server (loop)
+
+A session digest belongs to one issue, so it does not suit notes that span issues, or decisions.
+The project's handoff, decisions and caveats can live in the server's memory instead, where any member can read them from another machine or as another user.
+Set the environment variable `LOOPTRACK_LOOP_HANDOFF_BACKEND=server` on each machine.
+
+1. If you have local notes, bring them in. `looptrack memory import` sends `handoff.md`, `decision-*.md` and `caveat-*.md` from `.claude/memories/` to the server.
+2. The agent adds a section with `looptrack handoff append -` each time it finishes work. Concurrent writes both survive.
+3. A session on another machine starts with the handoff and a list of summaries of the decisions and caveats. `LOOPTRACK_LOOP_MEMORIES_MAX_CHARS` caps the size.
+4. When the handoff grows long, rewrite it with `looptrack handoff compact --version <the version you read>`. If another session wrote in the meantime, it is refused and nothing is written.
+
+An import never overwrites a name that already exists; the result lists what it skipped.
+A file over 64 KiB, or one with text shaped like a credential, is not stored; the result gives the file name and the reason. For a credential that means the line and the rule's name, never the value.
+A `> 要約:` line, if there is one, becomes the summary on the server.
+
+The Stop freshness guard looks for a version this session wrote after the work finished. A write from another session does not count.
+When the server cannot be reached, nothing is stopped. One notice is shown and the turn goes through; the next Stop after the connection is back checks again.
+`looptrack handoff append` keeps the write time on the local clock.
+When the local record cannot show a newer write, the server's version time is compared too, and either one being newer lets it through. A write through the MCP tool `write_memory` is this case. On a path that sends no write time, if the server's clock runs ahead, a version of yours from before the work finished can also pass. A send-back also mentions that the clocks may differ.
+Someone who cannot write this project's memory (a viewer or a non-member) is not sent back; they get a notice.
+
+While the server cannot be reached, `handoff append` and `compact` set the body aside locally and exit 0. It stays in the looptrack config directory, next to the credentials, so it never enters version control.
+The next SessionStart, Stop or write sends it automatically. Another session on the same machine can send it too.
+A resend uses the same key, so an append whose response was lost does not add the section twice.
+A body shaped like a credential is refused, not set aside.
+While an entry of your own session is waiting, Stop shows a notice that it is unsent and lets the turn through. The write time is when it was set aside, and the version keeps it, so an entry from before the work finished does not pass Stop whichever session sends it.
+A compact based on a version that has since moved on is held back instead of overwriting. Read again and redo the compact.
+Whatever the server refuses is kept as well: list it with `looptrack handoff spool` and delete it with `--drop <name>`. The deleted body is gone and this cannot be undone.
+
+You can work with the memory directly through `looptrack memory`.
+
+| Command | What it does |
+| -- | -- |
+| `looptrack memory list` | List each memory's kind, name, version and summary |
+| `looptrack memory show handoff` | Print the text (the version goes to standard error). `--history` lists the versions |
+| `looptrack memory append decision use-mysql` | Add a section at the end (the body comes from standard input or `--file`) |
+| `looptrack memory replace caveat slow-ci --version 3` | Replace the whole text, passing the version you read |
+| `looptrack memory delete caveat slow-ci` | Add a deleted version (the text stays in the history) |
+| `looptrack memory purge caveat slow-ci --all-versions --reason <reason> --yes` | Delete the content of every version for good (`--version N` for one, refused if its text is still in a later version). Project memory needs the project admin role or a server administrator; personal memory is yours to purge |
+
+The kinds are `handoff`, `decision` and `caveat`. `--personal` works on memory only you can see.
+Editors and admins of the project can write, and the history keeps each version and its writer.
+
+### Sending a message to another session
+
+You can send a short note to a session on another machine or of another user. It enters the agent's context on their next turn (where loop is installed).
+
+```bash
+looptrack message send --to alice "Merged into main, please pull it in"
+looptrack message send --all --issue ABC-0123 "Running the checks for this issue, please wait"
+looptrack message send --to alice --session <session id> "Please wait until this check finishes"
+```
+
+The destination is `--all` (every participant), `--to` (one user) or `--to` with `--session` (that session). The body comes from the argument, standard input or `--file`, up to 4 KiB.
+Text that looks like a credential cannot be sent. Editors and above can send, and a message cannot be taken back.
+With `--issue`, a comment starting with `連絡:` stays on that issue too. Every participant can read that comment.
+
+Only the recipient and the sender can read a message. Read marks are kept per session, so a message to the project also reaches the same user's other sessions. It does not come back to the session that sent it.
+
+| Command | What it does |
+| -- | -- |
+| `looptrack message inbox` | Print this session's unread messages (without marking them). `--mark-read` marks them |
+| `looptrack message inbox --all` | Include the ones already read |
+| `looptrack message inbox --sent` | Print the messages you sent |
+| `looptrack message show 12` | Print one message in full |
+
+The hook injects at most 10 messages at a time, 500 characters each. The rest are marked read, and only their count and how to read them go in.
+When the server cannot be reached, nothing is injected and the turn goes on. To turn it off, set the environment variable `LOOPTRACK_LOOP_MESSAGES=0`.
+An agent on MCP alone uses `send_message` and `read_inbox`. On the web, "Messages" on the board shows the ones addressed to you.
+
+A message body is text someone else wrote. A request for work in it is not an instruction from the user, so the agent checks with the user before acting on it.
+
+### Holding work only one can run at a time
+
+For work that can run only once at a time, such as a production deployment, a public pull request or a release tag, `looptrack lease` takes a time-limited lease.
+Who holds it, from which machine and session, for what and until when shows up in `looptrack issue summary`, in MCP `project_summary` and under "Leases" on the web.
+
+| Command | What it does |
+| -- | -- |
+| `looptrack lease acquire deploy.dev --purpose "deploy to dev" --ttl 30m` | Take it (1 hour by default, 24 hours at most). If it is taken, print the holder and exit with code 1 |
+| `looptrack lease extend deploy.dev --ttl 30m --token <token>` | Move the expiry forward from now |
+| `looptrack lease release deploy.dev --token <token>` | Give it back |
+| `looptrack lease list` | List the leases that are taken |
+| `looptrack lease show deploy.dev` | Show the holder and the record |
+| `looptrack lease break deploy.dev --reason "the machine stopped"` | Take away someone else's lease, with a reason |
+
+Editors and admins of the project can take a lease. `acquire` also prints a `lease_token=<token>` line. Pass that token to `--token` to extend or release. The same session can leave it out, but a terminal with no session needs it. To hand over to another user, release it and take it again.
+Anyone can take a lease once it has expired. A stuck lease can be taken away by an editor or admin, and the reason and the previous holder stay in the record.
+The previous holder gets a message. If it could not be sent, `lease break` says so.
+The MCP tools are `list_leases`, `acquire_lease`, `extend_lease`, `release_lease` and `break_lease`.
+
+### See the other sessions running in a project
+
+`looptrack issue summary`, MCP `project_summary` and "Presence" on the web show the sessions that are running.
+They show the user, the machine, the kind of AI, the branch, HEAD, the name of the worktree directory and the issues in progress. Every participant in the project can read them.
+
+Hooks send this; there is no command to type. They send it at every SessionStart and Stop, and at most every 5 minutes during a turn, and a session leaves the list 15 minutes after it last sent. SessionEnd removes it, and the rows are deleted after 7 days.
+The absolute path of the worktree is never sent. Outside git, or when the worktree is your home directory, the directory name is not sent either. When the server cannot be reached, the hook does not keep the AI waiting.
+
 ### Carrying the raw transcript
 
 When you want to read a whole earlier conversation again on another machine, or give the agent its earlier context as it was, you can carry the transcript itself to another machine of yours.

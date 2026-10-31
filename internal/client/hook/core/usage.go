@@ -151,6 +151,8 @@ type usageJob struct {
 	TranscriptPath string `json:"transcript_path"`
 	SessionID      string `json:"session_id"`
 	CWD            string `json:"cwd"`
+	// Presence があれば、この子プロセスの仕事は在席の送信だけ（presence.go）
+	Presence *presenceJob `json:"presence,omitempty"`
 }
 
 func (c *Call) debug(format string, a ...any) {
@@ -379,6 +381,7 @@ func (c *Call) markSent(sid string) error {
 // Usage は `looptrack hook usage`。出力は無い（送信は切り離した子プロセスで行う）。
 // 例外は LOOPTRACK_MCP_SERVER が RE2 で読めないときの知らせ 1 行だけ（MCP のツールの呼び出しのときに限る）。
 func Usage(ctx context.Context, c *Call, ev hookio.Event) (hookio.Result, error) {
+	c.reportPresence(ev) // Stop・SessionEnd・PostToolUse の配線がどの AI にもあるのはこの hook だけ
 	// サーバの URL かプロジェクト（LOOPTRACK_API_URL・LOOPTRACK_PROJECT）が無いときは、何もせず、失敗の記録も残さない。
 	// これは意図した振る舞い: hook は利用者の全体の設定（~/.claude など）に配線されることがあり、looptrack を使っていない
 	// リポジトリのセッションでも起動する。そこで送らないのは正しく、失敗として残すと、使っていないプロジェクトのたびに
@@ -427,6 +430,10 @@ func runUsageJob(ctx context.Context, c *Call, stdin io.Reader) {
 	}
 	var job usageJob
 	if json.Unmarshal(b, &job) != nil {
+		return
+	}
+	if job.Presence != nil {
+		c.sendPresence(*job.Presence)
 		return
 	}
 	c.work(ctx, job)

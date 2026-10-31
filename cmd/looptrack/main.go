@@ -28,7 +28,7 @@
 //	                                   desktop ビルド（-tags desktop）は引数なしの起動（ダブルクリック）もこれ。headless はトレイなし
 //
 // サーバの操作（setup・serve・user・member・token・settings・project・secret-key・healthcheck・migrate・import・verify・
-// export・verify-files・repair-lists・repair-attachments・repair-transcripts・purge-transcripts・features・check-proxy）は server.go の serverCommands。クライアントのサブコマンドと名前は重ならない。
+// export・verify-files・repair-lists・repair-attachments・repair-transcripts・purge-transcripts・purge-memory・features・check-proxy）は server.go の serverCommands。クライアントのサブコマンドと名前は重ならない。
 //
 //	looptrack version                  版とビルドの種類（headless / desktop）。サーバとクライアントで 1 つ
 //
@@ -102,6 +102,12 @@ func run(args []string, stdio cli.IO, e env.Env) int {
 		return loop.Handoff(context.Background(), args[1:], stdio.Stdin, stdio.Stdout, stdio.Stderr, nil)
 	case "session":
 		return cli.SessionMain(args[1:], stdio, e)
+	case "memory":
+		return cli.MemoryMain(args[1:], stdio, e)
+	case "message":
+		return cli.MessageMain(args[1:], stdio, e)
+	case "lease":
+		return cli.LeaseMain(args[1:], stdio, e)
 	case "report":
 		return report(args[1:], stdio, e, lang)
 	case "self-update":

@@ -10,7 +10,7 @@ import (
 )
 
 // Housekeeping は期限切れのセッション・古いログイン試行の記録・使われなくなった MCP 接続の記録を定期的に消し、
-// 保持期間（transcript_retention_days）が切れた会話記録の本体を消す（svc が nil なら会話記録は扱わない）。
+// 保持期間（transcript_retention_days・memory_retention_days）が切れた会話記録と記憶の版の本体を消す（svc が nil なら両方とも扱わない）。
 func Housekeeping(ctx context.Context, db *sql.DB, logger *slog.Logger, svc *service.Service) {
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
@@ -36,8 +36,22 @@ func housekeepOnce(ctx context.Context, db *sql.DB, logger *slog.Logger, svc *se
 			logger.Warn("housekeeping", "err", err)
 		}
 	}
+	if svc == nil {
+		return
+	}
+	if err := svc.PurgePresence(ctx); err != nil && ctx.Err() == nil { // 保持の長さを過ぎた在席（service の presence.go）
+		logger.Warn("housekeeping: presence", "err", err)
+	}
+	// 記憶の版は DB にあるので、会話記録の置き場が使えないサーバでも消す
+	mem, err := svc.PurgeExpiredMemories(ctx)
+	if err != nil && ctx.Err() == nil {
+		logger.Warn("housekeeping: memory retention", "err", err)
+	}
+	if mem != nil && mem.Memories > 0 {
+		logger.Info("housekeeping: memory retention", "retention_days", mem.RetentionDays, "memories", mem.Memories, "bodies_removed", mem.Bodies)
+	}
 	// 会話記録の置き場が使えないサーバ（未設定・添付の置き場と入れ子）では何もしない（失敗を毎時ログに出さない）
-	if svc == nil || !svc.TranscriptsAvailable() {
+	if !svc.TranscriptsAvailable() {
 		return
 	}
 	res, err := svc.PurgeExpiredTranscripts(ctx)

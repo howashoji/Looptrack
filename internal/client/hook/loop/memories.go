@@ -26,11 +26,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/howashoji/looptrack/internal/client/cli"
 	"github.com/howashoji/looptrack/internal/hookio"
 	"github.com/howashoji/looptrack/internal/i18n"
 )
-
-var summaryLine = compatRe(`^>\s*要約:\s*(.*)$`)
 
 // memoriesMaxChars は注入の上限（文字数）。既定 6000・読めない値も既定・0 以下なら上限なし。
 //
@@ -197,9 +196,12 @@ func clampRunes(s string, n int) string {
 	return string([]rune(s)[:n])
 }
 
-// SessionStartMemories はファイル版の記憶（引き継ぎ）をセッション冒頭の文脈に入れる。
+// SessionStartMemories は記憶（引き継ぎ）をセッション冒頭の文脈に入れる。置き場が server ならサーバから読む（memoryserver.go）。
 func SessionStartMemories(ctx context.Context, ev hookio.Event) (hookio.Result, error) {
 	e := envFrom(ctx)
+	if handoffBackend(e) == backendServer {
+		return sessionStartServerMemories(ctx, ev, e), nil
+	}
 	arg := ""
 	if len(e.Args) > 0 {
 		arg = e.Args[0]
@@ -214,19 +216,17 @@ func SessionStartMemories(ctx context.Context, ev hookio.Event) (hookio.Result, 
 	}
 	hf = baseName(hf)
 	handoff := filepath.Join(mem, hf)
-	bar := strings.Repeat("=", 64)
 	lang := e.lang()
-	head := []string{bar, i18n.T(lang, "loop.memories.header", "path", handoff), bar}
-	body, hasBody := "", false
-	var after []string // 本文の後ろに置くもの（最終更新。引き継ぎが無いときはその知らせ）
+	v := memoriesView{header: i18n.T(lang, "loop.memories.header", "path", handoff), othersHeader: i18n.T(lang, "loop.memories.others_header"),
+		footer:  i18n.T(lang, "loop.memories.footer"),
+		trimmed: func(total string) string { return i18n.T(lang, "loop.memories.trimmed", "total", total) }}
 	if st, err := os.Stat(handoff); err == nil && st.Mode().IsRegular() {
 		t, _ := readText(handoff)
-		body, hasBody = trimSpaceRight(t), true
-		after = []string{"", i18n.T(lang, "loop.memories.mtime", "time", st.ModTime().Local().Format("2006-01-02 15:04"))}
+		v.body, v.hasBody = trimSpaceRight(t), true
+		v.after = []string{"", i18n.T(lang, "loop.memories.mtime", "time", st.ModTime().Local().Format("2006-01-02 15:04"))}
 	} else {
-		after = []string{i18n.T(lang, "loop.memories.missing", "name", hf)}
+		v.after = []string{i18n.T(lang, "loop.memories.missing", "name", hf)}
 	}
-	var others []string
 	for _, p := range globMD(mem) {
 		name := filepath.Base(p)
 		if name == hf || name == "README.md" {
@@ -236,19 +236,33 @@ func SessionStartMemories(ctx context.Context, ev hookio.Event) (hookio.Result, 
 		if err != nil {
 			continue
 		}
-		summary := ""
-		for _, line := range textLines(t) {
-			if m := summaryLine.FindStringSubmatch(line); m != nil {
-				summary = trimSpace(m[1])
-				break
-			}
-		}
+		summary, _ := cli.MemoryFileSummary(t)
 		if summary == "" {
 			summary = i18n.T(lang, "loop.memories.no_summary")
 		}
-		others = append(others, fmt.Sprintf("  - %s — %s", name, summary))
+		v.others = append(v.others, fmt.Sprintf("  - %s — %s", name, summary))
 	}
-	foot := []string{bar, i18n.T(lang, "loop.memories.footer"), bar}
+	return renderMemories(e, lang, v), nil
+}
+
+// memoriesView は注入する記憶の材料（置き場に依らない）。
+type memoriesView struct {
+	header       string
+	body         string
+	hasBody      bool
+	after        []string // 本文の後ろに置くもの（最終更新。引き継ぎが無いときはその知らせ）
+	others       []string // ほかの記憶の要約の行
+	othersHeader string
+	footer       string
+	trimmed      func(total string) string // 末尾だけを入れるときの断り
+}
+
+// renderMemories は材料を上限（LOOPTRACK_LOOP_MEMORIES_MAX_CHARS）に収めて文脈にする。切り出しの規則はファイル冒頭のとおりで、置き場に依らない。
+func renderMemories(e *Env, lang i18n.Lang, v memoriesView) hookio.Result {
+	bar := strings.Repeat("=", 64)
+	head := []string{bar, v.header, bar}
+	body, hasBody, after, others := v.body, v.hasBody, v.after, v.others
+	foot := []string{bar, v.footer, bar}
 	// assemble は本文（bodyText）に、他の記憶の一覧（withOthers）と運用の注記（withFoot）を付けて組み立てる。
 	// 上限が厳しいときは、この 2 つを落として本文の取り分を作る（読み手が要るのは本文）。
 	assemble := func(bodyText string, withOthers, withFoot bool) string {
@@ -258,7 +272,7 @@ func SessionStartMemories(ctx context.Context, ev hookio.Event) (hookio.Result, 
 		}
 		out = append(out, after...)
 		if withOthers && len(others) > 0 {
-			out = append(out, "", i18n.T(lang, "loop.memories.others_header"))
+			out = append(out, "", v.othersHeader)
 			out = append(out, others...)
 		}
 		if withFoot {
@@ -271,11 +285,11 @@ func SessionStartMemories(ctx context.Context, ev hookio.Event) (hookio.Result, 
 	limit := memoriesMaxChars(e)
 	full := assemble(body, true, true)
 	if limit <= 0 || runeLen(full) <= limit || !hasBody {
-		return hookio.Result{Context: clampRunes(full, limit)}, nil
+		return hookio.Result{Context: clampRunes(full, limit)}
 	}
 	// 上限を超えるときは本文の**末尾（新しい節）**だけにする。それでも入らなければ、他の記憶の一覧を落として本文の取り分を作る。
 	// 末尾の枠とは別に「現在地」の節の枠を取る（末尾の切り出しに既に入っているなら取らない。同じ節を 2 回入れない）
-	notice := i18n.T(lang, "loop.memories.trimmed", "total", strconv.Itoa(runeLen(body)))
+	notice := v.trimmed(strconv.Itoa(runeLen(body)))
 	bodyLines := strings.Split(body, "\n")
 	type frame struct{ others, foot bool }
 	for i, f := range []frame{{true, true}, {false, true}, {false, false}} {
@@ -299,9 +313,9 @@ func SessionStartMemories(ctx context.Context, ev hookio.Event) (hookio.Result, 
 			out += cur + "\n\n"
 		}
 		out += tailExcerpt(lang, body, budget-used)
-		return hookio.Result{Context: clampRunes(assemble(out, f.others, f.foot), limit)}, nil
+		return hookio.Result{Context: clampRunes(assemble(out, f.others, f.foot), limit)}
 	}
-	return hookio.Result{Context: clampRunes(full, limit)}, nil
+	return hookio.Result{Context: clampRunes(full, limit)}
 }
 
 // baseName はパスの最後の要素（最後の区切りの後ろ。末尾が区切りなら ""）。
