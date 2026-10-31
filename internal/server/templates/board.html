@@ -22,6 +22,10 @@
       </div>
     </div>
     {{if .CanEdit}}<button type="button" class="appbar-action" id="newIssue" title="{{T .Lang "server.web.board.new_title"}}">{{T .Lang "server.web.board.new"}}</button>{{end}}
+    <a class="appbar-action" href="{{base}}/p/{{.Slug}}/leases" title="{{T .Lang "server.web.board.leases_title"}}">{{T .Lang "server.web.board.leases"}}</a>
+    <a class="appbar-action" href="{{base}}/p/{{.Slug}}/presence" title="{{T .Lang "server.web.board.presence_title"}}">{{T .Lang "server.web.board.presence"}}</a>
+    <a class="appbar-action" href="{{base}}/p/{{.Slug}}/memory" title="{{T .Lang "server.web.board.memory_title"}}">{{T .Lang "server.web.board.memory"}}</a>
+    <a class="appbar-action" href="{{base}}/p/{{.Slug}}/messages" title="{{T .Lang "server.web.board.messages_title"}}">{{T .Lang "server.web.board.messages"}}</a>
     <a class="appbar-action" href="{{base}}/p/{{.Slug}}/report-requests" title="{{T .Lang "server.web.board.report_title"}}">{{T .Lang "server.web.board.report"}}</a>
 {{template "appbar_row_end" .}}
   <div class="filters appbar-below" id="filters"></div>

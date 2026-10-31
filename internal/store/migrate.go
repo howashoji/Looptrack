@@ -88,7 +88,8 @@ const mysqlSchemaMigrationsExists = "SELECT COUNT(*) FROM information_schema.TAB
 // Migrate は未適用のマイグレーションを番号順に適用し、適用したファイル名を返す。
 // MySQL は fsys 直下、SQLite は fsys の sqlite/ のファイルを使う。
 // MySQL では同じスキーマに複数プロセスから同時に呼ばれても GET_LOCK で直列化する。DDL は MySQL では暗黙コミットされるため、
-// 1 ファイルの途中で失敗した場合は手で戻す必要がある（失敗したファイル名をエラーに含める）。
+// 1 ファイルの途中で失敗した場合は手で戻す必要がある（失敗したファイル名をエラーに含める）。流し直せる形に書いたファイル
+// （0015 のように、表は IF NOT EXISTS、移す段と列を落とす段は information_schema の条件つき）は、そのままやり直せば続きから通る。
 // SQLite では 1 ファイルを 1 トランザクション（BEGIN IMMEDIATE）で適用する（DDL も巻き戻る）。
 func Migrate(ctx context.Context, db *sql.DB, fsys fs.FS) ([]string, error) {
 	if IsSQLite(db) {

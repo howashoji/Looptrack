@@ -7,7 +7,8 @@ package loop
 // <状態>/handoff-pending.d/<session_id> に「時刻<TAB>イベント」を 1 行足して、引き継ぎの更新を促す。
 // 2 段目（Stop）: 積まれたマーカーより引き継ぎが古ければ差し戻す。新しければマーカーを畳む。鮮度の判定（LOOPTRACK_LOOP_HANDOFF_BACKEND）は
 // file（既定。LOOPTRACK_LOOP_HANDOFF_FILE）・auto-memory（<CLAUDE_CONFIG_DIR か ~/.claude>/projects/<パス>/memory/MEMORY.md）・command（LOOPTRACK_LOOP_HANDOFF_CHECK_CMD を
-// bash -c で実行。0 = 新しい / 1 = 古い / それ以外 = 判定できない）・issue（着手中のイシューのセッション要約。handoffdigest.go）。
+// bash -c で実行。0 = 新しい / 1 = 古い / それ以外 = 判定できない）・issue（着手中のイシューのセッション要約。handoffdigest.go）・
+// server（サーバのプロジェクト記憶。memoryserver.go）。
 //
 // bash 版との違い: シェルのツールは名前（Bash・bash・run_in_terminal）に加えて種類（hookio.KindBash）でも見分ける。ツールの結果は
 // Copilot CLI の camelCase の toolResult も読む。git diff-tree は git を起動する。
@@ -210,6 +211,7 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 	// 1 回のツールの呼び出しで完了が複数起きる（`looptrack issue status A Done; looptrack issue status B Done`）ので、
 	// 見つけたものを**ためて全部書く**。1 つの変数に上書きすると最後の 1 件しか残らず、ほかは黙って記録から消える。
 	var events [][]string
+	wroteHandoff := false // このツールの呼び出しが looptrack handoff を実行した
 	addEvent := func(fields ...string) {
 		line := strings.Join(fields, "\t")
 		for _, prev := range events {
@@ -258,6 +260,10 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 				continue
 			}
 			args := seg[1:]
+			if len(args) >= 2 && args[0] == "handoff" && (args[1] == "append" || args[1] == "compact") {
+				wroteHandoff = true
+				continue
+			}
 			if len(args) < 2 || args[0] != "issue" {
 				continue
 			}
@@ -306,6 +312,16 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 			}
 		}
 	}
+	// server の置き場の書き手は、シェルの中のセッション ID では hook の ID と結べないことがある（器の ID・ID の無い器）。
+	// hook はこのセッションの呼び出しとして見ているので、ここで手元の時計の記録を残す
+	if wroteHandoff && handoffBackend(e) == backendServer {
+		switch {
+		case handoffServerWrote.MatchString(resp):
+			markHandoffWritten(state, sessionFile(ev))
+		case handoffSpoolName.MatchString(resp):
+			noteSpoolHookSession(ev, e, handoffSpoolName.FindString(resp))
+		}
+	}
 	if len(events) == 0 {
 		return hookio.Result{}, nil
 	}
@@ -333,11 +349,14 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 	}
 	msg := i18n.T(lang, "loop.handoff.detected", "event", strings.Join(shown, i18n.T(lang, "loop.handoff.event.sep")))
 	// 印で判定するときは、実物の行をここで渡す（AI は自分のセッション ID を知らないので、文面で説明するだけでは書けない）
-	backend := trimSpace(e.env("LOOPTRACK_LOOP_HANDOFF_BACKEND"))
+	backend := handoffBackend(e)
 	if backend == "issue" { // 引き継ぎはイシューのセッション要約で判定する（送るコマンドをここで示す）
 		msg += "\n" + i18n.T(lang, "loop.handoff.digest.detected")
 	}
-	if (backend == "" || backend == "file") && handoffWriterMode(e) == writerSession {
+	if backend == backendServer { // 書き手は版の履歴で判定するので、印は要らない
+		msg += "\n" + i18n.T(lang, "loop.handoff.server.detected")
+	}
+	if backend == "file" && handoffWriterMode(e) == writerSession {
 		if sid := sessionFile(ev); sid != "" {
 			msg += "\n" + i18n.T(lang, "loop.handoff.mark.howto", "mark", writerMark(sid))
 		}
@@ -583,8 +602,8 @@ func StopHandoffFreshness(ctx context.Context, ev hookio.Event) (hookio.Result, 
 	if err != nil || ev.StopHookActive {
 		return res, err
 	}
-	// 本体以外の作業ツリーに取り残された引き継ぎを知らせる（止めない）
-	if res.SystemMessage == "" {
+	// 本体以外の作業ツリーに取り残された引き継ぎを知らせる（止めない）。server の置き場は手元のファイルを使わない
+	if res.SystemMessage == "" && handoffBackend(e) != backendServer {
 		res.SystemMessage = strayHandoffNotice(ev, e)
 		if res.SystemMessage != "" && res.Kind == "" {
 			res.Kind = "handoff: stray"
@@ -599,8 +618,12 @@ func stopHandoffFreshness(ctx context.Context, ev hookio.Event, e *Env) (hookio.
 	}
 	// 「更新が遅れている」より先に「前回あった記録が無い」を見る（別の文言で知らせる。recordloss.go）。
 	// マーカーが積まれていなくても消失は知らせるので、鮮度の判定より前に置く
-	if res := StopRecordLoss(ev, e); !res.IsZero() {
-		return res, nil
+	// server の置き場は記録がサーバの版に残るので見ない（取り込んだ後に手元のファイルを消しても消失ではない）
+	backend := handoffBackend(e)
+	if backend != backendServer {
+		if res := StopRecordLoss(ev, e); !res.IsZero() {
+			return res, nil
+		}
 	}
 	r, state := root(ev, e), stateDir(ev, e)
 	lang := e.lang()
@@ -609,6 +632,9 @@ func stopHandoffFreshness(ctx context.Context, ev hookio.Event, e *Env) (hookio.
 	st, err := os.Stat(pend)
 	if err != nil || st.Size() == 0 {
 		_ = os.Remove(blocked)
+		if backend == backendServer {
+			flushServerSpoolOnStop(ctx, ev, e, r, state)
+		}
 		return hookio.Result{}, nil
 	}
 	pendMT := st.ModTime()
@@ -623,15 +649,11 @@ func stopHandoffFreshness(ctx context.Context, ev hookio.Event, e *Env) (hookio.
 		}
 	}
 
-	backend := trimSpace(e.env("LOOPTRACK_LOOP_HANDOFF_BACKEND"))
-	if backend == "" {
-		backend = "file"
-	}
 	var fresh bool
 	var where string
 	var byMark bool   // 印で判定したか（差し戻しの文に印の行を添えるかの判断に使う）
 	var notice string // 止めずに知らせる注意（要約の判定でサーバに届かない・判定できないとき）
-	keep := false     // 通すがマーカーを畳まない（backend issue でサーバに届かなかったとき）
+	keep := false     // 通すがマーカーを畳まない（backend issue・server でサーバに届かなかったとき）
 	decided := true   // backend が判定したか（false = 判定できない・判定しない。ルールが無ければ従来どおり何もせずに通す）
 	switch backend {
 	case "issue":
@@ -641,6 +663,9 @@ func stopHandoffFreshness(ctx context.Context, ev hookio.Event, e *Env) (hookio.
 		if !fresh {
 			where = d.where(lang)
 		}
+	case backendServer:
+		// サーバの版の履歴で判定する（memoryserver.go。届かなければ止めずに注意だけ出す）
+		fresh, where, notice, keep = checkServerHandoff(ctx, ev, e, r, state, pendMT)
 	case "command":
 		cmd := e.env("LOOPTRACK_LOOP_HANDOFF_CHECK_CMD")
 		if cmd == "" {

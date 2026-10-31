@@ -53,6 +53,8 @@ If a project turns on carrying transcripts (`session.transcripts`), the transcri
 Copy that folder too when you back up.
 
 The `backups` folder inside the data folder holds copies of `looptrack.db` (`looptrack.db.20260926T010203Z`; the time is in UTC). The app takes them by itself, before a new version changes the database format.
+
+Purging project memory versions with `looptrack memory purge` does not touch the copies in `backups`. To remove the text from them too, delete those copy files.
 It takes one only when the new version actually has changes to apply to an existing database. It keeps the two newest and deletes older ones.
 Like the database, only you can read them. They're what you use to go back to the previous version ([Update](updating.md#update)).
 

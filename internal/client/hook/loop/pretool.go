@@ -38,7 +38,8 @@ var (
 	imProjectRe   = compatRe(`(?:^|[\s;&|(])(?:export\s+)?LOOPTRACK_PROJECT=([^\s;&|]+)`)
 	imServerRe    = regexp.MustCompile(`^looptrack(-[A-Za-z0-9]+)?$`)
 	imWriteTools  = map[string]bool{"create_issue": true, "add_comment": true, "set_status": true, "update_issue": true,
-		"assign_issue": true, "verify_issue": true, "report_verify": true, "add_usage_ledger": true}
+		"assign_issue": true, "verify_issue": true, "report_verify": true, "add_usage_ledger": true, "write_memory": true, "send_message": true,
+		"acquire_lease": true, "extend_lease": true, "release_lease": true, "break_lease": true}
 	heredocTagRe = compatRe(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
 	quotedRe     = regexp.MustCompile(`"(\\\\.|[^"\\\\])*"|'[^']*'`)
 	segSplitRe   = regexp.MustCompile(`&&|\|\||;|\n`)

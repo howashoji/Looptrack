@@ -95,3 +95,46 @@ func TestFirstMemberAlsoNeedsTwoFactor(t *testing.T) {
 		t.Error("指定なしで最初の利用者を作った")
 	}
 }
+
+// 連絡の保持日数の変更: 変わったときと同じ値のときで文面が違い、読み直すと新しい値になる。負の数と数でない値は拒む。
+func TestSetMessageRetention(t *testing.T) {
+	db := testutil.MigratedDB(t)
+	ctx := context.Background()
+	if msg, err := setMessageRetention(ctx, db, i18n.JA, "7"); err != nil || !strings.Contains(msg, "7 にしました") {
+		t.Fatalf("変更: %q %v", msg, err)
+	}
+	if msg, err := setMessageRetention(ctx, db, i18n.JA, "7"); err != nil || !strings.Contains(msg, "のままです") {
+		t.Fatalf("同じ値: %q %v", msg, err)
+	}
+	if days, err := store.ReadMessageRetentionDays(ctx, db); err != nil || days != 7 {
+		t.Fatalf("読み直し: %d %v", days, err)
+	}
+	for _, v := range []string{"-1", "abc", "36501"} {
+		if _, err := setMessageRetention(ctx, db, i18n.JA, v); err == nil {
+			t.Errorf("%s を受け付けた", v)
+		}
+	}
+}
+
+// 記憶の版の保持日数の変更: 既定は無期限で、変わったときと同じ値のときで文面が違う。負の数と数でない値は拒む。
+func TestSetMemoryRetention(t *testing.T) {
+	db := testutil.MigratedDB(t)
+	ctx := context.Background()
+	if days, err := store.ReadMemoryRetentionDays(ctx, db); err != nil || days != 0 {
+		t.Fatalf("既定: %d %v", days, err)
+	}
+	if msg, err := setMemoryRetention(ctx, db, i18n.JA, "30"); err != nil || !strings.Contains(msg, "30 にしました") {
+		t.Fatalf("変更: %q %v", msg, err)
+	}
+	if msg, err := setMemoryRetention(ctx, db, i18n.JA, "30"); err != nil || !strings.Contains(msg, "のままです") {
+		t.Fatalf("同じ値: %q %v", msg, err)
+	}
+	if days, err := store.ReadMemoryRetentionDays(ctx, db); err != nil || days != 30 {
+		t.Fatalf("読み直し: %d %v", days, err)
+	}
+	for _, v := range []string{"-1", "abc", "36501", "106752"} {
+		if _, err := setMemoryRetention(ctx, db, i18n.JA, v); err == nil {
+			t.Errorf("%s を受け付けた", v)
+		}
+	}
+}

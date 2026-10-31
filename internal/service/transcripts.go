@@ -15,7 +15,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -1017,7 +1016,7 @@ func (s *Service) PurgeExpiredTranscripts(ctx context.Context) (*TranscriptReten
 	if limits.RetentionDays == 0 {
 		return res, nil
 	}
-	cutoff := s.Now().Add(-time.Duration(limits.RetentionDays) * 24 * time.Hour)
+	cutoff := s.Now().AddDate(0, 0, -int(limits.RetentionDays))
 	live, err := store.TranscriptsWithLiveChunks(ctx, s.DB)
 	if err != nil {
 		return nil, err

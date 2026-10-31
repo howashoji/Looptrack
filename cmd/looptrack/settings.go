@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/howashoji/looptrack/internal/i18n"
@@ -73,8 +74,14 @@ func addUser(ctx context.Context, db *sql.DB, lang i18n.Lang, login, name, hash,
 }
 
 func settingsCmd(args []string) int {
-	const u = "settings two-factor [required|optional]"
+	const u = "settings two-factor [required|optional] | settings message-retention [days] | settings memory-retention [days]"
 	lang := cmdLang()
+	if len(args) >= 1 && args[0] == "message-retention" && len(args) <= 2 {
+		return messageRetentionCmd(args[1:])
+	}
+	if len(args) >= 1 && args[0] == "memory-retention" && len(args) <= 2 {
+		return memoryRetentionCmd(args[1:])
+	}
 	if len(args) < 1 || args[0] != "two-factor" || len(args) > 2 {
 		return usageErr(u)
 	}
@@ -98,6 +105,96 @@ func settingsCmd(args []string) int {
 	}
 	fmt.Println(msg)
 	return 0
+}
+
+// messageRetentionCmd は連絡の保持日数を表示し、値があれば変える（DESIGN.md §9-9）。
+func messageRetentionCmd(args []string) int {
+	lang := cmdLang()
+	ctx := context.Background()
+	db, err := openDB()
+	if err != nil {
+		return fail(err)
+	}
+	defer db.Close()
+	if len(args) == 0 {
+		days, err := store.ReadMessageRetentionDays(ctx, db)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Println(i18n.T(lang, "cmd.settings.message_retention.current", "days", days))
+		return 0
+	}
+	msg, err := setMessageRetention(ctx, db, lang, args[0])
+	if err != nil {
+		return fail(err)
+	}
+	fmt.Println(msg)
+	return 0
+}
+
+// setMessageRetention は連絡の保持日数を変え、表示する文を返す。
+func setMessageRetention(ctx context.Context, db *sql.DB, lang i18n.Lang, value string) (string, error) {
+	days, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || days < 0 || days > store.MaxRetentionDays {
+		return "", i18n.Errorf("cmd.err.message_retention_value", "value", value, "max", store.MaxRetentionDays)
+	}
+	note := "looptrack settings message-retention"
+	if who := os.Getenv("SUDO_USER"); who != "" {
+		note += "（" + who + "）"
+	}
+	_, changed, err := store.SetMessageRetentionDays(ctx, db, days, store.SettingChange{Via: "command", Note: note})
+	if err != nil {
+		return "", err
+	}
+	if changed {
+		return i18n.T(lang, "cmd.settings.message_retention.changed", "days", days), nil
+	}
+	return i18n.T(lang, "cmd.settings.message_retention.unchanged", "days", days), nil
+}
+
+// memoryRetentionCmd は記憶の版の保持日数を表示し、値があれば変える（DESIGN.md §9-9）。
+func memoryRetentionCmd(args []string) int {
+	lang := cmdLang()
+	ctx := context.Background()
+	db, err := openDB()
+	if err != nil {
+		return fail(err)
+	}
+	defer db.Close()
+	if len(args) == 0 {
+		days, err := store.ReadMemoryRetentionDays(ctx, db)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Println(i18n.T(lang, "cmd.settings.memory_retention.current", "days", days))
+		return 0
+	}
+	msg, err := setMemoryRetention(ctx, db, lang, args[0])
+	if err != nil {
+		return fail(err)
+	}
+	fmt.Println(msg)
+	return 0
+}
+
+// setMemoryRetention は記憶の版の保持日数を変え、表示する文を返す。
+func setMemoryRetention(ctx context.Context, db *sql.DB, lang i18n.Lang, value string) (string, error) {
+	days, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || days < 0 || days > store.MaxRetentionDays {
+		return "", i18n.Errorf("cmd.err.message_retention_value", "value", value, "max", store.MaxRetentionDays)
+	}
+	note := "looptrack settings memory-retention"
+	if who := os.Getenv("SUDO_USER"); who != "" {
+		note += "（" + who + "）"
+	}
+	_, changed, err := store.SetMemoryRetentionDays(ctx, db, days, store.SettingChange{Via: "command", Note: note})
+	if err != nil {
+		return "", err
+	}
+	if changed {
+		return i18n.T(lang, "cmd.settings.memory_retention.changed", "days", days), nil
+	}
+	return i18n.T(lang, "cmd.settings.memory_retention.unchanged", "days", days), nil
 }
 
 // setTwoFactor は管理コマンドから二段階認証の設定を変える（再認証は求めない: サーバ上の操作者は DB の資格情報を持つ）。

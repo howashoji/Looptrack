@@ -1,0 +1,31 @@
+{{define "messages.html"}}{{template "head" (headData .Lang (T .Lang "server.web.messages.title"))}}
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <a class="appbar-crumb" href="{{base}}/p/{{.Slug}}/">{{.Slug}}</a>
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <span class="appbar-title">{{T .Lang "server.web.messages.title"}}</span>
+{{template "appbar_end" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.messages.title"}}</h1>
+  <p class="muted">{{T .Lang "server.web.messages.intro"}}</p>
+  <section class="panel">
+    {{with .Messages}}
+    <table class="list">
+      <thead><tr><th>{{T $.Lang "server.web.messages.th_time"}}</th><th>{{T $.Lang "server.web.messages.th_from"}}</th><th>{{T $.Lang "server.web.messages.th_to"}}</th><th>{{T $.Lang "server.web.messages.th_body"}}</th></tr></thead>
+      <tbody>
+      {{range .}}
+      <tr>
+        <td>{{.Created}}</td>
+        <td>{{.SenderLogin}}{{if .SenderMachine}}<br><span class="muted">{{.SenderMachine}}</span>{{end}}</td>
+        <td>{{.ToKind}}{{if .IssueDisplay}}<br><a href="{{base}}/p/{{$.Slug}}/#{{.IssueDisplay}}">{{.IssueDisplay}}</a>{{end}}</td>
+        <td class="name"><pre>{{.Body}}</pre></td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">{{T .Lang "server.web.messages.none"}}</p>
+    {{end}}
+  </section>
+</main>
+{{template "foot"}}{{end}}

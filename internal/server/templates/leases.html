@@ -1,0 +1,33 @@
+{{define "leases.html"}}{{template "head" (headData .Lang (T .Lang "server.web.lease.title"))}}
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <a class="appbar-crumb" href="{{base}}/p/{{.Slug}}/">{{.Name}}</a>
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <span class="appbar-title">{{T .Lang "server.web.lease.title"}}</span>
+{{template "appbar_end" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.lease.h1"}}</h1>
+  <p class="muted">{{T .Lang "server.web.lease.intro"}}</p>
+  <section class="panel">
+    {{with .Leases}}
+    <table class="list">
+      <thead><tr><th>{{T $.Lang "server.web.lease.th_name"}}</th><th>{{T $.Lang "server.web.lease.th_holder"}}</th><th>{{T $.Lang "server.web.lease.th_machine"}}</th><th>{{T $.Lang "server.web.lease.th_session"}}</th><th>{{T $.Lang "server.web.lease.th_purpose"}}</th><th>{{T $.Lang "server.web.lease.th_expires"}}</th></tr></thead>
+      <tbody>
+      {{range .}}
+      <tr>
+        <td class="name"><a href="{{base}}/p/{{$.Slug}}/leases/{{.Name}}">{{.Name}}</a></td>
+        <td>{{.HolderLogin}}</td>
+        <td>{{.MachineLabel}}</td>
+        <td>{{.SessionID}}</td>
+        <td class="name">{{.Purpose}}</td>
+        <td>{{.Expires}}{{if .Expired}}<br><span class="muted">{{T $.Lang "server.web.lease.expired"}}</span>{{end}}</td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">{{T .Lang "server.web.lease.none"}}</p>
+    {{end}}
+  </section>
+</main>
+{{template "foot"}}{{end}}

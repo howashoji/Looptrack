@@ -314,6 +314,29 @@ func (s *Server) routes() {
 	api.HandleFunc("GET "+b+"/api/v1/transcripts/{id}", s.apiGetTranscript)
 	api.HandleFunc("GET "+b+"/api/v1/transcripts/{id}/chunks/{seq}", s.apiGetTranscriptChunk)
 	api.HandleFunc("POST "+b+"/api/v1/transcripts/{id}/purge", s.apiPurgeTranscript)
+	// プロジェクト記憶（範囲と権限・版は service の memory.go。memory_api.go）
+	api.HandleFunc("GET "+b+"/api/v1/projects/{slug}/memory", s.apiListMemories)
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/memory", s.apiCreateMemory)
+	api.HandleFunc("GET "+b+"/api/v1/projects/{slug}/memory/{kind}/{name}", s.apiGetMemory)
+	api.HandleFunc("PUT "+b+"/api/v1/projects/{slug}/memory/{kind}/{name}", s.apiReplaceMemory)
+	api.HandleFunc("DELETE "+b+"/api/v1/projects/{slug}/memory/{kind}/{name}", s.apiDeleteMemory)
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/memory/{kind}/{name}/append", s.apiAppendMemory)
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/memory/{kind}/{name}/purge", s.apiPurgeMemory)
+	// 連絡（宛先と権限は service の messages.go。messages_api.go）
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/messages", s.apiSendMessage)
+	api.HandleFunc("GET "+b+"/api/v1/projects/{slug}/messages/{id}", s.apiGetMessage)
+	api.HandleFunc("GET "+b+"/api/v1/projects/{slug}/inbox", s.apiInbox)
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/inbox/read", s.apiInboxRead)
+	// 占有（権限・期限・持ち主の照合は service の lease.go。lease_api.go）
+	api.HandleFunc("GET "+b+"/api/v1/projects/{slug}/leases", s.apiListLeases)
+	api.HandleFunc("GET "+b+"/api/v1/projects/{slug}/leases/{name}", s.apiGetLease)
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/leases/{name}", s.apiAcquireLease)
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/leases/{name}/extend", s.apiExtendLease)
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/leases/{name}/break", s.apiBreakLease)
+	api.HandleFunc("DELETE "+b+"/api/v1/projects/{slug}/leases/{name}", s.apiReleaseLease)
+	// 在席（検査と判定は service の presence.go。presence_api.go）
+	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/presence", s.apiReportPresence)
+	api.HandleFunc("DELETE "+b+"/api/v1/projects/{slug}/presence", s.apiEndPresence)
 	// MCP の呼び出しを会話に結ぶ合鍵（PreToolUse の hook が送る・session_binds.go）
 	api.HandleFunc("POST "+b+"/api/v1/projects/{slug}/session-binds", s.apiPostSessionBind)
 	api.HandleFunc("GET "+b+"/api/v1/activity", s.apiActivity)
@@ -380,7 +403,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+b+"/p/{slug}", s.web(s.board))
 	s.mux.HandleFunc("GET "+b+"/p/{slug}/report-requests", s.web(s.reportRequestsPage)) // レポート作成の依頼
 	s.mux.HandleFunc("POST "+b+"/p/{slug}/report-requests", s.web(s.reportRequestsSubmit))
-	s.mux.HandleFunc("POST "+b+"/p/{slug}/issues/{id}/assign", s.web(s.assignSubmit)) // 担当の変更（閲覧のみの例外）
+	s.mux.HandleFunc("GET "+b+"/p/{slug}/memory", s.web(s.memoryListPage))                         // プロジェクト記憶の一覧（参加者だけ。memory_web.go）
+	s.mux.HandleFunc("GET "+b+"/p/{slug}/memory/{scope}/{kind}/{name}", s.web(s.memoryDetailPage)) // プロジェクト記憶の詳細
+	s.mux.HandleFunc("GET "+b+"/p/{slug}/messages", s.web(s.messagesPage))                         // 自分宛ての連絡の一覧（messages_web.go）
+	s.mux.HandleFunc("GET "+b+"/p/{slug}/leases", s.web(s.leaseListPage))                          // 占有の一覧（参加者だけ。lease_web.go）
+	s.mux.HandleFunc("GET "+b+"/p/{slug}/leases/{name}", s.web(s.leaseDetailPage))                 // 占有の記録
+	s.mux.HandleFunc("GET "+b+"/p/{slug}/presence", s.web(s.presenceListPage))                     // 動いているセッションの一覧（presence_api.go）
+	s.mux.HandleFunc("POST "+b+"/p/{slug}/issues/{id}/assign", s.web(s.assignSubmit))              // 担当の変更（閲覧のみの例外）
 	s.mux.HandleFunc(b+"/", s.web(func(w http.ResponseWriter, r *http.Request, p *principal) {
 		s.notFoundPage(w, r, i18n.T(reqLang(r), "server.web.err.page_not_found"))
 	}))

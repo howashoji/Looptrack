@@ -898,7 +898,25 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				text += "\n\n" + i18n.T(c.lang, "server.mcp.summary.requests_heading", "count", len(requests)) + "\n" + s.requestText(c.lang, requests) +
 					i18n.T(c.lang, "server.mcp.summary.next_command", "command", requestCommand(c.lang, requests[len(requests)-1].ID))
 			}
-			return result(text, map[string]any{"project": pr.Slug, "counts": cnt, "in_progress": inProgress, "in_review": inReview, "feedback": fb,
+			unread := s.unreadMessages(ctx, c.actor, pr.Slug)
+			if unread > 0 {
+				text += "\n" + i18n.T(c.lang, "server.mcp.summary.unread_messages", "count", unread)
+			}
+			leases, err := s.svc.ProjectLeases(ctx, pr) // 今取られている占有（§9-9）
+			if err != nil {
+				return nil, nil, s.toolError(c.lang, "project_summary", err)
+			}
+			if len(leases) > 0 {
+				text += "\n\n" + i18n.T(c.lang, "server.mcp.summary.leases_heading", "count", len(leases)) + "\n" + leaseLines(c.lang, leases, s.svc.Loc)
+			}
+			others, err := s.svc.OtherPresence(ctx, c.actor, pr) // 動いているほかのセッション（§9-9）
+			if err != nil {
+				return nil, nil, s.toolError(c.lang, "project_summary", err)
+			}
+			if len(others) > 0 {
+				text += "\n\n" + i18n.T(c.lang, "server.mcp.summary.presence_heading", "count", len(others)) + "\n" + presenceLines(others, s.svc.Loc)
+			}
+			return result(text, map[string]any{"project": pr.Slug, "counts": cnt, "unread_messages": unread, "leases": leasesJSON(leases), "active_sessions": presencesJSON(others), "in_progress": inProgress, "in_review": inReview, "feedback": fb,
 				"ready": top, "ready_total": len(ready), "requirements_ready": closableTop, "requirements_ready_total": len(closable),
 				"usage_missing":  map[string]any{"count": missing.Missing, "issues": missing.Issues, "days": missing.Days, "command": missing.Command},
 				"usage_requests": requests}), nil, nil
@@ -1045,6 +1063,9 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 	s.addUsageMCPTools(srv, lang, ro, notDestructive) // トークンレポートの集計と台帳
 	s.addRequestMCPTools(srv, lang, ro)               // レポートの作成依頼
 	s.addVerifyMCPTools(srv, lang, ro)                // 検証コマンドの一覧（実行しない）
+	s.addMemoryMCPTools(srv, lang, ro)                // プロジェクト記憶（memory_api.go）
+	s.addMessageMCPTools(srv, lang)                   // 連絡（messages_api.go）
+	s.addLeaseMCPTools(srv, lang, ro)                 // 占有（lease_api.go）
 }
 
 // mcpAssign は担当の変更（assign_issue と update_issue の担当だけの変更）。
