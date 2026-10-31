@@ -62,7 +62,7 @@ API モードの詳細:
 | 担当者（§9-2） | 担当が付いたイシューは出力が増えます。`show` の frontmatter の `assignee:` 行、`list` / `ready` / `summary` の `ASSIGNEE` 列（担当が 1 件でもある表だけ）、`status` の `担当: <ID>: <旧> → <新>` 行です。最後の行は明示の変更と引き継ぎのときだけ出し、In Progress で本人が担当になる R1 では出しません。担当の無いイシューだけの表には列を出しません |
 | サブコマンド | `list` / `ready` / `show`（`--json`）、`edit` / `push [--rebase]`、`activity <ID…> [--since] [--json]`、`summary [--limit] [--json]`、`config [--json]`（利用者名も出す）、`login [--url] [--browser]`、`guide` / `next` / `init`（§5-2） |
 | 鮮度ガード | Stop のときに `/activity`（`since` = セッション開始時刻）を 1 回呼びます。`events_since` が 0 のイシューは「参照したのに更新していない」とみなします。クローズ済みと存在しない ID は対象外です。ID の見分けに使う prefix / width は `.claude/.looptrack-freshness/project.json` に控えます（mark は毎回のツール実行で走るので、そこでは HTTP を出しません）。サーバに聞けないときは黙って通します（fail-open） |
-| MCP | `/looptrack/mcp` です。公式 Go SDK の streamable HTTP を **Stateless・JSON 応答**で使い、セッションを持たないので常駐メモリが増えません。GET は 405 です。認証は Bearer のアクセストークンだけで、Cookie のセッションは使えません（401 には `WWW-Authenticate: Bearer`）。ツールは `list_projects` `create_project`（プロジェクトの作成。管理者だけ。「setup の直後にブラウザだけで起票できるようにする」の (c) と同じ `service.CreateProject`）`list_issues` `ready_issues` `get_issue` `create_issue` `add_comment` `set_status` `update_issue` `get_matrix` `project_summary` `issue_activity` `guide` `next`（guide / next は §5-2）`assign_issue`（担当者・§9-2・`create_issue` / `set_status` / `update_issue` / `next` にも `assignee` 引数）、トークンの `issue_usage` `usage_missing` `usage_report` `list_usage_ledger` `add_usage_ledger`（§9-5）`list_usage_requests` です。REST と同じ internal/service を呼ぶので、ルール・楽観ロック・権限・記録も同じです（`via=mcp`）。project は引数 → ヘッダ `X-Looptrack-Project` → 利用できるプロジェクトが 1 つならそれ、の順に決めます。エラーはツールの実行エラー（isError）で、文言は REST と同じです。`.mcp.json` の例: `{"mcpServers": {"looptrack": {"type": "http", "url": "https://example.com/looptrack/mcp", "headers": {"Authorization": "Bearer ${LOOPTRACK_TOKEN}", "X-Looptrack-Project": "<slug>"}}}}`。実際の Claude Code での確認は `deploy/dev/mcp-e2e.sh` で行います |
+| MCP | `/looptrack/mcp` です。公式 Go SDK の streamable HTTP を **Stateless・JSON 応答**で使い、セッションを持たないので常駐メモリが増えません。GET は 405 です。認証は Bearer のアクセストークンだけで、Cookie のセッションは使えません（401 には `WWW-Authenticate: Bearer`）。ツールは `list_projects` `create_project`（プロジェクトの作成。管理者だけ。「setup の直後にブラウザだけで起票できるようにする」の (c) と同じ `service.CreateProject`）`list_issues` `ready_issues` `get_issue` `create_issue` `add_comment` `set_status` `update_issue` `get_matrix` `project_summary` `issue_activity` `guide` `next`（guide / next は §5-2）`assign_issue`（担当者・§9-2・`create_issue` / `set_status` / `update_issue` / `next` にも `assignee` 引数）、トークンの `issue_usage` `usage_missing` `usage_report` `list_usage_ledger` `add_usage_ledger`（§9-5）`list_usage_requests`、プロジェクト記憶の `list_memories` `get_memory` `write_memory`、連絡の `send_message` `read_inbox`、占有の `list_leases` `acquire_lease` `extend_lease` `release_lease` `break_lease`（§9-9）です。REST と同じ internal/service を呼ぶので、ルール・楽観ロック・権限・記録も同じです（`via=mcp`）。project は引数 → ヘッダ `X-Looptrack-Project` → 利用できるプロジェクトが 1 つならそれ、の順に決めます。エラーはツールの実行エラー（isError）で、文言は REST と同じです。`.mcp.json` の例: `{"mcpServers": {"looptrack": {"type": "http", "url": "https://example.com/looptrack/mcp", "headers": {"Authorization": "Bearer ${LOOPTRACK_TOKEN}", "X-Looptrack-Project": "<slug>"}}}}`。実際の Claude Code での確認は `deploy/dev/mcp-e2e.sh` で行います |
 | edit / push | `edit` は `.claude/.looptrack-work/`（中に `.gitignore`）へ `<ID>.md`・`<ID>.base.md`・版番号を書きます。反映していない変更があれば、`--force` なしでは取り直しません。`push` は変更が無ければ何もせず、作業コピーを消します。409 のときは edit した時点からサーバの最新への差分を stderr に出し、最新版を `<ID>.server.md` に保存して exit 1 で終わります。差分を取り込んだら `push --rebase` で最新版に対して反映します。**作業コピーを取った後に付いたコメントはサーバ側が保持します**（全文更新のコメント節は、現在のコメントの先頭部分であればかまいません） |
 
 ### 1-4. リポジトリ構成
@@ -681,6 +681,25 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | `GET /transcripts/{id}` | 会話記録 1 つとチャンクの一覧（持ち主だけ。ほかの人には無いものと同じ 404） | `session transcript pull` |
 | `GET /transcripts/{id}/chunks/{seq}` | チャンクの本体（置いた形のまま・`X-Looptrack-Transcript-Encoding`・添付と同じ安全のヘッダ・持ち主だけ） | `session transcript pull` |
 | `POST /transcripts/{id}/purge` | 会話記録の本体の消去（`{"reason"}`・持ち主だけ。運用者は管理用のサブコマンド `purge-transcripts`・§9-8） | `session transcript purge` |
+| `GET /projects/{slug}/memory?deleted=1` | プロジェクト記憶の一覧（project の範囲と自分の personal。本文は含めず要約と版だけ・§9-9） | `memory list`・MCP `list_memories` |
+| `POST /projects/{slug}/memory` | 記憶を作る（`{scope, kind, name, content, machine_label}`・あれば 409 `memory_exists`） | MCP `write_memory`（`op: create`） |
+| `GET /projects/{slug}/memory/{kind}/{name}?scope=&version=` | 記憶 1 件と版の履歴（`ETag` に今の版）。`version` を付けるとその版の本文 | `memory show`・MCP `get_memory` |
+| `POST /projects/{slug}/memory/{kind}/{name}/append?scope=` | 節を末尾に足す（`{content, machine_label}`・版を問わない・無ければ作る） | `memory append`・MCP `write_memory`（`op: append`） |
+| `PUT /projects/{slug}/memory/{kind}/{name}?scope=` | 本文の全体を置き換える（`If-Match: "<版>"` が必須。無ければ 428、違えば 409 `memory_version`） | `memory replace`・MCP `write_memory`（`op: replace`） |
+| `DELETE /projects/{slug}/memory/{kind}/{name}?scope=` | 消した印の版を足す（`If-Match` は任意） | `memory delete`・MCP `write_memory`（`op: delete`） |
+| `POST /projects/{slug}/memory/{kind}/{name}/purge?scope=` | 版の本体を消す（`{version, reason}` か `{all_versions: true, reason}`。どちらか 1 つだけで、`version` 0 は 400。戻せない） | `memory purge`（MCP には置かない） |
+| `POST /projects/{slug}/messages` | 連絡を送る（`{to, user, session, body, issue, machine_label}`・editor 以上・§9-9） | `message send`・MCP `send_message` |
+| `GET /projects/{slug}/messages/{id}` | 連絡 1 件（宛先と送り手だけ。ほかの人には無いものと同じ 404） | `message show` |
+| `GET /projects/{slug}/inbox?unread=1&sent=1&limit=` | 自分宛ての連絡の一覧と、このセッションの未読の件数と ID。既読の印は付けない | `message inbox`・MCP `read_inbox`・hook |
+| `POST /projects/{slug}/inbox/read` | このセッションの既読の印を付ける（`{ids}`・1,000 件まで） | `message inbox --mark-read`・hook |
+| `GET /projects/{slug}/leases` | 持ち主のいる占有の一覧（期限切れは `expired: true`・§9-9） | `lease list`・MCP `list_leases` |
+| `GET /projects/{slug}/leases/{name}` | 占有 1 件と記録（一度も取られていなければ 404） | `lease show` |
+| `POST /projects/{slug}/leases/{name}` | 取る（`{ttl_seconds, purpose, machine_label}`。応答の `lease_token` は取った者にだけ返す。取られていれば 409 `lease_held` で `error.current` に持ち主） | `lease acquire`・MCP `acquire_lease` |
+| `POST /projects/{slug}/leases/{name}/extend` | 延ばす（`{ttl_seconds, machine_label, lease_token}`。取っている者だけ） | `lease extend`・MCP `extend_lease` |
+| `DELETE /projects/{slug}/leases/{name}` | 返す（本文は任意で `{machine_label, lease_token}`。取っている者だけ） | `lease release`・MCP `release_lease` |
+| `POST /projects/{slug}/leases/{name}/break` | 外す（`{reason, machine_label}`。editor 以上。外された者へ連絡を送り、送れなければ `notice_failed: true`） | `lease break`・MCP `break_lease` |
+| `POST /projects/{slug}/presence` | 本人のセッションの在席を送る（`{agent, machine_label, branch, head_sha, directory}`。セッションは `X-Looptrack-Session`・§9-9） | hook |
+| `DELETE /projects/{slug}/presence` | 本人のセッションの在席を外す（SessionEnd） | hook |
 | `GET /projects/{slug}/matrix` | トレース表 + 警告 2 種 | `matrix` / `index` |
 | `GET /projects/{slug}/summary` | SessionStart 用（① 進行中・ready 上位 ② In Review と滞留 ③ 未応答のフィードバック の 3 層と、トークン情報の未付与の件数・§9-3-7） | `summary` |
 | `GET /activity?ids=&since=` | ID ごとの最終更新イベント時刻 | `activity` |
@@ -740,7 +759,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | サブコマンド | 中身 |
 | -- | -- |
 | `issue …` | イシューの操作（サブコマンド・引数・`--json`・出力・終了コード・決まった文言をゴールデンテストで固定します） |
-| `hook <名前> --agent <AI>` | core の hook（鮮度ガード・usage の送信と spool・summary・MCP の呼び出しの合鍵）と loop の hook 14 本・gates |
+| `hook <名前> --agent <AI>` | core の hook（鮮度ガード・usage の送信と spool・summary・MCP の呼び出しの合鍵）と loop の hook 21 本・gates |
 | `session digest`・`session pull` | セッション要約を送る・最新の要約を作業コピーの置き場に書き出す（§9-7） |
 | `report pdf` | トークンレポートの PDF |
 | `serve`・`setup`・`user`・`project` … | サーバ |
@@ -2643,7 +2662,7 @@ OTel のスパンはまとめて書き出されるので、切り離した後に
 有効にする前の操作は後から有効にしても対象に戻りません。どちらも無ければ従来どおり対象外です。
 判定の材料は既存の列（`usage_snapshots.client`・`issue_events.detail.agent`）だけなので、マイグレーションはありません。
 
-- MCP の変更系のツール（`create_issue`・`add_comment`・`set_status`・`update_issue`・`assign_issue`・`next`・`report_verify`）は、接続してきた AI（`clientInfo` から §6 の `agentOf`）を `Actor.Agent` に持ちます。
+- MCP の変更系のツール（`create_issue`・`add_comment`・`set_status`・`update_issue`・`assign_issue`・`next`・`report_verify`・`send_message`・`break_lease`）は、`break_lease` を除いて接続してきた AI（`clientInfo` から §6 の `agentOf`）を `Actor.Agent` に持ちます。`break_lease` はイシューを添えずに連絡を送るだけで、トークン情報に関わらないので持ちません。
   それを `issue_events.detail` の `agent` に残します。detail は JSON なので列は足さず、マイグレーションも要りません。
 - `store.UsageOptInAgents`（今は `copilot` だけ）の AI の操作を `service.UsageTarget` が対象外にするのは、その利用者が計測を有効にしていないときだけです。つまり同じプロジェクトに直近 7 日の `client = copilot` のスナップショットが無いときです。このとき応答の付与の指示（経路 ③）・クローズ時の必須（`usage.require_on_close`）・Done の警告は出ません。有効にしている利用者の操作は Claude Code と同じに数えます。
 - 未付与の検知（`usage/coverage`・`usage missing`・MCP の `usage_missing`・summary の未付与の行）も同じ条件です。`via` が mcp / cli かつ `detail.agent` がその AI の操作のうち、計測を有効にしていない利用者の分は数えません（`target` にも `humans` にも入りません）。
@@ -2868,8 +2887,8 @@ PDF の既定の保存先はリポジトリの外の `~/Documents/トークン�
 | Gemini CLI | AfterTool / AfterAgent / SessionEnd | 同上。トークンの記録を読めることを確かめてから足す |
 
 拾うツールと op は `internal/usage` の `ToolOps` 1 か所から作ります。その値の集合（`usage.Ops`）が、サーバが受け付ける op（`issue_op`）と未付与の検知（`internal/store` の `UsageCoverage`）が数える `issue_events` の kind を兼ねます。
-上の「MCP の変更系のツール」の 7 つとこの表の 7 つは同じ集合です。
-同じ「イシューを変える MCP のツール」の一覧は、`internal/client/hook/loop/pretool.go` の `imWriteTools`（8 つ。`verify_issue`・`add_usage_ledger` を含む）にもあります。
+上の「MCP の変更系のツール」から `send_message` と `break_lease` を除いた 7 つとこの表の 7 つは同じ集合です。`break_lease` は外された者への連絡を `send_message` と同じ関数で送りますが、イシューを添えないのでコメントを書きません。`send_message` はイシューを添えたときだけコメントを書くので、トークン情報を付ける対象にしません。
+同じ「イシューを変える MCP のツール」の一覧は、`internal/client/hook/loop/pretool.go` の `imWriteTools`（14 個。`verify_issue`・`add_usage_ledger`・`write_memory`・`send_message`・占有を書く 4 つを含む）にもあります。
 4 か所（サーバの登録・この表・フックの正規表現・`imWriteTools`）のずれは `internal/docscheck/mcptoolsets_test.go` が突き合わせます。どれか 1 本だけを動かすとテストが失敗します。
 
 共通: **送信は子プロセスに切り離し、フック自体はすぐ 0 で終わります**。送信が操作を遅らせることはなく、送信に失敗しても操作を妨げません。
@@ -3638,6 +3657,242 @@ gzip の比は Claude の 1 セッションだけの実測なので、Codex と�
 | 会話記録の行（`transcripts`）をロックし、記録の後の合計で使用量を判定する | アプリ用の DB 利用者は `transcripts` に UPDATE の権限が無く `FOR UPDATE` できない。権限を足しても会話記録ごとの並びにしかならず、REPEATABLE READ では別の会話記録の未確定の行が合計に見えないので、同時の追記が合わせて上限を超える |
 | `GET_LOCK` で利用者ごとに並べる | 接続に付くロックで、トランザクションが終わっても外れない（接続を固定して確定の後に外す手順が要る）。名前が MySQL のインスタンス全体で共有される。SQLite に無い |
 | 本体の置き換えをプロセスの中で全利用者 1 つずつにする | 守りたいのは同じ本体の「置いてから記録が確定するまで」と「数えてから消すまで」が交わらないことだけで、本体ごとの排他で足りる。全体で 1 つにすると、1 人の追記の fsync とロック待ちが全員の追記を止める |
+
+### 9-9. 協調の基盤（複数の利用者・端末・セッションの並行作業）
+
+複数の利用者が複数の端末で AI のセッションを並行して動かすとき、互いの作業を見て譲り合えるようにします。
+いまサーバに載っているのは着手の状態（§9-2・summary の `own_session`）・イシューごとのセッション要約（§9-7）・本人だけの会話記録（§9-8）です。
+この節はそれにプロジェクト記憶・連絡・占有・在席の 4 つを足します。4 つとも新しいテーブルに持たせ、判定の規則は `internal/service` の 1 か所に置きます。
+いまの書き込みの可否は `internal/server` の `canWrite`（editor か admin）で決めていますが、4 つの判定はサービスの関数に書いて REST・MCP・CLI・Web から同じものを呼びます。
+
+#### 言葉
+
+| 言葉 | 意味 | サーバが受け取る場所 |
+| -- | -- | -- |
+| 利用者 | `users` の 1 行 | 認証（Bearer トークンかセッション） |
+| 端末 | 利用者が AI を動かす機械 | `machine_label`（64 文字まで。既定はホスト名の最初の「.」より前で、`LOOPTRACK_MACHINE_LABEL` で変えられる。§9-8 と同じ） |
+| セッション | AI の会話 1 本 | ヘッダ `X-Looptrack-Session`（128 文字まで）。MCP は無ければ `Mcp-Session-Id` |
+
+#### 範囲と権限
+
+範囲は「個人」と「プロジェクト」の 2 つです。プロジェクトの役割は既存の viewer・editor・admin（`project_members.role`）をそのまま使います。
+
+| もの | 範囲 | 読める | 書ける | 他人のものを変える |
+| -- | -- | -- | -- | -- |
+| プロジェクト記憶（project） | プロジェクト | 参加者全員 | editor 以上 | editor 以上（版で守り、履歴に書き手が残る） |
+| プロジェクト記憶（personal） | 個人 | 本人だけ（管理者にも 404。§9-8 と同じ） | 本人 | できない |
+| 連絡 | 宛先で決まる（下の「連絡」） | 宛先と送り手 | editor 以上 | できない（追記のみ） |
+| 占有 | プロジェクト | 参加者全員 | editor 以上 | editor 以上が理由つきで外せる |
+| 在席 | プロジェクト | 参加者全員 | 本人のセッション | できない |
+
+参加していないプロジェクトを利用者の admin が開いたときは、既存の扱い（`NonMemberAdminRole`）と同じく viewer として読めます。ほかの利用者の個人の範囲のものは読めません。自分の個人の範囲のものは参加していなくても読み書きできます。
+
+#### プロジェクト記憶
+
+kit の file の置き場（`.claude/memories/` の `handoff.md`・`decision-*.md`・`caveat-*.md`）と linksee の entity が持っていたものをサーバに置きます。
+
+| 項目 | 決定 |
+| -- | -- |
+| 種類 | `handoff`（引き継ぎ）・`decision`（決定）・`caveat`（注意） |
+| 名前 | 種類と範囲の中で一意の短い名前（英小文字・数字・`-`。64 文字まで）。`handoff` の既定の名前は `main` |
+| 要約 | 先頭の 1 行（200 文字まで）。SessionStart はこの一覧を注入する（file の置き場の `> 要約:` と同じ使い方） |
+| 本文の上限 | 1 件 64 KiB、追記 1 回 16 KiB（セッション要約の `MaxDigestBytes` と同じ） |
+| 書き方 | 追記（`append`。版を問わず節を末尾に足す）と置き換え（`replace`。読んだ版を `If-Match` で渡す） |
+| 同時の書き込み | 追記は記憶の行をロックして並べるので、同時に書いても両方が残る。置き換えは版が食い違えば 409 `memory_version` で何も書かない（`looptrack handoff compact --sha` と同じ考え方） |
+| 履歴 | 書くたびに版を 1 つ足す。版の表は SELECT・INSERT だけを与え（`deploy/grants.sql`）、書き手の利用者・端末・セッションを残す |
+| 消す | 消した印の版を足す（`deleted`）。本体を消すのは下の「版の本体の消去」の 4 経路だけ |
+| 資格情報 | 本文（足す節と、足した後の全体）・名前・端末のラベルに `domain.FindSecret` を掛け、当たれば拒む。プロジェクト別ルールでは緩めない（セッション要約と同じ） |
+| セッション要約との住み分け | 要約はイシューに付く（着手中の作業の文脈）。記憶はプロジェクトに付く（イシューをまたぐ申し送り・決定・注意） |
+
+実装は次のとおりです。規則は `internal/service/memory.go` の 1 か所にあり、REST・MCP・CLI・Web はそこを呼びます。
+
+| 項目 | 実装 |
+| -- | -- |
+| 表 | `memories`（今の版の 1 行。project_id・scope・owner_user_id・kind・name が一意）と `memory_versions`（版ごとの操作・書き手の利用者・`machine_label`・`session_id`・経路）、`memory_bodies`（版ごとの本文の全体と要約）、`memory_purges`（本体を消した記録）。マイグレーション 0011・0015 |
+| 権限の付与 | `memories` は SELECT・INSERT・UPDATE、`memory_bodies` は SELECT・INSERT・DELETE、`memory_versions` と `memory_purges` は SELECT・INSERT だけです。SQLite は `memory_versions` と `memory_purges` の書き換えと削除をトリガで拒みます |
+| personal の持ち主 | `owner_user_id` はキーの一部です。project の範囲は 0 にします。ほかの利用者の要求からは引けないので、管理者にも 404 になります |
+| 追記の並べ方 | 書く前に行が無ければ下書きの行（`version` 0・`deleted`）を `INSERT IGNORE` で作り、トランザクションではその行を `FOR UPDATE` で読みます。今の本文と版はこの読みで取ります。無い行への `FOR UPDATE` はギャップロックになり、別の名前の記憶を同時に作るとデッドロックになるので、行を先に作ります。下書きの行はどの読みにも出しません |
+| 版の印 | 置き換えと作成の 409 と、消した記憶の 404 は `error.current` に今の版を載せます。消した記憶は今の版を `If-Match` に渡した置き換えで作り直せます |
+| 要約 | 本文の最初の空でない行です。200 文字を超えると 422 `memory_summary_too_long` で拒みます |
+| 範囲の渡し方 | パスに種類と名前がある経路はクエリの `?scope=`、作る経路は本文の `scope` です。逆の側に書いた要求は 400 で拒みます。種類と名前を本文に書いた追記・置き換え・消す要求も同じです |
+| CLI | `looptrack memory list [--deleted] [--json]`・`show <種類> [名前] [--version N] [--history] [--json]`・`append`・`replace --version N`・`delete [--version N]`・`purge --version N|--all-versions --reason <理由> --yes`・`import [ディレクトリ]`。`--personal` で personal を扱い、本文は `--file`（既定は標準入力）から読みます。端末のラベルは `LOOPTRACK_MACHINE_LABEL` かホスト名です |
+| 取り込み | `looptrack memory import` は `handoff.md`・`decision-*.md`・`caveat-*.md` を作成の経路で送ります。`> 要約:` の行は本文の先頭に移して要約にします。既にある名前は飛ばして報告する動きです。資格情報の形は手元で確かめてファイルの行と規則の語だけを出し、ほかの拒否はサーバの理由を添えます。拒まれても残りを続け、最後に終了コード 1 を返します |
+| 冪等の鍵と書いた時刻 | 追記の要求の `Idempotency-Key`（英数字・`-`・`_` の 64 文字まで）を `memory_versions.idempotency_key` に残します（マイグレーション 0012）。追記と置き換えは本文の `written_at`（クライアントが本文を作った時刻）も受け取り、同じ表の列に残します。未来の時刻はサーバの今に丸めます。記憶の行のロックの中で同じ鍵を探します。同じ利用者の同じ節の再送なら新しい版を作らずその鍵の版を返し、別の本文や別の利用者なら 409 `memory_idempotency_conflict` で拒みます。鍵の無い版は NULL で、`deploy/grants.sql` の権限は SELECT・INSERT のままです |
+| kit の置き場 | `LOOPTRACK_LOOP_HANDOFF_BACKEND=server`。SessionStart は `handoff/main` の本文と、ほかの記憶の要約の一覧を `LOOPTRACK_LOOP_MEMORIES_MAX_CHARS` の上限で入れます（切り出しは file の置き場と同じ規則）。注入を先に読み、退避の送信は持ち時間の残りで足りるときだけ行います。`looptrack handoff append` は追記の経路へ、`compact --version N` は置き換えの経路へ書きます。鮮度ガードは本文の印を使いません。書けたら手元の `.looptrack-freshness/handoff-written` に手元の時計で残し、先にそれを完了のマーカーと比べます。シェルの中の ID が hook の ID と結べない器でも、PostToolUse が同じ記録を hook の ID で残します。手元の記録で新しいと言えなければ、版の履歴のセッションと書いた時刻（`written_at`。無ければ版の時刻）でも見ます。通す条件はどちらかで新しいことです。書き手を比べられない版は、書き手の利用者が自分のときだけ注意を出して通し、マーカーは畳みません。一覧の応答（`GET /memory`）の `can_write` と 404 で書けない者を見分け、`user`（要求した利用者の login）で版の書き手と比べます。差し戻さずに注意だけを出します。サーバに届かないときも注意を 1 つ出して通し、マーカーを残します |
+| 退避 | サーバに届かない（接続の失敗・時間切れ・5xx）ときの `handoff append / compact` は、本文を looptrack の置き場の `handoff-spool/<プロジェクトの鍵>/` に 0600 で退避して成功で終わります。作業ツリーの外なので版管理に入りません。資格情報の形の本文は退避せず拒みます。退避は冪等の鍵を持ち、送り直しても同じ鍵を使います。次の SessionStart・Stop か次の書き込みが古い順に送ります。書き手は書いたセッションのままです。送る前に `.sending` へ rename して取った時刻を残すので、別のプロセスが同時に送ることはありません。10 分を過ぎた `.sending` は落ちたものとして戻しますが、鍵があるので節は増えません。圧縮の退避は今の本文と同じなら片付け、読んだ版が今の版と同じときだけ送ります。古ければ追記にせず残して注意を出します（全文が 2 重になり、追記の上限にも当たるため）。拒まれたものも残して注意を出し、値は出しません。5xx や届かないときの送信は順序を守ってそこで止まります。残したものは `looptrack handoff spool` で確かめ、`--drop` で消します。消すと本文は残りません。書いた記録は送れた後にだけ残し、時刻は退避した時刻を使います。版にも退避した時刻を `written_at` で渡すので、どの作業ツリーが送っても鮮度の判定は同じです。完了より前の退避は完了の後に送れても Stop を通さず、残った退避で Stop を通すのも持ち主のセッションだけです。退避や `--drop` だけではマーカーは畳まれません |
+
+#### 版の本体の消去
+
+版は `delete` の後も全文を持ちます。だから検査をすり抜けた秘密を消す経路と、増え方を止める上限が要ります。
+規則は `internal/service/memory_purge.go` の 1 か所にあります。
+
+本体は版の行とは別の表に置きます。`memory_versions` はアプリ用の DB 利用者に UPDATE も DELETE も与えません。
+追記専用の表にメタデータだけを残して本体を消せる場所へ分ける形は、会話記録と同じです。
+会話記録の本体はファイルで、記憶の本体は `memory_bodies` です。要約も本文の先頭の行なので `memory_bodies` に移しています。
+運用者の管理用の資格情報だけで消す形も考えましたが、保持期間と上限はサーバが動かすので使えません。
+
+| 項目 | 決定 |
+| -- | -- |
+| 消えるもの | 版の本文と要約。今の版を消すと `memories` の本文と要約も外し、消した印を立てます |
+| 版 | 今の版を消すと本体の無い `delete` の版を 1 つ足して版を進めます。進めないと、消す前に読んだ版の置き換えが照合を通って本文が戻るからです。古い版の置き換えと `handoff compact --version` は 409 で、退避の圧縮も古い版として残ります。古い版だけを消すときは版を進めません |
+| 残るもの | 版の行（操作・書き手・端末・セッション・時刻）と、記憶の名前。名前と端末のラベルは書くときに資格情報の検査を通しています。バックアップに入った本体は、バックアップの側で消すまで残ります。デスクトップ版やローカル利用の更新前の控え（`backups/`）も同じです |
+| ファイルの中 | SQLite は `secure_delete` を接続ごとに入れています。消した行を 0 で塗るので、チェックポイントの後はファイルに本文が残りません（実測）。チェックポイントの前は DB のファイルに残ります。MySQL の 0015 は `ALGORITHM=INPLACE` で表を作り直すので、落とした列の本文は `memory_versions` のファイルに残りません。既定の INSTANT では残るので指定しています（8.4.5 で実測）。`memory_bodies` の DELETE の後は 8 秒でファイルから消えました（1 回の実測）。バイナリログを有効にしたサーバのログと redo・undo のログに本文が残るかは未確認です |
+| 読むと | 消した版は 404 `memory_version_purged` です。履歴には `purged` の印を付けて出し、Web には版のリンクを出しません |
+| 記録 | 消すたびに `memory_purges` へ 1 行足します（`from_version`・`through_version`・`bodies`・`cause`・`actor_user_id`・`via`・`reason`）。本体の削除と同じトランザクションなので、本体の無い版には必ず記録があります |
+| ロック | どの経路も記憶の行を `FOR UPDATE` してから消します。書き込みと順番が同じなので、消している間に足された版を巻き込みません |
+
+本体を消す経路は 4 つです。
+
+| 経路 | 消せる人 | `cause` | 対象 |
+| -- | -- | -- | -- |
+| `POST …/purge`・`looptrack memory purge` | project の範囲はプロジェクトの admin とサーバの管理者、personal は本人。理由が必須です | `user` | `version` か `all_versions` で指した版 |
+| `looptrack purge-memory`（`LOOPTRACK_DSN` の経路。`cmd/looptrack/purge_memory.go`） | サーバの運用者。他人の personal に届くのはこの経路だけです。`--yes` が無ければ数と大きさだけを示し、`--yes` には理由が要ります | `operator`（via `admin`） | `--version` か `--all-versions` で指した版 |
+| 定期の処理（`server.Housekeeping`） | サーバ（`memory_retention_days`） | `retention`（via `system`） | 下の条件の版 |
+| 書き込みの中（`thinMemoryBodies`） | サーバ（`service.MaxMemoryVersions`） | `thinning`（via `system`） | 上限を超えた古い版 |
+
+editor には消させません。書き換えと違って消去は戻せないからです。
+画面にも MCP にも消す操作は置きません。AI が判断で履歴を消せる形にしないためです。
+追記の節は後の版に引き継がれます。秘密を含む節を足した後に書き続けた記憶は、その版だけを消しても後の版に残ります。そのときは全部の版を消します。
+`--version` で指した版の本文が後の版に含まれるときは、何も消さずに 409 `memory_purge_text_remains` で拒みます。消えたと思わせないためです。
+この判定は本文の全体が含まれるかを見ます。圧縮で節の一部だけが残った版は見つけられません。
+全部の版を明示の指定に分けているのは、値の抜けた要求（`version` 0）で全部が消えないようにするためです。
+
+保持期間の既定は無期限（`memory_retention_days` 0）です。記憶は決定や注意のように長く読み返すものなので、期限で勝手に消すと困る人が出ます。
+短くしたいサーバは `looptrack settings memory-retention <日数>` で変えられます（36500 日まで）。
+連絡と会話記録の保持日数も同じ上限で、範囲の外の値は読むときに既定へ戻します。変更は `setting_changes` に残ります。
+消すのは今の版より古い版と消した印の記憶の今の版です。生きている記憶の今の版は書いた日がどれだけ古くても残します。
+
+版の数の上限は 1 件 100 版です（`service.MaxMemoryVersions`）。本体が 100 版を超えたら書き込みのトランザクションの中で古い版から本体を消します。
+1 件の本体の合計は 64 KiB × 100 の 6.4 MiB で止まります。設定で変えられる値にはしていません。
+100 は版を戻す用途に足りて最悪の大きさも許せる値です。`handoff` は 1 日に数回から十数回書かれる想定で、100 版あれば数日から数週間さかのぼれます。
+間引くのは本体だけなので版の行（1 行数百バイト）は増え続けます。上限より多い版を持つ記憶は次の書き込みでまとめて間引きます。
+
+冪等の鍵の版の本体を消した後の再送は節を足さずにその版を返します。ここで足すと消した秘密を再送が戻してしまうからです。
+本文を照らせないので書き手の利用者だけを比べ、別の利用者なら 409 `memory_idempotency_conflict` です。
+
+#### 連絡
+
+別の端末・別の利用者のセッションへ短い知らせを送り、相手の次のターンの hook に未読を注入します。
+
+| 項目 | 決定 |
+| -- | -- |
+| 宛先 | `project`（参加者全員）・`user`（利用者 1 人）・`session`（セッション 1 本。その持ち主の利用者に見える） |
+| 本文 | 4 KiB まで。資格情報は拒む |
+| 届け方 | hook（UserPromptSubmit と SessionStart）が自分宛ての未読を取り、注入した後に既読の印を付ける。既読はセッションごとに持つ（`project` 宛ては、同じ利用者の別のセッションにも届く） |
+| イシューとのつながり | 任意でイシュー ID を添える。添えると、そのイシューに `連絡:` で始まるコメントも残す（会話が流れても経緯が残る） |
+| 追記のみ | 連絡と既読の表は SELECT・INSERT だけ。取り消しはできない |
+| 保持期間 | `message_retention_days`（既定 30 日。0 は無期限） |
+
+実装は次のとおりです。規則は `internal/service/messages.go` の 1 か所にあり、REST・MCP・CLI・Web はそこを呼びます。
+
+| 項目 | 実装 |
+| -- | -- |
+| 表 | `messages`（連絡の 1 行）と `message_reads`（利用者とセッションごとの既読の 1 行）。マイグレーション 0013。権限はどちらも SELECT・INSERT だけで、SQLite は書き換えと削除をトリガで拒みます |
+| 宛先の持ち主 | `session` 宛ては持ち主の利用者も `user` で指定し、`me` は自分を指します。セッション ID はクライアントが名乗る値なので、読めるかは利用者で決めます。他人のセッション ID を名乗っても読めません |
+| 宛先の検査 | 宛先の利用者は `project_members` の参加者だけで、参加していない管理者も宛先にできません。無い利用者・無効の利用者・参加していない利用者は同じ 422 `message_recipient` で拒み、利用者の有無を探らせません |
+| 本文の検査 | 使える制御文字は改行（`\n`・`\r\n`）とタブだけで、ほかは 400 です。行を分ける文字と書式の文字も同じに拒みます。書式の文字には表示の向きを変える文字と人に見えないタグ文字が入り、ZWJ・ZWNJ だけは通します。本文は相手の AI の文脈に入るので、引用の印を抜ける文字を通しません。端末のラベルと送り手・宛先のセッションも同じ検査を掛けます。`domain.FindSecret` に当たれば 422 `message_secret` で、理由には行番号と規則の語だけを載せます |
+| 未読 | このセッションに届ける連絡です。自分のセッションが送ったものと、同じ利用者の別のセッションに宛てたものを外します。手で打つ CLI のようにセッションの無い読み手は、持ち主として別のセッション宛ても見ます |
+| 既読の印 | hook が未読を読み、注入の文を作ってから `inbox/read` に送ります。送れなければ次のターンにもう一度届きます。取りこぼすより 2 度届くほうを選びました |
+| 注入の上限 | 1 回に 10 件、1 件 500 文字です。利用者宛てとセッション宛てを先に並べます。超えた分も既読にして件数と `looptrack message inbox --all` を知らせます。新しいセッションには保持期間の中のプロジェクト宛てがすべて未読に見えるので、残すと次のターンから同じ量が入り続けるためです |
+| 注入の形 | 本文は行ごとに `> ` を付けた引用で入れ、見出しで利用者の指示とは別のものだと示します。CLI の `message inbox`・`show` と MCP の `read_inbox` も同じ引用で出します。本文に見出しと同じ形の行があっても地の文になりません。端末のラベルは引用の外に出るので、空白を含むものは見出しに載せません |
+| 届かないとき | hook はサーバに届かなくても、設定が無くても、古いサーバでも何も出さずに通します。毎ターン走るので注意は出しません。`LOOPTRACK_LOOP_MESSAGES=0` で切れます |
+| hook の本数 | loop に `session-start-messages` と `user-prompt-messages` を足しました。core だけの導入先には注入が入らず、summary の件数で知ります |
+| イシューのコメント | 添えたときは先にコメントを書きます。記録の detail に `kind: message` を付け、トークン情報の未付与に数えません。プロジェクト別ルールで拒まれたら連絡も送りません。連絡を先に送ると、送り直しで 2 度届くからです。コメントはプロジェクトの全員が読めるので、利用者宛ての本文も見えます |
+| 保持期間の効かせ方 | 読みの条件で期限を過ぎたものを外します。アプリ用の DB 利用者は DELETE を持たないので行は残ります。行を消すのは運用者が管理用の資格情報で行います。値は `looptrack settings message-retention [日数]` で変え、`setting_changes` に残します |
+| summary | `unread_messages` にこのセッションの未読の件数を載せます。数えられなくても summary は止めません |
+
+#### 占有
+
+本番への反映・公開の PR・リリースのタグのような、プロジェクトで同時に 1 本しか動かせない作業を期限つきで取ります。
+端末ごとの docker で回す DB つきの検査は端末の中で閉じるので対象にしません。
+
+| 項目 | 決定 |
+| -- | -- |
+| 名前 | プロジェクトの中で一意（英小文字・数字・`-`・`.`。64 文字まで）。例: `deploy.dev`・`publish` |
+| 取る | 期限（既定 1 時間・上限 24 時間）と目的（200 文字まで）を付けて取る。取っている者がいれば 409 `lease_held` と、取っている者・目的・期限を返す |
+| 延ばす・返す | 取っている者（取ったときの鍵か、同じ利用者の空でない同じセッション）だけ。端末をまたいで渡すときは返してから取り直す |
+| 期限切れ | 期限を過ぎたものは誰でも取れる。サーバは期限切れを自動で返したことにせず、次に取った者の記録に「期限切れから取った」と残す |
+| 外す | editor 以上の誰でも、理由（必須）を付けて外せる。外された者には連絡（`user` 宛て）で知らせる |
+| 記録 | 占有の表は SELECT・INSERT・UPDATE（今の持ち主の 1 行）。取る・延ばす・返す・外すの記録は別の表に追記のみで残す |
+
+実装は次のとおりです。規則は `internal/service/lease.go` の 1 か所にあり、REST・MCP・CLI・Web はそこを呼びます。
+
+| 項目 | 実装 |
+| -- | -- |
+| 表 | `leases`（資源ごとの今の持ち主の 1 行。空きは `holder_user_id` が NULL で、行は消しません）と `lease_events`（記録）。マイグレーション 0014 |
+| 権限の付与 | `leases` は SELECT・INSERT・UPDATE、`lease_events` は SELECT・INSERT だけです。SQLite は `lease_events` の書き換えと削除をトリガで拒みます |
+| 同時に取る | 取る前に空の行を `INSERT IGNORE` で作り、トランザクションではその行を `FOR UPDATE` で読みます。無い行への `FOR UPDATE` はギャップロックになり、同時に取ると 1213 のデッドロックになるからです。延ばす・返す・外すは行の有無をロックなしで確かめ、無ければトランザクションを始めずに 404 を返します。持ち主を比べる今の時刻はロックの後で取ります |
+| 取っている者 | 取るたびに世代の鍵（`lease_token`）を作り、取った者の応答にだけ返します。DB には SHA-256 を置き、summary・一覧・記録・Web には出しません。延ばす・返すは鍵が一致すれば通し、鍵が古ければ 409 `lease_not_holder` です。セッションが変わった MCP の接続でも鍵で返せます。鍵が無い要求は、同じ利用者の空でない同じセッションのときだけ通します。セッションの無い要求を同じ者と見ないのは、同じ利用者の別の端末や期限切れの後の遅い要求が、次の持ち主の占有を消すからです。同じセッションがもう一度取っても 409 `lease_held` で、長くするなら延ばします |
+| 延ばす | 新しい期限は今から `ttl_seconds` 後です（上限 24 時間）。省くと今の期限と「今 + 1 時間」の遅いほうなので、省いて残りが縮むことはありません。期限が切れた後は 409 `lease_expired` で取り直しを求めます。切れた占有は誰かがもう取っているかもしれないからです |
+| 返す | 取っている者は期限が切れた後でも、次に取られるまでは返せます。ほかの者は 409 `lease_not_holder` で、持ち主を `error.current` に載せます。空いている資源は 404 です |
+| 目的と理由 | どちらも必須の 1 行で 200 文字までです。全員に見えるので、資格情報の形は 422 `lease_secret` で拒みます。名前・端末のラベル・セッション ID も同じです。目的は summary で AI の文脈に入るので、これらの使える文字は連絡の 1 行の欄と同じです |
+| 記録に残すもの | 操作・操作した利用者と端末とセッション・経路・目的・理由・期限・操作の前の持ち主です。`was_expired` は操作の時点で前の占有の期限が切れていた印で、取る操作なら「期限切れから取った」を表します |
+| summary | `GET /summary` と MCP の `project_summary` は `leases` に今有効な占有だけを載せます。CLI の `issue summary` は 1 件以上あるときだけ節を出すので、SessionStart の要約にも入ります。期限切れは一覧（`GET /leases`）にだけ `expired: true` で出ます |
+| CLI | `looptrack lease list [--json]`・`show <名前> [--json]`・`acquire <名前> --purpose 文 [--ttl 30m]`（`lease_token=<鍵>` の行を出します）・`extend <名前> [--ttl 30m] [--token 鍵]`・`release <名前> [--token 鍵]`・`break <名前> --reason 文`。取れないときは終了コード 1 で、手順やスクリプトはこれで止められます |
+| Web | `/p/{slug}/leases`（一覧）と `/p/{slug}/leases/{name}`（記録）。閲覧だけです |
+| kit の hook | 足しません。本番への反映のコマンドはプロジェクトごとに違い、kit に書くとプロジェクト固有の分岐になるからです。使うプロジェクトは反映の手順やスクリプトで `looptrack lease acquire` を呼び、終了コードで止めます |
+| 外された者への連絡 | 外したトランザクションの確定の後に `SendMessage` で `user` 宛てに送ります。本文は外された者の言語で、資源・外した者・理由・目的を書きます。取っていた同じセッションが自分で外したときは送りません。送れなくても外した結果は戻しません。持ち主が既に参加者でないと送れないのに、そのときこそ外したいからです。送れなかったら応答の `notice_failed` が true になり、CLI と MCP が 1 行で知らせます |
+
+#### 在席
+
+どの利用者のどの端末のセッションが、どのブランチ・イシューで動いているかを summary と Web に出します。
+
+| 項目 | 決定 |
+| -- | -- |
+| 送るもの | セッション ID・AI の種類・端末のラベル・ブランチ・HEAD の SHA・作業ツリーのディレクトリの名前（最後の要素だけ。git の外と、作業ツリーがホームやルートのときは送らない） |
+| 着手中のイシュー | 送らず、読むときにサーバが着手の記録から引く |
+| 送らないもの | 作業ツリーの絶対パス（ホームディレクトリに利用者名が入る） |
+| 送る時 | 既にある配線の SessionStart と Stop（hook の summary と同じ経路）。長いターンの間は既にある PostToolUse・UserPromptSubmit の配線で 5 分に 1 回まで。届かないときは止めない |
+| 動いている | 最後に送ってから 15 分以内。SessionEnd を受けたら外す |
+| 保持 | 最後に送ってから 7 日で消す（定期の処理） |
+
+実装は次のとおりです。規則は `internal/service/presence.go` の 1 か所にあり、REST・Web・summary はそこを呼びます。
+
+| 項目 | 実装 |
+| -- | -- |
+| 表 | `session_presence`（プロジェクト・利用者・セッションごとの 1 行）。マイグレーション 0016 |
+| 権限の付与 | SELECT・INSERT・UPDATE・DELETE です。動いている間の状態なので、記録の表と違って書き換えて消します |
+| 本人のセッション | キーに利用者が入ります。他人のセッション ID を名乗っても別の行になり、他人の行は変わりません。役割は問いません。viewer の AI も動いているセッションだからです |
+| 文字の検査 | セッション ID に連絡の 1 行の欄と同じ検査を掛けます。端末のラベル・ブランチ・ディレクトリの名前は文字・数字・`.`・`_`・`-`・`/` だけで 64 文字までに絞り、資格情報も拒みます（`domain.PresenceText`）。viewer も名乗れて summary で他人の AI の文脈に入るので、文として読める値を通さないためです。ディレクトリの名前に `/` があれば 400 で拒み、パスを受け取りません。hook は通らない値を空にして送り、セッションは一覧に残します |
+| 文脈に入る形 | summary と `project_summary` は値をバッククォートで囲み、見出しで参加者が名乗った値だと示します |
+| 行数の上限 | 利用者ごとに 1 プロジェクト 20 行までで、超えたら自分の古い行から消します。一覧の 50 本は利用者ごとの新しい順の順位が小さい行から選ぶので、1 人の行で埋まりません |
+| 自分のセッション | 同じ利用者の同じセッションです。閲覧側が MCP の接続 ID のときは会話の ID と比べられないので、同じ利用者の行を自分のものと見て summary から外します |
+| 着手中のイシュー | In Progress のイシューの着手の記録（`store.InProgressStarters`）から、利用者とセッションが同じものを引きます。全員に見える値を名乗らせずに済み、終えたイシューが次の送信まで残ることもありません |
+| 送る経路 | SessionStart は `summary`、Stop と SessionEnd は `usage` の hook が送ります。ターンの途中は `issue-freshness-mark`（Claude Code の UserPromptSubmit と Bash・Read・Edit・Write・NotebookEdit の PostToolUse）と `usage`（PostToolUse）が 5 分に 1 回まで送ります。新しい配線を足さないので `init` をやり直さなくても動きます。`init --no-usage` の配線では Stop と SessionEnd に送りません。`LOOPTRACK_USAGE=0` では止まりません |
+| 限界 | Codex の PostToolUse は MCP のツールだけに配線があるので、Codex で MCP を呼ばない 15 分を超えるターンの間は一覧から消え、次の Stop で戻ります。SessionEnd の後に遅れて届いた送信は行を戻しますが、最長 15 分で一覧から消えます |
+| 届かないとき | 送るのは `usage` の切り離した子プロセスで、hook は待ちません。届かない・古いサーバ・拒まれたときも何も残さず、次の Stop で送り直します。退避はしません |
+| summary | `GET /summary` と MCP の `project_summary` は `active_sessions` に自分以外のセッションを新しい順に載せます（50 本まで）。CLI の `issue summary` は 1 本以上あるときだけ節を出すので、SessionStart の要約にも入ります |
+| Web | `/p/{slug}/presence`（一覧）。閲覧だけで、自分のセッションも出ます。行に載せる項目ですべて見えるので詳細の画面は置きません |
+
+#### 経路
+
+| 経路 | 形（名前は実装で確かめて決める） |
+| -- | -- |
+| REST | `GET/POST /api/v1/projects/{slug}/memory`・`GET/PUT /api/v1/projects/{slug}/memory/{kind}/{name}`・`POST …/append`・`POST …/purge`・`POST /api/v1/projects/{slug}/messages`・`GET /api/v1/projects/{slug}/inbox`・`GET /api/v1/projects/{slug}/leases`・`GET/POST/DELETE /api/v1/projects/{slug}/leases/{name}`・`POST …/extend`・`POST …/break`・`POST /api/v1/projects/{slug}/presence`・`DELETE /api/v1/projects/{slug}/presence` |
+| MCP | 記憶を読む・書く、連絡を送る、占有を見る・取る・返すツール。在席は hook だけが送る |
+| CLI | `looptrack memory …`・`looptrack message …`・`looptrack lease …`。`looptrack handoff append / compact` は kit の置き場が `server` のとき記憶の API を使う |
+| Web | 記憶と占有の一覧と詳細、在席の一覧だけ。連絡は自分宛てのものだけ |
+| summary | 未読の連絡の件数・取られている占有・動いているほかのセッションを足す |
+
+マイグレーションは新しい番号（0011 以降）で足し、MySQL と SQLite の両方に置きます。
+
+#### 利用者が決めたこと（2026-10-30）
+
+- プロジェクトの範囲の記憶は editor の全員が書き換えられます。版と書き手が残るので戻せます。
+- 他人の占有は editor 以上の誰でも外せます。理由は必須です。止まった占有を待たずに外せるほうを採りました。
+- viewer は連絡を送れません。送れるのは editor 以上です。
+- Claude Code の auto-memory は kit の置き場として残し、server の置き場と並べて選べるようにします。
+- linksee の記憶を取り込む手段は Looptrack に持たせません。linksee の DB を読むのはプロジェクト固有の分岐になるからです。各プロジェクトが Markdown に書き出してから `looptrack memory import` を使います。
+
+#### 採らなかった案
+
+| 案 | 採らなかった理由 |
+| -- | -- |
+| 記憶をイシュー（専用のイシューのコメント）に載せる | 追記のみのコメントでは最新の 1 本に畳み直せず、引き継ぎが際限なく伸びる。SessionStart の注入にも毎回全件を読む |
+| 記憶を git に置いて共有する（linksee の方式） | 同時に書くと SQLite やファイルが衝突し、「同時に複数端末で書込みしない」を運用で守ることになる。git の外の利用者には届かない |
+| 連絡を Claude Code の SendMessage に任せる | 同じ機械のセッションにしか届かず、ほかの AI にも無い |
+| 占有を git のブランチやタグで表す | 期限が無く、取った者が落ちると誰も外せない。push の権限と占有の権限が分けられない |
+| 在席に作業ツリーの絶対パスを送る | ホームディレクトリの利用者名がほかの参加者に見える。必要なのは同じ作業ツリーかどうかで、ディレクトリの名前で足りる |
 
 ## 10. セキュリティ
 

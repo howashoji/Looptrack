@@ -206,6 +206,12 @@ func TestPreToolScope(t *testing.T) {
 		{name: "MCP で別プロジェクトに起票", mk: run("mcp__looptrack__create_issue", raw(map[string]any{"project": "other", "title": "t"})), want: ask},
 		{name: "MCP で自分のプロジェクトに起票", mk: run("mcp__looptrack__create_issue", raw(map[string]any{"project": "tst", "title": "t"})), want: quiet},
 		{name: "MCP で project を省略", mk: run("mcp__looptrack__add_comment", raw(map[string]any{"id": "TST-0001", "body": "c"})), want: quiet},
+		{name: "MCP で別プロジェクトの記憶を書く", mk: run("mcp__looptrack__write_memory", raw(map[string]any{"project": "other", "op": "append", "kind": "handoff", "content": "c"})), want: ask},
+		{name: "MCP で自分のプロジェクトの記憶を書く", mk: run("mcp__looptrack__write_memory", raw(map[string]any{"project": "tst", "op": "append", "kind": "handoff", "content": "c"})), want: quiet},
+		{name: "MCP で別プロジェクトの占有を取る", mk: run("mcp__looptrack__acquire_lease", raw(map[string]any{"project": "other", "name": "deploy", "purpose": "p"})), want: ask},
+		{name: "MCP で自分のプロジェクトの占有を取る", mk: run("mcp__looptrack__acquire_lease", raw(map[string]any{"project": "tst", "name": "deploy", "purpose": "p"})), want: quiet},
+		{name: "MCP で別プロジェクトの占有を読むだけ", mk: run("mcp__looptrack__list_leases", raw(map[string]any{"project": "other"})), want: quiet},
+		{name: "MCP で別プロジェクトの記憶を読むだけ", mk: run("mcp__looptrack__get_memory", raw(map[string]any{"project": "other", "kind": "handoff"})), want: quiet},
 		{name: "MCP で別プロジェクトを読むだけ", mk: run("mcp__looptrack__list_issues", raw(map[string]any{"project": "other"})), want: quiet},
 		// 例外
 		{name: "LOOPTRACK_LOOP_SCOPE_ALLOW_REPOS に挙げたリポジトリは通す",

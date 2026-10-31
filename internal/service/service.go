@@ -49,9 +49,12 @@ type Error struct {
 	Current     *Issue // Conflict のとき現在の内容
 	Rule        string // ルール違反のときのルール名
 	Overridable bool   // 理由付きで上書きできるルール違反か
-	// CurrentSeq は会話記録の追記の連番の不一致（transcript_seq）のときの今の連番（0 もありうるのでポインタ。transcripts.go）
+	// CurrentSeq は会話記録の追記の連番の不一致（transcript_seq）のときの今の連番（0 もありうるのでポインタ。transcripts.go）。
+	// プロジェクト記憶の版の不一致（memory_version・memory_exists）と消した印の 404 では今の版（memory.go）
 	CurrentSeq *int64
-	msg        error // i18n の ID を持つ文面（errf で作ったときだけ。無ければ nil）
+	// Lease は占有の拒否（lease_held など）のときの今の持ち主（lease.go）
+	Lease *LeaseState
+	msg   error // i18n の ID を持つ文面（errf で作ったときだけ。無ければ nil）
 }
 
 // Unwrap は ID を持つ文面を返す。i18n.Text が errors.As でこれを見つけて訳す。
@@ -500,6 +503,8 @@ type CommentInput struct {
 	Attachments []int64
 	// PathHints はセッション要約の本文のパスを置き換える手がかり（digest.go）。セッション要約でなければ見ない
 	PathHints *PathHints
+	// Message は連絡に添えたコメントか。記録の detail に kind: "message" を付け、トークン情報の未付与に数えない
+	Message bool
 }
 
 // AddComment はコメントを追記する（REST・MCP・CLI の入口。Comment・CommentAttach もここを通る）。
@@ -538,6 +543,9 @@ func (s *Service) AddComment(ctx context.Context, a Actor, p store.Project, issu
 		}
 		if digest {
 			detail["kind"] = domain.LeadDigest
+		}
+		if in.Message {
+			detail["kind"] = "message"
 		}
 		return change{kind: "comment", detail: detail}, nil
 	})

@@ -163,6 +163,8 @@ type Client struct {
 	Mark      session.Mark
 	UserAgent string
 	Now       func() time.Time
+	// Context は要求の親の context（nil なら打ち切らない）。持ち時間の内側で要求を打ち切りたい hook が使う
+	Context context.Context
 	// OnLang は、サーバが応答で宣言した言語（Content-Language）を受け取る（nil なら何もしない）。
 	// サーバは利用者の設定（users.lang。クライアントは知らない）まで見て決めるので、送った値の反響ではない。
 	// 呼ばれるのは応答のヘッダを読めた要求ごとに 1 回。要求を出す側と同じ goroutine で呼ぶ。
@@ -405,7 +407,11 @@ const contentLanguageHeader = "Content-Language"
 
 // send は HTTP の要求を 1 回送り、応答の全体を読む。接続の失敗は理由の文にして返す。
 func (c *Client) send(method, target string, body io.Reader, headers map[string]string) (int, http.Header, []byte, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+	parent := c.Context
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {

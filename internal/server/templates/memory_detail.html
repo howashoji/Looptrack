@@ -1,0 +1,33 @@
+{{define "memory_detail.html"}}{{template "head" (headData .Lang (T .Lang "server.web.memory.title"))}}
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <a class="appbar-crumb" href="{{base}}/p/{{.Slug}}/memory">{{T .Lang "server.web.memory.title"}}</a>
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <span class="appbar-title">{{.Memory.Kind}}/{{.Memory.Name}}</span>
+{{template "appbar_end" .}}
+<main class="wide">
+  <h1>{{.Memory.Kind}}/{{.Memory.Name}}</h1>
+  <p class="muted">{{T .Lang "server.web.memory.meta" "scope" .Memory.Scope "version" .Memory.Version "updated" .Updated "by" .Memory.UpdatedByLogin}}</p>
+  <section class="panel">
+    <h2>{{T .Lang "server.web.memory.content_h2" "version" .Shown}}</h2>
+    <pre><code>{{.Content}}</code></pre>
+  </section>
+  <section class="panel">
+    <h2>{{T .Lang "server.web.memory.history_h2"}}</h2>
+    <table class="list">
+      <thead><tr><th>{{T .Lang "server.web.memory.th_version"}}</th><th>{{T .Lang "server.web.memory.th_op"}}</th><th>{{T .Lang "server.web.memory.th_by"}}</th><th>{{T .Lang "server.web.memory.th_machine"}}</th><th>{{T .Lang "server.web.memory.th_updated"}}</th></tr></thead>
+      <tbody>
+      {{range .Versions}}
+      <tr>
+        <td>{{if .Purged}}{{.Version}} {{T $.Lang "server.web.memory.purged"}}{{else}}<a href="{{base}}/p/{{$.Slug}}/memory/{{$.Memory.Scope}}/{{$.Memory.Kind}}/{{$.Memory.Name}}?version={{.Version}}">{{.Version}}</a>{{end}}</td>
+        <td>{{.Op}}</td>
+        <td>{{.UserLogin}}</td>
+        <td>{{.MachineLabel}}</td>
+        <td>{{.Created}}</td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+</main>
+{{template "foot"}}{{end}}

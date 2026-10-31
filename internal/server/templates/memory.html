@@ -1,0 +1,33 @@
+{{define "memory.html"}}{{template "head" (headData .Lang (T .Lang "server.web.memory.title"))}}
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <a class="appbar-crumb" href="{{base}}/p/{{.Slug}}/">{{.Name}}</a>
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <span class="appbar-title">{{T .Lang "server.web.memory.title"}}</span>
+{{template "appbar_end" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.memory.h1"}}</h1>
+  <p class="muted">{{T .Lang "server.web.memory.intro"}}</p>
+  <section class="panel">
+    {{with .Memories}}
+    <table class="list">
+      <thead><tr><th>{{T $.Lang "server.web.memory.th_kind"}}</th><th>{{T $.Lang "server.web.memory.th_name"}}</th><th>{{T $.Lang "server.web.memory.th_scope"}}</th><th>{{T $.Lang "server.web.memory.th_summary"}}</th><th>{{T $.Lang "server.web.memory.th_version"}}</th><th>{{T $.Lang "server.web.memory.th_updated"}}</th></tr></thead>
+      <tbody>
+      {{range .}}
+      <tr>
+        <td>{{.Kind}}</td>
+        <td class="name"><a href="{{base}}/p/{{$.Slug}}/memory/{{.Scope}}/{{.Kind}}/{{.Name}}">{{.Name}}</a></td>
+        <td>{{.Scope}}</td>
+        <td class="name">{{.Summary}}</td>
+        <td>{{.Version}}</td>
+        <td>{{.Updated}}{{if .UpdatedByLogin}}<br><span class="muted">{{.UpdatedByLogin}}</span>{{end}}</td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">{{T .Lang "server.web.memory.none"}}</p>
+    {{end}}
+  </section>
+</main>
+{{template "foot"}}{{end}}

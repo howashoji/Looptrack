@@ -246,7 +246,7 @@ The highest-priority code of conduct, distilled from the instructions and correc
   Fetch every branch before you start, and check for branches behind, diverged, locally ahead but unpushed, or parallel and not yet taken in.
 - **Never start a session in another environment while local commits sit unpushed** (that environment branches off an old base, and the work gets done twice).
 - **Never start writing while you are behind.** After taking the changes in, confirm that the premises of the work you started (the version of the requirements or the design) have not changed, then resume.
-- To automate it, put a hook in your own project that fetches on SessionStart / UserPromptSubmit and prints only when there is divergence (do not put it in the kit).
+- The kit hook `session-start-remote-sync` fetches when a session starts and prints one line only when the branch is behind, diverged or ahead unpushed. It looks at the current branch alone, so check the other branches by hand.
 
 ### Optional: projects whose deliverable is documents
 - **Reflect a change of specification in the original document before you close the work.** Never leave it in a side note or in the chat.

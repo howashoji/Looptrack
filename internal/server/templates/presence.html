@@ -1,0 +1,35 @@
+{{define "presence.html"}}{{template "head" (headData .Lang (T .Lang "server.web.presence.title"))}}
+{{template "appbar_start" .}}
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <a class="appbar-crumb" href="{{base}}/p/{{.Slug}}/">{{.Name}}</a>
+    <span class="appbar-sep" aria-hidden="true">/</span>
+    <span class="appbar-title">{{T .Lang "server.web.presence.title"}}</span>
+{{template "appbar_end" .}}
+<main class="wide">
+  <h1>{{T .Lang "server.web.presence.h1"}}</h1>
+  <p class="muted">{{T .Lang "server.web.presence.intro" "minutes" .Minutes}}</p>
+  <section class="panel">
+    {{with .Sessions}}
+    <table class="list">
+      <thead><tr><th>{{T $.Lang "server.web.presence.th_user"}}</th><th>{{T $.Lang "server.web.presence.th_machine"}}</th><th>{{T $.Lang "server.web.presence.th_agent"}}</th><th>{{T $.Lang "server.web.presence.th_branch"}}</th><th>{{T $.Lang "server.web.presence.th_directory"}}</th><th>{{T $.Lang "server.web.presence.th_issues"}}</th><th>{{T $.Lang "server.web.presence.th_session"}}</th><th>{{T $.Lang "server.web.presence.th_seen"}}</th></tr></thead>
+      <tbody>
+      {{range .}}
+      <tr>
+        <td>{{.UserLogin}}</td>
+        <td>{{.MachineLabel}}</td>
+        <td>{{.Agent}}</td>
+        <td class="name">{{.Branch}}{{if .Head}} <span class="muted">{{.Head}}</span>{{end}}</td>
+        <td>{{.Directory}}</td>
+        <td>{{.IssueList}}</td>
+        <td>{{.SessionID}}</td>
+        <td>{{.Seen}}</td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">{{T .Lang "server.web.presence.none"}}</p>
+    {{end}}
+  </section>
+</main>
+{{template "foot"}}{{end}}

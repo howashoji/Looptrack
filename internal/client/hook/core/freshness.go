@@ -742,6 +742,7 @@ func indexTagOpen(s, open string) int {
 
 // FreshnessMark は `looptrack hook issue-freshness-mark`（以前の hook の mark）。出力は無い。
 func FreshnessMark(ctx context.Context, c *Call, ev hookio.Event) (hookio.Result, error) {
+	c.reportPresence(ev) // 長いターンの間も在席を保つ（間引きは reportPresence）
 	if !c.ready() {
 		return hookio.Result{}, nil
 	}

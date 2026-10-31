@@ -9,6 +9,9 @@ package loop
 //
 //	looptrack handoff append [--title <見出し>] [--file <パス>] [--session <ID>] [<本文> | -]
 //	looptrack handoff compact --sha <読んだ時点の SHA-256> [--drop-marks] [--lock-ttl <秒>] [<本文> | -]
+//	looptrack handoff compact --version <読んだ版> [--drop-marks] [<本文> | -]   （置き場が server のとき）
+//
+// 置き場が server（LOOPTRACK_LOOP_HANDOFF_BACKEND=server）なら、ファイルではなくサーバの記憶へ書く（memoryserver.go）。
 //
 // append は O_APPEND で 1 回だけ書く。同じファイルへ同時に書いても、それぞれの追記は混ざらないし消えない
 // （読んでから書き戻す経路を通らないので、そもそも他人の内容を持たない）。ロックは掛けない。
@@ -45,6 +48,7 @@ import (
 	"github.com/howashoji/looptrack/internal/client/dashstdin"
 	clientenv "github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/client/session"
+	"github.com/howashoji/looptrack/internal/domain"
 	"github.com/howashoji/looptrack/internal/hookio"
 	"github.com/howashoji/looptrack/internal/i18n"
 )
@@ -73,6 +77,10 @@ type handoffOpts struct {
 	title     string
 	session   string
 	sha       string
+	version   int64
+	hasVer    bool
+	show      string // spool --show
+	drop      string // spool --drop
 	dropMarks bool
 	lockTTL   time.Duration
 	hasTTL    bool
@@ -96,7 +104,7 @@ func Handoff(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		fmt.Fprint(stdout, i18n.T(lang, "loop.handoff.cli.usage"))
 		return handoffExitOK
 	}
-	if sub != "append" && sub != "compact" {
+	if sub != "append" && sub != "compact" && sub != "spool" {
 		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.unknown_subcommand", "name", sub))
 		fmt.Fprint(stderr, i18n.T(lang, "loop.handoff.cli.usage"))
 		return handoffExitUsage
@@ -111,12 +119,36 @@ func Handoff(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		fmt.Fprint(stdout, i18n.T(lang, "loop.handoff.cli.usage"))
 		return handoffExitOK
 	}
+	server := handoffBackend(e) == backendServer
+	if sub == "spool" {
+		return handoffSpoolCommand(e, lang, opt, stdout, stderr)
+	}
+	if opt.hasVer && sub == "append" {
+		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.version_append"))
+		return handoffExitUsage
+	}
+	if opt.hasVer && !server {
+		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.version_file"))
+		return handoffExitUsage
+	}
 	body, code := handoffReadBody(opt, stdin, stderr, lang)
 	if code != handoffExitOK {
 		return code
 	}
-	if sub == "append" {
+	if server {
+		// 行番号を利用者の入力のものにするため、見出しを足す前の本文を見る
+		if f, hit := domain.FindSecret(body); hit {
+			handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.secret_refused", "line", f.Line, "label", f.Label))
+			return handoffExitError
+		}
+	}
+	switch {
+	case sub == "append" && server:
+		return handoffServerAppend(e, lang, opt, body, stdout, stderr)
+	case sub == "append":
 		return handoffAppend(e, lang, opt, body, stdout, stderr)
+	case server:
+		return handoffServerCompact(e, lang, opt, body, stdout, stderr)
 	}
 	return handoffCompact(e, lang, opt, body, stdout, stderr)
 }
@@ -192,6 +224,20 @@ func handoffParse(args []string) (handoffOpts, string) {
 			o.session, ok = take(&i, inline, hasInline)
 		case "--sha":
 			o.sha, ok = take(&i, inline, hasInline)
+		case "--show":
+			o.show, ok = take(&i, inline, hasInline)
+		case "--drop":
+			o.drop, ok = take(&i, inline, hasInline)
+		case "--version":
+			var v string
+			v, ok = take(&i, inline, hasInline)
+			if ok {
+				n, err := strconv.ParseInt(trimSpace(v), 10, 64)
+				if err != nil || n < 0 {
+					return o, name
+				}
+				o.version, o.hasVer = n, true
+			}
 		case "--lock-ttl":
 			var v string
 			v, ok = take(&i, inline, hasInline)
@@ -343,18 +389,9 @@ func handoffCompact(e *Env, lang i18n.Lang, o handoffOpts, body string, stdout, 
 		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.bad_sha", "sha", o.sha))
 		return handoffExitUsage
 	}
-	body = trimSpace(body)
-	if o.dropMarks {
-		body = trimSpace(handoffDropMarks(body))
-	}
-	if body == "" {
-		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.empty_body"))
-		return handoffExitUsage
-	}
-	// 書き出す本文は必ず節の見出しから始める（読む側は節の単位で切り出す）
-	if !strings.HasPrefix(body, handoffHeadingPrefix) {
-		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.need_heading", "prefix", trimSpaceRight(handoffHeadingPrefix)))
-		return handoffExitUsage
+	body, code := handoffCompactBody(lang, o, body, stderr)
+	if code != handoffExitOK {
+		return code
 	}
 	p := handoffCLIFile(e, o.file)
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -389,6 +426,24 @@ func handoffCompact(e *Env, lang i18n.Lang, o handoffOpts, body string, stdout, 
 	}
 	fmt.Fprintln(stdout, i18n.T(lang, "loop.handoff.cli.compacted", "path", p, "sha", handoffFileSHA(p)))
 	return handoffExitOK
+}
+
+// handoffCompactBody は書き直す本文を確かめる（置き場に依らない）。
+func handoffCompactBody(lang i18n.Lang, o handoffOpts, body string, stderr io.Writer) (string, int) {
+	body = trimSpace(body)
+	if o.dropMarks {
+		body = trimSpace(handoffDropMarks(body))
+	}
+	if body == "" {
+		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.empty_body"))
+		return "", handoffExitUsage
+	}
+	// 書き出す本文は必ず節の見出しから始める（読む側は節の単位で切り出す）
+	if !strings.HasPrefix(body, handoffHeadingPrefix) {
+		handoffErr(stderr, lang, i18n.T(lang, "loop.handoff.cli.need_heading", "prefix", trimSpaceRight(handoffHeadingPrefix)))
+		return "", handoffExitUsage
+	}
+	return body, handoffExitOK
 }
 
 // handoffDropMarks はセッションの印の行だけを落とす（見出しと本文は残す）。

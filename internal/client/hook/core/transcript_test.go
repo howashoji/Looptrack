@@ -494,11 +494,42 @@ func TestTranscriptDetachEndToEnd(t *testing.T) {
 		var n int
 		b.api.set(func(f *trFake) { n = f.chunked })
 		if n > 0 {
+			waitStateQuiet(t, b.stateDir())
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatalf("子が追記を送っていない: %v", b.api.requests())
+}
+
+// waitStateQuiet は切り離した子が状態を書き終えるまで待つ。子の PID は親にも分からないので、ディレクトリが 1 秒変わらないことで見る。
+// 待たずに返すと、t.TempDir の消去が子の書き込みと重なって directory not empty で落ちる。
+func waitStateQuiet(t *testing.T, dir string) {
+	t.Helper()
+	snapshot := func() string {
+		var sb strings.Builder
+		_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if info, ierr := d.Info(); ierr == nil {
+				fmt.Fprintf(&sb, "%s %d %d\n", p, info.Size(), info.ModTime().UnixNano())
+			}
+			return nil
+		})
+		return sb.String()
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	last, since := snapshot(), time.Now()
+	for time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+		if cur := snapshot(); cur != last {
+			last, since = cur, time.Now()
+		} else if time.Since(since) >= time.Second {
+			return
+		}
+	}
+	t.Fatalf("切り離した子が 30 秒たっても書き終わらない: %s", dir)
 }
 
 // hook の自動送信が前段のリバースプロキシの 413（JSON でない）で止まったら、失敗の理由を proxy_limit で残す。

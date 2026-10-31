@@ -560,6 +560,9 @@ OTel のファイルは追記され続けます。大きくなったら古いも
 | イシュー | サーバ（`looptrack issue`） | **これからやること・やっていること**。1 課題 1 件・状態遷移あり |
 | 引き継ぎ | `.claude/memories/handoff.md` / `MEMORY.md` | **セッションをまたぐ現在地**。どのイシューがどこまで進んだかの要約 |
 | 決定・学び | `.claude/memories/decision-*` / `caveat-*` | 決定理由・再発防止 |
+| プロジェクト記憶 | サーバ（`looptrack memory`。置き場が `LOOPTRACK_LOOP_HANDOFF_BACKEND=server` のとき） | **別の端末・別の利用者へ渡す引き継ぎ・決定・注意**。上の 2 行のサーバ版で、書くのは `looptrack handoff append -` と `looptrack memory append <種類> <名前>`。手元の記憶は `looptrack memory import` で取り込む |
+| 在席 | サーバ（hook が送る。`looptrack issue summary` に出る） | **いま誰のどのセッションがどのブランチ・イシューで動いているか**。同じ作業に手を付ける前に見る |
+| 占有 | サーバ（`looptrack lease`） | **同時に 1 本しか動かせない作業を、いま誰が持っているか**。本番への反映・公開の PR・リリースのタグの前に取り、終わったら返す。取れなければ持ち主を見て待つか相談する |
 | セッション要約 | サーバ（`looptrack session digest`） | **別の端末のセッションへ渡す文脈**。頼まれたこと・決めたこと・どこまで進んだか。先頭の印で始まるコメントとして残る |
 
 イシュー本文に引き継ぎは書かない。引き継ぎにも、イシューの細かい経過は書かない。この線引きです。

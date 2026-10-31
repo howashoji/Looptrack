@@ -366,10 +366,10 @@ func ValidTranscriptLimitName(name string) bool {
 	return name == SettingTranscriptMaxChunk || name == SettingTranscriptMaxUser || name == SettingTranscriptRetentionDays
 }
 
-// validTranscriptLimit は設定 name の値として v を受け付けるかを返す（大きさは 1 以上、保持日数は 0 以上）。
+// validTranscriptLimit は設定 name の値として v を受け付けるかを返す（大きさは 1 以上、保持日数は 0 から MaxRetentionDays）。
 func validTranscriptLimit(name string, v int64) bool {
 	if name == SettingTranscriptRetentionDays {
-		return v >= 0
+		return v >= 0 && v <= MaxRetentionDays
 	}
 	return v > 0
 }

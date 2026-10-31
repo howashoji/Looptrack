@@ -11,9 +11,11 @@ package i18n
 // 失敗メッセージにファイルごとの実測値が全部出る（節と末尾の合計の行も TestAllowListTotals が実測と突き合わせる）。
 var jaAllowed = []jaAllow{
 
-	// ── 判定に使う語（訳すと壊れる） ── 13 ファイル・合計 27 件
+	// ── 判定に使う語（訳すと壊れる） ── 15 ファイル・合計 28 件
 	{path: "internal/client/hook/core/usage.go", count: 2, reason: jaJudge, note: "createdRe・startedRe が MCP の応答から ID を拾うための語（「作成: 」「着手: 」。英語の言い方も同じ正規表現で受ける）。表示しない"},
-	{path: "internal/client/hook/loop/memories.go", count: 2, reason: jaJudge, note: "引き継ぎの本文から節を取り出す語そのもの。`> 要約:` の行（summaryLine）と、「現在地」の節の見出しの判定（currentMarkers）。引き継ぎは書いた人の言語で書かれ、読む側の言語とは無関係なので、読む側の言語で訳すと日本語で書かれた引き継ぎから節を取り出せなくなる（英語の綴りは currentMarkers に並べてある）"},
+	{path: "internal/client/hook/loop/memoryserver.go", count: 1, reason: jaJudge, note: "handoff の成功の行を見分ける語そのもの。日本語で動く CLI の出力を読むので訳さない（英語の綴りも同じ正規表現に並べてある）"},
+	{path: "internal/client/cli/memory_access.go", count: 1, reason: jaJudge, note: "記憶のファイルの `> 要約:` の行を見分ける語そのもの。ファイルは書いた人の言語で書かれ、読む側の言語とは無関係なので訳さない"},
+	{path: "internal/client/hook/loop/memories.go", count: 1, reason: jaJudge, note: "引き継ぎの本文から節を取り出す語そのもの。「現在地」の節の見出しの判定（currentMarkers）。引き継ぎは書いた人の言語で書かれ、読む側の言語とは無関係なので、読む側の言語で訳すと日本語で書かれた引き継ぎから節を取り出せなくなる（英語の綴りは currentMarkers に並べてある）"},
 	{path: "internal/client/hook/loop/taskmode.go", count: 4, reason: jaJudge, note: "タスクモードを決める日本語の語の正規表現（execWords・investWords）。利用者の指示文と突き合わせる語そのもので、指示文は書いた人の言語で来るので訳さない（英語の別名は execWordsEn・investWordsEn に並べてある）"},
 	{path: "internal/client/kitinit/init.go", count: 1, reason: jaJudge, note: "loop を入れるかの問いに受け付ける答え「はい」（y / yes と並べて判定する。訳すと日本語で答えた入力を受けられなくなる）"},
 	{path: "internal/client/report/blocks.go", count: 1, reason: jaJudge, note: "レポートに必ず設ける章の見出しの判定（本文 JSON を書く AI が読む SKILL.md は日本語のまま）"},
@@ -40,12 +42,13 @@ var jaAllowed = []jaAllow{
 	{path: "internal/tools/transcriptfixture/main.go", count: 12, reason: jaDevTool, note: "会話記録から文字列の値を合成の値に置き換えたテスト材料を作る開発用ツール（配布物に入らない）"},
 	{path: "internal/tools/winversion/main.go", count: 35, reason: jaDevTool, note: "Windows の exe の版の情報を作って読み戻す、リリースのビルド用のツール（配布物に入らない）"},
 	{path: "private/tools/rulegap/main.go", count: 33, reason: jaDevTool, note: "private/ の規律と kit の rules を突き合わせる開発用ツール（private/ は git archive が外すので配布物に入らない）"},
-	// ── DB や書き出すファイルに残る記録 ── 3 ファイル・合計 23 件
+	// ── DB や書き出すファイルに残る記録 ── 4 ファイル・合計 24 件
 	{path: "cmd/looptrack/repair.go", count: 1, reason: jaRecord, note: "repair-lists の --reason の既定値。issue_events に残る記録なので、動かした人の言語で変えない（コードの注釈にも同じ理由を書いてある）"},
 	{path: "internal/domain/report.go", count: 20, reason: jaRecord, note: "matrix.md・index.md の本文。版管理に入る生成物なので、生成した人の言語で中身が変わると内容の違わない差分が出る。closable.go の警告節（ClosableMarkdown）も同じ文書に並ぶので i18n.JA に固定してある"},
+	{path: "internal/service/messages.go", count: 1, reason: jaRecord, note: "イシューに残すコメントの先頭の語（MessageIssueLead）。ほかの「判断:」「フィードバック:」と同じく固定の語で、言語で変えない"},
 	{path: "internal/service/membership.go", count: 2, reason: jaRecord, note: "担当の付け替えの理由（ReasonMemberRemoved・ReasonMemberViewer）。assign イベントの reason として issue_events に残る記録なので、動かした人の言語で変えない"},
 
 	// ── 未訳（i18n.T へ移す対象。ラチェットの残高。これが減っていくのが正しい方向） ── 0 ファイル・合計 0 件
 
-	// 合計 26 ファイル・292 件（うち未訳 0 件）
+	// 合計 29 ファイル・294 件（うち未訳 0 件）
 }
