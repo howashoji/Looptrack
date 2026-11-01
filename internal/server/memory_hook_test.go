@@ -1345,7 +1345,7 @@ func TestSessionStartSlowPostKeepsInjection(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	p.postDelay.Store(int64(1400 * time.Millisecond))
+	p.postDelay.Store(int64(1000 * time.Millisecond)) // 1 要求の待ち時間 memoryHookTimeout（1.5 秒）に余裕を残し、負荷で最初の 1 件まで打ち切られないようにする
 	s := a.sessionStart("sess-b")
 	p.postDelay.Store(0)
 	if !strings.Contains(s, "注入する本文") || !strings.Contains(s, "未送信の退避が") {

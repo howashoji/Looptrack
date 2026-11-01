@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -267,6 +268,32 @@ func TestAccountPassword(t *testing.T) {
 	}
 }
 
+// TestLoginFormPatternAllowsSurroundingSpace は、入力欄の規則が前後の空白を通し、不正な名前を止めることを固定する。
+// サーバは前後の空白を落とすので、入力欄で止めると空白の見えない形式エラーになる。
+func TestLoginFormPatternAllowsSurroundingSpace(t *testing.T) {
+	for _, name := range []string{"templates/admin_users.html", "templates/first_run.html"} {
+		b, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := regexp.MustCompile(`name="login"[^>]*pattern="([^"]+)"`).FindSubmatch(b)
+		if m == nil {
+			t.Fatalf("%s に入力欄の規則が無い（前提が崩れています）", name)
+		}
+		re := regexp.MustCompile(`^(?:` + string(m[1]) + `)$`)
+		for _, ok := range []string{"mikapo", " mikapo", "mikapo ", "a.b_c-1"} {
+			if !re.MatchString(ok) {
+				t.Errorf("%s: %q が止まる", name, ok)
+			}
+		}
+		for _, ng := range []string{"", " ", "a b", "-a", "日本語"} {
+			if re.MatchString(ng) {
+				t.Errorf("%s: %q が通る", name, ng)
+			}
+		}
+	}
+}
+
 func TestAdminUsers(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
@@ -315,6 +342,12 @@ func TestAdminUsers(t *testing.T) {
 
 	add := func(f url.Values) (*http.Response, string) {
 		return e.formAt(c, "/im/admin/users", "/im/admin/users", f)
+	}
+	if res, body := add(url.Values{"login": {" dave "}, "name": {"Dave"}, "role": {"member"}, "password": {"dave-password-1"}, "confirm": {"dave-password-1"}}); res.StatusCode != http.StatusOK {
+		t.Errorf("前後に空白のある名前の追加: %d %s", res.StatusCode, body)
+	}
+	if _, err := store.UserByLogin(ctx, e.db, "dave"); err != nil {
+		t.Errorf("前後の空白を落とした名前で追加されていない: %v", err)
 	}
 	if res, _ := e.post(c, "/im/admin/users", url.Values{"login": {"carol"}, "role": {"member"}, "password": {"carol-pass-123"}, "confirm": {"carol-pass-123"}}); res.StatusCode != http.StatusForbidden {
 		t.Errorf("CSRF なしの追加: %d", res.StatusCode)

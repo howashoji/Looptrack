@@ -127,6 +127,31 @@ func TestMainExitCodes(t *testing.T) {
 	}
 }
 
+// TestNoAPIURLNamesTheCommandGroup は、issue 以外の群の案内が実行したコマンドのまま出ることを固定する。
+// 案内の例をそのまま打てないと、接続先を足しても次のエラーで止まる。
+func TestNoAPIURLNamesTheCommandGroup(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		main func([]string, IO, env.Env) int
+		args []string
+		want string
+	}{
+		{"lease", LeaseMain, []string{"list"}, "looptrack lease list"},
+		{"memory", MemoryMain, []string{"list"}, "looptrack memory list"},
+		{"message", MessageMain, []string{"inbox"}, "looptrack message inbox"},
+		{"issue", Main, []string{"list"}, "looptrack issue list"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var out, errOut strings.Builder
+			code := c.main(c.args, IO{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut},
+				env.FromMap(map[string]string{"CLAUDE_PROJECT_DIR": t.TempDir(), "LOOPTRACK_LANG": "ja"}))
+			if code != 1 || !strings.Contains(errOut.String(), "<プロジェクト> "+c.want+"\n") {
+				t.Errorf("案内: %d %q", code, errOut.String())
+			}
+		})
+	}
+}
+
 func TestNoAPIURL(t *testing.T) {
 	root := t.TempDir()
 	code, _, stderr := run(t, map[string]string{"CLAUDE_PROJECT_DIR": root}, "config", "--json")

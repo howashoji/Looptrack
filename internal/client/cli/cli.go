@@ -40,7 +40,8 @@ type Ctx struct {
 	IO
 	Env  env.Env
 	Root string    // プロジェクトのディレクトリ（CLAUDE_PROJECT_DIR か作業ディレクトリ）
-	Args []string  // issue の後ろの引数（案内の文面に使う）
+	Prog string    // 実行したコマンドの群（looptrack lease など。案内の文面に使う）
+	Args []string  // Prog の後ろの引数（案内の文面に使う）
 	Lang i18n.Lang // 画面に出す文面の言語（環境から決める）
 
 	client *api.Client
@@ -74,7 +75,7 @@ func runGroup(prog string, tree func(i18n.Lang) *Command, args []string, stdio I
 	}
 	fixLocalZone(e)
 	api.SetRoot(root)
-	ctx := &Ctx{IO: stdio, Env: e, Root: root, Args: args, Lang: lang}
+	ctx := &Ctx{IO: stdio, Env: e, Root: root, Prog: prog, Args: args, Lang: lang}
 	cmd := tree(lang)
 	vals, leaf, err := Parse(cmd, prog, args)
 	if err != nil {
@@ -176,7 +177,11 @@ func (c *Ctx) noAPI() error {
 	for i, a := range c.Args {
 		quoted[i] = shellQuote(a)
 	}
-	cmd := strings.TrimRight(api.EntryCommand()+" "+strings.Join(quoted, " "), " \t\n")
+	prog := c.Prog
+	if prog == "" {
+		prog = api.EntryCommand()
+	}
+	cmd := strings.TrimRight(prog+" "+strings.Join(quoted, " "), " \t\n")
 	urlVar, projVar := env.Name(env.APIURL), env.Name(env.Project)
 	var found *jsonorder.Object
 	for _, name := range []string{"settings.local.json", "settings.json"} {

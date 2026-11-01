@@ -23,6 +23,46 @@ Nothing yet.
 
 まだありません。
 
+## [1.3.0] - 2026-11-01
+
+1.3.0 is a stable release. The changes below are relative to `v1.3.0-rc.1`,
+and no migrations were added after it. If you upgrade from `v1.2.0`, read the
+section for 1.3.0-rc.1 as well, above all "Moving from 1.2.0", because six
+migrations come with it. Unlike the release candidate, 1.3.0 becomes the
+Latest release on GitHub Releases and takes the `latest` tag on GHCR, so the
+one-line installer installs it. A server on 1.2.0 tells you about it, and so
+does one on 1.3.0-rc.1; once on 1.3.0, a server follows stable releases only.
+
+### Changed
+
+- The Windows installer check in the release workflow now runs apart from the
+  workflow step, with a deadline of 540 seconds. If the check hangs, the step
+  no longer stays stuck: it fails and keeps the diagnostic logs. This changes
+  only how releases are built and checked.
+
+### Fixed
+
+- The login name field no longer rejects a name with a space before or after
+  it. The space is invisible, so the form looked as if it refused a valid name.
+  The server already removes such spaces. The form on the first-run page has
+  the same fix.
+- When the server URL is not set, the example printed by `looptrack lease`,
+  `looptrack memory`, and `looptrack message` now shows the command you ran.
+  It used to show `looptrack issue …`, which does not work for these commands.
+
+---
+
+1.3.0 は正式版で、下の変更は `v1.3.0-rc.1` からの差分です。rc.1 の後に足したマイグレーションはありません。`v1.2.0` から上げるなら 1.3.0-rc.1 の節も読んでください。マイグレーションが 6 本あるので、特に「1.2.0 から上げるとき」が要ります。候補版と違って 1.3.0 は GitHub Releases の Latest になり、GHCR の `latest` タグも付きます。1 行のインストーラが入れるのもこの版です。1.2.0 と 1.3.0-rc.1 のサーバはこの版を知らせます。1.3.0 に上げた後は正式版だけを追います。
+
+### 変更
+
+- リリースの run の Windows のインストーラの検査を、段のプロセスから切り離して動かすようにしました。締切は 540 秒です。検査が止まっても段は止まったままにならず、診断のログを残して失敗します。変わったのは配布物の作り方と確かめ方だけです。
+
+### 修正
+
+- ログイン名の入力欄で、前後に空白のある名前が止まらなくなりました。空白は見えないので、正しい名前を拒まれたように見えていました。サーバは以前から前後の空白を落としています。初回設定の画面も同じです。
+- サーバの URL が無いときに `looptrack lease`・`looptrack memory`・`looptrack message` が示す例を、実行したコマンドのままにしました。以前は `looptrack issue …` と出て、そのままでは動きませんでした。
+
 ## [1.3.0-rc.1] - 2026-10-31
 
 First release candidate for 1.3.0. It is published as a pre-release, so
@@ -2054,7 +2094,8 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけでリモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの・まだ手を動かす必要がある所・うまくいかないときに確かめることも書いています。手を動かす所は auto モードでも Claude Code で要るインストールのコマンド・認可の後の Copilot CLI の 2 回目の再起動・再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - 新しいガイド「更新」。更新するとき何が自動で何が手作業かは、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.3.0-rc.1...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0
 [1.3.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0-rc.1
 [1.2.0]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0
 [1.2.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0-rc.1

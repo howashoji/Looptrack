@@ -387,18 +387,21 @@ jobs:
         timeout-minutes: 10
         run: bash deploy/release/desktop.sh windows-installer "$VERSION" "$ARCH" stage out
       # 中身は installer_smoke.ps1 にあり、run_with_deadline.ps1 が別のプロセスで動かして締切（540 秒）で子孫ごと止める。
-      # 締切は段の上限 600 秒から一覧・ログの写し・後始末の 60 秒を引いた値。中の Invoke-Bounded（各 120 秒）が
+      # run_with_deadline.ps1 は run_detached.ps1 が WMI で起動するので、段のプロセスとは親子関係もハンドルの受け継ぎも無い。
+      # 段の側はログと終了コードのファイルを見るだけで、切り離した側が締切を過ぎても終わらなければ 570 秒で木ごと止める。
+      # 540・570・600 の間の 30 秒ずつは後始末の時間（足し算は run_detached.ps1 の冒頭）。中の Invoke-Bounded（各 120 秒）が
       # 先に一覧を出して throw できるよう、できるだけ長くとる
       # 段の pwsh で直接動かすと、インストーラが起こし直した Looptrack.exe のような親の終わったプロセスが段の標準出力を
       # 握ったまま残ったときに、段の上限（10 分）でもジョブの上限でも runner が段を終えられない（ログも残らない）。
-      # 締切に達したら待っていたプロセスの一覧とインストーラのログを出し、$RUNNER_TEMP/smoke-diag に写して失敗する
+      # 締切に達したら待っていたプロセスの一覧とインストーラのログを出し、$RUNNER_TEMP/smoke-diag に写して失敗する。
+      # この形でも段が終わらずログが消えるなら、原因はパイプではなく runner か VM の側にある
       - name: smoke test（導入 → 起動中の上書き → 無人の上書きでの起動し直し → アンインストール）
         shell: pwsh
         timeout-minutes: 10
         run: |
           $logs = @('install.log','update.log','update-fail.log') | ForEach-Object { Join-Path $env:RUNNER_TEMP $_ }
-          pwsh -NoProfile -NonInteractive -File deploy/release/run_with_deadline.ps1 `
-            -Script deploy/release/installer_smoke.ps1 -Seconds 540 `
+          pwsh -NoProfile -NonInteractive -File deploy/release/run_detached.ps1 `
+            -Script deploy/release/installer_smoke.ps1 -Seconds 540 -OuterSeconds 570 `
             -DiagDir (Join-Path $env:RUNNER_TEMP 'smoke-diag') -Logs ($logs -join ',')
           if ($LASTEXITCODE -ne 0) { throw "smoke test が $LASTEXITCODE で終わりました" }
       # 段の上限で打ち切られた段は failure、ジョブの取り消しのときは cancelled になる。どちらでもログを残す
