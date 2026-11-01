@@ -1,16 +1,16 @@
 # Windows のインストーラの通しの smoke test（導入 → 起動中の上書き → 無人の上書きでの起動し直し → アンインストール）。
-# release.yml の desktop-windows-installer が run_with_deadline.ps1 を通して起動する（作業ディレクトリはリポジトリの根）。
+# release.yml の desktop-windows-installer が run_detached.ps1 と run_with_deadline.ps1 を通して起動する（作業ディレクトリはリポジトリの根）。
 #
-#   pwsh -NoProfile -File deploy/release/run_with_deadline.ps1 -Script deploy/release/installer_smoke.ps1 -Seconds 540 -DiagDir <置き場>
+#   pwsh -NoProfile -File deploy/release/run_detached.ps1 -Script deploy/release/installer_smoke.ps1 -Seconds 540 -OuterSeconds 570 -DiagDir <置き場>
 #
 # 使う環境変数: APP_ID（Looptrack.iss の AppId）・RUNNER_TEMP（インストーラのログの置き場）。
 # out\*_setup.exe（desktop.sh windows-installer の出力）を導入する。
 # 段の中で直接動かさないのは、外のプロセスが段の標準出力を握ったまま残ると、段の上限でもジョブの上限でも
-# runner が段を終えられなくなるため（run_with_deadline.ps1 の冒頭）。
+# runner が段を終えられなくなるため（run_with_deadline.ps1 と run_detached.ps1 の冒頭）。
 
 $ErrorActionPreference = 'Stop'
 # 出力はファイルを経てジョブのログに写る。日本語が化けないよう UTF-8 で書く
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { Write-Host "出力の文字コードを変えられません: $_" }
 $PSNativeCommandUseErrorActionPreference = $false
 # 外のプロセスは Invoke-Bounded で上限つきで待つ（超えたら待っていたプロセスと子孫の一覧を出して throw する）
 . ./deploy/release/bounded_wait.ps1

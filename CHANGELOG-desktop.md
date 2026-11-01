@@ -23,6 +23,45 @@ Nothing yet.
 
 まだありません。
 
+## [1.3.0] - 2026-11-01
+
+1.3.0 is a stable release. The changes below are relative to `v1.3.0-rc.1`,
+and no migrations were added after it. If you update from `v1.2.0`, read the
+section for 1.3.0-rc.1 as well. Unlike the release candidate, 1.3.0 becomes the
+Latest release on GitHub Releases, and an app on 1.2.0 offers it as an update.
+An app on 1.3.0-rc.1 offers it too, and after that update it follows stable
+releases only.
+
+### Changed
+
+- The Windows installer check in the release workflow now runs apart from the
+  workflow step, with a deadline of 540 seconds. If the check hangs, the step
+  no longer stays stuck: it fails and keeps the diagnostic logs. This changes
+  only how releases are built and checked.
+
+### Fixed
+
+- The login name field no longer rejects a name with a space before or after
+  it. The space is invisible, so the form looked as if it refused a valid name.
+  The server already removes such spaces. The form on the first-run page has
+  the same fix.
+- When the server URL is not set, the example printed by `looptrack lease`,
+  `looptrack memory`, and `looptrack message` now shows the command you ran.
+  It used to show `looptrack issue …`, which does not work for these commands.
+
+---
+
+1.3.0 は正式版です。下の変更は `v1.3.0-rc.1` からの差分で、rc.1 の後に足したマイグレーションはありません。`v1.2.0` から上げるなら 1.3.0-rc.1 の節も読んでください。候補版との違いは GitHub Releases の Latest になることです。1.2.0 と 1.3.0-rc.1 のアプリはこの版を更新として知らせ、この更新の後は正式版だけを追います。
+
+### 変更
+
+- リリースの run の Windows のインストーラの検査を、段のプロセスから切り離して動かすようにしました。締切は 540 秒です。検査が止まっても段は止まったままにならず、診断のログを残して失敗します。変わったのは配布物の作り方と確かめ方だけです。
+
+### 修正
+
+- ログイン名の入力欄で、前後に空白のある名前が止まらなくなりました。空白は見えないので、正しい名前を拒まれたように見えていました。サーバは以前から前後の空白を落としています。初回設定の画面も同じです。
+- サーバの URL が無いときに `looptrack lease`・`looptrack memory`・`looptrack message` が示す例を、実行したコマンドのままにしました。以前は `looptrack issue …` と出て、そのままでは動きませんでした。
+
 ## [1.3.0-rc.1] - 2026-10-31
 
 First release candidate for 1.3.0. It is published as a pre-release, so
@@ -1436,7 +1475,8 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定からチャットだけで AI エージェントをつなぐ方法。
 - 新しいガイド「更新」。デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.3.0-rc.1...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0
 [1.3.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0-rc.1
 [1.2.0]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0
 [1.2.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0-rc.1

@@ -21,7 +21,7 @@
     <h2>{{T .Lang "server.web.admin_users.add_h2"}}</h2>
     <form method="post" action="{{base}}/admin/users" class="narrow">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label>{{T .Lang "server.web.admin_users.login_name"}}<input name="login" value="{{.Form.login}}" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" autocomplete="off" required></label>
+      <label>{{T .Lang "server.web.admin_users.login_name"}}<input name="login" value="{{.Form.login}}" maxlength="64" pattern="\s*[A-Za-z0-9][A-Za-z0-9._\-]*\s*" autocomplete="off" required></label>
       <label>{{T .Lang "server.web.admin_users.display_name"}}<input name="name" value="{{.Form.name}}" maxlength="255"></label>
       <label>{{T .Lang "server.web.admin_users.role"}}<select name="role">
         <option value="member"{{if ne .Form.role "admin"}} selected{{end}}>{{T .Lang "server.web.admin_users.role_member"}}</option>

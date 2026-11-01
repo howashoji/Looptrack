@@ -8,9 +8,16 @@
 # Start-Process -Wait と引数なしの WaitForExit() は上限が無く、止まるとジョブの上限まで何も出さずに取り消される
 # （取り消されると後ろの段のログの保存も走らない）。ここでは上限を超えたら、どの段で何を待っていたか・経過秒・
 # 待っていたプロセスとその子孫の一覧を出して throw する。
+# 後半の関数は run_with_deadline.ps1 と run_detached.ps1 が共有する（一覧・ログの写し・止め方を 1 か所に置く）。
 
 # いまの段の名前。上限を超えたときの文面に入れる
 $script:BoundedWaitStage = ''
+
+# 中身の子孫でなくても一覧に出して止めるプロセスの名前（-like）。親が先に終わったプロセスは子孫として辿れないので名前でも拾う
+$script:LeftoverNames = @('Looptrack*', 'unins*', '_iu*', '*_setup*')
+
+# WMI の問い合わせの上限（秒）。WMI 自体が応答しないときに、締切の後の後始末まで止まらないようにする
+$script:CimTimeoutSec = 15
 
 # 段の始まりを時刻つきで出す。止まった段をログで見分けるため
 function Write-Stage([string]$Name) {
@@ -20,8 +27,8 @@ function Write-Stage([string]$Name) {
 
 # RootId のプロセスとその子孫を Win32_Process の ParentProcessId でたどって返す。
 # 本体が先に終わっていても、残った子は ParentProcessId に本体の PID を持ったままなので拾える
-function Get-ProcessTree([int]$RootId) {
-  $all = @(Get-CimInstance Win32_Process)
+function Get-ProcessTree([int]$RootId, $Snapshot = $null) {
+  $all = if ($null -ne $Snapshot) { @($Snapshot) } else { @(Get-CimInstance Win32_Process -OperationTimeoutSec $script:CimTimeoutSec) }
   $seen = @{}
   $queue = [System.Collections.Generic.Queue[int]]::new()
   $queue.Enqueue($RootId)
@@ -88,4 +95,69 @@ function Invoke-Bounded {
   Write-Host "--- 待っていたプロセスとその子孫（PID $($p.Id)）"
   Write-ProcessTree $p.Id
   throw $msg
+}
+
+# 名前の当たるプロセスと、RootId の子孫を重ねずに返す（RootId 自身は -IncludeRoot のときだけ含める）
+function Get-Leftover([int]$RootId, [switch]$IncludeRoot) {
+  $all = @(Get-CimInstance Win32_Process -OperationTimeoutSec $script:CimTimeoutSec)
+  $rows = @{}
+  foreach ($r in @(Get-ProcessTree $RootId $all)) {
+    if ($IncludeRoot -or $r.ProcessId -ne $RootId) { $rows[[int]$r.ProcessId] = $r }
+  }
+  foreach ($r in $all) {
+    foreach ($pat in $script:LeftoverNames) {
+      if ($r.Name -like $pat) { $rows[[int]$r.ProcessId] = $r; break }
+    }
+  }
+  return @($rows.Values | Sort-Object ProcessId)
+}
+
+function Write-Rows($Rows, [string]$Title, [string]$File) {
+  # 空の結果は $null で届くことがあるので、行として数えない
+  $Rows = @(@($Rows) | Where-Object { $null -ne $_ })
+  $text = "--- $Title`n"
+  if ($Rows.Count -eq 0) {
+    $text += "（ありません）`n"
+  } else {
+    $text += ($Rows | Format-Table -AutoSize -Wrap ProcessId, ParentProcessId, Name, CreationDate, CommandLine | Out-String -Width 400)
+  }
+  Write-Host $text
+  if ($File) { Add-Content -Path $File -Value $text }
+}
+
+function Stop-Rows($Rows) {
+  foreach ($r in @($Rows)) {
+    # 空の結果は $null で届く。Stop-Process -Id $null は引数の検査で止まり、ErrorAction では抑えられない
+    if ($null -eq $r) { continue }
+    Stop-Process -Id $r.ProcessId -Force -ErrorAction SilentlyContinue
+  }
+}
+
+# ファイルの Offset から後ろを読み、読み終えた位置を返す（書き込み中でも読めるよう共有で開く）
+function Copy-NewText([string]$Path, [long]$Offset) {
+  if (-not (Test-Path $Path)) { return $Offset }
+  $fs = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete)
+  try {
+    if ($fs.Length -le $Offset) { return $Offset }
+    $null = $fs.Seek($Offset, [System.IO.SeekOrigin]::Begin)
+    $reader = [System.IO.StreamReader]::new($fs, [System.Text.Encoding]::UTF8)
+    $text = $reader.ReadToEnd()
+    if ($text.Length -gt 0) { Write-Host -NoNewline $text }
+    return $fs.Length
+  } finally {
+    $fs.Dispose()
+  }
+}
+
+# インストーラのログを DiagDir に写し、-Tail なら末尾をジョブのログにも出す。プロセスを止める前に呼ぶ。
+# 止めると Inno Setup がログの終わりを書かずに終わり、何で止まっていたかが追えなくなるため
+function Save-Logs([string[]]$Files, [string]$DiagDir, [switch]$Tail) {
+  foreach ($f in @($Files)) {
+    if (-not (Test-Path $f)) { continue }
+    Copy-Item -Path $f -Destination $DiagDir -Force -ErrorAction SilentlyContinue
+    if ($Tail) {
+      Write-Host "--- $f（末尾 60 行）"
+      Get-Content -Path $f -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+    }
+  }
 }

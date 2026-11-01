@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -20,6 +21,15 @@ const installerSmokePath = "../../../deploy/release/installer_smoke.ps1"
 
 // releaseYMLPath はリリースの組み立て。installer_smoke.ps1 を締切つきで呼ぶ段がある。
 const releaseYMLPath = "../../../.github/workflows/release.yml"
+
+// runDetachedPath は段のプロセスから切り離して締切つきの中身を起動する薄い役。
+const runDetachedPath = "../../../deploy/release/run_detached.ps1"
+
+// runWithDeadlinePath は切り離した側で中身を締切つきで動かすスクリプト。
+const runWithDeadlinePath = "../../../deploy/release/run_with_deadline.ps1"
+
+// smokeCleanupSeconds は締切どうしの間に置く後始末の時間。段の側の足し算は run_detached.ps1 の冒頭にある。
+const smokeCleanupSeconds = 30
 
 // psArgList は PowerShell の配列の 1 行（$name = @('a','b',…)）から、一重引用符の項目を順に取り出す（無ければ nil）。
 // smoke の引数と Go の installerArgs を同じ読み方で比べるために使う。
@@ -159,15 +169,70 @@ func TestInstallerScriptSettings(t *testing.T) {
 		}
 	}
 
-	// 上の引数を持つ installer_smoke.ps1 を、release.yml が締切つきの run_with_deadline.ps1 を通して呼んでいること。
-	// 段で直接動かすと、残ったプロセスが段の標準出力を握って段の上限が効かなくなる
-	rel, err := os.ReadFile(releaseYMLPath)
+	// 上の引数を持つ installer_smoke.ps1 を、release.yml が切り離した起動（run_detached.ps1）を通して呼び、
+	// 中身の締切 < 段の側の締切 < 段の上限 の順になっていること。
+	// 段の子として動かすと、残ったプロセスが受け継いだハンドルで段を終わらせなくなり、段の上限が効かなくなる
+	relBytes, err := os.ReadFile(releaseYMLPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	call := regexp.MustCompile(`(?m)^\s*pwsh\b[^\n]*-File deploy/release/run_with_deadline\.ps1[^\n]*\n\s*-Script deploy/release/installer_smoke\.ps1 -Seconds \d+`)
-	if !call.Match(rel) {
-		t.Errorf("release.yml が run_with_deadline.ps1 -Script deploy/release/installer_smoke.ps1 -Seconds <秒> を呼んでいません")
+	rel := string(relBytes)
+	call := regexp.MustCompile(`timeout-minutes: (\d+)\n\s*run: \|\n[^\n]*\n\s*pwsh\b[^\n]*-File deploy/release/run_detached\.ps1[^\n]*\n\s*-Script deploy/release/installer_smoke\.ps1 -Seconds (\d+) -OuterSeconds (\d+)`).FindStringSubmatch(rel)
+	if call == nil {
+		t.Fatalf("release.yml が run_detached.ps1 -Script deploy/release/installer_smoke.ps1 -Seconds <秒> -OuterSeconds <秒> を呼んでいません")
+	}
+	stepMin, _ := strconv.Atoi(call[1])
+	inner, _ := strconv.Atoi(call[2])
+	outer, _ := strconv.Atoi(call[3])
+	if inner+smokeCleanupSeconds > outer || outer+smokeCleanupSeconds > stepMin*60 {
+		t.Errorf("締切の間に後始末の %d 秒がありません: 中身 %d 秒・段の側 %d 秒・段の上限 %d 秒", smokeCleanupSeconds, inner, outer, stepMin*60)
+	}
+	if strings.Contains(rel, "-File deploy/release/run_with_deadline.ps1") {
+		t.Errorf("release.yml が run_with_deadline.ps1 を段の子として直接起動しています")
+	}
+
+	// 切り離す役自身が段のパイプを受け継ぐ子を起こさないこと（WMI で起動し、Start-Process を使わない）
+	detached, err := os.ReadFile(runDetachedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`(?m)^[^#\n]*Invoke-CimMethod -ClassName Win32_Process -MethodName Create`).Match(detached) {
+		t.Errorf("run_detached.ps1 が WMI の Win32_Process Create で起動していません")
+	}
+	if regexp.MustCompile(`(?m)^[^#\n]*Start-Process`).Match(detached) {
+		t.Errorf("run_detached.ps1 が Start-Process で子を起こしています")
+	}
+
+	// 環境の写しと終了コードのファイルの配線。-f の添字まで照合する。どちらかが切れると、
+	// 切り離した側は環境変数を失うか、成功しても段が失敗で終わる
+	cmdLine := regexp.MustCompile(`(?s)\$inner = \('([^'\n]*)' -f\s+([^)\n]*)\)`).FindStringSubmatch(string(detached))
+	if cmdLine == nil {
+		t.Fatalf("run_detached.ps1 の $inner の組み立てを読めません")
+	}
+	fArgs := strings.Split(cmdLine[2], ", ")
+	for flag, want := range map[string]string{"-EnvFile": "$envFile", "-CodeFile": "$codeFile"} {
+		m := regexp.MustCompile(regexp.QuoteMeta(flag) + ` "\{(\d+)\}"`).FindStringSubmatch(cmdLine[1])
+		if m == nil {
+			t.Errorf("run_detached.ps1 が %s を渡していません", flag)
+			continue
+		}
+		i, _ := strconv.Atoi(m[1])
+		if i >= len(fArgs) || fArgs[i] != want {
+			t.Errorf("run_detached.ps1 の %s の値が %s ではありません: 添字 %d・引数 %v", flag, want, i, fArgs)
+		}
+	}
+	supervisor, err := os.ReadFile(runWithDeadlinePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`[string]$EnvFile`, `[string]$CodeFile`, `if ($EnvFile) {`, `if ($CodeFile) {`, `-Destination $CodeFile`} {
+		if !strings.Contains(string(supervisor), want) {
+			t.Errorf("run_with_deadline.ps1 に %s がありません", want)
+		}
+	}
+	// 終了は Exit-Run の中の 1 か所だけ。ほかで exit すると終了コードのファイルが書かれない
+	if n := len(regexp.MustCompile(`(?m)^\s*exit\b`).FindAll(supervisor, -1)); n != 1 {
+		t.Errorf("run_with_deadline.ps1 の exit が %d か所あります（Exit-Run の 1 か所だけにする）", n)
 	}
 }
 
