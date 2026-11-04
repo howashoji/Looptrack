@@ -125,9 +125,10 @@ jobs:
           fi
       - name: go test ./...
         # -v の全文は長いので go-test.log に置き、画面にはパッケージの結果と失敗だけを出す（run の成否に関わらず全文を artifact に残す）。
+        # -timeout は go test の既定の 10 分に internal/server の合計が届くので延ばす。ジョブの timeout-minutes より短くして、時間切れでもテストのスタックを残す。
         run: |
           rc=0
-          go test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
+          go test -count=1 -timeout 25m -v ./... > go-test.log 2>&1 || rc=$?
           grep -E '^(ok|FAIL|panic:)' go-test.log || true
           if [ "$rc" -ne 0 ]; then
             grep -n -B2 -A30 -E -- '--- FAIL|^panic:' go-test.log | head -400 || true
@@ -185,7 +186,7 @@ jobs:
         # -v の全文は長いので go-test.log に置き、画面にはパッケージの結果と失敗だけを出す（run の成否に関わらず全文を artifact に残す。linux のジョブと同じ形）。
         run: |
           rc=0
-          go test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
+          go test -count=1 -timeout 25m -v ./... > go-test.log 2>&1 || rc=$?
           grep -E '^(ok|FAIL|panic:)' go-test.log || true
           if [ "$rc" -ne 0 ]; then
             grep -n -B2 -A30 -E -- '--- FAIL|^panic:' go-test.log | head -400 || true
@@ -228,7 +229,7 @@ jobs:
         # -v の全文は長いので go-test.log に置き、画面にはパッケージの結果と失敗だけを出す（run の成否に関わらず全文を artifact に残す。linux のジョブと同じ形）。
         run: |
           rc=0
-          go test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
+          go test -count=1 -timeout 25m -v ./... > go-test.log 2>&1 || rc=$?
           grep -E '^(ok|FAIL|panic:)' go-test.log || true
           if [ "$rc" -ne 0 ]; then
             grep -n -B2 -A30 -E -- '--- FAIL|^panic:' go-test.log | head -400 || true
