@@ -19,3 +19,8 @@
 /site/node_modules/
 /site/.work/
 /site/dist/
+
+# Codex の手元の配線と状態（looptrack issue init がこの端末に書くもの）
+.codex/.looptrack-freshness/
+.codex/hooks.json
+/AGENTS.md

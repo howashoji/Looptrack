@@ -23,6 +23,32 @@ Nothing yet.
 
 まだありません。
 
+## [1.5.0] - 2026-11-05
+
+1.5.0 changes one session-start notice. No migrations were added after
+1.4.0, so upgrading from 1.4.0 needs no extra steps.
+
+### Changed
+
+- When something can be cleaned up, the session-start notice about worktrees
+  now asks the agent to check with you in its first reply: it lists what
+  `looptrack worktree prune` would delete, asks whether to delete it, and runs
+  `prune --yes` only after you agree. On Claude Code it names the question
+  tool, AskUserQuestion. Worktrees about to lose uncommitted work are never
+  offered for deletion; they appear in the same question as ones to look
+  into. The hook itself still deletes nothing.
+- The notice now counts merged branches the same way `looptrack worktree prune`
+  does, so a branch whose upstream still exists is no longer counted.
+
+---
+
+1.5.0 ではセッション冒頭の知らせを 1 つ変えました。1.4.0 の後に足したマイグレーションは無いので、1.4.0 から上げるときに追加の手順は要りません。
+
+### 変更
+
+- 片付けられるものがあるときは最初の返答で利用者に確かめるよう作業ツリーのセッション冒頭の知らせが AI に頼むようになりました。AI は `looptrack worktree prune` で消える対象を示して消すかを聞き、了承を得てから `prune --yes` を実行します。Claude Code では質問のツール AskUserQuestion を名指しします。未コミットの変更が失われかけている作業ツリーは消す候補に入れず、同じ問いで調べる候補として並べます。hook 自身はこれまでどおり何も消しません。
+- 知らせの取り込み済みのブランチの件数を `looptrack worktree prune` と同じ判定で数えます。追い先が残っているブランチは数えません。
+
 ## [1.4.0] - 2026-11-04
 
 1.4.0 adds one feature for administrators. No migrations were added after
@@ -2116,7 +2142,8 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけでリモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの・まだ手を動かす必要がある所・うまくいかないときに確かめることも書いています。手を動かす所は auto モードでも Claude Code で要るインストールのコマンド・認可の後の Copilot CLI の 2 回目の再起動・再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - 新しいガイド「更新」。更新するとき何が自動で何が手作業かは、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/howashoji/looptrack/releases/tag/v1.5.0
 [1.4.0]: https://github.com/howashoji/looptrack/releases/tag/v1.4.0
 [1.3.0]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0
 [1.3.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0-rc.1

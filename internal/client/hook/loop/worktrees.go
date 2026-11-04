@@ -7,6 +7,9 @@ package loop
 //
 //   - **何も消さない。**知らせるだけ（prune は呼ばない）。消すのは利用者か、一覧を見た AI が明示的に打ったときだけ。
 //   - 片付けられるものも、中身が失われかけているものも無ければ**何も出さない**（毎回出ると読まれなくなる）。
+//   - 消せるもの（prune の対象）があるときは、最初の返答で利用者に消すかを問うよう AI に頼む。
+//     件数を知らせるだけでは、AI は利用者に聞かないまま作業に入り、ブランチが溜まり続けた。
+//     SessionStart の hook は利用者に直接は問えないので、AI への文を足すことしかできない。
 //   - git が無い・git のリポジトリでない・git が失敗する・時間がかかるときは、黙って何もしない（fail-open）。
 
 import (
@@ -59,7 +62,7 @@ func SessionStartWorktrees(ctx context.Context, ev hookio.Event) (hookio.Result,
 	if err != nil {
 		return hookio.Result{}, nil // git が無い・リポジトリでない。黙る
 	}
-	note := worktreeNote(e.lang(), rep, minAge)
+	note := worktreeNote(e.lang(), rep, minAge, askTool(ev))
 	if note == "" {
 		return hookio.Result{}, nil
 	}
@@ -70,7 +73,9 @@ func SessionStartWorktrees(ctx context.Context, ev hookio.Event) (hookio.Result,
 //
 // 出すのは 2 つだけ: 片付けられるものが何件か、中身が失われかけているものが何件か。
 // 失われかけているもの（日をまたいだ未コミットの変更）は、消さずに残すだけだと忘れられるので、名前まで出す。
-func worktreeNote(lang i18n.Lang, rep *worktree.Report, minAge time.Duration) string {
+//
+// 消せるものが 1 件以上あるときだけ、利用者に消すかを問う指示を足す。tool は質問のツールの名前で、空なら名指ししない。
+func worktreeNote(lang i18n.Lang, rep *worktree.Report, minAge time.Duration, tool string) string {
 	var can, losing []worktree.Entry
 	for _, e := range rep.Entries {
 		if e.Main {
@@ -83,9 +88,10 @@ func worktreeNote(lang i18n.Lang, rep *worktree.Report, minAge time.Duration) st
 			can = append(can, e)
 		}
 	}
+	// prune と同じ判定で数える（追い先の残るブランチは prune が消さないので、数えると件数が合わない）
 	merged := 0
 	for _, b := range rep.Branches {
-		if b.Merged {
+		if ok, _ := b.Removable(lang); ok {
 			merged++
 		}
 	}
@@ -122,7 +128,27 @@ func worktreeNote(lang i18n.Lang, rep *worktree.Report, minAge time.Duration) st
 	}
 	b.WriteString(i18n.T(lang, "loop.worktrees.how") + "\n")
 	b.WriteString(i18n.T(lang, "loop.worktrees.warn") + "\n")
+	if len(can) > 0 || merged > 0 {
+		if tool != "" {
+			b.WriteString(i18n.T(lang, "loop.worktrees.ask.tool", "tool", tool) + "\n")
+		} else {
+			b.WriteString(i18n.T(lang, "loop.worktrees.ask.plain") + "\n")
+		}
+		if len(losing) > 0 {
+			b.WriteString(i18n.T(lang, "loop.worktrees.ask.losing") + "\n")
+		}
+		b.WriteString(i18n.T(lang, "loop.worktrees.ask.then") + "\n")
+	}
 	return b.String()
+}
+
+// askTool は利用者に問うときの質問のツールの名前。名前を確かめてある Claude Code の配線だけが返す
+// （Codex・Copilot は名前を確かめていないので、名指しせずに質問の形で聞かせる）。
+func askTool(ev hookio.Event) string {
+	if ev.Agent == hookio.ClaudeCode && !ev.Foreign {
+		return "AskUserQuestion"
+	}
+	return ""
 }
 
 // shortName は作業ツリーを短く指す言葉（ブランチ名。無ければパスの末尾）。
