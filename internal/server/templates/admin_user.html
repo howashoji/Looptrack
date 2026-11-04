@@ -5,6 +5,7 @@
   <h1>{{.Target.Login}}{{if .Target.DisplayName}}{{T .Lang "server.web.admin_user.display_name" "name" .Target.DisplayName}}{{end}}</h1>
   <p class="muted">{{T .Lang "server.web.admin_user.role" "role" .Target.Role}}{{T .Lang "server.web.admin_user.sep"}}{{T .Lang "server.web.admin_user.totp"}}{{if .Target.TOTPEnabled}}{{T .Lang "server.web.admin_users.totp_on"}}{{else}}{{T .Lang "server.web.admin_users.totp_off"}}{{end}}{{T .Lang "server.web.admin_user.sep"}}{{if .Target.Disabled}}<strong>{{T .Lang "server.web.admin_users.state_disabled"}}</strong>{{else}}{{T .Lang "server.web.admin_users.state_enabled"}}{{end}}{{T .Lang "server.web.admin_user.sep"}}{{T .Lang "server.web.admin_user.last_login"}}{{.LastLogin}}</p>
   {{template "messages" .}}
+  {{template "generated_password" .}}
   {{template "replacement" .}}
   {{$act := printf "%s/admin/users/%s" base .Target.Login}}
 
@@ -31,8 +32,9 @@
     </div>
     <form method="post" action="{{$act}}/password" class="narrow">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label>{{T .Lang "server.web.account.new_password" "n" .MinPassword}}<input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
-      <label>{{T .Lang "server.web.account.new_password_confirm"}}<input type="password" name="confirm" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <label>{{T .Lang "server.web.account.new_password" "n" .MinPassword}}<input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}"></label>
+      <label>{{T .Lang "server.web.account.new_password_confirm"}}<input type="password" name="confirm" autocomplete="new-password" minlength="{{.MinPassword}}"></label>
+      {{template "generate_choice" .}}
       <button type="submit">{{T .Lang "server.web.admin_user.password_submit"}}</button>
     </form>
     {{end}}

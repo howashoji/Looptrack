@@ -22,12 +22,17 @@ Page: `<server URL>/admin/users`
 - You can't change your own role or disable yourself. Any change that would leave no active administrator is refused too.
 - Disabling a user ends their sessions. Their tokens stop working as well.
 - Each user changes their own password, and issues or revokes their own access tokens, at `<server URL>/account`.
+- When adding a user or resetting a password, you can tick "Generate the password" instead of typing one.
+  The page shows the generated password once, right after the action. Copy it then and pass it on to the user over a safe channel.
+  It is never written to the logs, and the database keeps only its hash.
 
 Admin commands do the same:
 
 ```bash
 looptrack user list
 looptrack user add alice --name "Alice"          # prompts for the password twice
+looptrack user add bob --generate                # generates the password and prints it once
+looptrack user passwd alice --generate           # resets with a generated password
 looptrack user disable alice
 looptrack user totp-reset alice
 ```

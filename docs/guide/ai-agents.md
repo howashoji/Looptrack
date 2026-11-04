@@ -119,9 +119,9 @@ Here are the MCP tools:
 With MCP only, the agent runs the verify commands one by one in its local shell and sends the results with `report_verify`.
 Those records carry a "self-reported via MCP" mark. That's how people tell them apart from CLI records.
 
-## Working from several machines
+## Working with several people and machines
 
-You can work on one project from two machines (at home and at work, say) with your agents.
+Several people, or one person on two machines (at home and at work, say), can work on one project with their agents.
 What no vendor lets you do is carry on **one conversation** on two machines at the same time: you can only take turns, or fork it.
 So split the work by issue and branch, not by conversation.
 

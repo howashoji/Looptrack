@@ -205,6 +205,24 @@ func (s *Server) hashNewPassword(ctx context.Context, pw, confirm string) (strin
 	return hash, nil
 }
 
+// adminNewPassword は管理者のフォームの新しいパスワードをハッシュにする。generate が選ばれていれば
+// auth.GeneratePassword で生成し（入力欄は使わない）、平文を generated に返す。平文は POST の応答に 1 回だけ描き、
+// ログ・リダイレクト・cookie には載せない。選ばれていなければ 2 回の入力を照合する（これまでの経路）。
+func (s *Server) adminNewPassword(ctx context.Context, r *http.Request) (hash, generated string, err error) {
+	if r.PostFormValue("generate") == "" {
+		hash, err = s.hashNewPassword(ctx, r.PostFormValue("password"), r.PostFormValue("confirm"))
+		return hash, "", err
+	}
+	pw, err := auth.GeneratePassword()
+	if err != nil {
+		return "", "", i18n.Errorf("server.web.account.err_password_unset")
+	}
+	if hash, err = s.hashNewPassword(ctx, pw, pw); err != nil {
+		return "", "", err
+	}
+	return hash, pw, nil
+}
+
 func (s *Server) accountPassword(w http.ResponseWriter, r *http.Request, p *principal) {
 	ctx := r.Context()
 	ok, locked, err := s.verifyCurrentPassword(r, p.User, r.PostFormValue("current"))
@@ -359,9 +377,20 @@ type adminResult struct {
 	Notice   string
 	Error    string
 	NewToken string
-	status   int
-	form     map[string]string // 追加に失敗したときの入力の戻し（パスワード以外）
-	pending  *replacementForm  // 参加を外すのに代わりの担当者が要るとき
+	// Generated は自動生成したパスワードの平文と、その持ち主の login。生成した POST の応答にだけ描く。
+	Generated, GeneratedFor string
+	status                  int
+	form                    map[string]string // 追加に失敗したときの入力の戻し（パスワード以外）
+	pending                 *replacementForm  // 参加を外すのに代わりの担当者が要るとき
+}
+
+// noStoreGenerated は、自動生成したパスワードを描く応答にキャッシュさせないヘッダを付ける
+// （ServeHTTP が全画面に付けるものと同じ値。平文の載る応答では前段の設定に頼らず、ここでも明示する）。
+func noStoreGenerated(w http.ResponseWriter, res adminResult) {
+	if res.Generated != "" {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+	}
 }
 
 func (s *Server) adminUsersPage(w http.ResponseWriter, r *http.Request, p *principal) {
@@ -395,10 +424,12 @@ func (s *Server) renderAdminUsers(w http.ResponseWriter, r *http.Request, p *pri
 		s.internalError(w, r, err)
 		return
 	}
+	noStoreGenerated(w, res)
 	s.render(w, r, status, "admin_users.html", map[string]any{
 		"TwoFactorLabel": store.TwoFactorLabel(reqLang(r), policy), "TwoFactorRequired": policy == store.TwoFactorRequired,
 		"User": p.User, "CSRF": p.Session.CSRFToken, "Users": rows, "Notice": res.Notice, "Error": res.Error,
 		"Form": form, "MinPassword": auth.MinPasswordLen,
+		"Generated": res.Generated, "GeneratedFor": res.GeneratedFor,
 	})
 }
 
@@ -431,7 +462,7 @@ func (s *Server) adminCreateUser(w http.ResponseWriter, r *http.Request, p *prin
 		s.internalError(w, r, err)
 		return
 	}
-	hash, hashErr := s.hashNewPassword(ctx, r.PostFormValue("password"), r.PostFormValue("confirm"))
+	hash, generated, hashErr := s.adminNewPassword(ctx, r)
 	if hashErr != nil {
 		bad(i18n.Text(reqLang(r), hashErr))
 		return
@@ -440,14 +471,15 @@ func (s *Server) adminCreateUser(w http.ResponseWriter, r *http.Request, p *prin
 		s.internalError(w, r, err)
 		return
 	}
-	s.cfg.Logger.Info("admin", "action", "user_create", "actor", p.User.Login, "target", login, "role", role)
+	s.cfg.Logger.Info("admin", "action", "user_create", "actor", p.User.Login, "target", login, "role", role, "password_generated", generated != "")
 	notice := i18n.T(lang, "server.web.admin.notice_user_added", "login", login, "role", role)
 	if required, err := s.twoFactorRequired(ctx); err == nil && !required {
 		notice += i18n.T(lang, "server.web.admin.notice_totp_optional")
 	} else {
 		notice += i18n.T(lang, "server.web.admin.notice_totp_required")
 	}
-	s.renderAdminUsers(w, r, p, adminResult{Notice: notice + i18n.T(lang, "server.web.admin.notice_grant_projects")})
+	s.renderAdminUsers(w, r, p, adminResult{Notice: notice + i18n.T(lang, "server.web.admin.notice_grant_projects"),
+		Generated: generated, GeneratedFor: login})
 }
 
 // targetUser はパスの {login} の利用者。見つからなければ 404 を返して false。
@@ -511,11 +543,13 @@ func (s *Server) renderAdminUser(w http.ResponseWriter, r *http.Request, p *prin
 	if status == 0 {
 		status = http.StatusOK
 	}
+	noStoreGenerated(w, res)
 	s.render(w, r, status, "admin_user.html", map[string]any{
 		"User": p.User, "CSRF": p.Session.CSRFToken, "Target": u, "LastLogin": s.fmtWebTime(u.LastLoginAt),
 		"Self": u.ID == p.User.ID, "Projects": projects, "MemberRoles": memberRoles, "Tokens": tokens,
 		"Notice": res.Notice, "Error": res.Error, "MinPassword": auth.MinPasswordLen, "Pending": res.pending,
 		"RevokeAction": s.cfg.BasePath + "/admin/users/" + u.Login + "/revoke",
+		"Generated":    res.Generated, "GeneratedFor": res.GeneratedFor,
 	})
 }
 
@@ -580,7 +614,7 @@ func (s *Server) adminUserAction(w http.ResponseWriter, r *http.Request, p *prin
 			done(i18n.T(lang, "server.web.admin.notice_enabled"))
 		}
 	case "password":
-		hash, hashErr := s.hashNewPassword(ctx, r.PostFormValue("password"), r.PostFormValue("confirm"))
+		hash, generated, hashErr := s.adminNewPassword(ctx, r)
 		if hashErr != nil {
 			lang := reqLang(r)
 			fail(http.StatusBadRequest, i18n.T(lang, "server.web.account.err_password_unchanged", "reason", hashErr))
@@ -590,7 +624,13 @@ func (s *Server) adminUserAction(w http.ResponseWriter, r *http.Request, p *prin
 			s.internalError(w, r, err)
 			return
 		}
-		done(i18n.T(lang, "server.web.admin.notice_password_reset"))
+		if generated == "" {
+			done(i18n.T(lang, "server.web.admin.notice_password_reset"))
+			return
+		}
+		s.cfg.Logger.Info("admin", "action", action, "actor", p.User.Login, "target", u.Login, "password_generated", true)
+		s.renderAdminUser(w, r, p, u, adminResult{Notice: i18n.T(lang, "server.web.admin.notice_password_reset"),
+			Generated: generated, GeneratedFor: u.Login})
 	case "totp-reset":
 		// 未登録の利用者は更新行が 0 件（ErrNotFound）になるが、結果は同じなので成功として扱う
 		if err := store.ResetTOTP(ctx, s.db, u.ID); err != nil && !errors.Is(err, store.ErrNotFound) {

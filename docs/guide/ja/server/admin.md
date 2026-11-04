@@ -22,12 +22,17 @@
 - 自分自身の役割の変更と無効化はできません。有効な管理者が 0 人になる変更も拒否されます。
 - 無効化するとその人のセッションは破棄。トークンも使えなくなります。
 - パスワードの変更とアクセストークンの発行・失効は、各自が `<サーバの URL>/account` で行います。
+- 利用者の追加とパスワードの再設定では、入力する代わりに「パスワードを自動生成する」を選べます。
+  生成した値は操作の直後の画面に 1 回だけ出ます。その場で控えて本人に安全な方法で伝えてください。
+  ログには残らず、DB に置くのはハッシュだけです。
 
 同じことは管理コマンドでもできます。
 
 ```bash
 looptrack user list
 looptrack user add alice --name "Alice"          # パスワードを 2 回入力する
+looptrack user add bob --generate                # パスワードを生成して 1 回だけ表示する
+looptrack user passwd alice --generate           # 生成したパスワードで再設定する
 looptrack user disable alice
 looptrack user totp-reset alice
 ```

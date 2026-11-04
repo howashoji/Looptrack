@@ -196,7 +196,7 @@ What a comment means comes from its leading keyword.
 - Put the keyword at the very start, with no leading spaces or line breaks. Case doesn't matter for the English keywords. The Japanese keywords also accept a full-width colon (`：`).
 - On `判断:`, move the issue to Done (`close --comment "判断: …"`). On `差し戻し:`, move it to Todo (`status <ID> Todo --comment "差し戻し: …"`).
 - A `フィードバック:` comment counts as answered once a comment without a keyword, or a status change, follows it.
-- A `Session digest:` comment hands the context of the work to a session on another machine, and does not count as an answer to `フィードバック:`. How to write and read one is in [Working from several machines](ai-agents.md#session-digests).
+- A `Session digest:` comment hands the context of the work to a session on another machine, and does not count as an answer to `フィードバック:`. How to write and read one is in [Working with several people and machines](ai-agents.md#session-digests).
 - `looptrack session transcript`, which carries the transcript itself to another machine of yours, leaves no comment. How to use it is in [Carrying the raw transcript](ai-agents.md#carrying-the-raw-transcript).
 - A comment that looks like it carries a credential (`token=`, `Bearer …`, a private key and the like) is refused with 422 `comment_secret`, whichever way it is sent. The reason names only the line number and the rule. Replace the value with `***` and send it again. This is the project rule `comment.reject_secret`, on by default ([Administration](server/admin.md#setting-project-rules)).
 - Don't save it all up and write only the conclusion at the end. Write the cause when you find it, and the history survives even if the work stops half-way.

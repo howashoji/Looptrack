@@ -23,6 +23,28 @@ Nothing yet.
 
 まだありません。
 
+## [1.4.0] - 2026-11-04
+
+1.4.0 adds one feature for administrators. No migrations were added after
+1.3.0, so upgrading from 1.3.0 needs no extra steps.
+
+### Added
+
+- Administrators can have a password generated instead of typing one. Tick
+  the new box when adding a user or resetting a password on the admin pages,
+  or pass `--generate` to `looptrack user add` and `looptrack user passwd`.
+  The generated password is shown once, in the response to that action only
+  (the command prints it to standard output). It never goes into the logs or
+  a URL, and the database keeps only its hash.
+
+---
+
+1.4.0 では管理者向けの機能を 1 つ足しました。1.3.0 の後に足したマイグレーションは無いので、1.3.0 から上げるときに追加の手順は要りません。
+
+### 追加
+
+- 管理者がパスワードを入力せずに自動生成できるようにしました。管理画面では利用者の追加とパスワードの再設定の欄に選択肢があり、管理コマンドでは `looptrack user add` と `looptrack user passwd` に `--generate` を付けます。生成した値はその操作の応答に 1 回だけ出ます（コマンドは標準出力に出します）。ログや URL には残らず、DB に置くのはハッシュだけです。
+
 ## [1.3.0] - 2026-11-01
 
 1.3.0 is a stable release. The changes below are relative to `v1.3.0-rc.1`,
@@ -2094,7 +2116,8 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけでリモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの・まだ手を動かす必要がある所・うまくいかないときに確かめることも書いています。手を動かす所は auto モードでも Claude Code で要るインストールのコマンド・認可の後の Copilot CLI の 2 回目の再起動・再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - 新しいガイド「更新」。更新するとき何が自動で何が手作業かは、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/howashoji/looptrack/releases/tag/v1.4.0
 [1.3.0]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0
 [1.3.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0-rc.1
 [1.2.0]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0

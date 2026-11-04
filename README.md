@@ -96,7 +96,7 @@ What you get out of the box:
   session on the other machine starts from it. A project can also turn on
   carrying the raw transcript to your other machine, where it opens as a fork
   and nothing is appended to the original (`looptrack session transcript`). See
-  [Working from several machines](docs/guide/ai-agents.md#working-from-several-machines).
+  [Working with several people and machines](docs/guide/ai-agents.md#working-with-several-people-and-machines).
 
 ## Getting started
 

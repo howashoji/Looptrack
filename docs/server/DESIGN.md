@@ -445,6 +445,7 @@ compose は compose.yaml の `environment` に `LOOPTRACK_TRANSCRIPT_DIR: /data/
 | login の案内 | ブラウザでのログインと、発行したトークンを貼る login のコマンドは、setup が置いた looptrack の絶対パス（`"$HOME/.local/bin/looptrack"`・Windows は `& (Join-Path $env:LOCALAPPDATA 'Programs\looptrack\looptrack.exe')`）に `--url` を付けて示します。サーバは利用者の OS を知らないので、配っている OS ごとに両方を並べます。組み方は setup の手順と同じ（`goSetup.run`）で、配布ディレクトリにどの OS 向けも無ければ PATH の `looptrack` です |
 | 失効 | 一覧には PAT と OAuth の両方が出ます。`user_id` の条件つきの UPDATE で失効させるので、他人の ID や失効済みのものは 404 で何も変えません。OAuth のアクセストークンを失効させると、対の更新トークンも使えなくなります（§3-2） |
 | 利用者管理 | 追加（ログイン名は英数字と `. _ -`・初期パスワード・役割 admin / member）・役割の変更・無効化 / 有効化・パスワードの再設定・TOTP のリセット・プロジェクト権限（viewer / editor / admin / 解除）・トークンの失効ができます。無効化するとセッションを破棄し、トークンも認証時に利用者の無効を見て 401 にします |
+| パスワードの自動生成 | 管理者は追加と再設定で、入力の代わりに自動生成を選べます（フォームの `generate`・管理コマンドの `looptrack user add\|passwd <login> --generate`）。規則は `auth.GeneratePassword` の 1 か所にあり、画面とコマンドはこれを呼びます。`crypto/rand` から 56 文字（読み違えやすい `0 O o 1 l I` と記号を除く）を一様に選び、長さは `auth.GeneratedPasswordLen`（20）で `auth.MinPasswordLen` 以上です。平文は生成した POST の応答に直接描き、リダイレクトの URL・フラッシュの cookie・ログ（`password_generated=true` だけを出す）には載せません。応答には `Cache-Control: no-store` を付けます。コマンドは保存の後に標準出力へ 1 回だけ出します。DB に置くのはハッシュだけです。生成を選んだときは入力欄の値を使いません |
 | 自己防衛 | 管理画面から自分自身の役割変更・無効化・TOTP リセット・パスワード再設定はできません（自分のパスワードはアカウント設定で変えます）。有効な管理者が 0 人になる変更も拒否します |
 | 記録 | 管理操作とトークンの発行・失効は、サーバのログ（JSON）に操作者・対象・操作を出します。秘密は出しません |
 | 初回 | 最初の管理者だけは、サーバ上で `looptrack user add … --admin --two-factor required\|optional` を実行して作ります。二段階認証を必須にするか任意にするかもここで決めます（§2-1「二段階認証の設定」・DEPLOY.md） |
