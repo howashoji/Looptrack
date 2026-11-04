@@ -311,6 +311,7 @@ exits 0.
 
 With the loop layer installed, a session-start hook tells you when there's something to clean up or
 something about to be lost, and says nothing otherwise. It never deletes anything.
+When something can be deleted, it asks the agent to check with you in its first reply, and nothing goes without your agreement.
 Don't want the notice? Set `LOOPTRACK_LOOP_WORKTREE_NOTICE=0`.
 
 ## Things not to do
