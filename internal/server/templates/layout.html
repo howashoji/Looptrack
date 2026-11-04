@@ -104,3 +104,17 @@
 {{if .Notice}}<p class="notice" role="status">{{.Notice}}</p>{{end}}
 {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
 {{end}}
+
+{{/* 自動生成したパスワード。生成した POST の応答にだけ描く（利用者の追加と再設定の両方の画面） */}}
+{{define "generated_password"}}
+{{if .Generated}}
+<section class="panel created">
+  <h2>{{T .Lang "server.web.admin.generated_h2" "login" .GeneratedFor}}</h2>
+  <p><strong>{{T .Lang "server.web.account.token_created_warn"}}</strong>{{T .Lang "server.web.admin.generated_hint"}}</p>
+  <label>{{T .Lang "server.web.admin.generated_label"}}<input class="mono" readonly value="{{.Generated}}" autocomplete="off" data-generated-password></label>
+</section>
+{{end}}
+{{end}}
+
+{{/* 自動生成を選ぶ欄。選ぶと入力欄は使わない（入力欄の required は外し、空の入力はサーバが拒む） */}}
+{{define "generate_choice"}}<label class="choice"><input type="checkbox" name="generate" value="1">{{T .Lang "server.web.admin.generate_choice"}}</label>{{end}}

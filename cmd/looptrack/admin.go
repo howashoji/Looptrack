@@ -46,6 +46,7 @@ func userCmd(args []string) int {
 		name := fs.String("name", "", i18n.T(lang, "cmd.arg.display_name"))
 		admin := fs.Bool("admin", false, i18n.T(lang, "cmd.arg.user.admin"))
 		twoFactor := fs.String("two-factor", "", i18n.T(lang, "cmd.arg.user.two_factor"))
+		generate := fs.Bool("generate", false, i18n.T(lang, "cmd.arg.user.generate"))
 		login, err := oneArg(fs, args[1:], i18n.T(lang, "cmd.word.login"))
 		if err != nil {
 			return fail(err)
@@ -54,7 +55,7 @@ func userCmd(args []string) int {
 		if err := checkFirstUserTwoFactor(ctx, db, lang, *twoFactor); err != nil {
 			return fail(err)
 		}
-		hash, err := readNewPassword(lang)
+		hash, generated, err := newPasswordHash(lang, *generate, readNewPassword)
 		if err != nil {
 			return fail(err)
 		}
@@ -67,12 +68,19 @@ func userCmd(args []string) int {
 			return fail(err)
 		}
 		fmt.Println(msg)
+		printGeneratedPassword(os.Stdout, lang, generated)
 	case "passwd":
-		u, err := userArg(ctx, db, args[1:])
+		fs := flag.NewFlagSet("user passwd", flag.ExitOnError)
+		generate := fs.Bool("generate", false, i18n.T(lang, "cmd.arg.user.generate"))
+		login, err := oneArg(fs, args[1:], i18n.T(lang, "cmd.word.login"))
 		if err != nil {
 			return fail(err)
 		}
-		hash, err := readNewPassword(lang)
+		u, err := userArg(ctx, db, []string{login})
+		if err != nil {
+			return fail(err)
+		}
+		hash, generated, err := newPasswordHash(lang, *generate, readNewPassword)
 		if err != nil {
 			return fail(err)
 		}
@@ -80,6 +88,7 @@ func userCmd(args []string) int {
 			return fail(err)
 		}
 		fmt.Println(i18n.T(lang, "cmd.user.password_changed", "login", u.Login))
+		printGeneratedPassword(os.Stdout, lang, generated)
 	case "list":
 		users, err := store.ListUsers(ctx, db)
 		if err != nil {
@@ -321,6 +330,30 @@ func userArg(ctx context.Context, db store.Queryer, args []string) (store.User, 
 		return u, i18n.Wrapf(err, "cmd.err.user", "login", args[0])
 	}
 	return u, nil
+}
+
+// newPasswordHash は新しいパスワードのハッシュを返す。generate なら auth.GeneratePassword で生成して標準入力を読まず、
+// 平文を generated に返す（呼び出し側が保存の後に 1 回だけ出す）。そうでなければ read で入力を受ける（これまでの経路）。
+func newPasswordHash(lang i18n.Lang, generate bool, read func(i18n.Lang) (string, error)) (hash, generated string, err error) {
+	if !generate {
+		hash, err = read(lang)
+		return hash, "", err
+	}
+	pw, err := auth.GeneratePassword()
+	if err != nil {
+		return "", "", err
+	}
+	if hash, err = auth.HashPassword(pw); err != nil {
+		return "", "", err
+	}
+	return hash, pw, nil
+}
+
+// printGeneratedPassword は生成したパスワードを w（標準出力）に 1 回だけ出す。生成していなければ何も出さない。
+func printGeneratedPassword(w io.Writer, lang i18n.Lang, generated string) {
+	if generated != "" {
+		fmt.Fprintln(w, i18n.T(lang, "cmd.user.generated_password", "password", generated))
+	}
 }
 
 // readNewPassword は端末なら 2 回入力（表示しない）、パイプなら 1 行読む。

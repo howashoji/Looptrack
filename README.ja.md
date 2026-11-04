@@ -73,7 +73,7 @@ Claude Code ならプロジェクトの `.claude/settings.json` に 2 行足す�
 
 端末を替えても AI の作業の文脈は途切れません。AI は持っているイシューにセッション要約を残し（`looptrack session digest`）、別の端末のセッションはそこから始めます。
 プロジェクトで有効にすれば、会話記録そのものも自分の別の端末へ運べます。運んだ記録はそこで fork として開き、元の記録には書き足しません（`looptrack session transcript`）。
-詳しくは利用者ガイドの[複数の端末で使う](docs/guide/ja/ai-agents.md#複数の端末で使う)を見てください。
+詳しくは利用者ガイドの[複数の利用者・端末で並行して作業する](docs/guide/ja/ai-agents.md#複数の利用者端末で並行して作業する)を見てください。
 
 ## 始め方
 

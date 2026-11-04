@@ -3,6 +3,7 @@
 <main class="wide">
   <h1>{{T .Lang "server.web.common.admin_users"}}</h1>
   {{template "messages" .}}
+  {{template "generated_password" .}}
   <p class="muted">{{T .Lang "server.web.admin_users.two_factor"}}<strong>{{.TwoFactorLabel}}</strong>{{T .Lang "server.web.admin_users.two_factor_link_before"}}<a href="{{base}}/admin/security">{{T .Lang "server.web.admin_users.two_factor_link"}}</a>{{T .Lang "server.web.admin_users.two_factor_link_after"}}</p>
   <section class="panel">
     <table class="list">
@@ -27,8 +28,9 @@
         <option value="member"{{if ne .Form.role "admin"}} selected{{end}}>{{T .Lang "server.web.admin_users.role_member"}}</option>
         <option value="admin"{{if eq .Form.role "admin"}} selected{{end}}>{{T .Lang "server.web.admin_users.role_admin"}}</option>
       </select></label>
-      <label>{{T .Lang "server.web.admin_users.initial_password" "n" .MinPassword}}<input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
-      <label>{{T .Lang "server.web.admin_users.initial_password_confirm"}}<input type="password" name="confirm" autocomplete="new-password" minlength="{{.MinPassword}}" required></label>
+      <label>{{T .Lang "server.web.admin_users.initial_password" "n" .MinPassword}}<input type="password" name="password" autocomplete="new-password" minlength="{{.MinPassword}}"></label>
+      <label>{{T .Lang "server.web.admin_users.initial_password_confirm"}}<input type="password" name="confirm" autocomplete="new-password" minlength="{{.MinPassword}}"></label>
+      {{template "generate_choice" .}}
       <button type="submit">{{T .Lang "server.web.admin_users.add_submit"}}</button>
     </form>
     <p class="muted">{{T .Lang "server.web.admin_users.add_note"}}{{if .TwoFactorRequired}}{{T .Lang "server.web.admin_users.add_note_required"}}{{else}}{{T .Lang "server.web.admin_users.add_note_optional"}}{{end}}</p>

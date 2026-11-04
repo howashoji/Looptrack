@@ -23,6 +23,25 @@ Nothing yet.
 
 まだありません。
 
+## [1.4.0] - 2026-11-04
+
+1.4.0 adds one feature to the user admin page.
+
+### Added
+
+- On the user admin page (`/admin/users`), an administrator can now have a
+  password generated instead of typing one, both when adding a user and when
+  resetting a password. The generated password is shown once, in the response
+  to that action only, and the database keeps only its hash.
+
+---
+
+1.4.0 では利用者管理の画面に機能を 1 つ足しました。
+
+### 追加
+
+- 利用者管理の画面（`/admin/users`）で、パスワードを入力せずに自動生成できるようにしました。利用者の追加とパスワードの再設定の両方で選べます。生成した値はその操作の応答に 1 回だけ出て、DB に置くのはハッシュだけです。
+
 ## [1.3.0] - 2026-11-01
 
 1.3.0 is a stable release. The changes below are relative to `v1.3.0-rc.1`,
@@ -1475,7 +1494,8 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定からチャットだけで AI エージェントをつなぐ方法。
 - 新しいガイド「更新」。デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/howashoji/looptrack/releases/tag/v1.4.0
 [1.3.0]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0
 [1.3.0-rc.1]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0-rc.1
 [1.2.0]: https://github.com/howashoji/looptrack/releases/tag/v1.2.0

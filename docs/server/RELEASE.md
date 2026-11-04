@@ -21,9 +21,9 @@
 | ジョブ | いつ | 中身 |
 | -- | -- | -- |
 | `go-lint` | 毎回 | `gofmt -l`（差分があれば失敗）・`go vet ./...`・`go mod tidy -diff`・`govulncheck ./...` |
-| `go-test-linux` | 毎回 | MySQL 8.4 の service コンテナに `LOOPTRACK_TEST_DSN` を向けて `go test -count=1 -v ./...`。**DB を使うテストが省略されたら失敗**にする（省略の文言 `LOOPTRACK_TEST_DSN が未設定` を探す）。run の成否に関わらず全文を artifact `go-test-log` に残す（保持 7 日）。省略された主なテストの集計は全件のうち先頭 20 件を出し、21 件目以降があれば「ほか N 件」を添える。Go 以外の処理系は入れない |
-| `go-test-windows` | 毎回 | Windows で `go test -count=1 -v ./...`（DB なし。DB のテストは SQLite で走り、省略しない）。落ちたら全体を赤にする（2026-09-19 に continue-on-error を外した）。go-test-linux と同じ形で、全文を `go-test.log` に置き画面には `ok`/`FAIL`/`panic:` だけを出す・省略された主なテストの集計を出す（参考。全件のうち先頭 20 件 + 「ほか N 件」）・失敗時は前後を出して exit する。run の成否に関わらず全文を artifact `go-test-log-windows` に残す（保持 7 日）。一時ディレクトリは checkout と同じドライブに置く |
-| `go-test-macos` | 週次・手動の `full` | macOS で `go test -count=1 -v ./...`（DB なし）。重いので毎回は回さない。go-test-linux と同じ形で、全文を `go-test.log` に置き画面には `ok`/`FAIL`/`panic:` だけを出す・省略された主なテストの集計を出す（参考。全件のうち先頭 20 件 + 「ほか N 件」）・失敗時は前後を出して exit する。run の成否に関わらず全文を artifact `go-test-log-macos` に残す（保持 7 日） |
+| `go-test-linux` | 毎回 | MySQL 8.4 の service コンテナに `LOOPTRACK_TEST_DSN` を向けて `go test -count=1 -timeout 25m -v ./...`（`internal/server` の合計が go test の既定の 10 分に届くので延ばす）。**DB を使うテストが省略されたら失敗**にする（省略の文言 `LOOPTRACK_TEST_DSN が未設定` を探す）。run の成否に関わらず全文を artifact `go-test-log` に残す（保持 7 日）。省略された主なテストの集計は全件のうち先頭 20 件を出し、21 件目以降があれば「ほか N 件」を添える。Go 以外の処理系は入れない |
+| `go-test-windows` | 毎回 | Windows で `go test -count=1 -timeout 25m -v ./...`（DB なし。DB のテストは SQLite で走り、省略しない）。落ちたら全体を赤にする（2026-09-19 に continue-on-error を外した）。go-test-linux と同じ形で、全文を `go-test.log` に置き画面には `ok`/`FAIL`/`panic:` だけを出す・省略された主なテストの集計を出す（参考。全件のうち先頭 20 件 + 「ほか N 件」）・失敗時は前後を出して exit する。run の成否に関わらず全文を artifact `go-test-log-windows` に残す（保持 7 日）。一時ディレクトリは checkout と同じドライブに置く |
+| `go-test-macos` | 週次・手動の `full` | macOS で `go test -count=1 -timeout 25m -v ./...`（DB なし）。重いので毎回は回さない。go-test-linux と同じ形で、全文を `go-test.log` に置き画面には `ok`/`FAIL`/`panic:` だけを出す・省略された主なテストの集計を出す（参考。全件のうち先頭 20 件 + 「ほか N 件」）・失敗時は前後を出して exit する。run の成否に関わらず全文を artifact `go-test-log-macos` に残す（保持 7 日） |
 | `desktop-build` | 毎回 | デスクトップ版（`-tags desktop`）の linux/amd64 のビルドと vet、`internal/client/desktop/...` のテスト（通常のビルドに入らないコードの回帰を拾う） |
 | `desktop-cross` | 週次・手動の `full` | デスクトップ版を linux / windows × amd64 / arm64 でビルドと vet（cgo なし） |
 | `desktop-macos` | 週次・手動の `full` | デスクトップ版を macOS の runner で arm64・amd64 ともビルド（cgo。`fyne.io/systray` の Cocoa） |
