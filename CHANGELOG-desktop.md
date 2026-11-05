@@ -23,6 +23,27 @@ Nothing yet.
 
 まだありません。
 
+## [1.5.1] - 2026-11-05
+
+1.5.1 fixes how worktree cleanup decides that a branch is merged.
+
+### Fixed
+
+- `looptrack worktree list` and `prune`, and the session-start notice about
+  worktrees, now count a branch as merged when it is in either the local
+  default branch or its upstream (`origin/main` when no upstream is set).
+  Before, a branch merged only into `origin/main` stayed "not merged yet"
+  while your local `main` was behind. Nothing is fetched; the judgment uses
+  the remote-tracking branch from your last fetch.
+
+---
+
+1.5.1 では作業ツリーの片付けで、ブランチが取り込み済みかの判定を直しました。
+
+### 修正
+
+- `looptrack worktree list`・`prune` と作業ツリーのセッション冒頭の知らせは、手元の既定のブランチかその追い先（設定が無ければ `origin/main`）のどちらかに入っていれば取り込み済みと数えます。手元の `main` が遅れていると、`origin/main` にだけ入ったブランチがいつまでも「未取り込み」で残っていました。fetch はせず、最後に fetch したときの追跡ブランチで判定します。
+
 ## [1.5.0] - 2026-11-05
 
 1.5.0 changes one session-start notice.
@@ -1519,7 +1540,8 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定からチャットだけで AI エージェントをつなぐ方法。
 - 新しいガイド「更新」。デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/howashoji/looptrack/releases/tag/v1.5.1
 [1.5.0]: https://github.com/howashoji/looptrack/releases/tag/v1.5.0
 [1.4.0]: https://github.com/howashoji/looptrack/releases/tag/v1.4.0
 [1.3.0]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0

@@ -580,3 +580,108 @@ func TestPublishedBranchWithoutWorktreeIsKept(t *testing.T) {
 		t.Fatal("リモートに公開されているブランチを消している")
 	}
 }
+
+// behindOrigin は、手元の main を origin/main より遅らせる（push 済みで手元の main だけが古い状態）。
+// origin/main にだけ入ったコミットを指すブランチ only を残し、その SHA を返す。
+func (r *repo) behindOrigin(only string) string {
+	r.t.Helper()
+	r.publish("main")
+	r.git(r.root, "switch", "-q", "-c", only)
+	r.write(only+".txt", only+"\n")
+	r.git(r.root, "add", only+".txt")
+	r.git(r.root, "commit", "-q", "-m", only)
+	r.git(r.root, "push", "-q", "origin", only+":main")
+	r.git(r.root, "switch", "-q", "main")
+	r.git(r.root, "fetch", "-q", "origin")
+	return strings.TrimSpace(r.git(r.root, "rev-parse", only))
+}
+
+// TestMergedIntoOriginOnly は、origin/main にだけ入ったブランチと作業ツリーを取り込み済みと判定すること。
+// 対照として、手元にも origin にも入っていないブランチと作業ツリーは残す。
+func TestMergedIntoOriginOnly(t *testing.T) {
+	r := newRepo(t)
+	sha := r.behindOrigin("remoteonly")
+	if strings.TrimSpace(r.git(r.root, "rev-parse", "origin/main")) != sha {
+		t.Fatalf("前提が崩れています: origin/main が %s を指していない", sha)
+	}
+	if n := strings.TrimSpace(r.git(r.root, "rev-list", "--count", "main..origin/main")); n != "1" {
+		t.Fatalf("前提が崩れています: 手元の main が origin/main より 1 つ遅れていない（%s）", n)
+	}
+	// origin/main にだけ入ったコミットの作業ツリー（追い先なし）
+	wt := filepath.Join(r.root, "wt", "remotewt")
+	r.git(r.root, "worktree", "add", "-q", "--no-track", "-b", "remotewt", wt, "origin/main")
+	r.addWorktree("neitherwt", false)
+	r.git(r.root, "branch", "--no-track", "neither", "neitherwt")
+	for _, n := range []string{"remotewt", "neitherwt"} {
+		r.mark(n, "s", time.Now().Add(-2*time.Hour))
+	}
+
+	rep := r.list(Options{})
+	if want := []string{"refs/heads/main", "refs/remotes/origin/main"}; strings.Join(rep.BaseRefs, " ") != strings.Join(want, " ") {
+		t.Errorf("見る参照 = %v, 期待 %v", rep.BaseRefs, want)
+	}
+	if e := find(t, rep, "remotewt"); !e.Merged || e.MergedInto != "refs/remotes/origin/main" {
+		t.Errorf("origin/main にだけ入った作業ツリーを取り込み済みと見ていない: %+v", e)
+	} else if ok, why := e.Removable(i18n.JA, DefaultMinAge); !ok {
+		t.Errorf("origin/main にだけ入った作業ツリーが片付けられない: %s", why)
+	}
+	if e := find(t, rep, "neitherwt"); e.Merged {
+		t.Errorf("どちらにも入っていない作業ツリーを取り込み済みと見ている: %+v", e)
+	}
+	got := map[string]Branch{}
+	for _, b := range rep.Branches {
+		got[b.Name] = b
+	}
+	if b := got["remoteonly"]; !b.Merged || b.MergedInto != "refs/remotes/origin/main" {
+		t.Errorf("origin/main にだけ入ったブランチを取り込み済みと見ていない: %+v", b)
+	}
+	if b, ok := got["neither"]; !ok || b.Merged {
+		t.Errorf("どちらにも入っていないブランチを取り込み済みと見ている（または一覧に無い）: %+v", b)
+	}
+
+	// prune --yes で実際に消え、対照は残る（git branch -d が断る形）
+	var out, errb bytes.Buffer
+	if code := Main([]string{"prune", "--yes", "--dir", r.root}, &out, &errb, env.FromMap(map[string]string{"LOOPTRACK_LANG": "ja"})); code != 0 {
+		t.Fatalf("終了コード %d: %s\n%s", code, errb.String(), out.String())
+	}
+	branches := " " + strings.Join(strings.Fields(r.git(r.root, "branch", "--format=%(refname:short)")), " ") + " "
+	for _, b := range []string{"remoteonly", "remotewt"} {
+		if strings.Contains(branches, " "+b+" ") {
+			t.Errorf("origin/main にだけ入ったブランチ %s が消えていない: %s\n%s", b, branches, out.String())
+		}
+	}
+	for _, b := range []string{"neither", "neitherwt", "main"} {
+		if !strings.Contains(branches, " "+b+" ") {
+			t.Errorf("消してはいけないブランチ %s を消した: %s", b, branches)
+		}
+	}
+	if _, err := os.Stat(wt); err == nil {
+		t.Error("origin/main にだけ入った作業ツリーが消えていない")
+	}
+}
+
+// TestDeleteBranchRefusesMovedBranch は、調べた後にブランチが動いていたら -D で消さないこと。
+func TestDeleteBranchRefusesMovedBranch(t *testing.T) {
+	r := newRepo(t)
+	sha := r.behindOrigin("moved")
+	r.git(r.root, "switch", "-q", "moved")
+	r.write("more.txt", "more\n")
+	r.git(r.root, "add", "more.txt")
+	r.git(r.root, "commit", "-q", "-m", "more")
+	r.git(r.root, "switch", "-q", "main")
+	o := Options{}
+	o.fill()
+	if err := deleteBranch(o, r.root, "moved", sha, "refs/remotes/origin/main"); err == nil {
+		t.Fatal("動いたブランチを消した")
+	}
+	if !strings.Contains(r.git(r.root, "branch", "--format=%(refname:short)"), "moved") {
+		t.Fatal("動いたブランチが消えている")
+	}
+	// 対照: 動いていなければ消える
+	cur := strings.TrimSpace(r.git(r.root, "rev-parse", "moved"))
+	r.git(r.root, "push", "-q", "origin", "moved:main")
+	r.git(r.root, "fetch", "-q", "origin")
+	if err := deleteBranch(o, r.root, "moved", cur, "refs/remotes/origin/main"); err != nil {
+		t.Fatalf("前提が崩れています: 動いていない取り込み済みのブランチを消せない: %v", err)
+	}
+}
