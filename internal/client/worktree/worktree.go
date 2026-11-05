@@ -55,7 +55,8 @@ type Entry struct {
 	Locked     bool          // git worktree lock されている
 	LockReason string        //
 	Missing    bool          // ディレクトリが無い（git worktree prune の対象）
-	Merged     bool          // 既定のブランチに取り込み済み
+	Merged     bool          // 既定のブランチ（手元か追い先）に取り込み済み
+	MergedInto string        // 取り込み済みと判定した参照（refs/heads/main・refs/remotes/origin/main など）
 	Published  bool          // リモートを追うブランチ（追い先がまだ在る）。常設の作業ツリーとみなして片付けない
 	Dirty      bool          // 未コミットの変更がある（生成物だけの残骸は数えない）
 	JunkOnly   bool          // 未コミットの変更が生成物だけ
@@ -70,8 +71,10 @@ type Entry struct {
 // Branch は作業ツリーを持たないブランチ。
 type Branch struct {
 	Name       string
+	Head       string // ブランチの指すコミット（消す直前に動いていないかを確かめる）
 	Merged     bool
-	Published  bool // リモートを追うブランチ（追い先がまだ在る）
+	MergedInto string // 取り込み済みと判定した参照（Entry.MergedInto と同じ）
+	Published  bool   // リモートを追うブランチ（追い先がまだ在る）
 	LastCommit time.Time
 	Age        time.Duration
 }
@@ -91,9 +94,10 @@ func (b Branch) Removable(lang i18n.Lang) (bool, string) {
 
 // Report は 1 つのリポジトリについて集めたもの。
 type Report struct {
-	Base     string  // 既定のブランチ
-	Root     string  // 本体の作業ツリー（一覧のパスをここからの相対で出すため）
-	Entries  []Entry // 作業ツリー（本体を含む。先頭が本体）
+	Base     string   // 既定のブランチ
+	BaseRefs []string // 取り込み済みかを見る参照（手元の既定のブランチと、その追い先）
+	Root     string   // 本体の作業ツリー（一覧のパスをここからの相対で出すため）
+	Entries  []Entry  // 作業ツリー（本体を含む。先頭が本体）
 	Branches []Branch
 }
 
@@ -166,7 +170,7 @@ func List(o Options) (*Report, error) {
 	if base == "" {
 		base = detectBase(o, mainRoot)
 	}
-	rep := &Report{Base: base, Root: mainRoot}
+	rep := &Report{Base: base, Root: mainRoot, BaseRefs: baseRefs(o, mainRoot, base)}
 
 	out, err := o.Git(mainRoot, "worktree", "list", "--porcelain")
 	if err != nil {
@@ -187,11 +191,54 @@ func List(o Options) (*Report, error) {
 			e.Missing = true
 		}
 		e.Published = e.Branch != "" && pub[e.Branch]
-		fillState(o, &e, mainRoot, gitCommon, base, now)
+		fillState(o, &e, mainRoot, gitCommon, rep.BaseRefs, now)
 		rep.Entries = append(rep.Entries, e)
 	}
-	rep.Branches = listBranches(o, mainRoot, base, rep.Entries, pub, now)
+	rep.Branches = listBranches(o, mainRoot, base, rep.BaseRefs, rep.Entries, pub, now)
 	return rep, nil
+}
+
+// baseRefs は取り込み済みかを見る参照を返す。手元の既定のブランチと、その追い先（設定が無ければ origin/<base>）。
+//
+// どちらに入っていても、コミットは手元の参照に残るので、ブランチを消して失うものは無い。手元だけを見ると、
+// push 済みで手元の main だけが古いとき、取り込み済みのブランチがいつまでも「未取り込み」で残る。
+// fetch はしない（SessionStart の hook でネットワークを待たない）。追跡ブランチが古いと候補が減るだけで、
+// 取り込まれていないものが候補に入ることは無い。
+func baseRefs(o Options, root, base string) []string {
+	if base == "" {
+		return nil
+	}
+	var refs []string
+	add := func(r string) {
+		for _, x := range refs {
+			if x == r {
+				return
+			}
+		}
+		refs = append(refs, r)
+	}
+	if _, err := o.Git(root, "rev-parse", "--verify", "--quiet", "refs/heads/"+base); err == nil {
+		add("refs/heads/" + base)
+	}
+	if s, err := o.Git(root, "rev-parse", "--symbolic-full-name", base+"@{upstream}"); err == nil {
+		if r := strings.TrimSpace(s); strings.HasPrefix(r, "refs/remotes/") {
+			add(r)
+		}
+	}
+	if _, err := o.Git(root, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+base); err == nil {
+		add("refs/remotes/origin/" + base)
+	}
+	return refs
+}
+
+// mergedInto は sha を含む最初の参照を返す。どれにも入っていなければ空。
+func mergedInto(o Options, root, sha string, refs []string) string {
+	for _, r := range refs {
+		if _, err := o.Git(root, "merge-base", "--is-ancestor", sha, r); err == nil {
+			return r
+		}
+	}
+	return ""
 }
 
 // publishedBranches は、リモートを追う設定があり、その追い先がまだ在るブランチを集める。
@@ -246,12 +293,11 @@ func parseWorktreeBlock(blk string) Entry {
 //
 // 「最後に動いていた時刻」は**いちばん先に**読む。git status は index の stat の記録を書き戻すことがあり、
 // 後から読むと、調べたこちらの操作で「いま動いた」ことになってしまう（--no-optional-locks と併せた二重の用心）。
-func fillState(o Options, e *Entry, mainRoot, gitCommon, base string, now time.Time) {
+func fillState(o Options, e *Entry, mainRoot, gitCommon string, refs []string, now time.Time) {
 	e.LastTouch, e.TouchFrom, e.Session = lastTouch(e, gitCommon)
-	if e.Head != "" && base != "" {
-		if _, err := o.Git(mainRoot, "merge-base", "--is-ancestor", e.Head, base); err == nil {
-			e.Merged = true
-		}
+	if e.Head != "" {
+		e.MergedInto = mergedInto(o, mainRoot, e.Head, refs)
+		e.Merged = e.MergedInto != ""
 	}
 	if e.Head != "" {
 		if s, err := o.Git(mainRoot, "log", "-1", "--format=%ct", e.Head); err == nil {
@@ -403,7 +449,7 @@ func worktreeName(o Options, gitCommon, path string) string {
 }
 
 // listBranches は作業ツリーを持たないブランチを集める。
-func listBranches(o Options, mainRoot, base string, entries []Entry, pub map[string]bool, now time.Time) []Branch {
+func listBranches(o Options, mainRoot, base string, refs []string, entries []Entry, pub map[string]bool, now time.Time) []Branch {
 	used := map[string]bool{base: true}
 	for _, e := range entries {
 		if e.Branch != "" {
@@ -420,14 +466,13 @@ func listBranches(o Options, mainRoot, base string, entries []Entry, pub map[str
 		if len(f) != 3 || used[f[0]] {
 			continue
 		}
-		b := Branch{Name: f[0], Published: pub[f[0]]}
+		b := Branch{Name: f[0], Head: f[1], Published: pub[f[0]]}
 		if n, err := strconv.ParseInt(f[2], 10, 64); err == nil {
 			b.LastCommit = time.Unix(n, 0)
 			b.Age = now.Sub(b.LastCommit)
 		}
-		if _, err := o.Git(mainRoot, "merge-base", "--is-ancestor", f[1], base); err == nil {
-			b.Merged = true
-		}
+		b.MergedInto = mergedInto(o, mainRoot, f[1], refs)
+		b.Merged = b.MergedInto != ""
 		bs = append(bs, b)
 	}
 	return bs

@@ -23,6 +23,28 @@ Nothing yet.
 
 まだありません。
 
+## [1.5.1] - 2026-11-05
+
+1.5.1 fixes how worktree cleanup decides that a branch is merged. No migrations
+were added after 1.5.0, so upgrading from 1.5.0 needs no extra steps.
+
+### Fixed
+
+- `looptrack worktree list` and `prune`, and the session-start notice about
+  worktrees, now count a branch as merged when it is in either the local
+  default branch or its upstream (`origin/main` when no upstream is set).
+  Before, a branch merged only into `origin/main` stayed "not merged yet"
+  while your local `main` was behind. Nothing is fetched; the judgment uses
+  the remote-tracking branch from your last fetch.
+
+---
+
+1.5.1 では作業ツリーの片付けで、ブランチが取り込み済みかの判定を直しました。1.5.0 の後に足したマイグレーションは無いので、1.5.0 から上げるときに追加の手順は要りません。
+
+### 修正
+
+- `looptrack worktree list`・`prune` と作業ツリーのセッション冒頭の知らせは、手元の既定のブランチかその追い先（設定が無ければ `origin/main`）のどちらかに入っていれば取り込み済みと数えます。手元の `main` が遅れていると、`origin/main` にだけ入ったブランチがいつまでも「未取り込み」で残っていました。fetch はせず、最後に fetch したときの追跡ブランチで判定します。
+
 ## [1.5.0] - 2026-11-05
 
 1.5.0 changes one session-start notice. No migrations were added after
@@ -2142,7 +2164,8 @@ over MCP. MCP behind nginx no longer stalls.
 - **プロンプトを 1 つ貼るだけでリモートのサーバにつなげます。** 「AI ごとの手引き」のガイドに、Claude Code・Codex・GitHub Copilot（VS Code）・Copilot CLI 向けの貼るだけのプロンプトが加わりました。用意するもの・まだ手を動かす必要がある所・うまくいかないときに確かめることも書いています。手を動かす所は auto モードでも Claude Code で要るインストールのコマンド・認可の後の Copilot CLI の 2 回目の再起動・再起動の前の Codex でのトークンの確認です。プロンプトは `setup` のツールに `project` を渡します。Codex は 1 つの MCP の設定をプロジェクトの間で共有するためです。トークンはエージェントに決して渡しません（サインインには `looptrack issue login --browser` を使う）。
 - 新しいガイド「更新」。更新するとき何が自動で何が手作業かは、CLI（`self-update` と、更新された配布スクリプトについてのお知らせ）・サーバ（`install.sh --upgrade`、または `looptrack setup` だけで用意したサーバ）・利用者に配る looptrack のそれぞれについて説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/howashoji/looptrack/releases/tag/v1.5.1
 [1.5.0]: https://github.com/howashoji/looptrack/releases/tag/v1.5.0
 [1.4.0]: https://github.com/howashoji/looptrack/releases/tag/v1.4.0
 [1.3.0]: https://github.com/howashoji/looptrack/releases/tag/v1.3.0

@@ -289,7 +289,7 @@ looptrack worktree mark --yes    # overwrite it even when another session's mark
 ```
 
 A worktree is removed only if **all** of these hold: it isn't the main worktree, it's merged into
-the default branch, it has no uncommitted changes, it isn't locked, its branch isn't published to a
+the default branch (either your local copy or its upstream, such as `origin/main`), it has no uncommitted changes, it isn't locked, its branch isn't published to a
 remote, and it hasn't moved for at least `--min-age` (30 minutes by default, since another session may
 still be inside it). Anything else is kept, with the reason printed next to it.
 

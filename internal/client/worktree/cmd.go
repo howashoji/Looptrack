@@ -219,13 +219,13 @@ func prune(lang i18n.Lang, o Options, yes bool, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, i18n.T(lang, "worktree.prune.removed", "path", e.Path))
 		removed++
 		if e.Branch != "" && e.Merged {
-			if _, err := o.Git(root, "branch", "-d", e.Branch); err == nil {
+			if err := deleteBranch(o, root, e.Branch, e.Head, e.MergedInto); err == nil {
 				fmt.Fprintln(stdout, i18n.T(lang, "worktree.prune.removed_branch", "name", e.Branch))
 			}
 		}
 	}
 	for _, b := range brs {
-		if _, err := o.Git(root, "branch", "-d", b.Name); err != nil {
+		if err := deleteBranch(o, root, b.Name, b.Head, b.MergedInto); err != nil {
 			fmt.Fprintln(stderr, i18n.T(lang, "worktree.prune.fail_branch", "name", b.Name, "reason", err))
 			failed++
 			continue
@@ -397,4 +397,25 @@ func repoRoot(o Options, rep *Report) string {
 		return filepath.Clean(o.Dir)
 	}
 	return ""
+}
+
+// deleteBranch は取り込み済みのブランチを消す。
+//
+// git branch -d は HEAD か追い先に入っていないと断るので、手元の main が遅れていて origin/main にだけ
+// 入っているブランチは消せない。その場合だけ、ブランチが調べたときのコミットから動いておらず、
+// いまも into に入っていることを確かめ直してから -D で消す（確かめた範囲では失うものが無い）。
+func deleteBranch(o Options, root, name, head, into string) error {
+	_, err := o.Git(root, "branch", "-d", name)
+	if err == nil || head == "" || into == "" {
+		return err
+	}
+	cur, rerr := o.Git(root, "rev-parse", "--verify", "--quiet", "refs/heads/"+name)
+	if rerr != nil || strings.TrimSpace(cur) != head {
+		return err
+	}
+	if _, aerr := o.Git(root, "merge-base", "--is-ancestor", head, into); aerr != nil {
+		return err
+	}
+	_, err = o.Git(root, "branch", "-D", name)
+	return err
 }
