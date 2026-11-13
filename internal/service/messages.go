@@ -133,6 +133,21 @@ func checkMessageBody(body string) error {
 	return nil
 }
 
+// checkMessageTo は宛先の種類と、利用者・セッションの指定の組み合わせを確かめ、前後の空白を除いた種類を返す（連絡とタイムラインが使う）。
+func checkMessageTo(to, user, session string) (string, error) {
+	to = strings.TrimSpace(to)
+	if !slices.Contains([]string{store.MessageToProject, store.MessageToUser, store.MessageToSession}, to) {
+		return "", errm(Invalid, "invalid_argument", i18n.M("service.err.message.to"))
+	}
+	if to == store.MessageToProject && (strings.TrimSpace(user) != "" || strings.TrimSpace(session) != "") {
+		return "", errm(Invalid, "invalid_argument", i18n.M("service.err.message.to_project_only"))
+	}
+	if to == store.MessageToUser && strings.TrimSpace(session) != "" {
+		return "", errm(Invalid, "invalid_argument", i18n.M("service.err.message.to_user_only"))
+	}
+	return to, nil
+}
+
 // cleanMessageSession は宛先のセッション ID を確かめる。
 func cleanMessageSession(v string) (string, error) {
 	v = strings.TrimSpace(v)
@@ -184,15 +199,9 @@ func (s *Service) messageSince(ctx context.Context) (time.Time, error) {
 
 // SendMessage は連絡を送る。Issue を添えたら先にコメントを残す（拒まれたら連絡も送らない。先に連絡を送ると、コメントの拒否で送り直して 2 度届くため）。
 func (s *Service) SendMessage(ctx context.Context, a Actor, in MessageSendInput) (*store.Message, error) {
-	to := strings.TrimSpace(in.To)
-	if !slices.Contains([]string{store.MessageToProject, store.MessageToUser, store.MessageToSession}, to) {
-		return nil, errm(Invalid, "invalid_argument", i18n.M("service.err.message.to"))
-	}
-	if to == store.MessageToProject && (strings.TrimSpace(in.User) != "" || strings.TrimSpace(in.Session) != "") {
-		return nil, errm(Invalid, "invalid_argument", i18n.M("service.err.message.to_project_only"))
-	}
-	if to == store.MessageToUser && strings.TrimSpace(in.Session) != "" {
-		return nil, errm(Invalid, "invalid_argument", i18n.M("service.err.message.to_user_only"))
+	to, err := checkMessageTo(in.To, in.User, in.Session)
+	if err != nil {
+		return nil, err
 	}
 	if err := checkMessageBody(in.Body); err != nil {
 		return nil, err

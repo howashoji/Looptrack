@@ -1,6 +1,6 @@
 //go:build windows
 
-package core
+package detach
 
 import "syscall"
 
@@ -9,7 +9,7 @@ const (
 	createNewProcessGroup = 0x00000200 // CREATE_NEW_PROCESS_GROUP
 )
 
-// detachedAttr はコンソールを持たない新しいプロセスグループで起動する（DETACHED_PROCESS）。
-func detachedAttr() *syscall.SysProcAttr {
+// attr はコンソールを持たない新しいプロセスグループで起動する（DETACHED_PROCESS）。
+func attr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{CreationFlags: detachedProcess | createNewProcessGroup, HideWindow: true}
 }

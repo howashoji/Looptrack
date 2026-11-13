@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/howashoji/looptrack/internal/client/detach"
 	"github.com/howashoji/looptrack/internal/hookio"
 )
 
@@ -57,6 +58,30 @@ func (e *Env) run(ctx context.Context, dir string, extra []string, name string, 
 
 // selfExe は実行中の実行ファイル（テストで差し替える）。
 var selfExe = os.Executable
+
+// spawnSelf は実行中の looptrack を切り離して起動する（Env.Spawn の既定）。looptrack でない実行ファイル（テストの
+// バイナリ）からは起動しない（引数を自分のテストの指定と読んで、テストを走らせ直してしまうため）。
+func spawnSelf(args []string, dir string, environ []string) error {
+	exe, err := selfExe()
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix(strings.ToLower(filepath.Base(exe)), "looptrack") {
+		return errNotLooptrack
+	}
+	return detach.Start(exe, args, nil, dir, environ)
+}
+
+// errNotLooptrack は実行中の実行ファイルが looptrack でない（切り離した起動をしない）。
+var errNotLooptrack = errors.New("not looptrack")
+
+// spawn は Env.Spawn を呼ぶ（nil なら自分を、その時点の Environ で起動する）。
+func (e *Env) spawn(args []string, dir string, extra []string) error {
+	if e.Spawn == nil {
+		return spawnSelf(args, dir, append(append([]string(nil), e.Environ()...), extra...))
+	}
+	return e.Spawn(args, dir, extra)
+}
 
 // issueCLI は issue の CLI の起動のしかた（名前と前に付ける引数）。
 // LOOPTRACK_LOOP_ISSUE_CLI（実行ファイルのパス）→ 実行中の looptrack（looptrack issue）。どちらも無ければ ok = false。

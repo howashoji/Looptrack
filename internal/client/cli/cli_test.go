@@ -136,6 +136,7 @@ func TestNoAPIURLNamesTheCommandGroup(t *testing.T) {
 		args []string
 		want string
 	}{
+		{"timeline", TimelineMain, []string{"list"}, "looptrack timeline list"},
 		{"lease", LeaseMain, []string{"list"}, "looptrack lease list"},
 		{"memory", MemoryMain, []string{"list"}, "looptrack memory list"},
 		{"message", MessageMain, []string{"inbox"}, "looptrack message inbox"},

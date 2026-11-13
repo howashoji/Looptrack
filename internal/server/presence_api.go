@@ -11,7 +11,7 @@ import (
 // 在席（docs/server/DESIGN.md §9-9）の REST と画面。動いているかの判定・権限・検査は service（presence.go）にあり、
 // ここでは HTTP の形だけを決める。セッションは X-Looptrack-Session で受け取る。
 //
-//	POST   /api/v1/projects/{slug}/presence  在席を送る（{agent, machine_label, branch, head_sha, directory}）
+//	POST   /api/v1/projects/{slug}/presence  在席を送る（{agent, machine_label, branch, head_sha, directory, start}。start はセッションの開始の印）
 //	DELETE /api/v1/projects/{slug}/presence  セッションの終わり（在席を外す）
 
 // presenceJSON は動いているセッション 1 本。
@@ -68,6 +68,8 @@ type presenceRequest struct {
 	Branch       string `json:"branch,omitempty"`
 	HeadSHA      string `json:"head_sha,omitempty"`
 	Directory    string `json:"directory,omitempty"`
+	// Start はセッションの開始の印（SessionStart の送信だけが付ける。古いクライアントは送らない）
+	Start bool `json:"start,omitempty"`
 }
 
 // apiReportPresence は POST /projects/{slug}/presence。
@@ -77,7 +79,7 @@ func (s *Server) apiReportPresence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := s.svc.ReportPresence(r.Context(), actor(r), service.PresenceInput{Project: r.PathValue("slug"), Agent: req.Agent, MachineLabel: req.MachineLabel,
-		Branch: req.Branch, HeadSHA: req.HeadSHA, Directory: req.Directory})
+		Branch: req.Branch, HeadSHA: req.HeadSHA, Directory: req.Directory, Start: req.Start})
 	if err != nil {
 		s.serviceError(w, r, err)
 		return

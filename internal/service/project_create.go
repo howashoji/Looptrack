@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/howashoji/looptrack/internal/i18n"
 	"github.com/howashoji/looptrack/internal/store"
@@ -79,6 +80,10 @@ func CreateProjectNoMember(ctx context.Context, q store.Queryer, p store.Project
 	case errors.Is(err, store.ErrProjectExists) || store.IsDuplicateKey(err):
 		return store.Project{}, errm(Conflict, "project_exists", i18n.M("service.err.conflict.project_exists", "slug", p.Slug, "prefix", p.Prefix))
 	case err != nil:
+		return store.Project{}, err
+	}
+	// タイムラインの通し番号の行を作っておく（出来事を書く取引の中で、無い行をロックしてギャップロックを取らないように）
+	if err := store.EnsureTimelinePostHead(ctx, q, id, time.Now()); err != nil {
 		return store.Project{}, err
 	}
 	p.ID = id

@@ -19,14 +19,14 @@ var jaMDAllowed = []jaMDAllow{
 	// ── AI が読む共通規則 ── 1 ファイル・合計 54 行
 	{path: "internal/guide/common.md", lines: 54, reason: jaAIOnly, note: "guide の共通規則の本文。REST の guide・CLI の issue guide・MCP の guide の 3 経路で AI に届く（読むのは AI だけ）"},
 
-	// ── kit が配る rules・skill の本文（日本語が正本。en/ に対訳がある） ── 9 ファイル・合計 1041 行
+	// ── kit が配る rules・skill の本文（日本語が正本。en/ に対訳がある） ── 9 ファイル・合計 1045 行
 	{path: "kit/core/skills/issue/SKILL.md", lines: 75, reason: jaAIOnly, note: "kit が配る skill の本文（AI が読む手順）"},
 	{path: "kit/core/skills/token-report/SKILL.md", lines: 97, reason: jaAIOnly, note: "kit が配る skill の本文（AI が読む手順）"},
 	{path: "kit/loop/rules/background-process.md", lines: 62, reason: jaAIOnly, note: "kit が配る rules の本文（AI が読む行動規律）"},
 	{path: "kit/loop/rules/iteration-discipline.md", lines: 38, reason: jaAIOnly, note: "kit が配る rules の本文（AI が読む行動規律）"},
 	{path: "kit/loop/rules/output-discipline.md", lines: 42, reason: jaAIOnly, note: "kit が配る rules の本文（AI が読む行動規律）"},
 	{path: "kit/loop/rules/secrets-discipline.md", lines: 214, reason: jaAIOnly, note: "kit が配る rules の本文（AI が読む行動規律）"},
-	{path: "kit/loop/rules/working-discipline.md", lines: 340, reason: jaAIOnly, note: "kit が配る rules の本文（AI が読む行動規律）"},
+	{path: "kit/loop/rules/working-discipline.md", lines: 344, reason: jaAIOnly, note: "kit が配る rules の本文（AI が読む行動規律）"},
 	{path: "kit/loop/skills/iterate/SKILL.md", lines: 40, reason: jaAIOnly, note: "kit が配る skill の本文（AI が読む手順）"},
 	{path: "kit/loop/skills/session-handoff/SKILL.md", lines: 133, reason: jaAIOnly, note: "kit が配る skill の本文（AI が読む手順）"},
 
@@ -40,5 +40,5 @@ var jaMDAllowed = []jaMDAllow{
 	{path: "kit/README.ja.md", lines: 202, reason: jaDevTool, note: "kit の置き場の説明（何をどのプロジェクトへ配るか）。//go:embed * が実行ファイルに入れるが、配るのは core/ と loop/ の下だけ（kit.Names）なので導入先には出ない"},
 	{path: "kit/README.md", lines: 1, reason: jaDevTool, note: "同上。日本語版への案内の 1 行（日英 2 本立ての対の片方）"},
 
-	// 合計 16 ファイル・1315 行
+	// 合計 16 ファイル・1319 行
 }

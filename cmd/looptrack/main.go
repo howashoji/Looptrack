@@ -108,6 +108,8 @@ func run(args []string, stdio cli.IO, e env.Env) int {
 		return cli.MessageMain(args[1:], stdio, e)
 	case "lease":
 		return cli.LeaseMain(args[1:], stdio, e)
+	case "timeline":
+		return cli.TimelineMain(args[1:], stdio, e)
 	case "report":
 		return report(args[1:], stdio, e, lang)
 	case "self-update":

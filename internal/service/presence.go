@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"regexp"
 	"sort"
 	"strings"
@@ -45,6 +46,9 @@ type PresenceInput struct {
 	HeadSHA      string
 	// Directory は作業ツリーのディレクトリの名前（最後の要素だけ）
 	Directory string
+	// Start はセッションの開始の印（hook が SessionStart の送信に付ける）。付いた送信だけを取引に包み、タイムラインに開始の出来事を書く。
+	// 在席の行が新しくできたかでは決めない（終了の後に遅れて届いた送信や、上限と保持期間で行が消えた後の送信が偽の開始になる）
+	Start bool
 }
 
 // PresenceState は動いているセッション 1 本。
@@ -105,11 +109,27 @@ func (s *Service) ReportPresence(ctx context.Context, a Actor, in PresenceInput)
 	if err != nil {
 		return err
 	}
-	if err := store.UpsertPresence(ctx, s.DB, store.Presence{ProjectID: p.ID, UserID: u.ID, SessionID: a.SessionID, Agent: agent, MachineLabel: label,
-		Branch: branch, HeadSHA: head, Directory: dir, LastSeenAt: s.Now()}); err != nil {
+	now := s.Now()
+	write := func(q store.Queryer) error {
+		if err := store.UpsertPresence(ctx, q, store.Presence{ProjectID: p.ID, UserID: u.ID, SessionID: a.SessionID, Agent: agent, MachineLabel: label,
+			Branch: branch, HeadSHA: head, Directory: dir, LastSeenAt: now}); err != nil {
+			return err
+		}
+		return store.TrimPresence(ctx, q, p.ID, u.ID, a.SessionID, maxPresencePerUser)
+	}
+	if !in.Start { // 印の無い送信（古いクライアントと、開始より後の送信）はこれまでどおり取引の外で書く
+		return write(s.DB)
+	}
+	if err := store.EnsureTimelinePostHead(ctx, s.DB, p.ID, now); err != nil {
 		return err
 	}
-	return store.TrimPresence(ctx, s.DB, p.ID, u.ID, a.SessionID, maxPresencePerUser)
+	return s.inTx(ctx, func(tx *sql.Tx) error {
+		if err := write(tx); err != nil {
+			return err
+		}
+		return queueTimeline(tx, timelineSource{Origin: timelineFromSession, Kind: timelineSessionStart, ProjectID: p.ID, UserID: u.ID, Session: a.SessionID,
+			Machine: label, TokenID: a.TokenID, Via: a.Via, At: now, Detail: map[string]any{"agent": agent, "branch": branch}})
+	})
 }
 
 // presenceOwn は行が要求したセッション自身か。種類の違うセッション（MCP の接続 ID と会話の ID）は比べられないので、
@@ -156,7 +176,8 @@ func fairPresence(rows []store.Presence, max int) []store.Presence {
 	return out
 }
 
-// EndPresence は本人のセッションの在席を外す（SessionEnd）。無ければ何もしない。
+// EndPresence は本人のセッションの在席を外す（SessionEnd）。行が無ければ何も消さない。
+// 終了はこの送信そのものが印なので、取引に包んでタイムラインに終了の出来事を書く（端末のラベルは消す前の在席から引く）。
 func (s *Service) EndPresence(ctx context.Context, a Actor, slug string) error {
 	if err := presenceSession(a); err != nil {
 		return err
@@ -165,7 +186,21 @@ func (s *Service) EndPresence(ctx context.Context, a Actor, slug string) error {
 	if err != nil {
 		return err
 	}
-	return store.DeletePresence(ctx, s.DB, p.ID, u.ID, a.SessionID)
+	now := s.Now()
+	if err := store.EnsureTimelinePostHead(ctx, s.DB, p.ID, now); err != nil {
+		return err
+	}
+	return s.inTx(ctx, func(tx *sql.Tx) error {
+		label, err := store.PresenceMachineLabel(ctx, tx, p.ID, u.ID, a.SessionID)
+		if err != nil {
+			return err
+		}
+		if err := store.DeletePresence(ctx, tx, p.ID, u.ID, a.SessionID); err != nil {
+			return err
+		}
+		return queueTimeline(tx, timelineSource{Origin: timelineFromSession, Kind: timelineSessionEnd, ProjectID: p.ID, UserID: u.ID, Session: a.SessionID,
+			Machine: label, TokenID: a.TokenID, Via: a.Via, At: now})
+	})
 }
 
 // ProjectPresence はプロジェクトで動いているセッションを新しい順に返す（権限は呼ぶ側が確かめた後）。

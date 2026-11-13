@@ -2,13 +2,12 @@ package core
 
 // usage の送信を切り離す（hook は操作を待たせずにすぐ 0 で終わり、送信は子プロセスが続ける）。
 // 以前の実装は二重 fork + setsid だった。Go は fork できないので自分（looptrack）を起動し直し、仕事は標準入力の JSON で渡す。
-// POSIX は setsid（新しいセッション。hook を起動した AI の端末・プロセスグループから外れる）、Windows は DETACHED_PROCESS
-// （コンソールを持たない）と CREATE_NEW_PROCESS_GROUP（Ctrl+C が届かない）で起動する（detach_*.go）。
+// 起動の仕方（setsid・DETACHED_PROCESS）は internal/client/detach の 1 か所にある（loop の hook も同じ部品で離す）。
 
 import (
-	"errors"
 	"os"
-	"os/exec"
+
+	"github.com/howashoji/looptrack/internal/client/detach"
 )
 
 // ChildArgs は切り離した子プロセスの引数（実行ファイルの後ろ）。cmd/looptrack の `hook usage` に届く形。
@@ -33,25 +32,7 @@ func spawnTranscriptSelf(job []byte, dir string) error {
 	return spawnDetached(exe, TranscriptChildArgs, job, dir, nil)
 }
 
-// spawnDetached は exe を切り離して起動し、job を標準入力に書いて待たずに離す（environ が nil なら親の環境）。
+// spawnDetached は exe を切り離して起動する（detach.Start。core の各所の呼び出しの名前を保つ）。
 func spawnDetached(exe string, args []string, job []byte, dir string, environ []string) error {
-	r, w, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-	defer w.Close()
-	cmd := exec.Command(exe, args...)
-	cmd.Dir = dir
-	cmd.Env = environ
-	cmd.Stdin = r // *os.File なので子にそのまま渡る（コピーの goroutine を作らない＝親がすぐ終わってよい）
-	cmd.SysProcAttr = detachedAttr()
-	err = cmd.Start()
-	r.Close()
-	if err != nil {
-		return err
-	}
-	_, werr := w.Write(job)
-	cerr := w.Close()
-	rerr := cmd.Process.Release()
-	return errors.Join(werr, cerr, rerr)
+	return detach.Start(exe, args, job, dir, environ)
 }

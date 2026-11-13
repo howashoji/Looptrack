@@ -763,11 +763,13 @@ func (s *Server) apiSummary(w http.ResponseWriter, r *http.Request) {
 		"counts":  cnt,
 		// unread_messages はこの要求のセッションの未読の連絡の件数（DESIGN.md §9-9）
 		"unread_messages": s.unreadMessages(r.Context(), actor(r), pr.Slug),
-		"in_progress":     inProgress,
-		"in_review":       inReview,
-		"feedback":        fb,
-		"ready":           itemsJSON(pr, rows, ready[:min(limit, len(ready))]),
-		"ready_total":     len(ready),
+		// timeline はこの要求のセッションに効くタイムラインの件数（有効・未了解・待機。DESIGN.md §9-9）
+		"timeline":    timelineCountsJSON(s.timelineCounts(r.Context(), actor(r), pr.Slug)),
+		"in_progress": inProgress,
+		"in_review":   inReview,
+		"feedback":    fb,
+		"ready":       itemsJSON(pr, rows, ready[:min(limit, len(ready))]),
+		"ready_total": len(ready),
 		// ① の末尾: 下位がすべて完了した開いている要件（上位 limit 件と総数）
 		"requirements_ready":       closablesJSON(reqLang(r), closable[:min(limit, len(closable))]),
 		"requirements_ready_total": len(closable),
@@ -945,7 +947,13 @@ func (s *Server) apiStatus(w http.ResponseWriter, r *http.Request) {
 		body["secret_notice"] = res.SecretNotice
 	}
 	// 下位の最後の 1 件を閉じたら要件の検証と close を促す。messages に入れるので古い CLI でも表示される
-	body["messages"] = withClosable(reqLang(r), statusMessages(reqLang(r), res), body, s.closedRequirements(r.Context(), pr, res))
+	body["messages"] = withStartHolds(withClosable(reqLang(r), statusMessages(reqLang(r), res), body, s.closedRequirements(r.Context(), pr, res)),
+		body, s.statusHolds(r.Context(), reqLang(r), a, pr, res))
+	if statusFeedApplies(res) { // 未読と未了解は構造化の値だけ（messages に足さず、位置も進めない。timeline_read_api.go）
+		if f := s.timelineStartFeed(r.Context(), a, pr.Slug); f != nil {
+			body["timeline"] = timelineFeedJSON(f)
+		}
+	}
 	if n := s.usageNotice(r.Context(), reqLang(r), a, pr, it, it.Closed() && res.From != it.Item.Status); n != "" {
 		body["usage_notice"] = n
 	}

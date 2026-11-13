@@ -60,6 +60,9 @@ type mcpWriteTool struct {
 const leaseToolWhy = "占有の表（leases・lease_events）だけを書き、issue_events を書かないので付与の対象ではない。" +
 	"loop の PreToolUse は他プロジェクトへの誤爆の確認の対象に入れている"
 
+const timelinePostToolWhy = "タイムラインの表（timeline_post_events）だけを書き、issue_events を書かないので付与の対象ではない。" +
+	"loop の PreToolUse は他プロジェクトへの誤爆の確認の対象に入れている"
+
 // mcpWriteTools は宣言表。**一覧を書くのはここ 1 か所だけ**。
 //
 // 「扱いが揃っている」= serverWrite・event・hookOp・inPretool の 4 つが同じ側（すべて有・すべて無）。
@@ -97,6 +100,20 @@ var mcpWriteTools = []mcpWriteTool{
 	{tool: "break_lease", serverWrite: true, event: "comment", inPretool: true,
 		why: "占有の表と、外された者への連絡（messages）を書く。連絡の関数がイシューを添えたときだけ comment を書くので静的には辿れるが、" +
 			"ここからはイシューを添えないので issue_events は書かず、付与の対象ではない。loop の PreToolUse は他プロジェクトへの誤爆の確認の対象に入れている"},
+	{tool: "timeline_post", serverWrite: true, event: "comment", inPretool: true,
+		why: "タイムラインの表（timeline_posts・timeline_post_events）を書く。issue_events の comment を書くのはイシューを添えたときだけなので、" +
+			"send_message と同じくトークン情報の付与の対象にしない。loop の PreToolUse は他プロジェクトへの誤爆の確認の対象に入れている"},
+	{tool: "timeline_revise", serverWrite: true, inPretool: true, why: timelinePostToolWhy},
+	{tool: "timeline_withdraw", serverWrite: true, inPretool: true, why: timelinePostToolWhy},
+	{tool: "timeline_list", serverWrite: true,
+		why: "mark_received のときだけ受け取りの表（timeline_post_receipts）を書く。issue_events は書かないので付与の対象ではなく、" +
+			"自分のセッションの受け取りだけの操作なので loop の PreToolUse の確認にも当たらない"},
+	{tool: "timeline_ack", serverWrite: true,
+		why: "自分のセッションの了解と受け取り（timeline_post_receipts）だけを書く。issue_events は書かないので付与の対象ではなく、" +
+			"loop の PreToolUse の確認にも当たらない（read_inbox の既読と同じ扱い）"},
+	{tool: "timeline_seen", serverWrite: true,
+		why: "自分のセッションの読んだ位置（timeline_reads）だけを書く。issue_events は書かないので付与の対象ではなく、" +
+			"loop の PreToolUse の確認にも当たらない（timeline_ack・read_inbox の既読と同じ扱い）"},
 	{tool: "verify_issue", inPretool: true,
 		why: "読み取り専用（ReadOnlyHint）で何も書かないが、loop の PreToolUse は" +
 			"他プロジェクトのイシューを読み違えないように確認の対象に入れている"},

@@ -79,7 +79,7 @@ http_headers = { "X-Looptrack-Project" = "demo" }
 ```
 
 - Hooks: wired in `.codex/hooks.json`. After trusting the project, **start the terminal `codex` in the project and trust the hooks with `/hooks`**. That trust carries over to the desktop app too. Untrusted hooks are skipped silently.
-- CLI environment: init writes `LOOPTRACK_API_URL` and `LOOPTRACK_PROJECT` to `[shell_environment_policy]` in `.codex/config.toml`.
+- CLI environment: init writes `LOOPTRACK_API_URL` and `LOOPTRACK_PROJECT` to `[shell_environment_policy]` in `.codex/config.toml`. The loop hooks read these values too when the environment has no connection. They then ignore `LOOPTRACK_TOKEN` in the environment and use the token saved for that URL by `looptrack issue login`.
 
 ## GitHub Copilot (VS Code agent mode, Copilot CLI)
 
@@ -90,6 +90,7 @@ looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --agen
 - Like Codex, Copilot works mainly through MCP.
 - Connecting MCP: with `--mcp`, init writes `.vscode/mcp.json` for VS Code and `.github/mcp.json` for Copilot CLI. In Copilot CLI, authorise with `/mcp auth looptrack`.
 - Instructions: Copilot reads the managed section of `AGENTS.md`.
+- Connection: when the environment has no connection, the loop hooks read the init record (`url` and `project` in `.claude/.looptrack-kit.json`). They then ignore `LOOPTRACK_TOKEN` in the environment and use the token saved for that URL by `looptrack issue login`.
 - Hooks: wired in `.github/hooks/looptrack.json`. VS Code picks them up in a new chat. Copilot CLI, once you trust the folder.
 - Token tracking: Copilot usage is measured only if the user turns on OpenTelemetry file export. If it's off, missing token info isn't held against you.
 
@@ -369,6 +370,34 @@ They show the user, the machine, the kind of AI, the branch, HEAD, the name of t
 
 Hooks send this; there is no command to type. They send it at every SessionStart and Stop, and at most every 5 minutes during a turn, and a session leaves the list 15 minutes after it last sent. SessionEnd removes it, and the rows are deleted after 7 days.
 The absolute path of the worktree is never sent. Outside git, or when the worktree is your home directory, the directory name is not sent either. When the server cannot be reached, the hook does not keep the AI waiting.
+
+### Reading what other sessions are doing on the timeline (loop)
+
+At fixed scenes, the hooks put into the agent's context what each session in the same project is doing. The timeline carries the events (issues created, status and assignee changes, comments, leases, sessions starting and ending, commits) and what sessions write (updates, notes, requests and holds).
+The server decides what is unread from the read position, so nothing is lost when a local file disappears. It is added to hooks you already have, so it works without running `looptrack issue init` again.
+
+| Scene | Hook | What goes in |
+| -- | -- | -- |
+| Session start | `session-start-messages` | A new session gets "now" (the running sessions, the leases taken, the holds and requests in force) and the latest 20 lines. Resuming the same session ID gets the unread items from the previous position |
+| Start of work | `user-prompt-messages` | The unread items from the previous position, and the unacknowledged holds and requests |
+| Work boundary | `post-work-complete-handoff-mark` | Sends the commits, then puts in the unread items and a one-line nudge to write an update |
+| End of turn | `stop-handoff-freshness` | Sends the turn back if anything unread up to the boundary, or an unacknowledged hold or request, is left. What arrived after the boundary waits for the next scene |
+| Before a write | `pre-tool-scope-guard` | Checks at most once a minute and puts in only newly arrived requests and unacknowledged holds. It blocks nothing |
+
+Events and updates go in 20 lines at a time; the count of the rest is shown and the rest comes at the next scene. Bodies and subjects go in as `>` quotations, line by line. Follow a hold whoever posted it, and treat a request as an instruction only when it comes from the same user. Acknowledge one once read with `looptrack timeline ack <ID>`.
+An update is optional: write 1 to 3 lines, for example `looptrack timeline post update "Fixing the search index. Tests next"`. The hook sends the commits from the HEAD the session last saw in that worktree up to the current HEAD, so commits pulled in or rebased onto are left out, 20 at a time, by running `looptrack timeline commit` as a detached child process.
+A request or a hold can also go to the work instead of a session ID: `--to-issue <ID>` reaches the sessions working on that issue, `--to-branch <name>` and `--to-machine <label>` the sessions whose presence names that branch or machine label, and `--others` everyone but you, for example `looptrack timeline post hold "Hold the push to main" --to-issue ABC-0123`. The server resolves the recipients each time they read, so a session that starts on that work later gets it too. Check who it reached with `looptrack timeline status <ID>`.
+
+When the server cannot be reached, the work is not stopped. The time of the last check is noted at most once every 10 minutes. An old server without the timeline routes gets nothing. To turn it off, set `LOOPTRACK_LOOP_MESSAGES=0`, as for messages.
+
+It has limits.
+
+- The timeline is read only when a scene's hook runs. During a long piece of work only requests and holds arrive, and Codex and Copilot have no wiring before a write, so even those wait for the next scene there.
+- At Codex's work boundary the text was checked to reach the agent, so the read position is advanced there. Whether the text added at Copilot's work boundary reaches the agent has not been checked. The read position is not advanced there, and the same items come again in the next scene. Codex's Stop does not send the turn back; it falls back to a note to the user, so the position is not advanced there either.
+- Commits that could not be sent are sent again at the next boundary. If you check out another branch, or rewrite several commits with a rebase, before that, those commits do not appear.
+- Hook injections never reach a subagent. When the parent receives a hold, it passes it on to the running children itself.
+- A branch or machine label is what the session itself names in its presence. A session that switches branch or names a different label drops out of a post sent that way, and one that sends no presence never gets it. An issue reaches only the session that last moved it to In Progress. The delivery status lists only sessions that reported presence in the last 15 minutes, so a session whose reports stopped can have it without showing there until it records receipt. For a hold that must not miss anyone, check the delivery status with `looptrack timeline status <ID>`.
+- Without a session ID (a terminal you type into), the hooks do not read. The CLI `looptrack timeline unread` treats every read as a new session and prints "now" and the latest lines.
 
 ### Carrying the raw transcript
 

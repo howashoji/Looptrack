@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	_ "time/tzdata" // コンテナに tzdata が無くても Asia/Tokyo を使う
 
@@ -248,27 +249,53 @@ func (s *Service) Detail(ctx context.Context, p store.Project, issueID int64) (*
 	return &Issue{Project: p, Row: r, Item: domain.FromDocument(r.Doc), Markdown: render(r)}, nil
 }
 
-// inTx は fn をトランザクションで実行する。デッドロックは数回まで再試行する。
+// inTx は fn をトランザクションで実行する。デッドロックは数回まで再試行する（再試行の回数は inTxRetries に数える）。
+// fn が溜めたタイムラインの出来事は、確定の直前に flushTimeline が通し番号を 1 度だけ取って書く（timeline_events.go）。
 func (s *Service) inTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	for attempt := 0; ; attempt++ {
-		tx, err := s.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		err = fn(tx)
-		if err == nil {
-			err = tx.Commit()
-		}
+		err := s.inTxOnce(ctx, fn)
 		if err == nil {
 			return nil
 		}
-		_ = tx.Rollback()
 		if attempt < 4 && store.IsRetryable(err) {
+			inTxRetries.Add(1)
 			time.Sleep(time.Duration(attempt+1) * 10 * time.Millisecond)
 			continue
 		}
 		return err
 	}
+}
+
+// inTxRetries は inTx がデッドロックなどでやり直した回数（プロセスの起動からの累計）。
+// テストが「やり直しで緑になった」のか「1 度も衝突しなかった」のかを見分けるために数える。
+var inTxRetries atomic.Int64
+
+// inTxOnce は inTx の 1 回分。収集器の登録は defer で外し、fn が panic しても残さない（取引も取り消す）。
+func (s *Service) inTxOnce(ctx context.Context, fn func(tx *sql.Tx) error) (err error) {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	batch := &timelineBatch{}
+	timelineBatches.Store(tx, batch)
+	committed := false
+	defer func() {
+		timelineBatches.Delete(tx)
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err = fn(tx); err != nil {
+		return err
+	}
+	if err = s.flushTimeline(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 // CreateInput は起票の入力。
@@ -362,7 +389,7 @@ func (s *Service) Create(ctx context.Context, a Actor, p store.Project, in Creat
 		if err != nil {
 			return err
 		}
-		if err := store.InsertEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: issueID, Kind: "create", SessionID: a.SessionID,
+		if err := s.recordIssueEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: issueID, Kind: "create", SessionID: a.SessionID,
 			// sections は本文の節ごとのハッシュ（DESIGN.md §9-3-4）。起票時の値が、後の食い違いの判定の基準になる
 			Author: s.author(a, now), Detail: map[string]any{"status": in.Status, "type": in.Type, "sections": domain.NewSectionHashes(doc.BodyMain)}}); err != nil {
 			return err
@@ -405,7 +432,7 @@ type change struct {
 // recordEvents は追加の記録を順に残す。
 func (s *Service) recordEvents(ctx context.Context, tx *sql.Tx, a Actor, p store.Project, issueID int64, now time.Time, evs []event) error {
 	for _, e := range evs {
-		if err := store.InsertEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: issueID, Kind: e.kind, SessionID: a.SessionID,
+		if err := s.recordIssueEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: issueID, Kind: e.kind, SessionID: a.SessionID,
 			Author: s.author(a, now), Detail: e.detail}); err != nil {
 			return err
 		}
@@ -420,7 +447,7 @@ func (s *Service) recordOverride(ctx context.Context, tx *sql.Tx, a Actor, p sto
 			continue
 		}
 		detail := map[string]any{"rule": o.Rule, "reason": o.Reason}
-		if err := store.InsertEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: issueID, Kind: "rule_override", SessionID: a.SessionID,
+		if err := s.recordIssueEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: issueID, Kind: "rule_override", SessionID: a.SessionID,
 			Author: s.author(a, now), Detail: detail}); err != nil {
 			return err
 		}
@@ -462,7 +489,7 @@ func (s *Service) mutate(ctx context.Context, a Actor, p store.Project, issueID 
 		if err != nil {
 			return err
 		}
-		if err := store.InsertEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: row.ID, Kind: ch.kind, SessionID: a.SessionID,
+		if err := s.recordIssueEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: row.ID, Kind: ch.kind, SessionID: a.SessionID,
 			Author: s.author(a, now), Detail: ch.detail}); err != nil {
 			return err
 		}

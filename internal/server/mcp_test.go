@@ -164,7 +164,7 @@ func TestMCPTools(t *testing.T) {
 		}
 	}
 	sort.Strings(names)
-	if got := strings.Join(names, ","); got != "acquire_lease,add_comment,add_usage_ledger,assign_issue,break_lease,create_issue,create_project,extend_lease,get_issue,get_matrix,get_memory,guide,issue_activity,issue_usage,list_issues,list_leases,list_memories,list_projects,list_usage_ledger,list_usage_requests,next,project_summary,read_inbox,ready_issues,release_lease,report_verify,send_message,set_status,setup,update_issue,usage_missing,usage_report,verify_issue,write_memory" {
+	if got := strings.Join(names, ","); got != "acquire_lease,add_comment,add_usage_ledger,assign_issue,break_lease,create_issue,create_project,extend_lease,get_issue,get_matrix,get_memory,guide,issue_activity,issue_usage,list_issues,list_leases,list_memories,list_projects,list_usage_ledger,list_usage_requests,next,project_summary,read_inbox,ready_issues,release_lease,report_verify,send_message,set_status,setup,timeline_ack,timeline_list,timeline_now,timeline_post,timeline_revise,timeline_seen,timeline_status,timeline_unread,timeline_withdraw,update_issue,usage_missing,usage_report,verify_issue,write_memory" {
 		t.Errorf("ツール: %s", got)
 	}
 

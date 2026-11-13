@@ -344,7 +344,7 @@ func (s *Service) AcquireLease(ctx context.Context, a Actor, in LeaseInput) (*Le
 		if err := store.UpdateLease(ctx, tx, next); err != nil {
 			return err
 		}
-		if err := store.InsertLeaseEvent(ctx, tx, store.LeaseEvent{LeaseID: cur.ID, Action: store.LeaseActionAcquire, UserID: u.ID, MachineLabel: label,
+		if err := s.recordLeaseEvent(ctx, tx, cur.ProjectID, cur.Name, store.LeaseEvent{LeaseID: cur.ID, Action: store.LeaseActionAcquire, UserID: u.ID, MachineLabel: label,
 			SessionID: a.SessionID, TokenID: a.TokenID, Via: leaseVia(a), Purpose: purpose, ExpiresAt: next.ExpiresAt, PrevUserID: cur.HolderUserID,
 			PrevMachineLabel: cur.MachineLabel, PrevSessionID: cur.SessionID, WasExpired: wasExpired, CreatedAt: now}); err != nil {
 			return err
@@ -431,7 +431,7 @@ func (s *Service) ExtendLease(ctx context.Context, a Actor, in LeaseInput) (*Lea
 		if err := store.UpdateLease(ctx, tx, next); err != nil {
 			return err
 		}
-		if err := store.InsertLeaseEvent(ctx, tx, store.LeaseEvent{LeaseID: cur.ID, Action: store.LeaseActionExtend, UserID: u.ID, MachineLabel: label,
+		if err := s.recordLeaseEvent(ctx, tx, cur.ProjectID, cur.Name, store.LeaseEvent{LeaseID: cur.ID, Action: store.LeaseActionExtend, UserID: u.ID, MachineLabel: label,
 			SessionID: a.SessionID, TokenID: a.TokenID, Via: leaseVia(a), Purpose: cur.Purpose, ExpiresAt: next.ExpiresAt, PrevUserID: cur.HolderUserID,
 			PrevMachineLabel: cur.MachineLabel, PrevSessionID: cur.SessionID, CreatedAt: now}); err != nil {
 			return err
@@ -453,7 +453,7 @@ func (s *Service) endLease(ctx context.Context, tx *sql.Tx, a Actor, u store.Use
 	if err := store.UpdateLease(ctx, tx, next); err != nil {
 		return err
 	}
-	return store.InsertLeaseEvent(ctx, tx, store.LeaseEvent{LeaseID: cur.ID, Action: action, UserID: u.ID, MachineLabel: label, SessionID: a.SessionID,
+	return s.recordLeaseEvent(ctx, tx, cur.ProjectID, cur.Name, store.LeaseEvent{LeaseID: cur.ID, Action: action, UserID: u.ID, MachineLabel: label, SessionID: a.SessionID,
 		TokenID: a.TokenID, Via: leaseVia(a), Purpose: cur.Purpose, Reason: reason, PrevUserID: cur.HolderUserID, PrevMachineLabel: cur.MachineLabel,
 		PrevSessionID: cur.SessionID, WasExpired: !now.Before(cur.ExpiresAt), CreatedAt: now})
 }

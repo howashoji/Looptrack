@@ -114,6 +114,11 @@ type nextJSON struct {
 	Skipped           []service.NextSkip `json:"skipped"`
 	Next              []string           `json:"next_steps"`
 	Text              string             `json:"text"` // 人（と AI）が読む形。CLI はこれをそのまま出す
+	// TimelinePostHolds は着手したイシューがあるとき、このセッションに効くタイムラインの有効な待機の ID（知らせの行は Text にも足す。拒まない）
+	TimelinePostHolds []int64 `json:"timeline_holds,omitempty"`
+	// Timeline は着手したイシューがあるとき、このセッションの未読と未了解（構造化の値だけ。REST は Text に足さず位置も進めない。
+	// MCP は Text に足して位置を進める。timeline_read_api.go）
+	Timeline map[string]any `json:"timeline,omitempty"`
 	// UsageNotice は started（In Progress にした）ときだけ載る、トークン情報の付与の指示（service.UsageNotice）
 	UsageNotice string `json:"usage_notice,omitempty"`
 	// AcceptanceNotice は started のとき、受け入れ条件が雛形のままなら載る注意（service.StatusResult と同じ文面）
@@ -365,6 +370,12 @@ func (s *Server) apiNext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := nextView(reqLang(r), res)
+	s.nextHolds(r.Context(), reqLang(r), actor(r), pr, &v)
+	if v.Issue != nil {
+		if f := s.timelineStartFeed(r.Context(), actor(r), pr.Slug); f != nil {
+			v.Timeline = timelineFeedJSON(f)
+		}
+	}
 	if res.Action == "started" {
 		v.UsageNotice = s.usageNotice(r.Context(), reqLang(r), actor(r), pr, res.Issue, false)
 	}

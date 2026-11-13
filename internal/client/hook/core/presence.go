@@ -1,6 +1,7 @@
 package core
 
 // 在席を送る（DESIGN.md §9-9）。既にある配線に乗せる: SessionStart は summary、Stop と SessionEnd は usage の hook が呼ぶ。
+// SessionStart の送信だけに開始の印（start）を付け、サーバがタイムラインに開始の出来事を書く。終了の出来事は SessionEnd の在席の終了から書かれる。
 // 別の配線を足さないので、init をやり直していないプロジェクトでも動く。
 // 長いターンの間も一覧から消えないよう、PostToolUse と UserPromptSubmit でも presenceBeat に 1 回まで送る
 // （Claude Code は issue-freshness-mark、ほかの AI は usage の配線。どの本数も増えない）。
@@ -12,6 +13,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -43,6 +45,8 @@ type presenceJob struct {
 	CWD       string `json:"cwd"`
 	// Ended はセッションの終わり（在席を外す）
 	Ended bool `json:"ended,omitempty"`
+	// Start はセッションの開始の印（SessionStart の送信だけが付ける。サーバがタイムラインに開始の出来事を書く）
+	Start bool `json:"start,omitempty"`
 }
 
 // reportPresence は在席の送信を切り離す。どこで失敗しても呼んだ hook の本体には影響させない（panic も含む）。
@@ -83,7 +87,8 @@ func (c *Call) reportPresence(ev hookio.Event) {
 	if cwd == "" {
 		cwd = c.Getwd()
 	}
-	b, err := json.Marshal(usageJob{Presence: &presenceJob{Agent: agent, SessionID: sid, CWD: cwd, Ended: ev.Name == hookio.SessionEnd}})
+	b, err := json.Marshal(usageJob{Presence: &presenceJob{Agent: agent, SessionID: sid, CWD: cwd, Ended: ev.Name == hookio.SessionEnd,
+		Start: ev.Name == hookio.SessionStart}})
 	if err != nil {
 		return
 	}
@@ -144,12 +149,24 @@ func (c *Call) sendPresence(j presenceJob) {
 	}
 	path := "/projects/" + api.PathEscape(slug) + "/presence"
 	req := api.Request{Method: http.MethodDelete, Path: path}
+	var body map[string]any
 	if !j.Ended {
 		branch, head, dir := presenceGit(j.CWD, presenceHomes(vars))
-		req = api.Request{Method: http.MethodPost, Path: path, Body: map[string]string{"agent": j.Agent, "machine_label": presenceWord(presenceLabel(vars)),
-			"branch": presenceWord(branch), "head_sha": head, "directory": presenceWord(dir)}}
+		body = map[string]any{"agent": j.Agent, "machine_label": presenceWord(presenceLabel(vars)),
+			"branch": presenceWord(branch), "head_sha": head, "directory": presenceWord(dir)}
+		if j.Start {
+			body["start"] = true
+		}
+		req = api.Request{Method: http.MethodPost, Path: path, Body: body}
 	}
-	if _, err := cl.Do(req); err != nil {
+	_, err = cl.Do(req)
+	var ae *api.Error
+	if j.Start && errors.As(err, &ae) && ae.Status == http.StatusBadRequest && ae.Code == "invalid_json" {
+		// 開始の印を知らない古いサーバは知らない欄を拒む（400 invalid_json）。印を外して在席だけを送り直す
+		delete(body, "start")
+		_, err = cl.Do(req)
+	}
+	if err != nil {
 		c.debug("presence: %s", fmt.Sprint(err))
 	}
 }

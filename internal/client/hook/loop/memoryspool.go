@@ -121,7 +121,9 @@ func newSpoolKey() string {
 
 // writeSpool は退避を書き、ファイルの名前を返す。
 //
-// 名前の先頭は時刻なので、同じ秒でも書いた順に並ぶ（古い順に送る）。後ろの乱数と O_EXCL で、同じ時刻の書き込みが互いを消さないようにする。
+// 名前の先頭は時刻で、名前の順に古いものから送る。後ろの乱数と O_EXCL で、同じ時刻の書き込みが互いを消さないようにする。
+// 時計の刻みが粗いと（Windows）続けて書いた 2 件が同じ時刻になり、順序が乱数で決まってしまう。時計が戻ることもある。
+// そこで置き場にある退避の最新の時刻より後ろへずらし、書いた順に並ぶようにする。
 // 書き終えてから見える名前に移す（書きかけを別のセッションが送らないため）。
 func writeSpool(dir string, en spoolEntry, now time.Time) (string, error) {
 	if dir == "" {
@@ -129,6 +131,9 @@ func writeSpool(dir string, en spoolEntry, now time.Time) (string, error) {
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
+	}
+	if last, ok := latestSpoolStamp(dir); ok && !now.After(last) {
+		now = last.Add(time.Nanosecond)
 	}
 	b, err := json.Marshal(en)
 	if err != nil {
@@ -158,6 +163,34 @@ func writeSpool(dir string, en spoolEntry, now time.Time) (string, error) {
 		}
 		return name, os.Rename(tmp, filepath.Join(dir, name))
 	}
+}
+
+// spoolStampRe は退避の名前の先頭の時刻（Unix 秒と 16 進 8 桁のナノ秒）。
+var spoolStampRe = regexp.MustCompile(`^\.?(\d+)-([0-9a-f]{8})`)
+
+// latestSpoolStamp は置き場にある退避のいちばん新しい時刻を返す。
+// 送っている最中（.sending）と書きかけ（先頭の .）も数える。どれも後で名前の順に送られるからだ。
+func latestSpoolStamp(dir string) (time.Time, bool) {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return time.Time{}, false
+	}
+	var last time.Time
+	found := false
+	for _, ent := range ents {
+		m := spoolStampRe.FindStringSubmatch(ent.Name())
+		if m == nil {
+			continue
+		}
+		var sec, nsec int64
+		if _, err := fmt.Sscanf(m[1]+" "+m[2], "%d %x", &sec, &nsec); err != nil || nsec >= int64(time.Second) {
+			continue
+		}
+		if t := time.Unix(sec, nsec); !found || t.After(last) {
+			last, found = t, true
+		}
+	}
+	return last, found
 }
 
 // spoolHookPath は退避の横に置く hook の ID のファイル。退避そのものを書き戻さないので、送信や --drop と競っても退避が生き返らない。

@@ -97,7 +97,7 @@ func normalizeHandoffCmd(cmd string) string {
 // 改行を空白でつないで 1 行にすると、そこから文字列の終わりまでが全部消える。
 func commandSegments(cmd string) [][]string {
 	s := hookcmd.StripHeredocsStrict(strings.ReplaceAll(cmd, "\r\n", "\n"))
-	toks, err := shlexSplit(strings.ReplaceAll(hookcmd.ShlexFriendly(s), "\n", "\n ; "))
+	toks, err := shlexSplit(strings.ReplaceAll(winAbsPathsToSlash(hookcmd.ShlexFriendly(s)), "\n", "\n ; "))
 	if err != nil {
 		return nil
 	}
@@ -117,6 +117,54 @@ func commandSegments(cmd string) [][]string {
 		segs = append(segs, seg)
 	}
 	return segs
+}
+
+// winAbsPathsToSlash は、引用符の外でドライブ文字から始まる語（`D:\a\b`・`D:/a\b`）の `\` を `/` に替える。
+// posix の規則で読むと `\` が次の 1 文字を打ち消して `D:ab` になり、cd・-C の行き先（コミットした作業ツリー）を
+// 見失う。PowerShell・cmd では `\` はただの文字で、Git Bash も含め Windows は `/` 区切りでも同じ場所を指す。
+// ドライブ文字で始まる語に `\` の打ち消しを意図して書くことはまず無いので、この形だけ Windows の読み方にそろえる
+// （git ガードが posix と Windows の両方の規則で読むのと同じ考え。引用符の中と、ほかの語の `\` は変えない）。
+// 直後が空白・区切り・引用符の `\` は Git Bash で書く打ち消し（`D:/My\ Docs`）なので残す。コメントと $'…'・ヒアドキュメントの
+// 本文の `'` で引用符の読みがずれないよう、呼ぶ側は ShlexFriendly と StripHeredocsStrict の後に渡す。
+func winAbsPathsToSlash(cmd string) string {
+	if !strings.Contains(cmd, `\`) {
+		return cmd
+	}
+	b := []byte(cmd)
+	var q byte // 開いている引用符（0 は外）
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+		switch {
+		case q == '\'':
+			if c == '\'' {
+				q = 0
+			}
+		case q == '"':
+			if c == '\\' {
+				i++
+			} else if c == '"' {
+				q = 0
+			}
+		case c == '\'' || c == '"':
+			q = c
+		case c == '\\':
+			i++
+		case i+2 < len(b) && isDriveLetter(c) && b[i+1] == ':' && (b[i+2] == '\\' || b[i+2] == '/') && (i == 0 || strings.IndexByte(" \t\n;&|()<>=", b[i-1]) >= 0):
+			for j := i + 2; j < len(b) && strings.IndexByte(" \t\n;&|()<>'\"", b[j]) < 0; j++ {
+				i = j
+				if b[j] != '\\' {
+					continue
+				}
+				if j+1 < len(b) && strings.IndexByte(" \t\n;&|()<>'\"", b[j+1]) >= 0 {
+					j++ // 空白・区切り・引用符の打ち消し（`D:/My\ Docs`）は語の続きとしてそのまま残す
+					i = j
+					continue
+				}
+				b[j] = '/'
+			}
+		}
+	}
+	return string(b)
 }
 
 // gitSub は git の語の並びからサブコマンドとその後ろを返す（-C・-c などの引数付きの前置きを飛ばす）。
@@ -212,6 +260,8 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 	// 見つけたものを**ためて全部書く**。1 つの変数に上書きすると最後の 1 件しか残らず、ほかは黙って記録から消える。
 	var events [][]string
 	wroteHandoff := false // このツールの呼び出しが looptrack handoff を実行した
+	tlCommitDir := ""     // タイムラインへコミットを送る作業ツリー（数える価値のあるコミットがあったときだけ）
+	shellDir := ""        // シェルの呼び出しの最後の場所（タイムラインの観測。cd を追った先）
 	addEvent := func(fields ...string) {
 		line := strings.Join(fields, "\t")
 		for _, prev := range events {
@@ -286,6 +336,7 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 				}
 			}
 		}
+		shellDir = dir
 		for i, done := range events {
 			if len(done) != 1 || done[0] != "commit" {
 				continue
@@ -293,6 +344,7 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 			// addEvent が重複を畳むので "commit" は高々 1 件
 			if commitCounts(ctx, ev, e, commitDir, resp) {
 				events[i] = append([]string{"commit"}, commitFields(ctx, e, commitDir, resp)...)
+				tlCommitDir = commitDir
 			} else {
 				events = append(events[:i:i], events[i+1:]...)
 			}
@@ -323,6 +375,9 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 		}
 	}
 	if len(events) == 0 {
+		// 完了でないシェルの呼び出しでも、その場所の HEAD をタイムラインの観測として記録する（pull・rebase で取り込んだ分を、次に
+		// 送るコミットの範囲から外す）
+		timelineObserve(ctx, ev, e, shellDir)
 		return hookio.Result{}, nil
 	}
 
@@ -360,6 +415,21 @@ func PostWorkCompleteHandoffMark(ctx context.Context, ev hookio.Event) (hookio.R
 		if sid := sessionFile(ev); sid != "" {
 			msg += "\n" + i18n.T(lang, "loop.handoff.mark.howto", "mark", writerMark(sid))
 		}
+	}
+	// タイムラインの作業区切り: コミットを送り、未読を入れて近況を促し、区切りの番号を印に残す（timeline.go）
+	n := 0
+	if tlCommitDir != "" {
+		out := resp
+		if ev.Tool.Response != nil && ev.Tool.Response.Text != "" {
+			out = ev.Tool.Response.Text // Bash の結果が JSON（stdout・stderr）でも、成功の行を行頭で数えられる本文
+		}
+		n = len(commitHead.FindAllString(out, -1))
+	}
+	if tl, ok := timelineBoundary(ctx, ev, e, tlCommitDir, n); ok && tl != "" {
+		msg += "\n\n" + tl
+	}
+	if shellDir != tlCommitDir {
+		timelineObserve(ctx, ev, e, shellDir)
 	}
 	return hookio.Result{Context: msg, Kind: "handoff: detected"}, nil
 }
@@ -455,7 +525,13 @@ func hasOutcome(r *hookio.Response) bool {
 // 全セッションで同じ 1 つ（本体のルートの下）で、別の作業ツリーにも同じリポジトリ相対パスの実体があるため、
 // git の diff-tree の出力（コミットした場所の git top-level から見た相対パス）とそのまま比べられる。
 func commitCounts(ctx context.Context, ev hookio.Event, e *Env, dir, resp string) bool {
-	// 成功したコミットだけ（出力がある場合。無いときは積む）
+	// 成功したコミットだけ（出力がある場合。無いときは積む）。Bash の結果がオブジェクト（stdout・stderr）のときは
+	// 本文（hookio.Response.Text）で見る。JSON の文字列のままでは、`git commit -q` の空の出力も「出力がある」に見える
+	if ev.Tool != nil && ev.Tool.Response != nil {
+		if _, obj := ev.Tool.Response.Raw.(map[string]any); obj {
+			resp = ev.Tool.Response.Text
+		}
+	}
 	if trimSpace(resp) != "" {
 		if notCommitted.MatchString(resp) || !commitSuccess.MatchString(resp) {
 			return false
@@ -599,8 +675,24 @@ func blockedPath(ev hookio.Event, state string) string {
 func StopHandoffFreshness(ctx context.Context, ev hookio.Event) (hookio.Result, error) {
 	e := envFrom(ctx)
 	res, err := stopHandoffFreshness(ctx, ev, e)
-	if err != nil || ev.StopHookActive {
+	if err != nil {
 		return res, err
+	}
+	// タイムラインの作業区切りの後の確認（印の番号までの読み残し。timeline.go）。引き継ぎの差し戻しと同じ 1 回に並べる
+	if block, notice := timelineStop(ctx, ev, e); block != "" {
+		if res.Block != "" {
+			res.Block += "\n\n" + block
+		} else {
+			res.Block, res.Kind = block, "timeline: unread"
+		}
+	} else if notice != "" {
+		res.SystemMessage = joinNotices(res.SystemMessage, notice)
+		if res.Kind == "" {
+			res.Kind = "timeline: unreachable"
+		}
+	}
+	if ev.StopHookActive {
+		return res, nil
 	}
 	// 本体以外の作業ツリーに取り残された引き継ぎを知らせる（止めない）。server の置き場は手元のファイルを使わない
 	if res.SystemMessage == "" && handoffBackend(e) != backendServer {
