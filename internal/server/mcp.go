@@ -748,7 +748,14 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				data["secret_notice"] = res.SecretNotice
 			}
 			// 下位の最後の 1 件を閉じたら要件の検証と close を促す（REST の messages と同じ行）
-			text := strings.Join(withClosable(c.lang, statusMessages(c.lang, res), data, s.closedRequirements(ctx, pr, res)), "\n")
+			text := strings.Join(withStartHolds(withClosable(c.lang, statusMessages(c.lang, res), data, s.closedRequirements(ctx, pr, res)),
+				data, s.statusHolds(ctx, c.lang, c.actor, pr, res)), "\n")
+			if statusFeedApplies(res) { // 作業開始と作業区切り。結果が AI に届く前提で位置を進める。前提は推定で、実機の確認は hook の実装のとき（timeline_read_api.go）
+				if f := s.timelineStartFeed(ctx, c.actor, pr.Slug); f != nil {
+					data["timeline"] = timelineFeedJSON(f)
+					text = withTimelineText(text, s.timelineMCPFeed(ctx, c.lang, c.actor, f))
+				}
+			}
 			notice := s.usageNotice(ctx, c.lang, c.actor, pr, res.Issue, res.Issue.Closed() && res.From != res.Issue.Item.Status)
 			data["usage_notice"] = notice
 			return result(withNotice(text, notice), data), nil, nil
@@ -902,6 +909,10 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			if unread > 0 {
 				text += "\n" + i18n.T(c.lang, "server.mcp.summary.unread_messages", "count", unread)
 			}
+			tlCounts := s.timelineCounts(ctx, c.actor, pr.Slug)
+			if line := timelineCountsLine(c.lang, tlCounts); line != "" {
+				text += "\n" + line
+			}
 			leases, err := s.svc.ProjectLeases(ctx, pr) // 今取られている占有（§9-9）
 			if err != nil {
 				return nil, nil, s.toolError(c.lang, "project_summary", err)
@@ -916,7 +927,7 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 			if len(others) > 0 {
 				text += "\n\n" + i18n.T(c.lang, "server.mcp.summary.presence_heading", "count", len(others)) + "\n" + presenceLines(others, s.svc.Loc)
 			}
-			return result(text, map[string]any{"project": pr.Slug, "counts": cnt, "unread_messages": unread, "leases": leasesJSON(leases), "active_sessions": presencesJSON(others), "in_progress": inProgress, "in_review": inReview, "feedback": fb,
+			return result(text, map[string]any{"project": pr.Slug, "counts": cnt, "unread_messages": unread, "timeline": timelineCountsJSON(tlCounts), "leases": leasesJSON(leases), "active_sessions": presencesJSON(others), "in_progress": inProgress, "in_review": inReview, "feedback": fb,
 				"ready": top, "ready_total": len(ready), "requirements_ready": closableTop, "requirements_ready_total": len(closable),
 				"usage_missing":  map[string]any{"count": missing.Missing, "issues": missing.Issues, "days": missing.Days, "command": missing.Command},
 				"usage_requests": requests}), nil, nil
@@ -994,6 +1005,13 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 				return nil, nil, s.toolError(c.lang, "next", err)
 			}
 			v := nextView(c.lang, res)
+			s.nextHolds(ctx, c.lang, c.actor, pr, &v)
+			if v.Issue != nil { // 作業開始。結果が AI に届く前提で位置を進める。前提は推定で、実機の確認は hook の実装のとき（timeline_read_api.go）
+				if f := s.timelineStartFeed(ctx, c.actor, pr.Slug); f != nil {
+					v.Timeline = timelineFeedJSON(f)
+					v.Text = withTimelineText(v.Text, s.timelineMCPFeed(ctx, c.lang, c.actor, f))
+				}
+			}
 			if res.Action == "started" {
 				v.UsageNotice = s.usageNotice(ctx, c.lang, c.actor, pr, res.Issue, false)
 			}
@@ -1066,6 +1084,8 @@ func (s *Server) addMCPTools(srv *mcp.Server, lang i18n.Lang) {
 	s.addMemoryMCPTools(srv, lang, ro)                // プロジェクト記憶（memory_api.go）
 	s.addMessageMCPTools(srv, lang)                   // 連絡（messages_api.go）
 	s.addLeaseMCPTools(srv, lang, ro)                 // 占有（lease_api.go）
+	s.addTimelinePostMCPTools(srv, lang, ro)          // タイムライン（timeline_api.go）
+	s.addTimelineReadMCPTools(srv, lang, ro)          // タイムラインを読む側（timeline_read_api.go）
 }
 
 // mcpAssign は担当の変更（assign_issue と update_issue の担当だけの変更）。

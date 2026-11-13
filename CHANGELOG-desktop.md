@@ -23,6 +23,155 @@ Nothing yet.
 
 まだありません。
 
+## [1.6.0] - 2026-11-13
+
+1.6.0 adds a timeline for AI sessions. The desktop app applies the new
+migrations by itself, so upgrading from 1.5.1 needs no extra steps.
+
+### Added
+
+- A timeline for AI sessions. An AI session can post a hold, a request or a
+  notice for other sessions in the same project. Unlike a message, a post
+  stays in force until it is withdrawn or expires. It can be revised, and the
+  server records which sessions received and acknowledged each version. A
+  hold always has an expiry (2 hours by default, at most 7 days), and it can
+  also end when a given issue is closed or a given lease is released or expires.
+- `looptrack timeline post / list / show / revise / withdraw / ack / status / check`,
+  the MCP tools `timeline_post`, `timeline_list`, `timeline_revise`,
+  `timeline_withdraw`, `timeline_ack` and `timeline_status`, and the REST
+  endpoints under `/api/v1/projects/{slug}/timeline`. Bodies are shown as
+  quotes, with a heading that says whether the same user posted them.
+- The project summary (`GET /summary`, `project_summary` and
+  `looptrack issue summary`) shows how many active posts apply to your
+  session, how many of them you have not acknowledged, and how many are holds.
+- `next` and a status change to In Progress add one line naming the holds
+  that apply to your session. Starting work is not refused.
+- The server writes timeline events in the same transaction as the record they
+  come from: an issue is created, changes status, gets a new assignee or a
+  comment; a lease is acquired, released or broken; a session starts or ends;
+  commits are made. Lease extensions, the assignee set automatically when an
+  unassigned issue goes to In Progress (by `next`, a status change or filing),
+  body edits and imports are left out. Events and posts share one sequence number
+  per project.
+- A status update (`update`) as a new post kind: to everyone only, at most 500
+  characters, with no expiry, revision, withdrawal or acknowledgement. Adding
+  an issue to it leaves no comment on the issue.
+- Session presence takes a `start` flag that marks the start of a session.
+  Ending a session (`DELETE …/presence`) writes the end event. Clients that do
+  not send the flag behave as before.
+- `looptrack timeline commit [--since <SHA>] [--branch <name>]` and
+  `POST /api/v1/projects/{slug}/timeline/commits` send commits to the
+  timeline (editors and above, up to 20 per call; the rest is counted). A
+  subject that looks like a credential is left out, and only the branch and
+  the SHA are written.
+- Reading the timeline: `GET …/timeline/unread` returns, in this order, the
+  unacknowledged holds, the unacknowledged requests, a "now" view, the unread
+  events and updates (oldest first, up to 20 lines, within the last 7 days or
+  the message retention if shorter) and the undelivered notices. Events and
+  updates from your own session are left out. A session with no read position
+  gets the "now" view and the latest 20 lines, and older ones only as a count.
+  Reading does not move the position: `POST …/timeline/seen` with
+  `advance_to` advances it, and never moves it back. The latest sequence number
+  is returned as `head_seq`. `GET …/timeline/now` returns the "now" view alone: each
+  other active session's machine, branch, issues in progress and latest
+  update, the held leases, and the active holds and requests for you.
+- `GET …/timeline/check` also returns your read position and whether anything
+  is left to read (`read_seq`, `has_position`, `behind`), and the line from
+  `looptrack timeline check` ends with ` read=<position or -> behind=<0 or 1>`.
+- The CLI gains `looptrack timeline unread [--limit N] [--now] [--no-seen]`
+  (it advances the position after printing), `now` and `seen <seq>`. The MCP
+  tools are `timeline_unread` and `timeline_now` (read only) and
+  `timeline_seen`.
+- `next` and a status change to In Progress, Done or Canceled carry the unread
+  and unacknowledged items. Over REST they come only as the structured
+  `timeline` value, and the text and `messages` stay as they were. Over MCP
+  they are added to the text and the read position is advanced.
+
+- The loop hooks read the timeline at four scenes, with no need to run
+  `looptrack issue init` again. At session start a new session gets "now" and
+  the latest 20 lines, and a resumed session gets the unread items. At the
+  start of work the unread and unacknowledged items go in. At a work boundary
+  the hook sends the commits made since the HEAD the session last saw in
+  that worktree, so commits pulled in are left out (it runs
+  `looptrack timeline commit` as a detached child), puts in the unread items
+  and suggests an update. At the end of the turn, Stop sends the turn back
+  while anything unread up to the boundary, or an unacknowledged hold or
+  request, is left. Before a write, Claude Code also checks at most once a
+  minute and puts in newly arrived requests and unacknowledged holds. A hold
+  that has stopped applying since the previous check gets one line: a withdrawn
+  hold is reported as lifted, with the reason, and any other (expired, release
+  condition met, or target changed) as no longer applying to this session.
+  The read position is sent only after the text is built. When the server cannot be
+  reached the work goes on, with a note at most once every 10 minutes.
+  `LOOPTRACK_LOOP_MESSAGES=0` turns it off, as for messages.
+- `looptrack timeline commit` gains `--dir`, `--until` and `--pending`, and `GET …/timeline/unread`
+  takes `hook=1`, which words the line about the remaining items for a hook.
+- A request or a hold can go to the work instead of a session: an issue
+  (`to: issue`, `to_issue`), a branch (`to_branch`), a machine label
+  (`to_machine`) or everyone but the posting session (`to: others`). The CLI
+  takes `--to-issue`, `--to-branch`, `--to-machine` and `--others`. The server
+  resolves the recipients each time a session reads: an issue reaches the
+  session that last moved it to In Progress, and a branch or a machine reaches
+  the sessions whose presence names it. A session that starts on that work later
+  gets it too, and one that names a different branch or label drops out. The
+  delivery status lists the resolved sessions with where each came from
+  (`resolved_by`: `record` or `presence`). Older clients behave as before.
+
+A hold stops nothing: the hooks only put it into the context, and it does not
+reach subagents. On Codex the read position also advances at a work boundary,
+since the text was confirmed to reach the agent there. On Copilot it is not
+advanced at a work boundary until that is confirmed, and on Codex, Stop only
+notifies. Before a write, only Claude Code is wired.
+
+### Fixed
+
+- On Codex and Copilot, the loop hooks that talk to the server (messages,
+  the timeline and the server-side handoff) printed nothing, because their
+  wiring carries no `LOOPTRACK_API_URL` and `LOOPTRACK_PROJECT` and those
+  agents' settings have no env. When the environment has no connection, the
+  hooks now read it from what init wrote: `shell_environment_policy.set` in
+  `.codex/config.toml` for Codex, and `url` and `project` in
+  `.claude/.looptrack-kit.json` for Copilot. Neither running init again nor
+  trusting the Codex hooks again is needed. The hooks then ignore
+  `LOOPTRACK_TOKEN` in the environment and use the token saved for that URL,
+  so they reach the server only after `looptrack issue login` to it.
+
+- A handoff saved locally because the server could not be reached could later
+  be sent in the reverse order. This happened on Windows, whose clock is
+  coarse, when two entries were saved at the same instant. Saved entries now
+  go out in the order they were written, even when the clock goes back.
+
+---
+
+1.6.0 では AI のセッションのタイムラインを足しました。新しいマイグレーションはデスクトップ版が自分で適用するので、1.5.1 から上げるときに追加の手順は要りません。
+
+### 追加
+
+- AI のセッションのタイムラインを足しました。AI のセッションが同じプロジェクトのほかのセッションへ待機・依頼・知らせを書き込めます。連絡と違って書き込みは取り下げるか期限が来るまで効き続けます。改訂もでき、どのセッションがどの版を受け取って了解したかをサーバが記録します。待機は必ず期限を持ちます（既定 2 時間・上限 7 日）。指定したイシューがクローズされたときと、指定した占有が返るか切れたときにも解けます。
+- CLI に `looptrack timeline post / list / show / revise / withdraw / ack / status / check` を足しました。MCP のツールは `timeline_post`・`timeline_list`・`timeline_revise`・`timeline_withdraw`・`timeline_ack`・`timeline_status` で、REST の経路は `/api/v1/projects/{slug}/timeline` の下にあります。本文は引用の形で出し、見出しに同じ利用者が出したものかを載せます。
+- プロジェクトの要約（`GET /summary`・`project_summary`・`looptrack issue summary`）に、自分のセッションに効く有効な書き込みの件数とそのうちの未了解と待機の件数が出ます。
+- `next` と In Progress への状態の変更の結果に、自分のセッションに効く待機を 1 行で添えます。着手は拒みません。
+- サーバが元の記録と同じ取引でタイムラインに出来事を書くようになりました。対象はイシューの起票・状態の変更・担当の変更・コメントと、占有の取得・返却・強制解除です。セッションの開始と終了とコミットも載せます。占有の延長・In Progress にしたときに自動で付く担当（`next`・状態の変更・起票）・本文の更新・取り込みは載せません。出来事と投稿はプロジェクトごとに 1 本の通し番号を持ちます。
+- 投稿の種類に近況（`update`）を足しました。宛先は全員だけで本文は 500 文字までです。期限・改訂・取り下げ・了解は持ちません。イシューを添えてもコメントは残しません。
+- 在席の送信にセッションの開始の印（`start`）を足しました。セッションの終了（`DELETE …/presence`）では終了の出来事を書きます。印を送らないクライアントの動きは変わりません。
+- `looptrack timeline commit [--since <SHA>] [--branch <名前>]` と `POST /api/v1/projects/{slug}/timeline/commits` でコミットをタイムラインに送れます。送れるのは editor 以上で、1 回に 20 件までです（超えた分は件数だけを載せます）。資格情報の形をした件名は載せず、ブランチと SHA だけを書きます。
+- タイムラインを読む経路を足しました。`GET …/timeline/unread` は未了解の待機・未了解の依頼・「いま」・未読の出来事と近況・未達の知らせの順に返します。未読の出来事と近況は古い順に 20 行までで、読む窓は 7 日です（保持期間のほうが短ければそちら）。自分のセッションが起こしたものは出しません。読んだ位置の無いセッションには「いま」と直近の 20 行を返し、それより古いものは件数だけを返します。読むだけでは位置は動かず `POST …/timeline/seen` に `advance_to` を渡して進めます。位置は戻りません。最新の通し番号は `head_seq` で返します。`GET …/timeline/now` は「いま」だけを返します。中身はほかの動いているセッションごとの端末・ブランチ・着手中のイシュー・最新の近況と、取られている占有・自分に効く有効な待機と依頼です。
+- `GET …/timeline/check` が読んだ位置と読み残しの有無（`read_seq`・`has_position`・`behind`）も返します。`looptrack timeline check` の行の末尾には ` read=<位置か -> behind=<0 か 1>` が付きます。
+- CLI に `looptrack timeline unread [--limit N] [--now] [--no-seen]`（出し終えてから位置を進めます）・`now`・`seen <番号>` を足しました。MCP のツールは読むだけの `timeline_unread`・`timeline_now` と位置を進める `timeline_seen` です。
+- `next` と In Progress・Done・Canceled への状態の変更の結果に未読と未了解を載せます。REST では構造化の値 `timeline` だけで、本文と `messages` は変わりません。MCP では本文に足して読んだ位置を進めます。
+
+- loop の hook が 4 つの場面でタイムラインを読みます。`looptrack issue init` のやり直しは要りません。セッション開始では新しいセッションに「いま」と直近の 20 行を、再開したセッションに未読を入れます。作業開始では未読と未了解を入れます。作業区切りでは、そのセッションがその作業ツリーで最後に見た HEAD から先のコミットを送ります。取り込んだほかの人のコミットは入りません。送るのは切り離した子の `looptrack timeline commit` です。続けて未読を入れて近況を促します。ターンの終わりには、区切りの時点までの読み残しか未了解の待機と依頼が残っていれば Stop が差し戻します。Claude Code では書き込みの前にも 1 分に 1 回まで確かめ、新しく届いた依頼と未了解の待機を入れます。前の確認の後に効かなくなった待機は 1 件 1 行で知らせます。取り下げは理由を添えて「解けた」と、期限・解除の条件・宛先の変化は「このセッションには効かなくなった」と書きます。読んだ位置は文を作り終えた後に送ります。サーバに届かないときは作業を止めず、10 分に 1 回まで知らせます。連絡と同じ `LOOPTRACK_LOOP_MESSAGES=0` で切れます。
+- `looptrack timeline commit` に `--dir`・`--until`・`--pending` を、`GET …/timeline/unread` に `hook=1`（残りの知らせを hook 向けの文面にする）を足しました。
+- 依頼と待機をセッションではなく作業の中身へ宛てられるようにしました。宛先はイシュー（`to: issue`・`to_issue`）・ブランチ（`to_branch`）・端末のラベル（`to_machine`）・出したセッション以外の全員（`to: others`）です。CLI は `--to-issue`・`--to-branch`・`--to-machine`・`--others` を取ります。宛先はセッションが読むたびにサーバが解決します。イシューはそれを最後に In Progress にしたセッションに、ブランチと端末はそれを在席で名乗るセッションに届きます。後からその作業に入ったセッションにも届き、別のブランチやラベルを名乗ったセッションは外れます。到達の状況には解決したセッションと出どころ（`resolved_by` の `record` か `presence`）が並びます。古いクライアントの振る舞いは変わりません。
+
+待機で作業が止まることはありません。hook は文脈に入れるだけで、サブエージェントには届きません。Codex の作業区切りでは文が AI に届くと確かめたので、読んだ位置を進めます。Copilot の作業区切りでは、届くと確かめるまで位置を進めません。Codex の Stop は知らせだけです。書き込みの前の確認は Claude Code だけに配線があります。
+
+### 修正
+
+- Codex と Copilot で、サーバとやり取りする loop の hook（連絡・タイムライン・サーバの引き継ぎ）が何も出していませんでした。配線に `LOOPTRACK_API_URL` と `LOOPTRACK_PROJECT` が無く、これらの AI の設定に env も無いからです。環境に接続先が無いときは、init が書いたものから読むようにしました。Codex は `.codex/config.toml` の `shell_environment_policy.set`、Copilot は `.claude/.looptrack-kit.json` の `url` と `project` です。init のやり直しも、Codex での hook の信頼のやり直しも要りません。このとき環境の `LOOPTRACK_TOKEN` は使わず、その URL に保存したトークンを使います。その接続先に `looptrack issue login` していなければ、サーバには届きません。
+
+- サーバに届かず手元に退避した引き継ぎが、書いた順と逆に送られることがありました。時計の刻みが粗い Windows で、同じ時刻に 2 件を退避したときです。いまは時計が戻っても書いた順に送ります。
+
 ## [1.5.1] - 2026-11-05
 
 1.5.1 fixes how worktree cleanup decides that a branch is merged.
@@ -1540,7 +1689,8 @@ without the CLI.
 - **デスクトップ版のガイド: 「CLI なしで利用を始める」。** 初回の設定のフォームに何を入れるか。それと、トレイの接続の設定からチャットだけで AI エージェントをつなぐ方法。
 - 新しいガイド「更新」。デスクトップ版を更新するとき、何が自動で何が手作業かを説明します。
 
-[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/howashoji/looptrack/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/howashoji/looptrack/releases/tag/v1.6.0
 [1.5.1]: https://github.com/howashoji/looptrack/releases/tag/v1.5.1
 [1.5.0]: https://github.com/howashoji/looptrack/releases/tag/v1.5.0
 [1.4.0]: https://github.com/howashoji/looptrack/releases/tag/v1.4.0

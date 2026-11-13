@@ -134,6 +134,7 @@ func mainWith(ctx context.Context, name string, args []string, stdin io.Reader, 
 		return 0
 	}
 	e.Args = append([]string(nil), rest...)
+	e.noBlock = opts.Render.NoBlock
 	opts.Parse.Getwd = e.Getwd
 	if opts.Parse.Event == "" {
 		// 入力に hook_event_name が無い（手で動かした・Copilot CLI の camelCase で --event を忘れた）ときは配線先のイベントとみなす
@@ -147,7 +148,8 @@ func mainWith(ctx context.Context, name string, args []string, stdin io.Reader, 
 		adjust(&opts)
 	}
 	return hookio.Run(stdin, stdout, stderr, opts, func(ev hookio.Event) (hookio.Result, error) {
-		c, cancel := context.WithTimeout(WithEnv(ctx, e), entry.Timeout)
+		// Codex・Copilot で環境に接続先が無ければ導入先の設定から補う（installconn.go。core の hook は通らない）
+		c, cancel := context.WithTimeout(WithEnv(ctx, withInstallConnection(e, ev)), entry.Timeout)
 		defer cancel()
 		r, err := entry.Hook(c, ev)
 		// 打ち切りの ctx を受けて本体が途中の結果を返しても出さない（hookio.Run の時間切れと同じ扱い）。
@@ -177,6 +179,12 @@ type Env struct {
 	Procs func(ctx context.Context) ([]proc.Proc, error)
 	// SelfPID は自分のプロセスの PID（runaway の検知で祖先をたどる起点）。
 	SelfPID int
+	// Spawn は実行中の looptrack を args で切り離して起動する（待たない。タイムラインのコミットの送信）。
+	// extra は環境に足す KEY=VALUE。nil なら自分を Environ（導入先の設定から補った接続先を含む）で起動する（spawnSelf）。
+	Spawn func(args []string, dir string, extra []string) error
+
+	// noBlock は配線の --no-block（か LOOPTRACK_LOOP_NO_BLOCK=1）。差し戻しが利用者への知らせに落ちる（タイムラインの位置を進めない判断に使う）。
+	noBlock bool
 }
 
 // Command は起動するコマンド。

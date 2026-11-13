@@ -132,6 +132,8 @@ The highest-priority code of conduct, distilled from the instructions and correc
   start only once the other side has stepped down. For one that has been held a long time, it may have been handed over and then left (check first in that case too).
 - **When you hand an issue to another session, the side handing it over puts the state back to Todo and clears the assignee.** Handed over while still In Progress, it keeps
   looking like "somebody is on it" even though the receiving side has not started.
+- **When you send a hold or a request to an issue, a branch or a machine, check who it reached in the delivery status before you start the work** (`looptrack timeline status <ID>`).
+  Branches and machines resolve from what each session names in its presence, so a session that renames itself drops out. The more a hold must not miss anyone, the more you check.
 - **When you work from several machines, keep one machine to one issue and one branch** (if one issue has to be split, cut child issues). Push before you switch machines.
   The side taking over re-declares with `looptrack issue status <ID> "In Progress"`, and the side handing over puts it back to Todo first (the rule above).
   A shell with no AI session id (a terminal a person types into) treats every In Progress issue of the same user as its own, so never run `looptrack issue next` from one.
@@ -165,6 +167,8 @@ The highest-priority code of conduct, distilled from the instructions and correc
   session, run `looptrack handoff compact --drop-marks`** (while a file carries marks, an update without your own mark is sent back by the freshness guard).
 - **Finishing one task is not the end of the session.** Never treat "idle" and "finished" as the same thing.
 - **The moment you detect a conflict, stop and report it to the user.** Never keep writing after you have detected one.
+- **The hooks put timeline holds and requests into the parent's session only; they never reach a subagent.** When the parent receives a hold, pass it on to the running children (with `SendMessage` or the like)
+  and have a child stop if its work touches that hold. The parent does the acknowledging (`looptrack timeline ack <ID>`). Until the children have been told, do not hand out new work that touches the hold.
 
 ### Subagents (delegation is the default; the parent's context is for judgment)
 - **Keep the parent's context for judgment, and hand out work whose procedure is settled.** This is not a preference but a question of how long a session lives.

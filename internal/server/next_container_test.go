@@ -63,11 +63,12 @@ func TestNextSkipsContainersAndHonorsTypes(t *testing.T) {
 		t.Errorf("types=epic: %+v", r)
 	}
 
-	// MCP の next は REST と同じ本文を返す
+	// MCP の next は REST と同じ本文を返す（MCP はその後ろにタイムラインの未読を足し、REST は構造化の値だけで本文に足さない）
 	next(map[string]any{"types": []string{"test"}})
 	m := ed.e.mcpAs(ed.token, map[string]string{"X-Looptrack-Project": "req"})
 	text, data := m.call("next", map[string]any{"types": []string{"test"}}, false)
-	if data["action"] != "resumed" || text != r.Text {
+	rest, ok := strings.CutPrefix(text, r.Text)
+	if data["action"] != "resumed" || !ok || (rest != "" && !strings.HasPrefix(rest, "\n\nタイムライン:")) || strings.Contains(r.Text, "タイムライン:") {
 		t.Errorf("MCP と REST が違う:\nMCP:\n%s\nREST:\n%s", text, r.Text)
 	}
 }

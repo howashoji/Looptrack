@@ -228,7 +228,9 @@ func TestUsageRequiredOnClose(t *testing.T) {
 	b = usageBody("c3", "sess-c", "issue_op", "REQ-0005", "create", 30, 3, 3)
 	b["via"] = "mcp"
 	ai.json(201, "POST", "/projects/req/usage", b, nil)
-	if text, _ = m.call("set_status", map[string]any{"id": "REQ-0005", "status": "Done"}, false); text != "REQ-0005: Todo → Done" {
+	// 本文の後ろにはタイムラインの未読が続く（ほかのセッションの起票。timeline_read_api.go）
+	text, _ = m.call("set_status", map[string]any{"id": "REQ-0005", "status": "Done"}, false)
+	if rest, ok := strings.CutPrefix(text, "REQ-0005: Todo → Done"); !ok || (rest != "" && !strings.HasPrefix(rest, "\n\nタイムライン:")) {
 		t.Errorf("MCP の付与後のクローズ: %s", text)
 	}
 

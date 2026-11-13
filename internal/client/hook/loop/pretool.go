@@ -7,6 +7,8 @@ package loop
 //   - Bash: LOOPTRACK_PROJECT=<別> を付けて CLI の変更系サブコマンドを打つ
 //   - MCP（im…）: 変更系ツールの project がセッションの LOOPTRACK_PROJECT と違う
 //
+// 同じ hook でタイムラインの書き込みの前の確認（新しく届いた依頼と未了解の待機。止めない）も行う（timeline.go）。
+//
 // Bash の 2 つは、入れ子のシェル（bash -c '…'・sudo sh -c '…'・eval "…"）を hookcmd で 1 段ほどいてから見る（包んだ形も素の形と同じ）。
 //
 // 通すもの: 読むだけ・git でない場所・同じリポジトリの worktree・LOOPTRACK_LOOP_SCOPE_ALLOW_REPOS・LOOPTRACK_PROJECT が無いときのイシューの判定。
@@ -39,7 +41,8 @@ var (
 	imServerRe    = regexp.MustCompile(`^looptrack(-[A-Za-z0-9]+)?$`)
 	imWriteTools  = map[string]bool{"create_issue": true, "add_comment": true, "set_status": true, "update_issue": true,
 		"assign_issue": true, "verify_issue": true, "report_verify": true, "add_usage_ledger": true, "write_memory": true, "send_message": true,
-		"acquire_lease": true, "extend_lease": true, "release_lease": true, "break_lease": true}
+		"acquire_lease": true, "extend_lease": true, "release_lease": true, "break_lease": true,
+		"timeline_post": true, "timeline_revise": true, "timeline_withdraw": true}
 	heredocTagRe = compatRe(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
 	quotedRe     = regexp.MustCompile(`"(\\\\.|[^"\\\\])*"|'[^']*'`)
 	segSplitRe   = regexp.MustCompile(`&&|\|\||;|\n`)
@@ -159,6 +162,21 @@ func stripHeredocsNarrow(s string) string {
 
 // PreToolScopeGuard は別のリポジトリ・別のプロジェクトのイシューの変更を利用者に確認する。
 func PreToolScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, error) {
+	res, err := preToolScopeGuard(ctx, ev)
+	if err != nil {
+		return res, err
+	}
+	// タイムラインの書き込みの前の軽い確認（新しく届いた依頼と未了解の待機だけ。止めない。timeline.go）
+	if tl := timelinePreTool(ctx, ev, envFrom(ctx)); tl != "" {
+		res.Context = joinNotices(res.Context, tl)
+		if res.Kind == "" {
+			res.Kind = "timeline: pre-tool"
+		}
+	}
+	return res, nil
+}
+
+func preToolScopeGuard(ctx context.Context, ev hookio.Event) (hookio.Result, error) {
 	e := envFrom(ctx)
 	if ev.Tool == nil {
 		return hookio.Result{}, nil

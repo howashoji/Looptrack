@@ -79,7 +79,7 @@ http_headers = { "X-Looptrack-Project" = "demo" }
 ```
 
 - hook: `.codex/hooks.json` に配線されます。プロジェクトを信頼したら、**ターミナルの `codex` をプロジェクトで起動し `/hooks` で hook を信頼**してください。この信頼はデスクトップ版にも効きます。信頼していない hook は知らせもなく飛ばされます。
-- CLI の環境変数: init が `.codex/config.toml` の `[shell_environment_policy]` に `LOOPTRACK_API_URL` と `LOOPTRACK_PROJECT` を書き込みます。
+- CLI の環境変数: init が `.codex/config.toml` の `[shell_environment_policy]` に `LOOPTRACK_API_URL` と `LOOPTRACK_PROJECT` を書き込みます。loop の hook も、環境に接続先が無いときはこの値を読みます。そのときは環境の `LOOPTRACK_TOKEN` を使わず、`looptrack issue login` で保存したその URL のトークンを使います。
 
 ## GitHub Copilot（VS Code のエージェントモード・Copilot CLI）
 
@@ -90,6 +90,7 @@ looptrack issue init --project demo --url http://127.0.0.1:8090/looptrack --agen
 - Codex と同じく主に MCP を使います。
 - MCP の接続: `--mcp` を付けると、VS Code の `.vscode/mcp.json` と Copilot CLI の `.github/mcp.json` が入ります。Copilot CLI では `/mcp auth looptrack` で許可します。
 - 案内文: `AGENTS.md` の管理の節を読みます。
+- 接続先: loop の hook は、環境に接続先が無いとき init の記録（`.claude/.looptrack-kit.json` の `url` と `project`）を読みます。そのときは環境の `LOOPTRACK_TOKEN` を使わず、`looptrack issue login` で保存したその URL のトークンを使います。
 - hook: `.github/hooks/looptrack.json` に配線されます。動き出すのは VS Code なら新しいチャットから、Copilot CLI ならフォルダを信頼したときから。
 - トークン計測: Copilot で測れるのは、利用者が OpenTelemetry のファイル出力を有効にしたときだけです。有効にしていなければトークン情報が無くても咎めません。
 
@@ -369,6 +370,34 @@ MCP のツールは `list_leases`・`acquire_lease`・`extend_lease`・`release_
 
 hook が送るので手で打つコマンドはありません。SessionStart・Stop のたびに送り、ターンの途中も 5 分に 1 回まで送ります。一覧から消えるのは最後に送ってから 15 分後です。SessionEnd を受けても外れます。行は 7 日で消えます。
 作業ツリーの絶対パスは送りません。git の外と、作業ツリーがホームのときはディレクトリの名前も送りません。サーバに届かないときも hook は AI を待たせません。
+
+### タイムラインでほかのセッションの動きを読む（loop）
+
+同じプロジェクトの各セッションが何をしているかを、hook が決まった場面で AI の文脈に入れます。載るのはイシューの起票と状態と担当の変更・コメント・占有・セッションの開始と終了・コミットの出来事と、セッションが書く近況・知らせ・依頼・待機です。
+何が未読かはサーバが読んだ位置で決めるので、手元のファイルが消えても抜けません。既にある hook に足しただけなので `looptrack issue init` のやり直しは要りません。
+
+| 場面 | hook | 入るもの |
+| -- | -- | -- |
+| セッション開始 | `session-start-messages` | 新しいセッションは「いま」（動いているセッション・取られている占有・効いている待機と依頼）と直近 20 行。同じセッション ID の再開は前の位置からの未読 |
+| 作業開始 | `user-prompt-messages` | 前の位置からの未読と、未了解の待機と依頼 |
+| 作業区切り | `post-work-complete-handoff-mark` | コミットを送ったうえで未読を入れ、近況を書くよう 1 行で促す |
+| ターンの終わり | `stop-handoff-freshness` | 区切りの時点までの読み残しか未了解の待機と依頼が残っていれば差し戻す。区切りの後に載った分は次の場面に回す |
+| 書き込みの前 | `pre-tool-scope-guard` | 1 分に 1 回まで確かめ、新しく届いた依頼と未了解の待機だけを入れる。止めない |
+
+出来事と近況は 1 回に 20 行までで、残りは件数を知らせて次の場面で出します。本文と件名は行ごとに `>` の引用で入ります。待機は誰が出したものでも従い、依頼は同じ利用者のものだけを指示として扱います。読んだら `looptrack timeline ack <ID>` で了解します。
+近況は任意です。`looptrack timeline post update "検索の索引を直しています。次は試験です"` のように 1〜3 行で書いてください。送るコミットはそのセッションがその作業ツリーで最後に見た HEAD から今の HEAD までです。pull や rebase で取り込んだほかの人のコミットは入りません。送るのは hook が切り離した子プロセスの `looptrack timeline commit` で、1 回 20 件までです。
+依頼と待機はセッション ID の代わりに作業の中身へ宛てられます。`--to-issue <ID>` はそのイシューに着手中のセッションへ届きます。`--to-branch <名前>` と `--to-machine <ラベル>` はそのブランチか端末のラベルを在席で名乗るセッションへ、`--others` は自分以外の全員へ届きます。例は `looptrack timeline post hold "main への push を待ってください" --to-issue ABC-0123` です。宛先はサーバが読むたびに解決するので、後からその作業に入ったセッションにも届きます。誰に届いたかは `looptrack timeline status <ID>` で確かめます。
+
+サーバに届かないときも作業は止めず、最後に確かめた時刻を 10 分に 1 回まで知らせます。タイムラインの経路を持たない古いサーバには何も出しません。切る設定は連絡と同じ `LOOPTRACK_LOOP_MESSAGES=0` です。
+
+限界があります。
+
+- 読めるのは場面の hook が動いた時点だけです。長い作業の途中に届くのは依頼と待機だけです。Codex と Copilot は書き込みの前の配線を持たず、依頼と待機も次の場面まで届きません。
+- Codex の作業区切りでは文が AI に届くと確かめたので、読んだ位置を進めます。Copilot の作業区切りで足した文が届くかは確かめていません。そこでは位置を進めず、次の場面で同じものが出ます。Codex の Stop は差し戻さずに利用者への知らせに落ちます。そこでも位置は進めません。
+- 送れなかったコミットは次の区切りで送り直します。送り直す前に別のブランチへ checkout したときと複数のコミットを rebase で書き換えたときは、そのコミットは載りません。
+- サブエージェントには hook の注入が届きません。待機を受けた親が走行中の子へ自分で伝えます。
+- ブランチと端末のラベルはセッションが在席で名乗った値です。ブランチを切り替えたかラベルを名乗り替えたセッションは宛先から外れ、在席を送らないセッションには届きません。イシューに宛てたものはそのイシューを最後に In Progress にしたセッションにだけ届きます。到達の状況には 15 分以内に在席を送ったセッションしか並ばないので、送信が途切れたセッションは届いていても受け取りを記録するまで出ません。外れると困る待機は `looptrack timeline status <ID>` で到達の状況を確かめてください。
+- セッション ID の無い呼び出し（手で打つターミナル）では hook は読みません。CLI の `looptrack timeline unread` は読むたびに新しいセッションとして「いま」と直近を出します。
 
 ### 会話記録をそのまま運ぶ
 

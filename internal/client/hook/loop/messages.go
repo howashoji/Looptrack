@@ -1,6 +1,7 @@
 package loop
 
 // session-start-messages・user-prompt-messages: 自分宛ての未読の連絡を文脈に入れ、既読の印を付ける（docs/server/DESIGN.md §9-9）。
+// 同じ hook でタイムラインのセッション開始と作業開始の場面も読む（timeline.go）。
 // 別の端末・別の利用者のセッションからの知らせを、相手の次のターンで受け取るための hook。
 //
 // サーバの設定が無い・届かない・古いサーバのときは何も出さずに通す（毎ターン走るので、注意を出すと届かない間ずっと文脈を汚す。
@@ -30,32 +31,52 @@ const (
 	messageHookRunes = 500
 )
 
-// MessagesHook は未読の連絡を文脈に入れる（SessionStart と UserPromptSubmit で同じ）。
+// MessagesHook は未読の連絡と、タイムラインの未読と未了解を文脈に入れる（SessionStart と UserPromptSubmit で同じ）。
+// タイムラインの場面は、SessionStart がセッション開始、UserPromptSubmit が作業開始（timeline.go）。
 func MessagesHook(ctx context.Context, ev hookio.Event) (hookio.Result, error) {
 	e := envFrom(ctx)
-	switch strings.ToLower(trimSpace(e.env("LOOPTRACK_LOOP_MESSAGES"))) {
-	case "0", "off", "false", "no":
+	if messagesOff(e) {
 		return hookio.Result{}, nil // 利用者が切った
 	}
-	m, err := hookMemoryAccess(ev, e, root(ev, e))
-	if err != nil {
+	var parts []string
+	var unread []int64
+	if m, err := hookMemoryAccess(ev, e, root(ev, e)); err == nil {
+		deadline := time.Now().Add(memoryHookBudget)
+		if d, ok := ctx.Deadline(); ok {
+			deadline = d.Add(-memoryHookMargin)
+		}
+		reqCtx, cancel := context.WithDeadline(ctx, deadline)
+		m.WithContext(reqCtx)
+		if box, err := m.Inbox(messageHookLimit); err == nil && len(box.Messages) > 0 {
+			parts = append(parts, renderMessages(e.lang(), box))
+			unread = box.UnreadIDs
+		}
+		scene := scenePrompt
+		if ev.Name == hookio.SessionStart {
+			scene = sceneSessionStart
+		}
+		tl, ok := timelineSceneText(ctx, ev, e, scene)
+		if !ok { // 締切に間に合わない。連絡も既読にせず、何も出さない
+			cancel()
+			return hookio.Result{}, nil
+		}
+		if tl != "" {
+			parts = append(parts, tl)
+		}
+		if len(unread) > 0 {
+			// 既読は注入の文を作った後に付ける。失敗しても出す（2 度届くほうを選ぶ）
+			_ = m.MarkRead(unread)
+		}
+		cancel()
+	}
+	if len(parts) == 0 {
 		return hookio.Result{}, nil
 	}
-	deadline := time.Now().Add(memoryHookBudget)
-	if d, ok := ctx.Deadline(); ok {
-		deadline = d.Add(-memoryHookMargin)
+	kind := "messages: unread"
+	if len(unread) == 0 {
+		kind = "messages: timeline"
 	}
-	reqCtx, cancel := context.WithDeadline(ctx, deadline)
-	defer cancel()
-	m.WithContext(reqCtx)
-	box, err := m.Inbox(messageHookLimit)
-	if err != nil || len(box.Messages) == 0 {
-		return hookio.Result{}, nil
-	}
-	text := renderMessages(e.lang(), box)
-	// 既読は注入の文を作った後に付ける。失敗しても出す（2 度届くほうを選ぶ）
-	_ = m.MarkRead(box.UnreadIDs)
-	return hookio.Result{Context: text, Kind: "messages: unread"}, nil
+	return hookio.Result{Context: strings.Join(parts, "\n\n"), Kind: kind}, nil
 }
 
 // renderMessages は注入の文を作る。

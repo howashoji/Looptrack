@@ -192,3 +192,57 @@ func gitInit(t *testing.T, dir, branch string) {
 		}
 	}
 }
+
+// SessionStart の在席だけに開始の印を付ける（ほかの送信には付けない）。開始の印を知らない古いサーバが知らない欄として
+// 400 invalid_json で拒んだら、印を外して在席だけを送り直す（在席は落とさない）。
+func TestPresenceStartMark(t *testing.T) {
+	var mu sync.Mutex
+	var bodies []map[string]any
+	old := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var b map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		mu.Lock()
+		bodies = append(bodies, b)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if _, ok := b["start"]; ok && old {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"code":"invalid_json","message":"unknown field \"start\""}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	e := presenceEnv(t, srv.URL, nil)
+	c := &Call{Env: e}
+	c.Env = e.withDefaults()
+	send := func(start bool) []map[string]any {
+		mu.Lock()
+		bodies = nil
+		mu.Unlock()
+		c.sendPresence(presenceJob{Agent: "claude-code", SessionID: "s1", CWD: t.TempDir(), Start: start})
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]map[string]any(nil), bodies...)
+	}
+	if got := send(true); len(got) != 1 || got[0]["start"] != true {
+		t.Errorf("開始の印が付かない: %v", got)
+	}
+	if got := send(false); len(got) != 1 || got[0]["start"] != nil {
+		t.Errorf("開始でない送信に印が付いた: %v", got)
+	}
+	old = true
+	if got := send(true); len(got) != 2 || got[0]["start"] != true || got[1]["start"] != nil || got[1]["agent"] != "claude-code" {
+		t.Errorf("古いサーバで印を外して送り直さない: %v", got)
+	}
+	// 仕事の形: SessionStart だけが Start を持つ
+	var jobs [][]byte
+	e2 := presenceEnv(t, "http://127.0.0.1:1", func(job []byte, _ string) error { jobs = append(jobs, job); return nil })
+	quietRun(t, "summary", []string{"--agent", "claude-code"}, `{"hook_event_name":"SessionStart","session_id":"s1"}`, e2, 0)
+	quietRun(t, "usage", []string{"--agent", "claude-code"}, `{"hook_event_name":"Stop","session_id":"s1"}`, e2, 0)
+	var a, b usageJob
+	if len(jobs) != 2 || json.Unmarshal(jobs[0], &a) != nil || json.Unmarshal(jobs[1], &b) != nil || !a.Presence.Start || b.Presence.Start {
+		t.Errorf("SessionStart だけに印: %s", jobs)
+	}
+}

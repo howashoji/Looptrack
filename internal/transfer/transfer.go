@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/howashoji/looptrack/internal/domain"
 	"github.com/howashoji/looptrack/internal/i18n"
@@ -181,6 +182,10 @@ func importProject(ctx context.Context, db *sql.DB, sp SourceProject) (ImportRes
 
 	projectID, err := store.UpsertProject(ctx, tx, sp.Project)
 	if err != nil {
+		return res, err
+	}
+	// タイムラインの通し番号の行（プロジェクトを作るときと同じ。無いまま取引の中で握るとギャップロックになる）
+	if err := store.EnsureTimelinePostHead(ctx, tx, projectID, time.Now()); err != nil {
 		return res, err
 	}
 	var live int

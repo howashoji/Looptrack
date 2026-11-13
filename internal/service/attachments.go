@@ -338,7 +338,7 @@ func (s *Service) Attach(ctx context.Context, a Actor, in AttachInput) (*store.A
 			return err
 		}
 		out.ID = id
-		return store.InsertEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: row.ID, Kind: "attach", SessionID: a.SessionID,
+		return s.recordIssueEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: row.ID, Kind: "attach", SessionID: a.SessionID,
 			Author: s.author(a, now), Detail: map[string]any{"attachment_id": id, "sha256": sum, "size": size, "filename": name, "media_type": mt}})
 	})
 	cancel()
@@ -471,7 +471,7 @@ func (s *Service) PurgeAttachment(ctx context.Context, a Actor, id int64, reason
 			byIssue[t.IssueID] = append(byIssue[t.IssueID], t.ID)
 		}
 		for _, t := range order {
-			if err := store.InsertEvent(ctx, tx, store.Event{ProjectID: t.ProjectID, IssueID: t.IssueID, Kind: "attach_purge", SessionID: a.SessionID,
+			if err := s.recordIssueEvent(ctx, tx, store.Event{ProjectID: t.ProjectID, IssueID: t.IssueID, Kind: "attach_purge", SessionID: a.SessionID,
 				Author: s.author(a, now), Detail: map[string]any{"sha256": at.SHA256, "attachment_ids": byIssue[t.IssueID], "requested": at.ID, "reason": reason}}); err != nil {
 				return err
 			}

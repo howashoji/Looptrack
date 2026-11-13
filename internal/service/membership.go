@@ -140,7 +140,7 @@ func (s *Service) SetMembership(ctx context.Context, a Actor, p store.Project, t
 				return err
 			}
 			detail := map[string]any{"from": target.Login, "to": to.Login, "reason": reason, "from_inactive": true, "op": "member"}
-			if err := store.InsertEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: id, Kind: "assign", SessionID: a.SessionID,
+			if err := s.recordIssueEvent(ctx, tx, store.Event{ProjectID: p.ID, IssueID: id, Kind: "assign", SessionID: a.SessionID,
 				Author: s.author(a, now), Detail: detail}); err != nil {
 				return err
 			}

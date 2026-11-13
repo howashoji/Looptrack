@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -86,6 +88,17 @@ WHERE p.project_id = ? AND p.last_seen_at >= ? ORDER BY p.last_seen_at DESC, p.i
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// PresenceOf は利用者のセッションの在席の行を返す（無ければ ok が偽。動いているかは問わない）。
+func PresenceOf(ctx context.Context, q execQuerier, projectID, userID int64, sessionID string) (p Presence, ok bool, err error) {
+	err = q.QueryRowContext(ctx, `SELECT p.project_id, p.user_id, u.login, p.session_id, p.agent, p.machine_label, p.branch, p.head_sha, p.directory, p.last_seen_at
+FROM session_presence p JOIN users u ON u.id = p.user_id WHERE p.project_id = ? AND p.user_id = ? AND p.session_id = ?`, projectID, userID, sessionID).
+		Scan(&p.ProjectID, &p.UserID, &p.UserLogin, &p.SessionID, &p.Agent, &p.MachineLabel, &p.Branch, &p.HeadSHA, &p.Directory, &p.LastSeenAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, false, nil
+	}
+	return p, err == nil, err
 }
 
 // PurgePresence は before より前に最後に送った行を消す。

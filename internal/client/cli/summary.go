@@ -104,6 +104,9 @@ func (c *Ctx) summaryBody(v *Values) error {
 	if truthy(res, "unread_messages") { // 未読の連絡に対応したサーバで、未読があるときだけ
 		data.Set("unread_messages", get(res, "unread_messages", nil))
 	}
+	if b := asObject(get(res, "timeline", nil)); truthy(b, "active") || truthy(b, "unacked") || truthy(b, "holds") {
+		data.Set("timeline", b) // 自分に効くタイムラインの件数（§9-9。古いサーバには無い。1 件以上あるときだけ）
+	}
 	if truthy(res, "leases") { // 今取られている占有（§9-9。古いサーバには無い）
 		data.Set("leases", orList(res, "leases"))
 	}
@@ -229,6 +232,11 @@ func (c *Ctx) printSummary(data *jsonorder.Object, limit int64) error {
 	c.Println(i18n.T(c.Lang, "cli.summary.counts", "open", intOf(open), "bugs", intOf(bugs)))
 	if truthy(data, "unread_messages") {
 		c.Println(i18n.T(c.Lang, "cli.summary.unread_messages", "count", intOf(get(data, "unread_messages", nil))))
+	}
+	if truthy(data, "timeline") {
+		b := asObject(get(data, "timeline", nil))
+		c.Println(i18n.T(c.Lang, "cli.summary.timeline", "active", intOf(get(b, "active", nil)), "unacked", intOf(get(b, "unacked", nil)),
+			"holds", intOf(get(b, "holds", nil))))
 	}
 	// 前のセッションで付けそこねたトークン情報を、このセッションで回収させる
 	missing := asObject(get(data, "usage_missing", nil))

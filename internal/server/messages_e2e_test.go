@@ -206,7 +206,13 @@ func TestMessageE2EInjectionBounds(t *testing.T) {
 	}
 }
 
-// 受け入れ条件: サーバに届かないとき hook はターンを止めない（exit 0・何も出さない）。設定の無いプロジェクトも同じ。
+// onlyTimelineNotice は、注入が空か、タイムラインの「確かめられていない」の知らせだけか（連絡の本文を含まない）。
+// 同じ hook がタイムラインも読み、届かないときは止めずに 1 行で知らせる（timeline_hook_e2e_test.go）。
+func onlyTimelineNotice(got string) bool {
+	return got == "" || (strings.HasPrefix(got, "[タイムライン] サーバに届かず") && !strings.Contains(got, "\n"))
+}
+
+// 受け入れ条件: サーバに届かないとき hook はターンを止めない（exit 0・連絡を出さない）。設定の無いプロジェクトも同じ。
 // サーバが 500 を返しても同じ。対照は、同じ設定で届くときに入ること。
 func TestMessageHookFailsOpen(t *testing.T) {
 	m := newMessageUsers(t)
@@ -216,7 +222,7 @@ func TestMessageHookFailsOpen(t *testing.T) {
 	url := m.peer.vars["LOOPTRACK_API_URL"]
 	m.peer.vars["LOOPTRACK_API_URL"] = "http://127.0.0.1:1/im"
 	start := time.Now()
-	if got := turn(m.peer, "peer"); got != "" {
+	if got := turn(m.peer, "peer"); !onlyTimelineNotice(got) {
 		t.Errorf("届かないのに出した: %q", got)
 	}
 	if d := time.Since(start); d > 4*time.Second {
@@ -273,7 +279,7 @@ func TestMessageHookServerFailures(t *testing.T) {
 	}
 	mode.Store(3)
 	start := time.Now()
-	if got := turn(m.peer, "peer"); got != "" {
+	if got := turn(m.peer, "peer"); !onlyTimelineNotice(got) {
 		t.Errorf("遅いサーバのときに出した: %q", got)
 	}
 	if d := time.Since(start); d > 4500*time.Millisecond {
