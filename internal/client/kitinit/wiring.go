@@ -330,6 +330,91 @@ func syncGroupedLoop(hooks *jsonorder.Object, desired []want) {
 	}
 }
 
+// agentOf は looptrack hook の配線の --agent の値（その形でなければ ""）。
+func agentOf(cmd string) string {
+	if m := newCmd.FindStringSubmatch(cmd); m != nil {
+		return m[3]
+	}
+	return ""
+}
+
+// dropForeignAgent は、--agent がこのファイルの AI（agent）と違う looptrack hook の配線を外し、外した数を返す。
+// そうした配線は verify が必ず拒む。それでも Codex のアプリの「Claude Code の hooks を移す」で .claude/settings.json の配線が
+// .codex/hooks.json に写ると生じる。core の配線は同じ名前があれば足さない（手で変えた配線を尊重する）ので、外さないと
+// 正しい配線が足されずに verify が落ち続ける。外した後に groupedSync・flatSync が正しい AI の配線を足す。
+func dropForeignAgent(hooks *jsonorder.Object, agent string, flat bool) int {
+	n := 0
+	foreign := func(h any) bool {
+		a := agentOf(cmdOf(asObj(h)))
+		if a != "" && a != agent {
+			n++
+			return true
+		}
+		return false
+	}
+	for _, ev := range hooks.Keys() {
+		v, _ := hooks.Get(ev)
+		list, ok := v.([]any)
+		if !ok {
+			continue
+		}
+		if flat {
+			var kept []any
+			for _, h := range list {
+				if !foreign(h) {
+					kept = append(kept, h)
+				}
+			}
+			if len(kept) != len(list) {
+				if len(kept) == 0 {
+					hooks.Delete(ev)
+				} else {
+					hooks.Set(ev, kept)
+				}
+			}
+			continue
+		}
+		var outGroups []any
+		changed := false
+		for _, g := range list {
+			gobj := asObj(g)
+			if gobj == nil {
+				outGroups = append(outGroups, g)
+				continue
+			}
+			hv, _ := gobj.Get("hooks")
+			hs, ok := hv.([]any)
+			if !ok {
+				outGroups = append(outGroups, g)
+				continue
+			}
+			var kept []any
+			for _, h := range hs {
+				if !foreign(h) {
+					kept = append(kept, h)
+				}
+			}
+			if len(kept) != len(hs) {
+				changed = true
+				if len(kept) == 0 {
+					continue
+				}
+				gobj.Set("hooks", kept)
+			}
+			outGroups = append(outGroups, g)
+		}
+		if !changed {
+			continue
+		}
+		if len(outGroups) == 0 {
+			hooks.Delete(ev)
+		} else {
+			hooks.Set(ev, outGroups)
+		}
+	}
+	return n
+}
+
 // stripManaged は init が書いた配線（core と loop）をすべて外す（配線の置き場を変えたとき）。
 func stripManaged(hooks *jsonorder.Object) bool {
 	removed := false

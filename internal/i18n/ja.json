@@ -1023,6 +1023,7 @@
   "kitinit.init.no_change": "変更はありません",
   "kitinit.init.no_change.installed": "変更はありません（導入済み）",
   "kitinit.init.note": "注意: {note}",
+  "kitinit.init.note.foreign_agent": "{file}: --agent が {agent} ではない looptrack の配線 {count} 件を外し、{agent} の配線を入れ直しました（別の AI の設定から写した配線は、その AI の hook として動きます）",
   "kitinit.init.note.codex_matcher": "{file}: トークン計測の PostToolUse の matcher を \"mcp\" から \"{matcher}\" に直しました（\"mcp\" は Codex では完全一致になり、MCP のツールで一度も動いていなかった）。変わったフックは Codex で信頼し直すまで動きません",
   "kitinit.init.note.codex_shell_env": "{file} には既に [shell_environment_policy] があるため変えていません。その set に LOOPTRACK_API_URL = \"{url}\"・LOOPTRACK_PROJECT = \"{project}\" があるか確かめてください（無いと AI が打つ CLI がサーバの場所を知らない）",
   "kitinit.init.note.copilot_reads_claude": "Copilot（VS Code・Copilot CLI）は .claude/settings.json の hooks も読みます。init が置く Claude Code 向けの hook（looptrack hook … --agent claude-code）は、Claude Code 以外から起動されると何もせずに終わります。以前の init の配線が残っていれば --agent に claude-code を含めて init を再実行して直してください（VS Code は設定 chat.hookFilesLocations で .claude/settings.json を外せる）",

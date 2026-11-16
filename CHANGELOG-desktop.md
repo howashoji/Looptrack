@@ -23,6 +23,41 @@ Nothing yet.
 
 まだありません。
 
+## [1.6.1] - 2026-11-16
+
+1.6.1 fixes `looptrack issue init` for projects whose Codex hooks were
+copied from Claude Code, and updates dependencies. Upgrading from 1.6.0
+needs no extra steps.
+
+### Fixed
+
+- `looptrack issue init` no longer fails verification when a hooks file holds
+  `looptrack hook` commands with another agent's `--agent`. The Codex app's
+  "migrate hooks from Claude Code" copies `.claude/settings.json` into
+  `.codex/hooks.json` with `--agent claude-code`, and adding Codex to such a
+  project stopped with "--agent is not codex" and rolled back. init now
+  removes those commands, wires them again for the right agent and says so.
+  Your own hooks in the file stay.
+
+### Changed
+
+- Dependencies are updated: golang.org/x/crypto v0.58.0, golang.org/x/sys
+  v0.49.0, golang.org/x/term v0.47.0, golang.org/x/text v0.43.0,
+  modernc.org/sqlite v1.61.1, excelize v2.11.1 (now a tagged release),
+  gopdf v0.38.4 and godbus/dbus v5.2.4.
+
+---
+
+1.6.1 では Claude Code の hooks を写した Codex の設定があるプロジェクトで `looptrack issue init` が止まる不具合を直しました。依存も上げています。1.6.0 から上げるときに追加の手順は要りません。
+
+### 修正
+
+- `looptrack issue init` は設定ファイルに別の AI の `--agent` を持つ `looptrack hook` の配線があっても verify で止まらなくなりました。Codex のアプリの「Claude Code の hooks を移す」は `.claude/settings.json` の配線を `--agent claude-code` のまま `.codex/hooks.json` に写します。そうしたプロジェクトに Codex を足すと「--agent が codex ではありません」で止まり、導入を戻していました。いまはその配線を外して正しい AI の配線を入れ直し、そのことを知らせます。利用者が自分で置いた hook は残します。
+
+### 変更
+
+- 依存を上げました。golang.org/x/crypto v0.58.0・golang.org/x/sys v0.49.0・golang.org/x/term v0.47.0・golang.org/x/text v0.43.0・modernc.org/sqlite v1.61.1・excelize v2.11.1・gopdf v0.38.4・godbus/dbus v5.2.4 です。excelize はタグの付いた版になりました。
+
 ## [1.6.0] - 2026-11-13
 
 1.6.0 adds a timeline for AI sessions. The desktop app applies the new
