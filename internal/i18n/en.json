@@ -1023,6 +1023,7 @@
   "kitinit.init.no_change": "No changes",
   "kitinit.init.no_change.installed": "No changes (already installed)",
   "kitinit.init.note": "Warning: {note}",
+  "kitinit.init.note.foreign_agent": "{file}: removed {count} looptrack hook(s) whose --agent was not {agent}, and wired them again for {agent} (wiring copied from another AI's settings runs as that AI's hooks)",
   "kitinit.init.note.codex_matcher": "{file}: changed the PostToolUse matcher for token metering from \"mcp\" to \"{matcher}\" (\"mcp\" is an exact match in Codex, so it never ran for MCP tools). A changed hook does not run until you trust it again in Codex.",
   "kitinit.init.note.codex_shell_env": "{file} already has [shell_environment_policy], so it was left alone. Please check that its set contains LOOPTRACK_API_URL = \"{url}\" and LOOPTRACK_PROJECT = \"{project}\" (without them the CLI the AI runs does not know where the server is).",
   "kitinit.init.note.copilot_reads_claude": "Copilot (VS Code and Copilot CLI) also reads the hooks in .claude/settings.json. The Claude Code hooks that init writes (looptrack hook ... --agent claude-code) do nothing when started from anything but Claude Code. If wiring from an older init is still there, re-run init with claude-code included in --agent to fix it (in VS Code you can drop .claude/settings.json with the chat.hookFilesLocations setting).",

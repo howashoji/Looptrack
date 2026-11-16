@@ -690,6 +690,7 @@ func (in *installer) planClaude() error {
 		}
 	}
 	hooks := ensureObj(data, "hooks")
+	in.dropForeign(rel, hooks, w.agent, false)
 	local := ".claude/settings.local.json"
 	if in.bin.abs == "" {
 		groupedSync(hooks, w, coreWants(w, o), loopWant, in.loopOn)
@@ -716,6 +717,7 @@ func (in *installer) planClaude() error {
 		}
 		lb, lex := beforeOf(ld)
 		lh := ensureObj(ld, "hooks")
+		in.dropForeign(local, lh, w.agent, false)
 		groupedSync(lh, w, coreWants(w, o), loopWant, in.loopOn)
 		if len(lh.Keys()) == 0 {
 			ld.Delete("hooks")
@@ -791,6 +793,13 @@ func (in *installer) putMCP(rel, key string, wantMCP *jsonorder.Object) error {
 	return nil
 }
 
+// dropForeign は rel の配線から --agent の違う looptrack hook を外し、外したら注記する（dropForeignAgent）。
+func (in *installer) dropForeign(rel string, hooks *jsonorder.Object, agent string, flat bool) {
+	if n := dropForeignAgent(hooks, agent, flat); n > 0 {
+		in.plan.Note(i18n.T(in.plan.Lang, "kitinit.init.note.foreign_agent", "file", rel, "count", n, "agent", agent))
+	}
+}
+
 func (in *installer) planCodex() error {
 	p, o := in.plan, in.o
 	rel := ".codex/hooks.json"
@@ -801,6 +810,7 @@ func (in *installer) planCodex() error {
 	before, existed := beforeOf(data)
 	hooks := ensureObj(data, "hooks")
 	w := in.wiring("codex")
+	in.dropForeign(rel, hooks, w.agent, false)
 	if !o.NoUsage && fixCodexUsageMatcher(hooks) {
 		p.Note(i18n.T(p.Lang, "kitinit.init.note.codex_matcher", "file", rel, "matcher", codexMCPMatcher))
 	}
@@ -901,6 +911,7 @@ func (in *installer) planCopilot() error {
 	}
 	hooks := ensureObj(data, "hooks")
 	w := in.wiring("copilot")
+	in.dropForeign(copilotHooks, hooks, w.agent, true)
 	var loopWant []want
 	if in.loopOn {
 		loopWant, _ = loopWants(in.loop, w)
