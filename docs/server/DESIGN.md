@@ -750,7 +750,7 @@ setup の直後はプロジェクトが 0 件です。プロジェクトを作�
 | # | 項目 | 決めていること | 理由 |
 | -- | -- | -- | -- |
 | Q1 | 実行ファイルの形 | **1 つ（`looptrack`）**を build tag で 2 種類にビルドします: desktop（トレイつき。macOS は cgo）と headless（cgo なし。サーバ・CI・Linux の端末） | デスクトップ版は 1 つで済みます。サーバとクライアントを分けても共通部品（`internal/usage`・`internal/xlsxreport`・kit の埋め込み）は同じです |
-| Q2 | hook の配線での実行ファイルの指し方 | PATH の名前（`looptrack hook …`）。解決できない端末では**手元専用の設定**（`settings.local.json` 等）に絶対パスを書きます | 共有の設定に利用者ごとのパスを入れないためです。GUI から起動した AI の PATH は OS や起動のしかたで違います |
+| Q2 | hook の配線での実行ファイルの指し方 | PATH の名前（`looptrack hook …`）。解決できない端末では**手元専用の設定**（`settings.local.json` 等）に絶対パスを書きます。Claude Code にはこのとき exec form（`command` に実行ファイル、`args` に引数）で書きます | 共有の設定に利用者ごとのパスを入れないためです。GUI から起動した AI の PATH は OS や起動のしかたで違います。Git Bash の無い Windows では Claude Code が hook を PowerShell で実行するので、引用したパスの後ろに語が続く形は動きません |
 | Q3 | 配布物の置き場 | GitHub Releases（`/api/v1/dist` の経路でも配ります） | 導入する側が外部のサーバに依存せずに取れます |
 | Q4 | PDF の日本語フォント | **BIZ UDGothic（SIL OFL）を埋め込む**（+約 7MB） | OS のフォントを探すと OS や言語設定で結果が変わります。すると列幅の規則が崩れます |
 | Q5 | Windows のトークンの保護 | ファイル + ACL（本人だけ） | 他の OS と同じ「ファイル 1 つを本人だけ読める形で置く」形に揃います |

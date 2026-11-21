@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -336,7 +337,8 @@ func TestInitGuideNextClose(t *testing.T) {
 			hooks += string(b)
 		}
 	}
-	if !strings.Contains(hooks, "SessionStart") || !strings.Contains(hooks, "hook summary") {
+	// 絶対パスの配線は exec form（"args": ["hook", "summary", …]）で書く
+	if !strings.Contains(hooks, "SessionStart") || (!strings.Contains(hooks, "hook summary") && !regexp.MustCompile(`"hook",\s*"summary"`).MatchString(hooks)) {
 		t.Errorf("init が SessionStart の hook（looptrack hook summary）を配線していない:\n%s", hooks)
 	}
 }

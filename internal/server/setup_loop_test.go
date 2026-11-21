@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/howashoji/looptrack/internal/hookio"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -767,6 +768,7 @@ func TestSetupLoopEndToEnd(t *testing.T) {
 		Hooks map[string][]struct {
 			Hooks []struct {
 				Command string `json:"command"`
+				Args    any    `json:"args"` // exec form（絶対パスの配線）の引数
 			} `json:"hooks"`
 		} `json:"hooks"`
 	}
@@ -783,8 +785,8 @@ func TestSetupLoopEndToEnd(t *testing.T) {
 		}
 		for _, g := range h.Hooks["SessionStart"] {
 			for _, c := range g.Hooks {
-				if strings.Contains(c.Command, "hook summary") {
-					sessionStart = c.Command
+				if strings.Contains(hookio.WiredCommand(c.Command, c.Args), "hook summary") {
+					sessionStart = hookio.WiredCommand(c.Command, c.Args)
 				}
 			}
 		}

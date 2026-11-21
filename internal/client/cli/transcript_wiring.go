@@ -10,6 +10,7 @@ import (
 	"github.com/howashoji/looptrack/internal/client/api"
 	"github.com/howashoji/looptrack/internal/client/env"
 	"github.com/howashoji/looptrack/internal/client/jsonorder"
+	"github.com/howashoji/looptrack/internal/hookio"
 )
 
 // 会話記録の自動送信の配線の有無（DESIGN.md §9-8「hook」）。
@@ -92,7 +93,8 @@ func hookNamesByEvent(fp string) map[string][]string {
 					continue
 				}
 				cmd, _ := ho.Get("command")
-				if m := looptrackHookCmd.FindStringSubmatch(jsonorder.Str(cmd)); m != nil {
+				args, _ := ho.Get("args") // Claude Code の exec form（絶対パスで配線したとき）
+				if m := looptrackHookCmd.FindStringSubmatch(hookio.WiredCommand(jsonorder.Str(cmd), args)); m != nil {
 					out[ev] = append(out[ev], m[1])
 				}
 			}

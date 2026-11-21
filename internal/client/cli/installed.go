@@ -161,7 +161,14 @@ func cmdInstalled(c *Ctx, v *Values) error {
 		}
 		return err
 	}
+	// 手で送った通知はフックが動いている証拠にならない（サーバは trigger=hook でしか記録しない）ので、
+	// フックからの通知が届いていなければ、その最後の失敗を添える（記録は消さない）
+	slug, _ := c.Project()
+	failure := localInstallFailure(c.Env, slug, v.Str("agent"))
 	if v.Bool("json") {
+		if failure != nil && res != nil {
+			res.Set("hook_report_failure", failure)
+		}
 		c.PrintJSON(res)
 		return nil
 	}
@@ -170,5 +177,9 @@ func cmdInstalled(c *Ctx, v *Values) error {
 		return err
 	}
 	c.Println(jsonorder.Str(msg))
+	// 手元の記録で、応答の timezone を持たないので既定の時間帯で描く
+	if line := installFailureText(c.Lang, failure, defaultTZ); line != "" {
+		c.Println(line)
+	}
 	return nil
 }

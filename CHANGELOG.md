@@ -23,6 +23,54 @@ Nothing yet.
 
 まだありません。
 
+## [1.6.2] - 2026-11-21
+
+1.6.2 makes the hooks that `looptrack issue init` wires with an absolute path
+work on Windows without Git Bash, and keeps a failed install notice from going
+unnoticed. No migrations were added after 1.6.1, so upgrading from 1.6.1
+needs no extra steps. Run `looptrack issue init` again in each project to
+rewrite the hooks.
+
+### Fixed
+
+- Hooks that `looptrack issue init` wires for Claude Code with an absolute
+  path (when looptrack is not on PATH, in `.claude/settings.local.json`) now
+  use Claude Code's exec form: the executable goes in `command` and the
+  arguments in `args`. On Windows without Git Bash, Claude Code runs hooks in
+  PowerShell, which rejected the old quoted path followed by words, so every
+  tool call was blocked. Re-running init rewrites the old entries in place.
+  This needs Claude Code 2.1.139 or later.
+- The SessionStart hook now gives its install notice up to 4 seconds instead of
+  the summary's 2. On a slow machine, or when the local SQLite server was busy
+  with the other SessionStart hooks, the notice timed out and was dropped in
+  silence, so the install stayed at "Waiting for hook approval" even though
+  the hook ran. When the notice still does not arrive, the last failure is kept on
+  this machine and shown in the session summary and in
+  `looptrack issue installed`.
+
+### Added
+
+- `looptrack doctor` suggests re-running init when the kit recorded in
+  `.claude/.looptrack-kit.json` differs from the kit embedded in the running
+  looptrack. Only installs made from the embedded kit are checked.
+- On Windows, the steps that the MCP `setup` tool returns for Claude Code say
+  that `looptrack issue verify` needs Git for Windows to run verification
+  commands. Hooks work without it.
+
+---
+
+1.6.2 では `looptrack issue init` が絶対パスで配線するフックが、Git Bash の無い Windows でも動くようにしました。フックの導入済み通知が届かないまま気づかれない不具合も直しています。1.6.1 の後に足したマイグレーションは無いので、1.6.1 から上げるときに追加の手順は要りません。各プロジェクトで `looptrack issue init` をやり直すとフックが書き直されます。
+
+### 修正
+
+- PATH に looptrack が無い端末で `looptrack issue init` が Claude Code に絶対パスで配線する hook（`.claude/settings.local.json`）を、Claude Code の exec form で書くようにしました。実行ファイルを `command` に引数を `args` に分けて書きます。Git Bash の無い Windows では Claude Code が hook を PowerShell で実行します。以前の書き方はそこで構文エラーになり、ツールの呼び出しがすべて止まっていました。init をやり直すと以前の配線をその場で書き換えます。Claude Code 2.1.139 以降が必要です。
+- SessionStart のフックが送る導入済み通知の打ち切りを、要約と同じ 2 秒から 4 秒に延ばしました。遅い PC や、ローカルの SQLite のサーバがほかの SessionStart のフックの書き込みで混んでいると、通知は時間切れになり黙って捨てられていました。フックは動いていても導入は未完了のままでした。それでも届かないときは最後の失敗をこの PC に残し、セッションの要約と `looptrack issue installed` に出します。
+
+### 追加
+
+- `.claude/.looptrack-kit.json` に記録した kit が実行中の looptrack に埋め込まれた kit と違うと、`looptrack doctor` が init のやり直しを促します。埋め込みの kit で入れた導入だけが対象です。
+- Windows の Claude Code 向けに MCP の `setup` ツールが返す手順に、`looptrack issue verify` の検証コマンドには Git for Windows が要ることを書きました。hook は Git for Windows が無くても動きます。
+
 ## [1.6.1] - 2026-11-16
 
 1.6.1 fixes `looptrack issue init` for projects whose Codex hooks were

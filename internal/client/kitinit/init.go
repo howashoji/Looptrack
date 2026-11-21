@@ -241,7 +241,7 @@ func resolveBin(lang i18n.Lang) binRef {
 			exe = r
 		}
 		return binRef{sh: `"` + exe + `"`, ps: "& '" + strings.ReplaceAll(exe, "'", "''") + "'", abs: exe,
-			note: i18n.T(lang, "kitinit.init.note.wired_abs", "exe", exe, "bindir", binDirHint())}
+			note: wiredAbsNote(lang, exe, desktopBundled(runtime.GOOS, exe, fileExists))}
 	}
 	return binRef{sh: "looptrack", ps: "looptrack",
 		note: i18n.T(lang, "kitinit.init.note.not_in_path", "bindir", binDirHint())}
@@ -250,10 +250,13 @@ func resolveBin(lang i18n.Lang) binRef {
 // binDirHint は looptrack を置く場所の例（setup の置き場。管理者権限が要らない）。
 func binDirHint() string {
 	if runtime.GOOS == "windows" {
-		return `%LOCALAPPDATA%\Programs\looptrack`
+		return winBinDir
 	}
 	return "~/.local/bin"
 }
+
+// winBinDir は Windows の置き場（setup の取得とデスクトップ版のトレイメニューが looptrack.exe を置く）。
+const winBinDir = `%LOCALAPPDATA%\Programs\looptrack`
 
 // serverMode は、サーバ版の導入（--url か --source server。setup の取得 + init もこの形）か。
 func (in *installer) serverMode() bool { return in.o.URL != "" || in.source == "server" }
@@ -288,7 +291,11 @@ func (in *installer) rerunCommand(extra string) string {
 }
 
 func (in *installer) wiring(agent string) wiring {
-	return wiring{agent: agent, bin: in.bin.sh, psBin: in.bin.ps, url: in.url, slug: in.o.Project, env: agent != "claude-code"}
+	w := wiring{agent: agent, bin: in.bin.sh, psBin: in.bin.ps, url: in.url, slug: in.o.Project, env: agent != "claude-code"}
+	if agent == "claude-code" {
+		w.exec = in.bin.abs // 絶対パスで配線するときは exec form（PowerShell でも起動できる形）
+	}
+	return w
 }
 
 func (in *installer) run() error {

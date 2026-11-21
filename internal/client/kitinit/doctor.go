@@ -112,11 +112,12 @@ func Doctor(args []string, o DoctorOptions) int {
 	source := kitSourceOf(dir)
 	selfRepo := cli.IsSelfRepo(dir)
 	redo, update := doctorRedo(o.Lang, source, selfRepo)
+	desktop := desktopBundled(runtime.GOOS, exe, fileExists) // デスクトップ版に同梱の CLI から動いている
 
 	// 2. PATH
 	inPath := false
 	if p, err := lookPath("looptrack"); err != nil || p == "" {
-		r.note(pathMissingText(o.Lang, runtime.GOOS, source, redo))
+		r.note(pathMissingText(o.Lang, runtime.GOOS, source, redo, desktop))
 	} else {
 		inPath = true
 		real := p
@@ -220,6 +221,9 @@ func Doctor(args []string, o DoctorOptions) int {
 			}
 			r.ok(i18n.T(o.Lang, "kitinit.doctor.kit.ok", "file", kitJSON, "project", orDash(data.String("project")),
 				"source", orDash(data.String("source")), "loop", ls))
+			if which := staleEmbeddedKit(data, embedded(), selfRepo); which != "" {
+				r.note(i18n.T(o.Lang, "kitinit.doctor.kit.stale", "file", kitJSON, "which", which, "command", bin+" issue init"))
+			}
 		} else {
 			r.bad(i18n.T(o.Lang, "kitinit.doctor.err.read_file", "file", kitJSON, "reason", err))
 		}
@@ -259,6 +263,9 @@ func Doctor(args []string, o DoctorOptions) int {
 	}
 	b := l.For(runtime.GOOS, runtime.GOARCH)
 	switch {
+	case b == nil && desktop:
+		// デスクトップ版は配布ディレクトリに looptrack を置かないのが普通（CLI はアプリと一緒に更新される）。注意にしない
+		r.ok(i18n.T(o.Lang, "kitinit.doctor.dist.desktop"))
 	case b == nil:
 		r.note(i18n.T(o.Lang, "kitinit.doctor.dist.none", "os", runtime.GOOS, "arch", runtime.GOARCH))
 	case relver.Older(o.Version, b.Version):
@@ -281,6 +288,36 @@ func runningBin(exe string) string {
 		return "& '" + strings.ReplaceAll(exe, "'", "''") + "'"
 	}
 	return `"` + exe + `"`
+}
+
+// staleEmbeddedKit は、埋め込みの kit で入れた導入（控えの source が copy）の控えの core / loop の bundle_sha256 が、実行中の
+// looptrack に埋め込まれた kit（files）と違えば、違う層の名前（"core"・"loop"・"core・loop"）を返す。同じ・比べられないときは ""。
+// デスクトップ版や looptrack の更新で埋め込みの kit が変わっても、init をやり直すまで配線と kit は古いまま残るので、doctor が促す。
+// サーバから入れた導入（server）はサーバの配布物と比べる（MCP の setup の stale）ので見ない。looptrack 自身のリポジトリ（kit の正本）は
+// init をしないので見ない。loop は入れているときだけ比べる。
+func staleEmbeddedKit(data *jsonorder.Object, files map[string]string, selfRepo bool) string {
+	if selfRepo || data.String("source") != "copy" {
+		return ""
+	}
+	coreSums, loopSums := map[string]string{}, map[string]string{}
+	for n, b := range files {
+		switch {
+		case strings.HasPrefix(n, "kit/core/"):
+			coreSums[n] = sha(b)
+		case strings.HasPrefix(n, "kit/loop/"):
+			loopSums[n] = sha(b)
+		}
+	}
+	var out []string
+	if c := data.Object("core").String("bundle_sha256"); c != "" && len(coreSums) > 0 && c != bundleSHA(coreSums) {
+		out = append(out, "core")
+	}
+	if lo := data.Object("loop"); truthy(lo, "installed") {
+		if l := lo.String("bundle_sha256"); l != "" && len(loopSums) > 0 && l != bundleSHA(loopSums) {
+			out = append(out, "loop")
+		}
+	}
+	return strings.Join(out, "・")
 }
 
 // kitSourceOf は控え（.claude/.looptrack-kit.json）の置き方（link / copy / server。読めなければ空）。
@@ -317,7 +354,13 @@ func doctorRedo(lang i18n.Lang, source string, selfRepo bool) (redo, update stri
 // hook の案内が looptrack を名前で呼ぶので AI がそのままでは打てないことと、直し方（setup の手順の再実行。その手順が置き場を
 // PATH に足す）を示す。導入済みだと setup は手順を返さないので、PATH を足すだけのコマンド（setup の手順と同じ断片。
 // internal/setuppath）も添える。
-func pathMissingText(lang i18n.Lang, goos, source, redo string) string {
+//
+// デスクトップ版に同梱の CLI から動いているとき（desktop）は、置き方に関わらずトレイメニューの「CLI を使えるようにする」と
+// その写し先を示す（同梱の場所は PATH に入らず、写し先は利用者が PATH に足す）。
+func pathMissingText(lang i18n.Lang, goos, source, redo string, desktop bool) string {
+	if desktop {
+		return i18n.T(lang, "kitinit.doctor.path.missing_desktop", "bindir", winBinDir, "menu", desktopMenu(lang))
+	}
 	if source != "server" {
 		return i18n.T(lang, "kitinit.doctor.path.missing")
 	}

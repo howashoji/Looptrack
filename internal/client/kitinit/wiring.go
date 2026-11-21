@@ -19,6 +19,9 @@ import (
 //     CLAUDE_PROJECT_DIR なしで起動しても失敗しない。Claude Code 以外からの起動は --agent claude-code の hook が何もせず終わる（hookio.ForeignHost）。
 //   - looptrack は PATH の名前で指す。PATH に無い端末では実行ファイルの絶対パスで配線し、Claude Code は手元専用の
 //     .claude/settings.local.json に書く（共有の設定に利用者ごとのパスを入れない）。
+//   - Claude Code を絶対パスで配線するときは exec form（command に実行ファイル、args に引数）で書く。Git Bash の無い
+//     Windows で Claude Code はフックを PowerShell で実行し、引用した絶対パスの後ろに語が続く形は構文エラーになるため。
+//     exec form はシェルを通さずに起動する（Claude Code 2.1.139 から）。読む側は hookio.WiredCommand で shell form と同じ文字列にそろえる。
 //   - Codex・Copilot は設定に env が無いので LOOPTRACK_API_URL / LOOPTRACK_PROJECT を前置する（以前の CLI と同じ）。
 //
 // 以前の CLI（1.0.0 より前）の init が書いた配線を新しい形に置き換える処理は、その撤去で
@@ -32,7 +35,8 @@ type wiring struct {
 	psBin string // PowerShell での呼び方（Copilot の powershell / windows）
 	url   string
 	slug  string
-	env   bool // LOOPTRACK_API_URL / LOOPTRACK_PROJECT を前置する（Codex・Copilot）
+	env   bool   // LOOPTRACK_API_URL / LOOPTRACK_PROJECT を前置する（Codex・Copilot）
+	exec  string // exec form で書くときの実行ファイルの絶対パス（Claude Code を絶対パスで配線するときだけ）
 }
 
 func (w wiring) prefix() string {
@@ -51,6 +55,14 @@ func (w wiring) hook(name, extra string, withEnv bool) string {
 	return p + w.bin + " hook " + name + " --agent " + w.agent + extra
 }
 
+// hookArgs は exec form の args（hook <名前> --agent <AI> と extra の語）。exec form でなければ nil。
+func (w wiring) hookArgs(name, extra string) []string {
+	if w.exec == "" {
+		return nil
+	}
+	return append([]string{"hook", name, "--agent", w.agent}, strings.Fields(extra)...)
+}
+
 // hookPS は Copilot の Windows（PowerShell）の同じ配線。
 func (w wiring) hookPS(name, extra string, withEnv bool) string {
 	p := ""
@@ -64,7 +76,8 @@ func (w wiring) hookPS(name, extra string, withEnv bool) string {
 func coreWants(w wiring, o *Options) []want {
 	var out []want
 	add := func(ev, matcher, name, extra string, timeout int) {
-		out = append(out, want{Event: ev, Matcher: matcher, ID: name, Cmd: w.hook(name, extra, true), PS: w.hookPS(name, extra, true), Timeout: timeout})
+		out = append(out, want{Event: ev, Matcher: matcher, ID: name, Cmd: w.hook(name, extra, true), PS: w.hookPS(name, extra, true), Timeout: timeout,
+			Exec: w.exec, Args: w.hookArgs(name, extra)})
 	}
 	if !o.NoSummary {
 		add("SessionStart", "", "summary", "", 10)
@@ -158,11 +171,61 @@ func asObj(v any) *jsonorder.Object {
 	return o
 }
 
+// cmdOf は hook の 1 件のコマンド（exec form は shell form と同じ文字列にそろえる。hookio.WiredCommand）。
 func cmdOf(h *jsonorder.Object) string {
 	if h == nil {
 		return ""
 	}
-	return h.String("command")
+	args, _ := h.Get("args")
+	return hookio.WiredCommand(h.String("command"), args)
+}
+
+// setHookCmd は hook の 1 件に d のコマンドを書く。d.Exec があれば exec form（command に実行ファイル、args に引数）、
+// 無ければ shell form（command だけ。exec form の args は外す）。
+func setHookCmd(h *jsonorder.Object, d want) {
+	if d.Exec != "" {
+		args := make([]any, len(d.Args))
+		for i, a := range d.Args {
+			args[i] = a
+		}
+		h.Set("command", d.Exec)
+		if t, ok := h.Get("timeout"); ok && !h.Has("args") {
+			h.Delete("timeout") // args を command の直後に置く（timeout は後ろに付け直す）
+			h.Set("args", args)
+			h.Set("timeout", t)
+			return
+		}
+		h.Set("args", args)
+		return
+	}
+	h.Set("command", d.Cmd)
+	h.Delete("args")
+}
+
+// sameHookButBin は a と b が、looptrack の指し方（PATH の名前・引用した絶対パス）を除いて同じ配線か。
+// init が以前に別の指し方（shell form・別の場所の絶対パス）で置いたままの配線を見分ける（手で変えた配線は違う文字列になる）。
+func sameHookButBin(a, b string) bool {
+	ma, mb := newCmd.FindStringSubmatch(a), newCmd.FindStringSubmatch(b)
+	if ma == nil || mb == nil {
+		return false
+	}
+	if !isLooptrackBin(ma[1]) || !isLooptrackBin(mb[1]) {
+		return false
+	}
+	pa, pb := strings.HasPrefix(a, "LOOPTRACK_API_URL="), strings.HasPrefix(b, "LOOPTRACK_API_URL=")
+	return pa == pb && ma[2] == mb[2] && ma[3] == mb[3] && ma[4] == mb[4]
+}
+
+// isLooptrackBin は配線の実行ファイルの語が looptrack そのもの（PATH の名前か、名前が looptrack / looptrack.exe の絶対パス）か。
+// newCmd は looptrack-wrapper のような名前も配線として読むが、利用者が別の実行ファイルに向けて手で置いた配線は
+// 置き換えない（init が置いた配線の実行ファイルの名前は必ず looptrack）。
+func isLooptrackBin(tok string) bool {
+	tok = strings.Trim(tok, `"'`)
+	if i := strings.LastIndexAny(tok, `/\`); i >= 0 {
+		tok = tok[i+1:]
+	}
+	tok = strings.ToLower(tok)
+	return tok == "looptrack" || tok == "looptrack.exe"
 }
 
 func matcherOf(o *jsonorder.Object) string {
@@ -221,7 +284,16 @@ func groupedEntries(hooks *jsonorder.Object, ev string) []*jsonorder.Object {
 // addGrouped は d を足す（同じイベントに同じ hook があれば足さない）。last なら同じ matcher の最後のグループ、
 // でなければ最初のグループに足す（以前の CLI（1.0.0 より前）の loop と core の違いをそのまま）。
 func addGrouped(hooks *jsonorder.Object, d want, last bool) {
-	if hasID(groupedEntries(hooks, d.Event), d.ID) {
+	if entries := groupedEntries(hooks, d.Event); hasID(entries, d.ID) {
+		// exec form で配線するとき、init が shell form（か別の場所の絶対パス）で置いたままの配線はその場で exec form に直す
+		// （重ねて足さない。手で変えた配線は違う文字列になるので残す）
+		if d.Exec != "" {
+			for _, h := range entries {
+				if sameHookButBin(cmdOf(h), d.Cmd) {
+					setHookCmd(h, d)
+				}
+			}
+		}
 		return
 	}
 	v, _ := hooks.Get(d.Event)
@@ -229,7 +301,9 @@ func addGrouped(hooks *jsonorder.Object, d want, last bool) {
 	if v != nil && !ok {
 		return
 	}
-	entry := jsonorder.NewObject().Set("type", "command").Set("command", d.Cmd).Set("timeout", num(d.Timeout))
+	entry := jsonorder.NewObject().Set("type", "command")
+	setHookCmd(entry, d)
+	entry.Set("timeout", num(d.Timeout))
 	var target *jsonorder.Object
 	for _, g := range groups {
 		gobj := asObj(g)
@@ -302,7 +376,7 @@ func syncGroupedLoop(hooks *jsonorder.Object, desired []want) {
 					continue
 				}
 				matched[hit] = true
-				ho.Set("command", desired[hit].Cmd)
+				setHookCmd(ho, desired[hit])
 				ho.Set("timeout", num(desired[hit].Timeout))
 				kept = append(kept, h)
 			}
