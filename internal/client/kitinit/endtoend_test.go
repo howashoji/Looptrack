@@ -152,8 +152,8 @@ func TestNotOnPathUsesLocalSettings(t *testing.T) {
 	}
 	shared := read(t, filepath.Join(ws, ".claude", "settings.json"))
 	local := read(t, filepath.Join(ws, ".claude", "settings.local.json"))
-	if strings.Contains(shared, `"hooks"`) || !strings.Contains(local, `"\"/opt/lt/looptrack\" hook summary --agent claude-code"`) {
-		t.Errorf("共有の設定に配線せず、手元の設定に絶対パスで配線する:\nshared=%s\nlocal=%s", shared, local)
+	if strings.Contains(shared, `"hooks"`) || !strings.Contains(local, `"command": "/opt/lt/looptrack"`) {
+		t.Errorf("共有の設定に配線せず、手元の設定に絶対パスで配線する（exec form）:\nshared=%s\nlocal=%s", shared, local)
 	}
 	if !strings.Contains(strings.Join(fr.calls, "\n"), "/opt/lt/looptrack version") {
 		t.Errorf("verify が絶対パスの looptrack を起動していない: %v", fr.calls)

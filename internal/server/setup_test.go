@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/howashoji/looptrack/internal/hookio"
 	"io"
 	"net/http"
 	"os"
@@ -674,6 +675,7 @@ func sessionStartHook(t *testing.T, proj string) (string, map[string]string) {
 		Hooks map[string][]struct {
 			Hooks []struct {
 				Command string `json:"command"`
+				Args    any    `json:"args"` // exec form（絶対パスの配線）の引数
 			} `json:"hooks"`
 		} `json:"hooks"`
 	}
@@ -689,8 +691,8 @@ func sessionStartHook(t *testing.T, proj string) (string, map[string]string) {
 		}
 		for _, g := range h.Hooks["SessionStart"] {
 			for _, c := range g.Hooks {
-				if strings.Contains(c.Command, "hook summary") {
-					cmd = c.Command
+				if strings.Contains(hookio.WiredCommand(c.Command, c.Args), "hook summary") {
+					cmd = hookio.WiredCommand(c.Command, c.Args)
 				}
 			}
 		}

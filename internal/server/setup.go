@@ -409,7 +409,12 @@ func (s *Server) evalInstall(lang i18n.Lang, pr store.Project, agent string, ins
 		st.Message = i18n.T(lang, "server.mcp.setup.state.missing", "agent", label, "project", pr.Slug)
 		return st
 	}
-	st.Source, st.Bundle, st.Host, st.Workspace, st.SelfRepo = inst.Source, inst.BundleSHA256, inst.Host, inst.Workspace, inst.SelfRepo
+	st.Source, st.Host, st.Workspace, st.SelfRepo = inst.Source, inst.Host, inst.Workspace, inst.SelfRepo
+	if len(inst.Files) > 0 {
+		// 今の CLI は files を送らない（古さは client.version と core / loop の控えで比べる）。空の files のハッシュ
+		// （空の入力の SHA-256）を返すと、壊れた控えに見えて読み違えるので返さない
+		st.Bundle = inst.BundleSHA256
+	}
 	st.ReportedAt = s.fmtTime(inst.ReportedAt)
 	if inst.HookAt != nil {
 		st.HookAt = s.fmtTime(*inst.HookAt)
@@ -880,6 +885,9 @@ type setupJSON struct {
 // Copilot・Codex 向けは、手順のコマンドにサーバの URL とプロジェクトを環境変数で前置する（agentEnvPrefix）。
 func setupStepsFor(lang i18n.Lang, agent, slug, base, dist string, st installStateJSON, l distLatest, g *goSetup, answer string) []setupStepJSON {
 	steps := setupStepsOf(lang, agent, slug, base, dist, st, l, g, answer)
+	if note := gitForWindowsStep(lang, agent, st, g); note != nil {
+		steps = append(steps, *note)
+	}
 	if !needsEnvPrefix(agent) {
 		return steps
 	}
@@ -888,6 +896,16 @@ func setupStepsFor(lang i18n.Lang, agent, slug, base, dist string, st installSta
 		s.Command, s.CommandWindows = agentEnvPrefix(s.Command, base, slug, g.isWindows()), agentEnvPrefix(s.CommandWindows, base, slug, true)
 	}
 	return steps
+}
+
+// gitForWindowsStep は Windows の Claude Code への導入の手順に添える、Git for Windows の前提（利用者の手順）。
+// フックは init が絶対パスを exec form（シェルを通さない形）で配線するので Git Bash が無くても動くが、
+// looptrack issue verify の検証コマンドは Git Bash で実行する。導入済み（current）と Windows でないときは nil。
+func gitForWindowsStep(lang i18n.Lang, agent string, st installStateJSON, g *goSetup) *setupStepJSON {
+	if agent != agentClaudeCode || st.State == "current" || g == nil || !g.isWindows() {
+		return nil
+	}
+	return &setupStepJSON{Who: "ai", Title: i18n.T(lang, "server.mcp.setup.step.git_for_windows")}
 }
 
 // needsEnvPrefix は、init が書いた設定を CLI にすぐには渡さない AI かどうか。

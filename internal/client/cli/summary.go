@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,6 +23,19 @@ import (
 
 // summaryTimeout は SessionStart を止めないための打ち切り（1 要求 2 秒）。
 const summaryTimeout = 2 * time.Second
+
+// installReportTimeout は、フックからの導入済み通知（trigger=hook）の打ち切り。1 要求の待ち時間と、
+// ローカルモードの確かめ・古いサーバ向けの送り直しを含めた通知の全体の両方をこの値で切る。
+//
+// 要約の 2 秒では足りないことがある。ローカルモード（SQLite）のサーバは書き込みを 1 本ずつ通すので、
+// SessionStart に並ぶほかのフックの書き込みの後ろで待つと 2 秒を超える。通知は書き込みなので要約の取得より遅れやすく、
+// 切れても黙って捨てていたので、フックが動いていてもサーバの導入状態が変わらなかった。
+//
+// 値はフックの持ち時間（internal/client/hook/core の registry の summary は 9 秒）から決める。通知は要約の取得の後に、
+// 取得に成功したときも失敗したとき（時間切れを含む）も 1 回だけ送る。要約の側はどちらでも最大で
+// ローカルモードの確かめ 2 秒 + 取得 2 秒 = 4 秒かかる（失敗は打ち切りの 2 秒より長くはかからない）。
+// 残りの 5 秒から、プロセスの起動と出力の分を 1 秒残して 4 秒にした（4 + 4 = 8 秒で 9 秒に収まる）。
+const installReportTimeout = 4 * time.Second
 
 // cmdSummary は SessionStart の要約を出す。
 func cmdSummary(c *Ctx, v *Values) error {
@@ -86,6 +101,11 @@ func (c *Ctx) summaryBody(v *Values) error {
 	}
 	raw, err := cl.Get(path)
 	if err != nil {
+		// 要約を取れなくてもフックとしては動いている。導入済みの通知は送り、届かなければ失敗を手元に残す
+		// （送らずに返すと、要約の取得が 2 秒で切れる環境では通知が一度も届かず、その理由もどこにも残らない）
+		if agent := v.Str("agent"); agent != "" {
+			c.reportHookInstall(agent)
+		}
 		return fail(err) // 設定はあるが届かない・時間切れ・認証切れ（文面は api が持つ）
 	}
 	res, ok := raw.(*jsonorder.Object)
@@ -145,8 +165,11 @@ func (c *Ctx) summaryBody(v *Values) error {
 	}
 	if agent := v.Str("agent"); agent != "" {
 		// SessionStart のフックとして動いている = フックが承認されて動いている証拠。導入済みをサーバへ知らせる
-		if inst, err := c.reportInstall(cl, agent, "hook"); err == nil {
+		if inst := c.reportHookInstall(agent); inst != nil {
 			data.Set("install", inst)
+		}
+		if f := localInstallFailure(c.Env, slug, agent); f != nil { // 届かなかった（理由はこの PC にだけある）
+			data.Set("install_report_failure", f)
 		}
 	}
 	if v.Bool("json") {
@@ -257,6 +280,9 @@ func (c *Ctx) printSummary(data *jsonorder.Object, limit int64) error {
 		return err
 	}
 	if line := pathMissingNote(c.Lang, c.Root); line != "" {
+		c.Println("\n" + line)
+	}
+	if line := installFailureText(c.Lang, asObject(get(data, "install_report_failure", nil)), loc); line != "" {
 		c.Println("\n" + line)
 	}
 	// 導入状態。導入済みで最新なら何も出さない
@@ -410,6 +436,89 @@ func otherSessionNote(lang i18n.Lang, items []*jsonorder.Object) string {
 		return ""
 	}
 	return i18n.T(lang, "cli.summary.other_session", "ids", strings.Join(ids, i18n.T(lang, "cli.sep.list")))
+}
+
+// reportHookInstall はフックからの導入済み通知（trigger=hook）を、要約とは別の打ち切りの client で送る。
+// 届いたら導入状態を返して手元の失敗の記録を消し、届かなければ失敗を手元に残して nil を返す（フックは止めない）。
+func (c *Ctx) reportHookInstall(agent string) *jsonorder.Object {
+	slug, _ := c.Project()
+	state, apiURL := usagesnap.StateDir(c.Env), c.Env.Value(env.APIURL)
+	cl, err := api.NewWithTimeout(c.Env, installReportTimeout)
+	if err != nil {
+		usagesnap.RecordInstallFailure(state, apiURL, slug, agent, time.Now(), usagesnap.FailClient, 0)
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), installReportTimeout)
+	defer cancel()
+	cl.Context = ctx
+	c.useServerLang(cl)
+	inst, err := c.reportInstall(cl, agent, "hook")
+	if err != nil {
+		reason, status := installFailReason(err)
+		usagesnap.RecordInstallFailure(state, apiURL, slug, agent, time.Now(), reason, status)
+		return nil
+	}
+	usagesnap.ClearInstallFailure(state, apiURL, slug, agent)
+	return inst
+}
+
+// installFailReason は導入済み通知の失敗を、記録に書く理由のキーと HTTP の状態にする。
+func installFailReason(err error) (string, int) {
+	var ae *api.Error
+	if errors.As(err, &ae) {
+		if ae.Status >= 500 {
+			return usagesnap.FailUnreachable, ae.Status
+		}
+		return usagesnap.FailRejected, ae.Status
+	}
+	var ce *api.ConnError
+	var nt *api.NoTokenError
+	switch {
+	case errors.As(err, &ce):
+		return usagesnap.FailUnreachable, 0
+	case errors.As(err, &nt):
+		// ここに来るのは要約の取得が通った後（トークンが無くて通るのはローカルモードのサーバだけ）。
+		// 通知の側でローカルモードの確かめが届かなかったので、トークンではなく届かなかったことを理由にする
+		return usagesnap.FailUnreachable, 0
+	}
+	return usagesnap.FailClient, 0
+}
+
+// localInstallFailure は、フックからの導入済み通知の最後の失敗（このプロジェクトと AI の分。無ければ nil）。
+func localInstallFailure(e env.Env, project, agent string) *jsonorder.Object {
+	f := usagesnap.ReadInstallFailure(usagesnap.StateDir(e), e.Value(env.APIURL), project, agent)
+	if f == nil {
+		return nil
+	}
+	o := jsonorder.NewObject().Set("reason", f.Reason).Set("at", f.At.UTC().Format(time.RFC3339)).Set("count", f.Count)
+	if f.Status != 0 {
+		o.Set("status", f.Status)
+	}
+	return o
+}
+
+// installFailureText は localInstallFailure の 1 行（無ければ ""）。
+func installFailureText(lang i18n.Lang, o *jsonorder.Object, loc *time.Location) string {
+	reason := getStr(o, "reason", "")
+	if o == nil || reason == "" {
+		return ""
+	}
+	var why string
+	switch reason {
+	case usagesnap.FailUnreachable:
+		why = i18n.T(lang, "cli.summary.install_fail.unreachable")
+		if s := intOf(get(o, "status", int64(0))); s != 0 {
+			why = i18n.T(lang, "cli.summary.install_fail.server_error", "status", s)
+		}
+	case usagesnap.FailRejected:
+		why = i18n.T(lang, "cli.summary.install_fail.rejected", "status", intOf(get(o, "status", int64(0))))
+	case usagesnap.FailClient:
+		why = i18n.T(lang, "cli.summary.install_fail.client_error")
+	default:
+		why = reason // 新しい版が書いた知らないキーはそのまま出す
+	}
+	return i18n.T(lang, "cli.summary.install_report_failed", "at", localTimeIn(getStr(o, "at", ""), loc), "reason", why,
+		"count", intOf(get(o, "count", int64(0))))
 }
 
 // localUsageFailure は、この PC の付与のフックが送れていないこと（最後の失敗と、このプロジェクトで再送を待っている件数）。

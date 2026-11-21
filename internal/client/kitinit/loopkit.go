@@ -162,6 +162,10 @@ type want struct {
 	// Lead は、そのイベントの配列が無ければ hooks の先頭側に作る（Copilot の合成の SessionStart。core の summary が
 	// 最初に作っていた位置を保つ）。
 	Lead bool
+	// Exec と Args は exec form（Claude Code を絶対パスで配線するとき）の command と args。Exec が空なら shell form（Cmd）。
+	// Cmd は exec form でも shell form と同じ文字列を持つ（読む側の cmdOf がそろえる形。判定と自己検査はこれで比べる）。
+	Exec string
+	Args []string
 }
 
 // loopWants は manifest の hook の配線（order 順）。agent が claude-code 以外なら、その AI の列（null・無しは配線しない）に従う。
@@ -196,7 +200,8 @@ func loopWants(entries []loopEntry, w wiring) (out []want, skipped []string) {
 		if noBlock {
 			extra = " --no-block"
 		}
-		out = append(out, want{Event: ev, Matcher: matcher, ID: name, Cmd: w.hook(name, extra, false), PS: w.hookPS(name, extra, false), Timeout: e.Timeout})
+		out = append(out, want{Event: ev, Matcher: matcher, ID: name, Cmd: w.hook(name, extra, false), PS: w.hookPS(name, extra, false), Timeout: e.Timeout,
+			Exec: w.exec, Args: w.hookArgs(name, extra)})
 	}
 	return out, skipped
 }

@@ -18,6 +18,8 @@ DEMO-0002 bug         Todo        P0  DEMO-0001 保存でエラーになる
 
 未クローズ 2 件（bug 0 件）
 
+フックからの導入済み通知がサーバに届いていません（最後の失敗 $NOW・続けて 1 回・サーバに届かない・時間切れ）。サーバの導入状態はフックの動作を確認できないままです。次のセッションの開始で送り直します
+
 #### stderr
 
 #### requests (2)
@@ -45,4 +47,10 @@ POST /im/api/v1/projects/demo/install
       "workspace": "ws"
     }
 
-#### files (0)
+#### files (1)
+home/.config/looptrack/install-report-failure/$PROJECTKEY/codex.json (0644)
+    {
+      "at": "$NOW",
+      "count": 1,
+      "reason": "unreachable"
+    }

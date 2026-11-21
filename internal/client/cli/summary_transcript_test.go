@@ -161,6 +161,27 @@ func TestSummaryTranscriptUnwired(t *testing.T) {
 	if got := lines(i18n.JA, split, ""); len(got) != 1 || !strings.Contains(got[0], on) || strings.Contains(got[0], unwired) {
 		t.Fatalf("2 つの設定ファイルの配線を合わせて数えていない: %q", got)
 	}
+	// 対照: Claude Code の exec form（絶対パスで配線したときの command と args）の配線も同じに数える。
+	// transcript のある exec form は「入」、transcript の無い exec form は案内する（args を読まなければ、どちらも未導入に見える）
+	execGroup := func(names ...string) string {
+		var hs []string
+		for _, n := range names {
+			hs = append(hs, `{"type": "command", "command": "/opt/lt/looptrack", "args": ["hook", "`+n+`", "--agent", "claude-code"], "timeout": 10}`)
+		}
+		return `[{"hooks": [` + strings.Join(hs, ", ") + `]}]`
+	}
+	execNew := t.TempDir()
+	write(execNew, ".claude/settings.local.json", `{"hooks": {"SessionStart": `+execGroup("summary")+
+		`, "Stop": `+execGroup("usage", "transcript")+`, "SessionEnd": `+execGroup("usage", "transcript")+`}}`)
+	if got := lines(i18n.JA, execNew, ""); len(got) != 1 || !strings.Contains(got[0], on) || strings.Contains(got[0], unwired) {
+		t.Fatalf("exec form の配線を数えていない: %q", got)
+	}
+	execOld := t.TempDir()
+	write(execOld, ".claude/settings.local.json", `{"hooks": {"SessionStart": `+execGroup("summary")+
+		`, "Stop": `+execGroup("usage")+`, "SessionEnd": `+execGroup("usage")+`}}`)
+	if got := lines(i18n.JA, execOld, ""); len(got) != 1 || !strings.Contains(got[0], unwired) {
+		t.Fatalf("exec form の古い配線を案内していない: %q", got)
+	}
 	// 案内が出る: looptrack の hook が settings.local.json にしか無く、そこに transcript が無い（settings.local.json を見なければ未導入として案内しない）
 	localOld := t.TempDir()
 	write(localOld, ".claude/settings.json", `{"hooks": {}}`)

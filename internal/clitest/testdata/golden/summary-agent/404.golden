@@ -7,10 +7,29 @@ $ issue summary --agent claude-code --limit 3
 
 #### stderr
 
-#### requests (1)
+#### requests (2)
 GET /im/api/v1/projects/demo/summary?limit=3
   Authorization: Bearer imp_golden_token
   X-Looptrack-Client: cli
   X-Looptrack-Lang: ja
+POST /im/api/v1/projects/demo/install
+  Authorization: Bearer imp_golden_token
+  Content-Type: application/json; charset=utf-8
+  X-Looptrack-Client: cli
+  X-Looptrack-Lang: ja
+  body:
+    {
+      "agent": "claude-code",
+      "client": {
+        "arch": "$GOARCH",
+        "os": "$GOOS",
+        "version": "$VERSION"
+      },
+      "files": {},
+      "host": "$HOST",
+      "source": "",
+      "trigger": "hook",
+      "workspace": "ws"
+    }
 
 #### files (0)

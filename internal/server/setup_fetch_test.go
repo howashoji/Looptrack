@@ -549,6 +549,13 @@ func TestSetupSelfRepoFetchOmitsInit(t *testing.T) {
 		{"Windows", map[string]any{"os": "windows"}, false, true},
 		{"不明", map[string]any{}, true, true},
 	}
+	// wantSteps は取得と承認の 2 つに、Windows の Claude Code だけに添える Git for Windows の前提を足した数
+	wantSteps := func(win bool) int {
+		if win {
+			return 3
+		}
+		return 2
+	}
 	// fetchCmds は取得の手順の (sh, PowerShell) のコマンド。Windows を指定したときは主のコマンドが PowerShell
 	fetchCmds := func(out loopSetupOut, win bool) (string, string) {
 		if win && out.Steps[0].CommandWindows == "" {
@@ -563,7 +570,7 @@ func TestSetupSelfRepoFetchOmitsInit(t *testing.T) {
 	}
 	for _, c := range osCases {
 		out := loopSetupOf(t, second(m.call("setup", c.args, false)))
-		if out.Ask != "" || len(out.Steps) != 2 || out.Steps[0].Title != fetchTitle {
+		if out.Ask != "" || len(out.Steps) != wantSteps(c.win && !c.posix) || out.Steps[0].Title != fetchTitle {
 			t.Fatalf("前提が崩れています（印なし・%s の手順）: ask=%q %+v", c.name, out.Ask, out.Steps)
 		}
 		sh, ps := fetchCmds(out, c.win && !c.posix)
@@ -588,7 +595,7 @@ func TestSetupSelfRepoFetchOmitsInit(t *testing.T) {
 		for _, c := range osCases {
 			label := fmt.Sprintf("self_repo（loop=%v・%s）", loop["installed"], c.name)
 			out := loopSetupOf(t, second(m.call("setup", c.args, false)))
-			if out.Ask != "" || len(out.Steps) != 2 {
+			if out.Ask != "" || len(out.Steps) != wantSteps(c.win && !c.posix) {
 				t.Errorf("%s の手順: ask=%q %+v", label, out.Ask, out.Steps)
 				continue
 			}
