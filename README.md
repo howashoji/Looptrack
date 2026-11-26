@@ -10,6 +10,8 @@ plans, kept apart from your project's own issues. You can see the plans and
 decisions behind them. And it logs the tokens each task consumed, so you can
 report on them.
 
+[![Watch the two-minute introduction on YouTube: the same AI gets the same request twice, without and with Looptrack](https://img.youtube.com/vi/HJLEBZntN0I/maxresdefault.jpg)](https://youtu.be/HJLEBZntN0I)
+
 Why does that matter? Four reasons.
 
 - External memory for AI coding agents: in vibe coding, an AI remembers only
