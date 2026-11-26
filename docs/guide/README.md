@@ -4,6 +4,12 @@ Looptrack is an issue tracker that works as external memory for AI coding agents
 It records the work items an AI plans, kept apart from your project's own issues. You can see the plans and decisions behind them, and since it logs the tokens each task consumed, you can report on those too.
 Coding agents and people work around the same issues. That's the core idea.
 
+A two-minute video shows what that looks like. The same AI gets the same request twice, once without Looptrack and once with it.
+
+<iframe src="https://www.youtube-nocookie.com/embed/HJLEBZntN0I" title="Looptrack: who approved the code your AI wrote? One request, run twice" style="width: 100%; aspect-ratio: 16 / 9; border: 0;" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+If the video does not show up here, [watch it on YouTube](https://youtu.be/HJLEBZntN0I).
+
 This guide is for people who use it.
 Server design and deployment details? Those live in separate documents for developers and operators.
 

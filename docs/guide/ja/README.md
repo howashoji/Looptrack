@@ -4,6 +4,12 @@ Looptrack は AI コーディングエージェントの外部記憶になるイ
 記録するのは AI が分解した作業単位の課題で、プロジェクト本来のイシューとは別のものです。AI の作業計画と意思決定が見えるようになります。作業ごとのトークンも残るので分析レポートまで出せます。
 コーディング AI と人が同じイシューを軸に作業を回します。それが基本の形です。
 
+実際の様子は 2 分の動画で見られます。同じ AI に同じ依頼を 2 回出し、Looptrack の有無で比べました。
+
+<iframe src="https://www.youtube-nocookie.com/embed/X0oLk-fsP9Q" title="Looptrack 紹介｜AIが書いたコード、誰が承認した？同じ依頼を2回した記録" style="width: 100%; aspect-ratio: 16 / 9; border: 0;" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+ここに動画が出ないときは [YouTube で見られます](https://youtu.be/X0oLk-fsP9Q)。
+
 このガイドは使う人向けです。
 サーバの設計や配置の細かい話は開発者・運用者向けの文書に回しました。
 
